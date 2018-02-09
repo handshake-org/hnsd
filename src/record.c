@@ -1105,7 +1105,6 @@ hsk_parse_resource(
   hsk_record_t *head = NULL;
 
   int32_t code = HSK_SUCCESS;
-  int32_t i = 0;
 
   if (st_size != 0) {
     if (data_len < 1)
@@ -1119,7 +1118,8 @@ hsk_parse_resource(
       goto fail;
     }
 
-    for (; i < st_size; i++) {
+    int32_t i;
+    for (i = 0; i < st_size; i++) {
       if (data_len < 1)
         return HSK_EENCODING;
 
@@ -1190,7 +1190,6 @@ hsk_parse_resource(
   r->ttl = ttl;
   r->compat = compat;
   r->records = NULL;
-  *res = r;
 
   hsk_record_t *p = NULL;
 
@@ -1402,19 +1401,18 @@ hsk_parse_resource(
     p = r;
   }
 
+  r->records = head;
+
+  *res = r;
+
   goto done;
 
 fail:
   if (r != NULL)
     free(r);
 
-  if (head != NULL) {
-    hsk_record_t *c, *n;
-    for (c = head; c; c = n) {
-      n = c->next;
-      hsk_free_record(c);
-    }
-  }
+  if (head != NULL)
+    hsk_free_records(head);
 
 done:
   if (st.size > 0) {
