@@ -803,7 +803,7 @@ hsk_parse_addr_record(
         return HSK_EENCODING;
       }
 
-      (*rec)->currency = malloc(size);
+      (*rec)->address = malloc(size);
 
       if ((*rec)->address == NULL) {
         free((*rec)->currency);
@@ -840,7 +840,7 @@ hsk_parse_addr_record(
 
       if ((*rec)->hash == NULL) {
         free(*rec);
-        return HSK_EENCODING;
+        return HSK_ENOMEM;
       }
 
       memcpy((*rec)->hash, data, size);
@@ -878,7 +878,7 @@ hsk_parse_addr_record(
       if ((*rec)->hash == NULL) {
         free((*rec)->currency);
         free(*rec);
-        return HSK_EENCODING;
+        return HSK_ENOMEM;
       }
 
       memcpy((*rec)->hash, data, 20);
