@@ -87,6 +87,7 @@ hsk_read_string(
       continue;
     }
 
+    *s = ch;
     s += 1;
   }
 
