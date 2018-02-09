@@ -1084,6 +1084,9 @@ hsk_parse_resource(
   data += 1;
   data_len -= 1;
 
+  if (version != 0)
+    return HSK_EENCODING;
+
   if (data_len < 2)
     return HSK_EENCODING;
 
@@ -1138,12 +1141,13 @@ hsk_parse_resource(
 
       st.strings[i] = (char *)malloc(size * sizeof(char) + 1);
       st.sizes[i] = size;
-      st.size += 1;
 
       if (st.strings[i] == NULL) {
         code = HSK_ENOMEM;
         goto fail;
       }
+
+      st.size += 1;
 
       int32_t j;
       for (j = 0; j < size; j++) {
