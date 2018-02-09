@@ -516,11 +516,7 @@ hsk_verify_proof(
   for (c = nodes; c; c = c->next) {
     blake2b_ctx ctx;
 
-    if (blake2b_init(&ctx, 32) < 0) {
-      hsk_free_node(last_hn, true);
-      return HSK_ENOMEM;
-    }
-
+    assert(blake2b_init(&ctx, 32) == 0);
     blake2b_update(&ctx, c->data, c->len);
     blake2b_final(&ctx, hash, 32);
 
@@ -589,9 +585,7 @@ hsk_verify_name(
   uint8_t key[32];
   blake2b_ctx ctx;
 
-  if (blake2b_init(&ctx, 32) < 0)
-    return HSK_ENOMEM;
-
+  assert(blake2b_init(&ctx, 32) == 0);
   blake2b_update(&ctx, name, strlen(name));
   blake2b_final(&ctx, key, 32);
 

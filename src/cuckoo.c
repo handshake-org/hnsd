@@ -58,9 +58,7 @@ hsk_cuckoo_sipkey(
 
   blake2b_ctx blake;
 
-  if (blake2b_init(&blake, 32) < 0)
-    return HSK_ENOMEM;
-
+  assert(blake2b_init(&blake, 32) == 0);
   blake2b_update(&blake, hdr, hdr_len);
   blake2b_final(&blake, key, 32);
 
