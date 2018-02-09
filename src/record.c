@@ -66,6 +66,9 @@ hsk_read_string(
     real_size += 1;
   }
 
+  if (real_size > 512)
+    return HSK_EENCODING;
+
   char *str = malloc(real_size);
 
   if (str == NULL)
