@@ -506,10 +506,12 @@ hsk_verify_proof(
   if (to_nibbles(key, 32, &k, &kl) != 0)
     return HSK_ENOMEM;
 
+  assert(kl == 65);
+
   hsk_raw_node_t *c;
   uint8_t *h = root;
   uint8_t hash[32];
-  hsk_node_t *node;
+  hsk_node_t *node = NULL;
   hsk_node_t *last_hn = NULL;
   int32_t p = 0;
 
@@ -521,6 +523,7 @@ hsk_verify_proof(
     blake2b_final(&ctx, hash, 32);
 
     if (memcmp(hash, h, 32) != 0) {
+      free(k);
       hsk_free_node(last_hn, true);
       return HSK_EHASHMISMATCH;
     }
@@ -532,17 +535,21 @@ hsk_verify_proof(
 
     rc = hsk_parse_node(c->data, c->len, &node, NULL, NULL);
 
-    if (rc != HSK_SUCCESS)
+    if (rc != HSK_SUCCESS) {
+      free(k);
       return rc;
+    }
 
     rc = next_child(&node, k, &p);
 
     if (rc != HSK_SUCCESS) {
+      free(k);
       hsk_free_node(node, true);
       return rc;
     }
 
     if (node == NULL) {
+      free(k);
       if (c->next)
         return HSK_EEARLYEND;
       return HSK_EPROOFOK;
@@ -560,16 +567,19 @@ hsk_verify_proof(
         hsk_valuenode_t *n = (hsk_valuenode_t *)node;
         *data = n->data;
         *data_len = n->data_len;
+        free(k);
         free(node);
         return HSK_EPROOFOK;
       }
       default: {
+        free(k);
         hsk_free_node(node, true);
         return HSK_EINVALIDNODE;
       }
     }
   }
 
+  free(k);
   hsk_free_node(last_hn, true);
   return HSK_ENORESULT;
 }
