@@ -1,14 +1,7 @@
-#include <strings.h>
-
-#include <assert.h>
-#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
 #include <stdint.h>
-#include <limits.h>
-#include <stdbool.h>
-#include <errno.h>
 #include <ctype.h>
 
 #include "b64.h"
@@ -25,7 +18,7 @@ static const char b64_table[] = {
 };
 
 uint8_t *
-hsk_b64_decode(const char *src, size_t len, size_t *decsize) {
+b64_decode(const char *src, size_t len, size_t *decsize) {
   int32_t i = 0;
   int32_t j = 0;
   int32_t l = 0;

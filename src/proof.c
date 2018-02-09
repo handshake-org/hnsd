@@ -1,41 +1,14 @@
-#include <strings.h>
-
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
 #include <stdint.h>
-#include <limits.h>
 #include <stdbool.h>
-#include <errno.h>
-#include <ctype.h>
 
-#include "errors.h"
 #include "blake2b.h"
-#include "proof.h"
-
-static int32_t
-to_nibbles(uint8_t *data, size_t data_len, uint8_t **nib, size_t *nib_len);
-
-static int32_t
-decompress(uint8_t *data, size_t data_len, uint8_t **dec, size_t *dec_len);
-
-static int32_t
-read_varint(uint8_t *data, size_t data_len, size_t *varlen, int32_t *value);
-
-static int32_t
-read_varbytes(
-  uint8_t *data,
-  size_t data_len,
-  uint8_t **out,
-  size_t *out_len,
-  size_t *varlen,
-  bool light
-);
-
-static int32_t
-next_child(hsk_node_t **node, uint8_t *k, int32_t *p);
+#include "hsk-error.h"
+#include "hsk-proof.h"
 
 static int32_t
 to_nibbles(uint8_t *data, size_t data_len, uint8_t **nib, size_t *nib_len) {

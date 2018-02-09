@@ -8,10 +8,14 @@ ACLOCAL_AMFLAGS = -I m4
 
 AM_CPPFLAGS = -I$(top_builddir) \
               -I$(top_srcdir)/include \
-              -I$(top_srcdir)/src \
-              -I$(top_srcdir)/cares
+              -I$(top_srcdir)/src
 
-include_HEADERS = include/hsk.h
+include_HEADERS = include/hsk.h \
+                  include/hsk-cuckoo.h \
+                  include/hsk-name.h \
+                  include/hsk-error.h \
+                  include/hsk-proof.h \
+                  include/hsk-resource.h
 
 CLEANFILES =
 
@@ -23,9 +27,9 @@ libhsk_la_LDFLAGS = -no-undefined -version-info 0:0:0
 libhsk_la_SOURCES = src/b64.c \
                     src/blake2b.c \
                     src/cuckoo.c \
-                    src/dns.c \
+                    src/name.c \
                     src/proof.c \
-                    src/record.c \
+                    src/resource.c \
                     src/siphash.c
 
 EXTRA_DIST = include \

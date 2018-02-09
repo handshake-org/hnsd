@@ -1,5 +1,5 @@
-#ifndef _HSK_RECORD_H
-#define _HSK_RECORD_H
+#ifndef _HSK_RESOURCE_H
+#define _HSK_RESOURCE_H
 
 #define HSK_INET4 1
 #define HSK_INET6 2
@@ -167,5 +167,4 @@ hsk_parse_resource(
   size_t data_len,
   hsk_resource_t **res
 );
-
 #endif

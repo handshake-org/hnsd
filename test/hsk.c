@@ -160,7 +160,7 @@ main(int32_t argc, char **argv) {
 
   if (hsk_is_tld(*argv)) {
     hsk_proof_t *proof;
-    rc = hsk_getproof(*argv, &proof);
+    rc = hsk_get_proof(*argv, &proof);
 
     if (rc != HSK_SUCCESS) {
       fprintf(stderr, "error in hsk_getproof: %d\n", rc);

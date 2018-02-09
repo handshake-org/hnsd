@@ -1,7 +1,9 @@
-#include "errors.h"
+#include <assert.h>
+
 #include "blake2b.h"
 #include "siphash.h"
-#include "cuckoo.h"
+#include "hsk-error.h"
+#include "hsk-cuckoo.h"
 
 int32_t
 hsk_cuckoo_init(

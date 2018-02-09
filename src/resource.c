@@ -1,18 +1,13 @@
-#include <strings.h>
-
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
 #include <stdint.h>
-#include <limits.h>
 #include <stdbool.h>
-#include <errno.h>
-#include <ctype.h>
 
-#include "record.h"
-#include "errors.h"
+#include "hsk-resource.h"
+#include "hsk-error.h"
 
 int32_t
 hsk_read_string(

@@ -1,21 +1,16 @@
-#if !defined(WIN32) || defined(WATT32)
-#include <sys/time.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
-#include <netdb.h>
-#include <unistd.h>
-#endif
-#include <strings.h>
-
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h>
 
 #include <sys/types.h>
 #include <sys/socket.h>
+#include <sys/time.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
 #include <netdb.h>
+#include <unistd.h>
 
 #include <stdint.h>
 #include <limits.h>
@@ -24,14 +19,32 @@
 #include <errno.h>
 #include <ctype.h>
 
-#include "c-ares/ares.h"
-#include "c-ares/ares_dns.h"
-#include "c-ares/nameser.h"
+#include "cares/ares.h"
+#include "cares/ares_dns.h"
+#include "cares/nameser.h"
 
-#include "errors.h"
-#include "proof.h"
 #include "b64.h"
-#include "dns.h"
+#include "hsk-error.h"
+#include "hsk-proof.h"
+#include "hsk-name.h"
+
+typedef struct {
+  int32_t status;
+  int32_t timeouts;
+  struct hostent *host;
+} _hsk_hostent_ret_t;
+
+typedef struct {
+  int32_t status;
+  int32_t timeouts;
+  uint8_t *abuf;
+  int32_t alen;
+} _hsk_query_ret_t;
+
+typedef struct {
+  const char *host;
+  int32_t port;
+} _hsk_ns_t;
 
 static void
 cb_after_query(void *arg, int32_t status, int32_t timeouts, unsigned char *abuf, int32_t alen);
@@ -442,7 +455,7 @@ _hsk_gethostbyname(const char *name, int32_t af, struct hostent **host) {
 }
 
 int32_t
-hsk_getproof(const char *name, hsk_proof_t **proof) {
+hsk_get_proof(const char *name, hsk_proof_t **proof) {
   int32_t rc;
 
   if (proof == NULL)
@@ -552,7 +565,7 @@ hsk_getproof(const char *name, hsk_proof_t **proof) {
     }
 
     node->next = NULL;
-    node->data = hsk_b64_decode(last, i, &node->len);
+    node->data = b64_decode(last, i, &node->len);
 
     if (node->data == NULL) {
       free(b64);

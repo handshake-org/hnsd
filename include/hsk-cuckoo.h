@@ -1,9 +1,6 @@
 #ifndef _HSK_CUCKOO_H
 #define _HSK_CUCKOO_H
 
-#include <assert.h>
-#include <string.h>
-
 #include <stdint.h>
 #include <stdbool.h>
 
@@ -35,5 +32,4 @@ hsk_cuckoo_verify_header(
   uint32_t *sol,
   size_t sol_size
 );
-
 #endif
