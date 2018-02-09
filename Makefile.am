@@ -2,14 +2,14 @@
 # CFLAGS = -Wall -std=gnu11 -O2
 # LDFLAGS =
 
-SUBDIRS = c-ares
+SUBDIRS = cares
 
 ACLOCAL_AMFLAGS = -I m4
 
 AM_CPPFLAGS = -I$(top_builddir) \
               -I$(top_srcdir)/include \
               -I$(top_srcdir)/src \
-              -I$(top_srcdir)/c-ares
+              -I$(top_srcdir)/cares
 
 include_HEADERS = include/hsk.h
 

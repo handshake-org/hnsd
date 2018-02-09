@@ -13,7 +13,7 @@ LIBTOOLIZE=${LIBTOOLIZE:-libtoolize}
 
 set -ex
 
-pushd c-ares
+pushd cares
 if ! test -f configure; then
   ./buildconf
 fi
