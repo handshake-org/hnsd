@@ -77,7 +77,7 @@ CARES_VERSION_INFO = -version-info 4:0:2
 # If either revision or age are omitted, they default to 0. Also note that age
 # must be less than or equal to the current interface number.
 #
-# Here are a set of rules to help you update your library version information: 
+# Here are a set of rules to help you update your library version information:
 #
 # 1.Start with version information of 0:0:0 for each libtool library.
 #
