@@ -285,49 +285,59 @@ hsk_decode_node(uint8_t *data, size_t data_len, hsk_node_t **node) {
 }
 
 static bool
-starts_with(uint8_t *k, int32_t p, uint8_t *nk, uint8_t nkl) {
-  if (65 - p < nkl)
+starts_with(uint8_t *kk, size_t kl, uint8_t *nk, size_t nkl) {
+  if (kl < nkl)
     return false;
 
-  return memcmp(k + p, nk, nkl) == 0;
+  return memcmp(kk, nk, nkl) == 0;
 }
 
 static int32_t
-next_child(hsk_node_t **node, uint8_t *k, int32_t *p) {
-  while (65 - *p > 0) {
+next_child(hsk_node_t **node, uint8_t **kk, size_t *kl) {
+  while (*kl > 0) {
     if (*node == NULL) {
       hsk_free_node(*node, true);
       *node = NULL;
-      *p = -1;
+      *kl = 0;
       return HSK_SUCCESS;
     }
 
     switch ((*node)->type) {
       case HSK_SHORTNODE: {
         hsk_shortnode_t *n = (hsk_shortnode_t *)*node;
-        if (!starts_with(k, *p, n->key, n->key_len)) {
+        hsk_node_t *nn = n->value;
+
+        if (!starts_with(*kk, *kl, n->key, n->key_len)) {
           hsk_free_node(*node, true);
           *node = NULL;
-          *p = -1;
+          *kl = 0;
           return HSK_SUCCESS;
         }
-        *p += n->key_len;
-        hsk_node_t *nn = n->value;
+
+        *kk += n->key_len;
+        *kl -= n->key_len;
+
         hsk_free_node(*node, false);
         *node = nn;
+
         break;
       }
       case HSK_FULLNODE: {
         hsk_fullnode_t *n = (hsk_fullnode_t *)*node;
-        hsk_node_t *nn = n->children[k[*p]];
+        hsk_node_t *nn = n->children[**kk];
+
         int32_t j;
         for (j = 0; j < 17; j++) {
-          if (j != k[*p])
+          if (j != **kk)
             hsk_free_node(n->children[j], true);
         }
+
         hsk_free_node(*node, false);
+
         *node = nn;
-        *p += 1;
+        *kk += 1;
+        *kl -= 1;
+
         break;
       }
       case HSK_HASHNODE: {
@@ -342,14 +352,15 @@ next_child(hsk_node_t **node, uint8_t *k, int32_t *p) {
     }
   }
 
-  if (*node == NULL || (*node)->type != HSK_VALUENODE) {
+  if (*node == NULL)
+    return HSK_SUCCESS;
+
+  if ((*node)->type != HSK_VALUENODE) {
     hsk_free_node(*node, true);
     *node = NULL;
-    *p = -1;
     return HSK_SUCCESS;
   }
 
-  *p = -1;
   return HSK_SUCCESS;
 }
 
@@ -369,16 +380,28 @@ hsk_verify_proof(
     return HSK_EBADARGS;
   }
 
+  // Nibble key & key length
   uint8_t k[65];
-  hsk_raw_node_t *c;
+  uint8_t *kk = k;
+  size_t kl = 65;
+
+  // Current hash and hash buffer.
   uint8_t *h = root;
   uint8_t hash[32];
+
+  // Current node.
   hsk_node_t *node = NULL;
+
+  // Last hash node (for freeing up).
   hsk_node_t *hn = NULL;
-  int32_t p = 0;
+
+  // Return code.
   int32_t rc = HSK_ENORESULT;
 
-  assert(to_nibbles(key, 32, k, 65));
+  // Nibblify the key.
+  assert(to_nibbles(key, 32, kk, 65));
+
+  hsk_raw_node_t *c;
 
   for (c = nodes; c; c = c->next) {
     hsk_blake2b(c->data, c->len, hash);
@@ -388,6 +411,7 @@ hsk_verify_proof(
       goto fail;
     }
 
+    // Free up the last hash.
     hsk_free_node(hn, true);
     hn = NULL;
 
@@ -396,7 +420,7 @@ hsk_verify_proof(
       goto fail;
     }
 
-    rc = next_child(&node, k, &p);
+    rc = next_child(&node, &kk, &kl);
 
     if (rc != HSK_SUCCESS)
       goto fail;
@@ -410,8 +434,14 @@ hsk_verify_proof(
     switch (node->type) {
       case HSK_HASHNODE: {
         h = ((hsk_hashnode_t *)node)->data;
+
+        // Save the last hash node to
+        // free up (the hash data is
+        // allocated in the struct
+        // itself).
         hn = node;
         node = NULL;
+
         break;
       }
       case HSK_VALUENODE: {
@@ -419,10 +449,16 @@ hsk_verify_proof(
           rc = HSK_EEARLYEND;
           goto fail;
         }
+
         hsk_valuenode_t *n = (hsk_valuenode_t *)node;
+
         *data = n->data;
         *data_len = n->data_len;
+
+        // Free up the node,
+        // but not the data.
         free(node);
+
         return HSK_EPROOFOK;
       }
       default: {
