@@ -19,6 +19,12 @@ if ! test -f configure; then
 fi
 popd
 
+pushd uv
+if ! test -f configure; then
+  ./autogen.sh
+fi
+popd
+
 "$LIBTOOLIZE" --copy
 "$ACLOCAL" -I m4
 "$AUTOCONF"
