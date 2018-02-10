@@ -113,6 +113,8 @@ hsk_init_node(uint8_t type, hsk_node_t *node) {
 
 bool
 hsk_alloc_node(uint8_t type, hsk_node_t **node) {
+  *node = NULL;
+
   switch (type) {
     case HSK_NULLNODE: {
       *node = NULL;
@@ -152,6 +154,7 @@ hsk_alloc_node(uint8_t type, hsk_node_t **node) {
   }
 
   hsk_init_node(type, *node);
+
   return true;
 }
 
@@ -179,6 +182,7 @@ hsk_free_node(hsk_node_t *node, bool recurse) {
         hsk_free_node(n->value, recurse);
 
       free(n);
+
       break;
     }
     case HSK_FULLNODE: {
@@ -276,6 +280,7 @@ hsk_read_node(uint8_t **data, size_t *data_len, hsk_node_t **node) {
 
 fail:
   hsk_free_node(*node, true);
+  *node = NULL;
   return false;
 }
 
