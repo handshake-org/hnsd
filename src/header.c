@@ -118,10 +118,8 @@ write_sol(uint8_t **data, uint32_t *sol, uint8_t sol_size) {
   return write_bytes(data, (uint8_t *)sol, size);
 #else
   int32_t i;
-  for (i = 0; i < size; i++) {
-    if (!write_u32(data, sol[i]))
-      return false;
-  }
+  for (i = 0; i < size; i++)
+    write_u32(data, sol[i]);
   return size;
 #endif
 }
