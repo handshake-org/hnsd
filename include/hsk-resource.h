@@ -159,8 +159,6 @@ typedef struct {
   uint8_t version;
   uint32_t ttl;
   bool compat;
-  char **st;
-  uint8_t st_size;
   hsk_record_t *records;
 } hsk_resource_t;
 
