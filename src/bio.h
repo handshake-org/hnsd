@@ -5,6 +5,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <stdlib.h>
+#include <string.h>
 
 static inline bool
 read_u8(uint8_t **data, size_t *len, uint8_t *out) {

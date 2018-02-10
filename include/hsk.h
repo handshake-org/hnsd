@@ -5,6 +5,8 @@
 #include "hsk-name.h"
 #include "hsk-proof.h"
 #include "hsk-cuckoo.h"
+#include "hsk-header.h"
 #include "hsk-resource.h"
+#include "hsk-hash.h"
 
 #endif

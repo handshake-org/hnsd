@@ -31,7 +31,8 @@ libhsk_la_SOURCES = src/b64.c \
                     src/proof.c \
                     src/resource.c \
                     src/siphash.c \
-                    src/hash.c
+                    src/hash.c \
+                    src/header.c
 
 EXTRA_DIST = include \
              README.md \

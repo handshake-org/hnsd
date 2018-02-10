@@ -6,8 +6,8 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-#include "hash.h"
 #include "bio.h"
+#include "hsk-hash.h"
 #include "hsk-error.h"
 #include "hsk-proof.h"
 

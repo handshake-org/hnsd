@@ -29,4 +29,8 @@
 #define HSK_EPOWBRANCH 16
 #define HSK_EPOWDEADEND 17
 #define HSK_EPOWSHORTCYCLE 18
+
+// POW
+#define HSK_NEGTARGET 18
+#define HSK_HIGHHASH 19
 #endif
