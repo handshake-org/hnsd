@@ -218,6 +218,8 @@ bool
 hsk_read_node(uint8_t **data, size_t *data_len, hsk_node_t **node) {
   uint8_t type;
 
+  *node = NULL;
+
   if (!read_u8(data, data_len, &type))
     return false;
 
