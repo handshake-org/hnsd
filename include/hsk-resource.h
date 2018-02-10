@@ -90,6 +90,7 @@ typedef struct {
   uint8_t type;
   struct hsk_record_t *next;
   char *nid;
+  size_t nin_len;
   uint8_t *nin;
 } hsk_magnet_record_t;
 
@@ -99,6 +100,7 @@ typedef struct {
   uint16_t key_tag;
   uint8_t algorithm;
   uint8_t digest_type;
+  size_t digest_len;
   uint8_t *digest;
 } hsk_ds_record_t;
 
@@ -110,6 +112,7 @@ typedef struct {
   uint8_t usage;
   uint8_t selector;
   uint8_t matching_type;
+  size_t certificate_len;
   uint8_t *certificate;
 } hsk_tls_record_t;
 
@@ -118,6 +121,7 @@ typedef struct {
   struct hsk_record_t *next;
   uint8_t algorithm;
   uint8_t key_type;
+  size_t fingerprint_len;
   uint8_t *fingerprint;
 } hsk_ssh_record_t;
 
@@ -131,6 +135,7 @@ typedef struct {
   uint8_t ctype;
   bool testnet;
   uint8_t version;
+  size_t hash_len;
   uint8_t *hash;
 } hsk_addr_record_t;
 
@@ -138,6 +143,7 @@ typedef struct {
   uint8_t type;
   struct hsk_record_t *next;
   uint8_t rtype;
+  size_t data_len;
   uint8_t *data;
 } hsk_extra_record_t;
 

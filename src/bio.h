@@ -129,6 +129,61 @@ alloc_bytes(uint8_t **data, size_t *len, uint8_t **out, size_t size) {
   return true;
 }
 
+static inline bool
+read_ascii(uint8_t **data, size_t *len, char *out, size_t size) {
+  uint8_t *chunk;
+
+  if (!slice_bytes(data, len, &chunk, size))
+    return false;
+
+  uint8_t i;
+  for (i = 0; i < size; i++) {
+    uint8_t ch = chunk[i];
+
+    // No unicode.
+    if (ch & 0x80)
+      return false;
+
+    // No DEL.
+    if (ch == 0x7f)
+      return false;
+
+    // Any non-printable character can screw.
+    // Tab, line feed, and carriage return all valid.
+    if (ch < 0x20
+        && ch != 0x09
+        && ch != 0x0a
+        && ch != 0x0d) {
+      return false;
+    }
+  }
+
+  memcpy((void *)out, chunk, size);
+  out[size] = '\0';
+
+  return true;
+}
+
+static inline bool
+alloc_ascii(uint8_t **data, size_t *len, char **out, size_t size) {
+  if (*len < size)
+    return false;
+
+  char *o = malloc(size + 1);
+
+  if (o == NULL)
+    return false;
+
+  if (!read_ascii(data, len, o, size)) {
+    free(o);
+    return false;
+  }
+
+  *out = o;
+
+  return true;
+}
+
 static inline size_t
 write_u8(uint8_t **data, uint8_t out) {
   if (data == NULL || *data == NULL)
