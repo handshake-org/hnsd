@@ -403,7 +403,7 @@ hsk_verify_proof(
   hsk_node_t *hn = NULL;
 
   // Return code.
-  int32_t rc = HSK_ENORESULT;
+  int32_t rc = 0;
 
   // Nibblify the key.
   assert(to_nibbles(key, 32, kk, 65));
@@ -474,6 +474,8 @@ hsk_verify_proof(
       }
     }
   }
+
+  rc = HSK_ENORESULT;
 
 fail:
   hsk_free_node(hn, true);
