@@ -202,9 +202,7 @@ hsk_read_service_record(
   hsk_symbol_table_t *st,
   hsk_service_record_t *rec
 ) {
-  int32_t rc = HSK_SUCCESS;
-
-  rc = hsk_read_string(data, data_len, st, &rec->service);
+  int32_t rc = hsk_read_string(data, data_len, st, &rec->service);
 
   if (rc != HSK_SUCCESS)
     goto fail;
@@ -281,24 +279,19 @@ hsk_read_magnet_record(
   hsk_symbol_table_t *st,
   hsk_magnet_record_t *rec
 ) {
-  int32_t rc = HSK_SUCCESS;
-
-  rc = hsk_read_string(data, data_len, st, &rec->nid);
+  int32_t rc = hsk_read_string(data, data_len, st, &rec->nid);
+  uint8_t size;
 
   if (rc != HSK_SUCCESS)
     goto fail;
 
-  uint8_t size;
+  rc = HSK_EENCODING;
 
-  if (!read_u8(data, data_len, &size)) {
-    rc = HSK_EENCODING;
+  if (!read_u8(data, data_len, &size))
     goto fail;
-  }
 
-  if (!alloc_bytes(data, data_len, &rec->nin, size)) {
-    rc = HSK_ENOMEM;
+  if (!alloc_bytes(data, data_len, &rec->nin, size))
     goto fail;
-  }
 
   rec->nin_len = size;
 
@@ -349,17 +342,15 @@ hsk_read_tls_record(
   hsk_symbol_table_t *st,
   hsk_tls_record_t *rec
 ) {
-  int32_t rc = HSK_SUCCESS;
-
-  rc = hsk_read_string(data, data_len, st, &rec->protocol);
+  int32_t rc = hsk_read_string(data, data_len, st, &rec->protocol);
 
   if (rc != HSK_SUCCESS)
     goto fail;
 
-  if (*data_len < 6) {
-    rc = HSK_EENCODING;
+  rc = HSK_EENCODING;
+
+  if (*data_len < 6)
     goto fail;
-  }
 
   uint8_t size;
   read_u16(data, data_len, &rec->port);
@@ -368,10 +359,8 @@ hsk_read_tls_record(
   read_u8(data, data_len, &rec->matching_type);
   read_u8(data, data_len, &size);
 
-  if (!alloc_bytes(data, data_len, &rec->certificate, size)) {
-    rc = HSK_EENCODING;
+  if (!alloc_bytes(data, data_len, &rec->certificate, size))
     goto fail;
-  }
 
   rec->certificate_len = size;
 
@@ -431,36 +420,30 @@ hsk_read_addr_record(
   hsk_symbol_table_t *st,
   hsk_addr_record_t *rec
 ) {
-  if (*data_len < 3)
-    return HSK_EENCODING;
-
+  int32_t rc = HSK_EENCODING;
   uint8_t type;
 
   if (!read_u8(data, data_len, &type))
-    return HSK_EENCODING;
+    goto fail;
 
   rec->ctype = type;
 
-  int32_t rc = HSK_SUCCESS;
-
   switch (type) {
     case 0: {
-      int32_t rc = hsk_read_string(data, data_len, st, &rec->currency);
+      rc = hsk_read_string(data, data_len, st, &rec->currency);
 
       if (rc != HSK_SUCCESS)
-        return rc;
+        goto fail;
 
       uint8_t size;
 
-      if (!read_u8(data, data_len, &size)) {
-        rc = HSK_EENCODING;
-        goto fail;
-      }
+      rc = HSK_EENCODING;
 
-      if (!alloc_ascii(data, data_len, &rec->address, size)) {
-        rc = HSK_ENOMEM;
+      if (!read_u8(data, data_len, &size))
         goto fail;
-      }
+
+      if (!alloc_ascii(data, data_len, &rec->address, size))
+        goto fail;
 
       break;
     }
@@ -469,17 +452,17 @@ hsk_read_addr_record(
       uint8_t field;
 
       if (!read_u8(data, data_len, &field))
-        return HSK_EENCODING;
+        goto fail;
 
       rec->testnet = (field & 0x80) != 0;
 
       if (!read_u8(data, data_len, &rec->version))
-        return HSK_EENCODING;
+        goto fail;
 
       uint8_t size = (field & 0x7f) + 1;
 
       if (!alloc_bytes(data, data_len, &rec->hash, size))
-        return HSK_EENCODING;
+        goto fail;
 
       rec->hash_len = size;
 
@@ -496,18 +479,15 @@ hsk_read_addr_record(
       break;
     }
     case 3: { // ETH
-      if (*data_len < 20)
-        return HSK_ENOMEM;
-
       rec->currency = strdup("eth");
 
-      if (rec->currency == NULL)
-        return HSK_ENOMEM;
-
-      if (!alloc_bytes(data, data_len, &rec->hash, 20)) {
+      if (rec->currency == NULL) {
         rc = HSK_ENOMEM;
         goto fail;
       }
+
+      if (!alloc_bytes(data, data_len, &rec->hash, 20))
+        goto fail;
 
       rec->hash_len = 20;
 
@@ -804,15 +784,9 @@ hsk_free_record(hsk_record_t *r) {
       free(rec);
       break;
     }
-    case HSK_SSH: {
-      hsk_ssh_record_t *rec = (hsk_ssh_record_t *)r;
-      if (rec->fingerprint)
-        free(rec->fingerprint);
-      free(rec);
-      break;
-    }
+    case HSK_SSH:
     case HSK_PGP: {
-      hsk_pgp_record_t *rec = (hsk_pgp_record_t *)r;
+      hsk_ssh_record_t *rec = (hsk_ssh_record_t *)r;
       if (rec->fingerprint)
         free(rec->fingerprint);
       free(rec);
@@ -847,11 +821,11 @@ hsk_free_records(hsk_record_t *records) {
 }
 
 void
-hsk_free_resource(hsk_resource_t *rs) {
-  if (rs == NULL)
+hsk_free_resource(hsk_resource_t *res) {
+  if (res == NULL)
     return;
-  hsk_free_records(rs->records);
-  free(rs);
+  hsk_free_records(res->records);
+  free(res);
 }
 
 int32_t
