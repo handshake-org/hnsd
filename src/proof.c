@@ -6,7 +6,8 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-#include "blake2b.h"
+#include "hash.h"
+#include "bio.h"
 #include "hsk-error.h"
 #include "hsk-proof.h"
 
@@ -71,118 +72,6 @@ decompress(uint8_t *data, size_t data_len, uint8_t **dec, size_t *dec_len) {
 
   *dec = nib;
   *dec_len = len - pos;
-
-  return HSK_SUCCESS;
-}
-
-static int32_t
-read_varint(uint8_t *data, size_t data_len, size_t *varlen, int32_t *value) {
-  if (varlen == NULL || value == NULL)
-    return HSK_EBADARGS;
-
-  *varlen = 0;
-  *value = 0;
-
-  if (data == NULL)
-    return HSK_EBADARGS;
-
-  if (data_len == 0)
-    return HSK_EENCODING;
-
-  switch (*data) {
-    case 0xff: {
-      return HSK_EENCODING;
-    }
-    case 0xfe: {
-      if (data_len < 5)
-        return HSK_EENCODING;
-
-      int32_t v = 0;
-      v |= data[4] << 24;
-      v |= data[3] << 16;
-      v |= data[2] << 8;
-      v |= data[1] << 0;
-
-      if (v <= 0xffff)
-        return HSK_EENCODING;
-
-      *varlen = 5;
-      *value = v;
-      break;
-    }
-    case 0xfd: {
-      if (data_len < 3)
-        return HSK_EENCODING;
-
-      int32_t v = 0;
-      v |= data[2] << 8;
-      v |= data[1] << 0;
-
-      if (v < 0xfd)
-        return HSK_EENCODING;
-
-      *varlen = 3;
-      *value = v;
-      break;
-    }
-    default: {
-      *varlen = 1;
-      *value = *data;
-      break;
-    }
-  }
-
-  return HSK_SUCCESS;
-}
-
-static int32_t
-read_varbytes(
-  uint8_t *data,
-  size_t data_len,
-  uint8_t **out,
-  size_t *out_len,
-  size_t *varlen,
-  bool light
-) {
-  if (data == NULL)
-    return HSK_EBADARGS;
-
-  *out = NULL;
-  *out_len = 0;
-  *varlen = 0;
-
-  if (data == NULL)
-    return HSK_EBADARGS;
-
-  size_t size;
-  int32_t value;
-  int32_t rc = read_varint(data, data_len, &size, &value);
-
-  if (rc != HSK_SUCCESS)
-    return rc;
-
-  data_len -= size;
-  data += size;
-
-  if (data_len < value)
-    return HSK_EENCODING;
-
-  if (!light) {
-    uint8_t *o = malloc(value);
-
-    if (o == NULL)
-      return HSK_ENOMEM;
-
-    memcpy(o, data, value);
-
-    *out = o;
-    *out_len = value;
-    *varlen = size;
-  } else {
-    *out = data;
-    *out_len = value;
-    *varlen = size;
-  }
 
   return HSK_SUCCESS;
 }
@@ -300,13 +189,10 @@ hsk_parse_node(
 
       uint8_t *out;
       size_t out_len;
-      size_t varlen;
 
-      rc = read_varbytes(data, data_len, &out, &out_len, &varlen, true);
-
-      if (rc != HSK_SUCCESS) {
+      if (!slice_varbytes(&data, &data_len, &out, &out_len)) {
         free(n);
-        return rc;
+        return HSK_EENCODING;
       }
 
       uint8_t *dec;
@@ -318,11 +204,6 @@ hsk_parse_node(
         free(n);
         return rc;
       }
-
-      data += varlen;
-      data += out_len;
-      data_len -= varlen;
-      data_len -= out_len;
 
       n->key = dec;
       n->key_len = dec_len;
@@ -374,19 +255,11 @@ hsk_parse_node(
 
       uint8_t *out;
       size_t out_len;
-      size_t varlen;
 
-      int32_t rc = read_varbytes(data, data_len, &out, &out_len, &varlen, false);
-
-      if (rc != HSK_SUCCESS) {
+      if (!alloc_varbytes(&data, &data_len, &out, &out_len)) {
         free(n);
-        return rc;
+        return HSK_EENCODING;
       }
-
-      data += varlen;
-      data += out_len;
-      data_len -= varlen;
-      data_len -= out_len;
 
       n->data = out;
       n->data_len = out_len;
@@ -489,11 +362,7 @@ hsk_verify_proof(
   int32_t p = 0;
 
   for (c = nodes; c; c = c->next) {
-    blake2b_ctx ctx;
-
-    assert(blake2b_init(&ctx, 32) == 0);
-    blake2b_update(&ctx, c->data, c->len);
-    blake2b_final(&ctx, hash, 32);
+    hsk_blake2b(c->data, c->len, hash);
 
     if (memcmp(hash, h, 32) != 0) {
       free(k);
@@ -566,11 +435,6 @@ hsk_verify_name(
   size_t *data_len
 ) {
   uint8_t key[32];
-  blake2b_ctx ctx;
-
-  assert(blake2b_init(&ctx, 32) == 0);
-  blake2b_update(&ctx, name, strlen(name));
-  blake2b_final(&ctx, key, 32);
-
+  hsk_blake2b(name, strlen(name), key);
   return hsk_verify_proof(root, key, nodes, data, data_len);
 }
