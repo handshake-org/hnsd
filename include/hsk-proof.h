@@ -41,7 +41,7 @@ typedef struct {
 typedef struct {
   uint8_t type;
   uint8_t *key;
-  int32_t key_len;
+  size_t key_len;
   hsk_node_t *value;
 } hsk_shortnode_t;
 
@@ -53,7 +53,7 @@ typedef struct {
 typedef struct {
   uint8_t type;
   uint8_t *data;
-  int32_t data_len;
+  size_t data_len;
 } hsk_valuenode_t;
 
 // Cuckoo cycle

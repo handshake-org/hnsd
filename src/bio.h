@@ -111,6 +111,24 @@ read_bytes(uint8_t **data, size_t *len, uint8_t *out, size_t size) {
   return true;
 }
 
+static inline bool
+alloc_bytes(uint8_t **data, size_t *len, uint8_t **out, size_t size) {
+  if (*len < size)
+    return false;
+
+  uint8_t *o = malloc(size);
+
+  if (o == NULL)
+    return false;
+
+  if (!read_bytes(data, len, o, size))
+    return false;
+
+  *out = o;
+
+  return true;
+}
+
 static inline size_t
 write_u8(uint8_t **data, uint8_t out) {
   if (data == NULL || *data == NULL)
@@ -322,7 +340,7 @@ write_varsize(uint8_t **data, size_t size) {
 }
 
 static inline bool
-alloc_varbytes(
+slice_varbytes(
   uint8_t **data,
   size_t *data_len,
   uint8_t **out,
@@ -333,18 +351,9 @@ alloc_varbytes(
   if (!read_varsize(data, data_len, &size))
     return false;
 
-  if (*data_len < size)
+  if (!slice_bytes(data, data_len, out, size))
     return false;
 
-  uint8_t *o = malloc(size);
-
-  if (o == NULL)
-    return false;
-
-  if (!read_bytes(data, data_len, o, size))
-    return false;
-
-  *out = o;
   *out_len = size;
 
   return true;
@@ -372,7 +381,7 @@ read_varbytes(
 }
 
 static inline bool
-slice_varbytes(
+alloc_varbytes(
   uint8_t **data,
   size_t *data_len,
   uint8_t **out,
@@ -383,11 +392,10 @@ slice_varbytes(
   if (!read_varsize(data, data_len, &size))
     return false;
 
-  *out = *data;
-  *out_len = size;
+  if (!alloc_bytes(data, data_len, out, size))
+    return false;
 
-  *data += size;
-  *data_len -= size;
+  *out_len = size;
 
   return true;
 }
