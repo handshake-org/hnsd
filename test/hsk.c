@@ -197,10 +197,8 @@ main(int32_t argc, char **argv) {
     }
 
     hsk_resource_t *res;
-    rc = hsk_parse_resource(proof->data->data, proof->data->len, &res);
-
-    if (rc != HSK_SUCCESS) {
-      fprintf(stderr, "error in hsk_parse_resource: %d\n", rc);
+    if (!hsk_decode_resource(proof->data->data, proof->data->len, &res)) {
+      fprintf(stderr, "error in hsk_parse_resource\n");
       exit(EXIT_FAILURE);
     }
   }

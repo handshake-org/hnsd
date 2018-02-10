@@ -40,17 +40,17 @@ typedef struct {
   uint8_t type;
   struct hsk_record_t *next;
   hsk_target_t target;
-} hsk_target_record_t;
+} hsk_host_record_t;
 
-typedef hsk_target_record_t hsk_inet4_record_t;
-typedef hsk_target_record_t hsk_inet6_record_t;
-typedef hsk_target_record_t hsk_onion_record_t;
-typedef hsk_target_record_t hsk_onionng_record_t;
-typedef hsk_target_record_t hsk_iname_record_t;
-typedef hsk_target_record_t hsk_hname_record_t;
-typedef hsk_target_record_t hsk_canonical_record_t;
-typedef hsk_target_record_t hsk_delegate_record_t;
-typedef hsk_target_record_t hsk_ns_record_t;
+typedef hsk_host_record_t hsk_inet4_record_t;
+typedef hsk_host_record_t hsk_inet6_record_t;
+typedef hsk_host_record_t hsk_onion_record_t;
+typedef hsk_host_record_t hsk_onionng_record_t;
+typedef hsk_host_record_t hsk_iname_record_t;
+typedef hsk_host_record_t hsk_hname_record_t;
+typedef hsk_host_record_t hsk_canonical_record_t;
+typedef hsk_host_record_t hsk_delegate_record_t;
+typedef hsk_host_record_t hsk_ns_record_t;
 
 typedef struct {
   uint8_t type;
@@ -165,8 +165,8 @@ typedef struct {
 void
 hsk_free_resource(hsk_resource_t *rs);
 
-int32_t
-hsk_parse_resource(
+bool
+hsk_decode_resource(
   uint8_t *data,
   size_t data_len,
   hsk_resource_t **res

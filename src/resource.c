@@ -10,8 +10,8 @@
 #include "hsk-resource.h"
 #include "hsk-error.h"
 
-int32_t
-hsk_read_string(
+bool
+hsk_read_compressed(
   uint8_t **data,
   size_t *data_len,
   hsk_symbol_table_t *st,
@@ -21,10 +21,10 @@ hsk_read_string(
   uint8_t *chunk;
 
   if (!read_u8(data, data_len, &size))
-    return HSK_EENCODING;
+    return false;
 
   if (!slice_bytes(data, data_len, &chunk, size))
-    return HSK_EENCODING;
+    return false;
 
   int32_t real_size = 0;
   int32_t i;
@@ -35,14 +35,14 @@ hsk_read_string(
     if (ch & 0x80) {
       uint8_t index = ch & 0x7f;
       if (index >= st->size)
-        return HSK_EENCODING;
+        return false;
       real_size += st->sizes[index];
       continue;
     }
 
     // No DEL.
     if (ch == 0x7f)
-      return HSK_EENCODING;
+      return false;
 
     // Any non-printable character can screw.
     // Tab, line feed, and carriage return all valid.
@@ -50,19 +50,19 @@ hsk_read_string(
         && ch != 0x09
         && ch != 0x0a
         && ch != 0x0d) {
-      return HSK_EENCODING;
+      return false;
     }
 
     real_size += 1;
   }
 
   if (real_size > 512)
-    return HSK_EENCODING;
+    return false;
 
   char *str = malloc(real_size);
 
   if (str == NULL)
-    return HSK_ENOMEM;
+    return false;
 
   char *s = str;
   for (i = 0; i < size; i++) {
@@ -86,39 +86,29 @@ hsk_read_string(
 
   *out = str;
 
-  return HSK_SUCCESS;
+  return true;
 }
 
-int32_t
+bool
 hsk_read_target(
   uint8_t **data,
   size_t *data_len,
+  uint8_t type,
   hsk_symbol_table_t *st,
   hsk_target_t *target
 ) {
-  if (data == NULL || st == NULL || target == NULL)
-    return HSK_EBADARGS;
-
-  uint8_t type;
-
-  if (!read_u8(data, data_len, &type))
-    return HSK_EENCODING;
-
   target->type = type;
   target->name = NULL;
 
   switch (type) {
     case HSK_INET4: {
-      if (!read_bytes(data, data_len, target->addr, 4))
-        return HSK_EENCODING;
-
-      break;
+      return read_bytes(data, data_len, target->addr, 4);
     }
     case HSK_INET6: {
       uint8_t field;
 
       if (!read_u8(data, data_len, &field))
-        return HSK_EENCODING;
+        return false;
 
       uint8_t start = field >> 4;
       uint8_t len = field & 0x0f;
@@ -126,7 +116,7 @@ hsk_read_target(
 
       // Front half.
       if (!read_bytes(data, data_len, target->addr, start))
-        return HSK_EENCODING;
+        return false;
 
       // Fill in the missing section.
       memset(target->addr + start, 0x00, len);
@@ -134,85 +124,71 @@ hsk_read_target(
       // Back half.
       uint8_t *back = target->addr + start + len;
 
-      if (!read_bytes(data, data_len, back, left))
-        return HSK_EENCODING;
-
-      break;
+      return read_bytes(data, data_len, back, left);
     }
     case HSK_ONION: {
-      if (!read_bytes(data, data_len, target->addr, 10))
-        return HSK_EENCODING;
-      break;
+      return read_bytes(data, data_len, target->addr, 10);
     }
     case HSK_ONIONNG: {
-      if (!read_bytes(data, data_len, target->addr, 33))
-        return HSK_EENCODING;
-      break;
+      return read_bytes(data, data_len, target->addr, 33);
     }
     case HSK_INAME:
     case HSK_HNAME: {
-      int32_t rc = hsk_read_string(data, data_len, st, &target->name);
-      if (rc != HSK_SUCCESS)
-        return rc;
-      break;
+      return hsk_read_compressed(data, data_len, st, &target->name);
     }
     default: {
-      return HSK_EENCODING;
+      return false;
     }
   }
-
-  return HSK_SUCCESS;
 }
 
-int32_t
-hsk_read_target_record(
+bool
+hsk_read_host(
   uint8_t **data,
   size_t *data_len,
   hsk_symbol_table_t *st,
-  hsk_target_record_t *rec
+  hsk_target_t *target
 ) {
-  return hsk_read_target(data, data_len, st, &rec->target);
+  uint8_t type;
+
+  if (!read_u8(data, data_len, &type))
+    return false;
+
+  return hsk_read_target(data, data_len, type, st, target);
 }
 
-int32_t
+bool
+hsk_read_host_record(
+  uint8_t **data,
+  size_t *data_len,
+  hsk_symbol_table_t *st,
+  hsk_host_record_t *rec
+) {
+  return hsk_read_host(data, data_len, st, &rec->target);
+}
+
+bool
 hsk_read_txt_record(
   uint8_t **data,
   size_t *data_len,
   hsk_symbol_table_t *st,
   hsk_txt_record_t *rec
 ) {
-  uint8_t size;
-
-  if (!read_u8(data, data_len, &size))
-    return HSK_EENCODING;
-
-  if (*data_len < size)
-    return HSK_EENCODING;
-
-  if (!alloc_ascii(data, data_len, &rec->text, size))
-    return HSK_EENCODING;
-
-  return HSK_SUCCESS;
+  return hsk_read_compressed(data, data_len, st, &rec->text);
 }
 
-int32_t
+bool
 hsk_read_service_record(
   uint8_t **data,
   size_t *data_len,
   hsk_symbol_table_t *st,
   hsk_service_record_t *rec
 ) {
-  int32_t rc = hsk_read_string(data, data_len, st, &rec->service);
-
-  if (rc != HSK_SUCCESS)
+  if (!hsk_read_compressed(data, data_len, st, &rec->service))
     goto fail;
 
-  rc = hsk_read_string(data, data_len, st, &rec->protocol);
-
-  if (rc != HSK_SUCCESS)
+  if (!hsk_read_compressed(data, data_len, st, &rec->protocol))
     goto fail;
-
-  rc = HSK_EENCODING;
 
   if (!read_u8(data, data_len, &rec->priority))
     goto fail;
@@ -220,17 +196,13 @@ hsk_read_service_record(
   if (!read_u8(data, data_len, &rec->weight))
     goto fail;
 
-  rc = hsk_read_target(data, data_len, st, &rec->target);
-
-  if (rc != HSK_SUCCESS)
+  if (!hsk_read_host(data, data_len, st, &rec->target))
     goto fail;
-
-  rc = HSK_EENCODING;
 
   if (!read_u16(data, data_len, &rec->port))
     goto fail;
 
-  return HSK_SUCCESS;
+  return true;
 
 fail:
   if (rec->service) {
@@ -248,18 +220,17 @@ fail:
     rec->target.name = NULL;
   }
 
-  return rc;
+  return false;
 }
 
-int32_t
+bool
 hsk_read_location_record(
   uint8_t **data,
   size_t *data_len,
-  hsk_symbol_table_t *st,
   hsk_location_record_t *rec
 ) {
   if (*data_len < 16)
-    return HSK_EENCODING;
+    return false;
 
   read_u8(data, data_len, &rec->version);
   read_u8(data, data_len, &rec->size);
@@ -269,24 +240,20 @@ hsk_read_location_record(
   read_u32(data, data_len, &rec->longitude);
   read_u32(data, data_len, &rec->altitude);
 
-  return HSK_SUCCESS;
+  return true;
 }
 
-int32_t
+bool
 hsk_read_magnet_record(
   uint8_t **data,
   size_t *data_len,
   hsk_symbol_table_t *st,
   hsk_magnet_record_t *rec
 ) {
-  int32_t rc = hsk_read_string(data, data_len, st, &rec->nid);
-  uint8_t size;
-
-  if (rc != HSK_SUCCESS)
+  if (!hsk_read_compressed(data, data_len, st, &rec->nid))
     goto fail;
 
-  rc = HSK_EENCODING;
-
+  uint8_t size;
   if (!read_u8(data, data_len, &size))
     goto fail;
 
@@ -295,7 +262,7 @@ hsk_read_magnet_record(
 
   rec->nin_len = size;
 
-  return HSK_SUCCESS;
+  return true;
 
 fail:
   if (rec->nid) {
@@ -308,18 +275,17 @@ fail:
     rec->nin = NULL;
   }
 
-  return rc;
+  return false;
 }
 
-int32_t
+bool
 hsk_read_ds_record(
   uint8_t **data,
   size_t *data_len,
-  hsk_symbol_table_t *st,
   hsk_ds_record_t *rec
 ) {
   if (*data_len < 5)
-    return HSK_EENCODING;
+    return false;
 
   uint8_t size;
   read_u16(data, data_len, &rec->key_tag);
@@ -328,26 +294,22 @@ hsk_read_ds_record(
   read_u8(data, data_len, &size);
 
   if (!alloc_bytes(data, data_len, &rec->digest, size))
-    return HSK_EENCODING;
+    return false;
 
   rec->digest_len = size;
 
-  return HSK_SUCCESS;
+  return true;
 }
 
-int32_t
+bool
 hsk_read_tls_record(
   uint8_t **data,
   size_t *data_len,
   hsk_symbol_table_t *st,
   hsk_tls_record_t *rec
 ) {
-  int32_t rc = hsk_read_string(data, data_len, st, &rec->protocol);
-
-  if (rc != HSK_SUCCESS)
+  if (!hsk_read_compressed(data, data_len, st, &rec->protocol))
     goto fail;
-
-  rc = HSK_EENCODING;
 
   if (*data_len < 6)
     goto fail;
@@ -364,7 +326,7 @@ hsk_read_tls_record(
 
   rec->certificate_len = size;
 
-  return HSK_SUCCESS;
+  return true;
 
 fail:
   if (rec->protocol) {
@@ -377,18 +339,17 @@ fail:
     rec->certificate = NULL;
   }
 
-  return rc;
+  return false;
 }
 
-int32_t
+bool
 hsk_read_ssh_record(
   uint8_t **data,
   size_t *data_len,
-  hsk_symbol_table_t *st,
   hsk_ssh_record_t *rec
 ) {
   if (*data_len < 3)
-    return HSK_EENCODING;
+    return false;
 
   uint8_t size;
   read_u8(data, data_len, &rec->algorithm);
@@ -396,48 +357,42 @@ hsk_read_ssh_record(
   read_u8(data, data_len, &size);
 
   if (!alloc_bytes(data, data_len, &rec->fingerprint, size))
-    return HSK_EENCODING;
+    return false;
 
   rec->fingerprint_len = size;
 
-  return HSK_SUCCESS;
+  return true;
 }
 
-int32_t
+bool
 hsk_read_pgp_record(
   uint8_t **data,
   size_t *data_len,
-  hsk_symbol_table_t *st,
   hsk_pgp_record_t *rec
 ) {
-  return hsk_read_ssh_record(data, data_len, st, (hsk_ssh_record_t *)rec);
+  return hsk_read_ssh_record(data, data_len, (hsk_ssh_record_t *)rec);
 }
 
-int32_t
+bool
 hsk_read_addr_record(
   uint8_t **data,
   size_t *data_len,
   hsk_symbol_table_t *st,
   hsk_addr_record_t *rec
 ) {
-  int32_t rc = HSK_EENCODING;
-  uint8_t type;
+  uint8_t ctype;
 
-  if (!read_u8(data, data_len, &type))
+  if (!read_u8(data, data_len, &ctype))
     goto fail;
 
-  rec->ctype = type;
+  rec->ctype = ctype;
 
-  switch (type) {
+  switch (ctype) {
     case 0: {
-      rc = hsk_read_string(data, data_len, st, &rec->currency);
-
-      if (rc != HSK_SUCCESS)
+      if (!hsk_read_compressed(data, data_len, st, &rec->currency))
         goto fail;
 
       uint8_t size;
-
-      rc = HSK_EENCODING;
 
       if (!read_u8(data, data_len, &size))
         goto fail;
@@ -466,25 +421,21 @@ hsk_read_addr_record(
 
       rec->hash_len = size;
 
-      if (type == 1)
+      if (ctype == 1)
         rec->currency = strdup("hsk");
       else
         rec->currency = strdup("btc");
 
-      if (rec->currency == NULL) {
-        rc = HSK_ENOMEM;
+      if (rec->currency == NULL)
         goto fail;
-      }
 
       break;
     }
     case 3: { // ETH
       rec->currency = strdup("eth");
 
-      if (rec->currency == NULL) {
-        rc = HSK_ENOMEM;
+      if (rec->currency == NULL)
         goto fail;
-      }
 
       if (!alloc_bytes(data, data_len, &rec->hash, 20))
         goto fail;
@@ -493,9 +444,12 @@ hsk_read_addr_record(
 
       break;
     }
+    default: {
+      return false;
+    }
   }
 
-  return HSK_SUCCESS;
+  return true;
 
 fail:
   if (rec->currency) {
@@ -513,25 +467,24 @@ fail:
     rec->hash = NULL;
   }
 
-  return rc;
+  return false;
 }
 
-int32_t
+bool
 hsk_read_extra_record(
   uint8_t **data,
   size_t *data_len,
-  hsk_symbol_table_t *st,
   hsk_extra_record_t *rec
 ) {
   uint8_t size;
   read_u8(data, data_len, &size);
 
   if (!alloc_bytes(data, data_len, &rec->data, size))
-    return HSK_EENCODING;
+    return false;
 
   rec->data_len = size;
 
-  return HSK_SUCCESS;
+  return true;
 }
 
 void
@@ -552,7 +505,7 @@ hsk_init_record(hsk_record_t *r) {
     case HSK_CANONICAL:
     case HSK_DELEGATE:
     case HSK_NS: {
-      hsk_target_record_t *rec = (hsk_target_record_t *)r;
+      hsk_host_record_t *rec = (hsk_host_record_t *)r;
       rec->target.type = 0;
       memset(rec->target.addr, 0, 33);
       rec->target.name = NULL;
@@ -659,7 +612,7 @@ hsk_alloc_record(uint8_t type) {
     case HSK_CANONICAL:
     case HSK_DELEGATE:
     case HSK_NS: {
-      r = (hsk_record_t *)malloc(sizeof(hsk_target_record_t));
+      r = (hsk_record_t *)malloc(sizeof(hsk_host_record_t));
       break;
     }
     case HSK_SERVICE: {
@@ -728,7 +681,7 @@ hsk_free_record(hsk_record_t *r) {
     case HSK_CANONICAL:
     case HSK_DELEGATE:
     case HSK_NS: {
-      hsk_target_record_t *rec = (hsk_target_record_t *)r;
+      hsk_host_record_t *rec = (hsk_host_record_t *)r;
       if (rec->target.name)
         free(rec->target.name);
       free(rec);
@@ -828,7 +781,7 @@ hsk_free_resource(hsk_resource_t *res) {
   free(res);
 }
 
-int32_t
+bool
 hsk_read_record(
   uint8_t **data,
   size_t *data_len,
@@ -836,12 +789,12 @@ hsk_read_record(
   hsk_symbol_table_t *st,
   hsk_record_t **r
 ) {
-  int32_t rc = HSK_SUCCESS;
-
   *r = hsk_alloc_record(type);
 
   if (r == NULL)
-    return HSK_ENOMEM;
+    return false;
+
+  bool result = true;
 
   switch (type) {
     case HSK_INET4:
@@ -849,86 +802,83 @@ hsk_read_record(
     case HSK_ONION:
     case HSK_ONIONNG:
     case HSK_INAME:
-    case HSK_HNAME:
-      *data -= 1;
-      *data_len += 1;
-      // fall through
+    case HSK_HNAME: {
+      hsk_host_record_t *rec = (hsk_host_record_t *)*r;
+      result = hsk_read_target(data, data_len, type, st, &rec->target);
+      break;
+    }
     case HSK_CANONICAL:
     case HSK_DELEGATE:
     case HSK_NS: {
-      hsk_target_record_t *rec = (hsk_target_record_t *)*r;
-      rc = hsk_read_target_record(data, data_len, st, rec);
+      hsk_host_record_t *rec = (hsk_host_record_t *)*r;
+      result = hsk_read_host_record(data, data_len, st, rec);
       break;
     }
     case HSK_SERVICE: {
       hsk_service_record_t *rec = (hsk_service_record_t *)*r;
-      rc = hsk_read_service_record(data, data_len, st, rec);
+      result = hsk_read_service_record(data, data_len, st, rec);
       break;
     }
     case HSK_URL:
     case HSK_EMAIL:
     case HSK_TEXT: {
       hsk_txt_record_t *rec = (hsk_txt_record_t *)*r;
-      rc = hsk_read_txt_record(data, data_len, st, rec);
+      result = hsk_read_txt_record(data, data_len, st, rec);
       break;
     }
     case HSK_LOCATION: {
       hsk_location_record_t *rec = (hsk_location_record_t *)*r;
-      rc = hsk_read_location_record(data, data_len, st, rec);
+      result = hsk_read_location_record(data, data_len, rec);
       break;
     }
     case HSK_MAGNET: {
       hsk_magnet_record_t *rec = (hsk_magnet_record_t *)*r;
-      rc = hsk_read_magnet_record(data, data_len, st, rec);
+      result = hsk_read_magnet_record(data, data_len, st, rec);
       break;
     }
     case HSK_DS: {
       hsk_ds_record_t *rec = (hsk_ds_record_t *)*r;
-      rc = hsk_read_ds_record(data, data_len, st, rec);
+      result = hsk_read_ds_record(data, data_len, rec);
       break;
     }
     case HSK_TLS: {
       hsk_tls_record_t *rec = (hsk_tls_record_t *)*r;
-      rc = hsk_read_tls_record(data, data_len, st, rec);
+      result = hsk_read_tls_record(data, data_len, st, rec);
       break;
     }
-    case HSK_SSH: {
-      hsk_ssh_record_t *rec = (hsk_ssh_record_t *)*r;
-      rc = hsk_read_ssh_record(data, data_len, st, rec);
-      break;
-    }
+    case HSK_SSH:
     case HSK_PGP: {
-      hsk_pgp_record_t *rec = (hsk_pgp_record_t *)*r;
-      rc = hsk_read_pgp_record(data, data_len, st, rec);
+      hsk_ssh_record_t *rec = (hsk_ssh_record_t *)*r;
+      result = hsk_read_ssh_record(data, data_len, rec);
       break;
     }
     case HSK_ADDR: {
       hsk_addr_record_t *rec = (hsk_addr_record_t *)*r;
-      rc = hsk_read_addr_record(data, data_len, st, rec);
+      result = hsk_read_addr_record(data, data_len, st, rec);
       break;
     }
     default: {
       hsk_extra_record_t *rec = (hsk_extra_record_t *)*r;
-      rc = hsk_read_extra_record(data, data_len, st, rec);
+      result = hsk_read_extra_record(data, data_len, rec);
       break;
     }
   }
 
-  if (rc != HSK_SUCCESS) {
+  if (!result) {
     free(*r);
-    return rc;
+    return false;
   }
 
-  return HSK_SUCCESS;
+  return true;
 }
 
-int32_t
-hsk_parse_resource(
+bool
+hsk_decode_resource(
   uint8_t *data,
   size_t data_len,
   hsk_resource_t **resource
 ) {
-  int32_t code = HSK_EENCODING;
+  bool result = true;
 
   hsk_symbol_table_t st;
   st.strings = NULL;
@@ -938,7 +888,7 @@ hsk_parse_resource(
   hsk_resource_t *res = malloc(sizeof(hsk_resource_t));
 
   if (res == NULL)
-    return HSK_ENOMEM;
+    goto fail;
 
   res->version = 0;
   res->ttl = 0;
@@ -956,7 +906,7 @@ hsk_parse_resource(
     goto fail;
 
   res->compat = (field & 0x8000) != 0;
-  res->ttl = (field & 0x7fff) << 6;
+  res->ttl = ((uint32_t)(field & 0x7fff)) << 6;
 
   uint8_t st_size;
   if (!read_u8(&data, &data_len, &st_size))
@@ -966,10 +916,8 @@ hsk_parse_resource(
     st.strings = (char **)malloc(st_size * sizeof(char *) + 1);
     st.sizes = (uint8_t *)malloc(st_size * sizeof(uint8_t) + 1);
 
-    if (st.strings == NULL || st.sizes == NULL) {
-      code = HSK_ENOMEM;
+    if (st.strings == NULL || st.sizes == NULL)
       goto fail;
-    }
 
     int32_t i;
     for (i = 0; i < st_size; i++) {
@@ -997,9 +945,7 @@ hsk_parse_resource(
 
     read_u8(&data, &data_len, &type);
 
-    code = hsk_read_record(&data, &data_len, type, &st, &record);
-
-    if (code != HSK_SUCCESS)
+    if (!hsk_read_record(&data, &data_len, type, &st, &record))
       goto fail;
 
     if (res->records == NULL)
@@ -1017,6 +963,7 @@ hsk_parse_resource(
 
 fail:
   hsk_free_resource(res);
+  result = false;
 
 done:
   if (st.size > 0) {
@@ -1031,5 +978,5 @@ done:
   if (st.sizes != NULL)
     free(st.sizes);
 
-  return code;
+  return result;
 }
