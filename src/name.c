@@ -261,9 +261,9 @@ _hsk_init_servers(struct ares_addr_port_node **n) {
     if (cn == NULL)
       return ARES_ENOMEM;
 
-    if (inet_pton(AF_INET, ns->host, &cn->addr.addr4) == 1) {
+    if (ares_inet_pton(AF_INET, ns->host, &cn->addr.addr4) == 1) {
       cn->family = AF_INET;
-    } else if (inet_pton(AF_INET6, ns->host, &cn->addr.addr6) == 1) {
+    } else if (ares_inet_pton(AF_INET6, ns->host, &cn->addr.addr6) == 1) {
       cn->family = AF_INET6;
     } else {
       return ARES_EBADSTR;
