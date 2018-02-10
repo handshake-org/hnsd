@@ -23,8 +23,9 @@ read_u16(uint8_t **data, size_t *len, uint16_t *out) {
 #ifdef HSK_LITTLE_ENDIAN
   memcpy(out, data, 2);
 #else
-  *out |= ((uint16_t)*data[1]) << 8;
-  *out |= (uint16_t)*data[0];
+  *out = 0;
+  *out |= ((uint16_t)(*data)[1]) << 8; // SEGFAULT
+  *out |= (uint16_t)(*data)[0];
 #endif
   *data += 2;
   *len -= 2;
@@ -39,10 +40,10 @@ read_u32(uint8_t **data, size_t *len, uint32_t *out) {
   memcpy(out, data, 4);
 #else
   *out = 0;
-  *out |= ((uint32_t)*data[3]) << 24;
-  *out |= ((uint32_t)*data[2]) << 16;
-  *out |= ((uint32_t)*data[1]) << 8;
-  *out |= (uint32_t)*data[0];
+  *out |= ((uint32_t)(*data)[3]) << 24;
+  *out |= ((uint32_t)(*data)[2]) << 16;
+  *out |= ((uint32_t)(*data)[1]) << 8;
+  *out |= (uint32_t)(*data)[0];
 #endif
   *data += 4;
   *len -= 4;
@@ -57,14 +58,14 @@ read_u64(uint8_t **data, size_t *len, uint64_t *out) {
   memcpy(out, data, 8);
 #else
   *out = 0;
-  *out |= ((uint64_t)*data[7]) << 56;
-  *out |= ((uint64_t)*data[6]) << 48;
-  *out |= ((uint64_t)*data[5]) << 40;
-  *out |= ((uint64_t)*data[4]) << 32;
-  *out |= ((uint64_t)*data[3]) << 24;
-  *out |= ((uint64_t)*data[2]) << 16;
-  *out |= ((uint64_t)*data[1]) << 8;
-  *out |= (uint64_t)*data[0];
+  *out |= ((uint64_t)(*data)[7]) << 56;
+  *out |= ((uint64_t)(*data)[6]) << 48;
+  *out |= ((uint64_t)(*data)[5]) << 40;
+  *out |= ((uint64_t)(*data)[4]) << 32;
+  *out |= ((uint64_t)(*data)[3]) << 24;
+  *out |= ((uint64_t)(*data)[2]) << 16;
+  *out |= ((uint64_t)(*data)[1]) << 8;
+  *out |= (uint64_t)(*data)[0];
 #endif
   *data += 8;
   *len -= 8;
