@@ -411,7 +411,7 @@ hsk_verify_proof(
   hsk_raw_node_t *c;
 
   for (c = nodes; c; c = c->next) {
-    hsk_blake2b(c->data, c->len, hash);
+    hsk_blake2b(c->data, c->data_len, hash);
 
     if (memcmp(hash, h, 32) != 0) {
       rc = HSK_EHASHMISMATCH;
@@ -422,7 +422,7 @@ hsk_verify_proof(
     hsk_free_node(hn, true);
     hn = NULL;
 
-    if (!hsk_decode_node(c->data, c->len, &node)) {
+    if (!hsk_decode_node(c->data, c->data_len, &node)) {
       rc = HSK_EMALFORMEDNODE;
       goto fail;
     }
@@ -435,6 +435,8 @@ hsk_verify_proof(
     if (node == NULL) {
       if (c->next)
         return HSK_EEARLYEND;
+      *data = NULL;
+      *data_len = 0;
       return HSK_EPROOFOK;
     }
 
@@ -480,8 +482,6 @@ hsk_verify_proof(
 fail:
   hsk_free_node(hn, true);
   hsk_free_node(node, true);
-  *data = NULL;
-  *data_len = 0;
   return rc;
 }
 
@@ -496,4 +496,73 @@ hsk_verify_name(
   uint8_t key[32];
   hsk_blake2b(name, strlen(name), key);
   return hsk_verify_proof(root, key, nodes, data, data_len);
+}
+
+void
+hsk_raw_node_init(hsk_raw_node_t *n) {
+  if (n == NULL)
+    return;
+
+  n->data = NULL;
+  n->data_len = 0;
+  n->next = NULL;
+}
+
+hsk_raw_node_t *
+hsk_raw_node_alloc() {
+  hsk_raw_node_t *n = malloc(sizeof(hsk_raw_node_t));
+  hsk_raw_node_init(n);
+  return n;
+}
+
+void
+hsk_raw_node_free(hsk_raw_node_t *n) {
+  if (n == NULL)
+    return;
+
+  if (n->data)
+    free(n->data);
+
+  free(n);
+}
+
+void
+hsk_raw_node_free_list(hsk_raw_node_t *n) {
+  hsk_raw_node_t *c, *nn;
+  for (c = n; c; c = nn) {
+    nn = c->next;
+    hsk_raw_node_free(c);
+  }
+}
+
+void
+hsk_proof_init(hsk_proof_t *p) {
+  if (p == NULL)
+    return;
+
+  memset(p->block_hash, 0, 32);
+  p->nodes = NULL;
+  p->data = NULL;
+  p->data_len = 0;
+}
+
+hsk_proof_t *
+hsk_proof_alloc() {
+  hsk_proof_t *p = malloc(sizeof(hsk_proof_t));
+  hsk_proof_init(p);
+  return p;
+}
+
+void
+hsk_proof_free(hsk_proof_t *p) {
+  if (p == NULL)
+    return;
+
+  if (p->nodes)
+    hsk_raw_node_free_list(p->nodes);
+
+  if (p->data)
+    free(p->data);
+
+  free(p);
 }

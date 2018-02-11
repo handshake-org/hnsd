@@ -158,7 +158,7 @@ main(int32_t argc, char **argv) {
 
   hsk_freeaddrinfo(result);
 
-  if (hsk_is_tld(*argv)) {
+  if (hsk_is_sld(*argv)) {
     hsk_proof_t *proof;
     rc = hsk_get_proof(*argv, &proof);
 
@@ -188,7 +188,7 @@ main(int32_t argc, char **argv) {
     blake2b_ctx ctx;
 
     assert(blake2b_init(&ctx, 32) >= 0);
-    blake2b_update(&ctx, proof->data->data, proof->data->len);
+    blake2b_update(&ctx, proof->data, proof->data_len);
     blake2b_final(&ctx, hash, 32);
 
     if (memcmp(hash, data, 32) != 0) {
@@ -197,7 +197,7 @@ main(int32_t argc, char **argv) {
     }
 
     hsk_resource_t *res;
-    if (!hsk_decode_resource(proof->data->data, proof->data->len, &res)) {
+    if (!hsk_decode_resource(proof->data, proof->data_len, &res)) {
       fprintf(stderr, "error in hsk_parse_resource\n");
       exit(EXIT_FAILURE);
     }

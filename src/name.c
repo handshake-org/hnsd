@@ -24,9 +24,13 @@
 #include "cares/nameser.h"
 
 #include "b64.h"
+#include "msg.c"
+#include "hsk-hash.h"
 #include "hsk-error.h"
 #include "hsk-proof.h"
 #include "hsk-name.h"
+#include "hsk-header.h"
+#include "hsk-resource.h"
 
 typedef struct {
   int32_t status;
@@ -37,26 +41,13 @@ typedef struct {
 typedef struct {
   int32_t status;
   int32_t timeouts;
-  uint8_t *abuf;
-  int32_t alen;
-} _hsk_query_ret_t;
+  dns_message_t *msg;
+} hsk__query_ret_t;
 
 typedef struct {
-  const char *host;
+  char *host;
   int32_t port;
 } _hsk_ns_t;
-
-static void
-cb_after_query(void *arg, int32_t status, int32_t timeouts, unsigned char *abuf, int32_t alen);
-
-static struct hostent *
-copy_hostent(struct hostent *host);
-
-static int32_t
-_hsk_init_servers(struct ares_addr_port_node **n);
-
-static int32_t
-_hsk_query(const char *name, int32_t type, unsigned char **abuf, int32_t *alen);
 
 static void
 cb_after_query(
@@ -67,12 +58,6 @@ cb_after_query(
   int32_t alen
 );
 
-static int32_t
-_hsk_gethostbyname(const char *name, int32_t af, struct hostent **host);
-
-static void
-check_pf(bool *ipv4, bool *ipv6);
-
 static const _hsk_ns_t nameservers[] = {
   { .host = "127.0.0.1", .port = 53 },
   { .host = NULL, .port = 0 }
@@ -81,11 +66,11 @@ static const _hsk_ns_t nameservers[] = {
 static struct ares_addr_port_node *gn = NULL;
 
 bool
-hsk_is_hskn(const char *name, size_t len) {
+hsk_is_hskn(char *name, size_t len) {
   if (name == NULL)
     return false;
 
-  const char *s = name;
+  char *s = name;
 
   if (len == 1) {
     if (s[0] == 'h')
@@ -110,7 +95,7 @@ hsk_is_hskn(const char *name, size_t len) {
 }
 
 bool
-hsk_is_hsk(const char *name) {
+hsk_is_hsk(char *name) {
   if (name == NULL)
     return false;
 
@@ -118,7 +103,7 @@ hsk_is_hsk(const char *name) {
 }
 
 bool
-hsk_is_tld(const char *name) {
+hsk_is_sld(char *name) {
   if (name == NULL)
     return false;
 
@@ -149,8 +134,8 @@ hsk_is_tld(const char *name) {
 }
 
 char *
-hsk_to_tld(const char *name) {
-  if (!hsk_is_tld(name))
+hsk_to_tld(char *name) {
+  if (!hsk_is_sld(name))
     return NULL;
 
   size_t len = strlen(name);
@@ -244,10 +229,10 @@ copy_hostent(struct hostent *host) {
 }
 
 static int32_t
-_hsk_init_servers(struct ares_addr_port_node **n) {
+hsk__init_servers(struct ares_addr_port_node **n) {
   if (gn != NULL) {
     *n = gn;
-    return ARES_SUCCESS;
+    return HSK_SUCCESS;
   }
 
   *n = NULL;
@@ -259,14 +244,14 @@ _hsk_init_servers(struct ares_addr_port_node **n) {
     struct ares_addr_port_node *cn = malloc(sizeof(struct ares_addr_port_node));
 
     if (cn == NULL)
-      return ARES_ENOMEM;
+      return HSK_ENOMEM;
 
     if (ares_inet_pton(AF_INET, ns->host, &cn->addr.addr4) == 1) {
       cn->family = AF_INET;
     } else if (ares_inet_pton(AF_INET6, ns->host, &cn->addr.addr6) == 1) {
       cn->family = AF_INET6;
     } else {
-      return ARES_EBADSTR;
+      return HSK_EBADSTR;
     }
 
     cn->udp_port = ns->port;
@@ -282,25 +267,20 @@ _hsk_init_servers(struct ares_addr_port_node **n) {
   *n = pn;
   gn = pn;
 
-  return ARES_SUCCESS;
+  return HSK_SUCCESS;
 }
 
 static int32_t
-_hsk_query(const char *name, int32_t type, unsigned char **abuf, int32_t *alen) {
+hsk__query(char *name, int32_t type, dns_message_t **msg) {
   int32_t rc;
 
-  if (abuf == NULL)
-    return ARES_EBADSTR;
+  if (msg == NULL)
+    return HSK_EBADSTR;
 
-  *abuf = NULL;
-
-  if (alen == NULL)
-    return ARES_EBADSTR;
-
-  *alen = 0;
+  *msg = NULL;
 
   if (name == NULL)
-    return ARES_EBADSTR;
+    return HSK_EBADSTR;
 
   rc = ares_library_init(ARES_LIB_INIT_ALL);
 
@@ -324,9 +304,9 @@ _hsk_query(const char *name, int32_t type, unsigned char **abuf, int32_t *alen) 
 
   struct ares_addr_port_node *n;
 
-  rc = _hsk_init_servers(&n);
+  rc = hsk__init_servers(&n);
 
-  if (rc != ARES_SUCCESS) {
+  if (rc != HSK_SUCCESS) {
     ares_destroy(channel);
     return rc;
   }
@@ -338,8 +318,8 @@ _hsk_query(const char *name, int32_t type, unsigned char **abuf, int32_t *alen) 
     return rc;
   }
 
-  _hsk_query_ret_t ret;
-  ares_query(channel, name, ns_c_in, type, cb_after_query, &ret);
+  hsk__query_ret_t ret;
+  ares_query(channel, name, DNS_INET, type, cb_after_query, &ret);
 
   fd_set readers, writers;
   struct timeval *tvp, tv;
@@ -362,16 +342,22 @@ _hsk_query(const char *name, int32_t type, unsigned char **abuf, int32_t *alen) 
   ares_destroy(channel);
 
   if (ret.status != ARES_SUCCESS) {
-    if (ret.abuf != NULL)
-      free(ret.abuf);
+    if (ret.msg != NULL)
+      dns_message_free(ret.msg);
     return ret.status;
   }
 
-  if (ret.abuf == NULL)
-    return ARES_ENODATA;
+  if (ret.msg == NULL)
+    return HSK_ENODATA;
 
-  *abuf = ret.abuf;
-  *alen = ret.alen;
+  rc = hsk_verify_dns(ret.msg, name, type);
+
+  if (rc != HSK_SUCCESS)  {
+    dns_message_free(ret.msg);
+    return rc;
+  }
+
+  *msg = ret.msg;
 
   return ret.status;
 }
@@ -384,257 +370,604 @@ cb_after_query(
   unsigned char *abuf,
   int32_t alen
 ) {
-  _hsk_query_ret_t *ret = (_hsk_query_ret_t *)arg;
+  hsk__query_ret_t *ret = (hsk__query_ret_t *)arg;
 
-  ret->status = 0;
-  ret->timeouts = 0;
-  ret->abuf = NULL;
-  ret->alen = 0;
+  ret->status = status;
+  ret->timeouts = timeouts;
+  ret->msg = NULL;
 
   if (abuf) {
-    ret->abuf = malloc(alen * sizeof(char));
-    if (ret->abuf == NULL) {
-      ret->status = ARES_ENOMEM;
+    uint8_t *data = malloc(alen * sizeof(char));
+
+    if (data == NULL) {
+      ret->status = HSK_ENOMEM;
       return;
     }
-    memcpy(ret->abuf, abuf, alen);
-    ret->alen = alen;
+
+    memcpy(data, abuf, alen);
+
+    if (!dns_decode_message(data, alen, &ret->msg)) {
+      ret->status = HSK_ENOMEM;
+      return;
+    }
   }
 }
 
+static struct hostent *
+parse_addr_records(dns_message_t *msg, char *target, uint8_t type) {
+  assert(type == DNS_A || type == DNS_AAAA);
+
+  dns_record_t *section = dns_get_records(msg->answer, target, type);
+  struct hostent *host = NULL;
+
+  if (section == NULL)
+    goto fail;
+
+  host = malloc(sizeof(struct hostent));
+
+  if (host == NULL)
+    goto fail;
+
+  host->h_name = NULL;
+  host->h_aliases = NULL;
+  host->h_addrtype = type == DNS_A ? AF_INET : AF_INET6;
+  host->h_length = 0;
+  host->h_addr_list = NULL;
+
+  dns_record_t *c;
+
+  int32_t len = 0;
+  for (c = section; c; c = c->next) {
+    if (!host->h_name) {
+      host->h_name = strdup(c->name);
+      if (!host->h_name)
+        goto fail;
+    }
+    len += 1;
+  }
+
+  host->h_aliases = (char **)malloc(1);
+
+  if (!host->h_aliases)
+    goto fail;
+
+  host->h_aliases[0] = NULL;
+
+  host->h_addr_list = (char **)malloc((len + 1) * sizeof(struct sockaddr *));
+
+  if (!host->h_addr_list)
+    goto fail;
+
+  for (c = section; c; c = c->next) {
+    uint8_t *sa = (uint8_t *)malloc(sizeof(struct sockaddr));
+
+    if (sa == NULL)
+      goto fail;
+
+    if (type == DNS_A) {
+      if (!dns_read_a_record(c, sa))
+        goto fail;
+    } else {
+      if (!dns_read_aaaa_record(c, sa))
+        goto fail;
+    }
+
+    host->h_addr_list[host->h_length] = (char *)sa;
+    host->h_length += 1;
+  }
+
+  host->h_addr_list[host->h_length] = NULL;
+
+  dns_record_free_list(section);
+
+  return host;
+
+fail:
+  if (section)
+    dns_record_free_list(section);
+
+  if (host) {
+    if (host->h_name)
+      free(host->h_name);
+    if (host->h_aliases)
+      free(host->h_aliases);
+    if (host->h_addr_list) {
+      while (host->h_length--)
+        free(host->h_addr_list[host->h_length]);
+      free(host->h_addr_list);
+    }
+    free(host);
+  }
+
+  return NULL;
+}
+
 static int32_t
-_hsk_gethostbyname(const char *name, int32_t af, struct hostent **host) {
+hsk__gethostbyname(char *name, int32_t af, struct hostent **host) {
   int32_t rc;
 
   if (host == NULL)
-    return ARES_EBADSTR;
+    return HSK_EBADSTR;
 
   *host = NULL;
 
   if (name == NULL)
-    return ARES_EBADSTR;
+    return HSK_EBADSTR;
 
-  if (af == 0 || af == AF_UNSPEC)
-    af = AF_INET;
+  int32_t type;
 
-  if (af != AF_INET && af != AF_INET6)
-    return ARES_EBADSTR;
-
-  int32_t type = ns_t_a;
-
-  if (af == AF_INET6)
-    type = ns_t_aaaa;
-
-  uint8_t *abuf;
-  int32_t alen;
-
-  rc = _hsk_query(name, type, &abuf, &alen);
-
-  if (rc != ARES_SUCCESS)
-    return rc;
-
-  struct ares_addrttl ttls[256];
-  int32_t nttls = sizeof(ttls);
-
-  switch (type) {
-    case ns_t_a:
-      rc = ares_parse_a_reply(abuf, alen, host, ttls, &nttls);
+  switch (af) {
+    case AF_UNSPEC:
+    case AF_INET:
+      type = DNS_A;
       break;
-    case ns_t_aaaa:
-      rc = ares_parse_aaaa_reply(
-        abuf, alen, host, (struct ares_addr6ttl *)ttls, &nttls);
+    case AF_INET6:
+      type = DNS_AAAA;
       break;
     default:
-      assert(0);
-      break;
+      return HSK_EBADSTR;
   }
 
-  free(abuf);
+  dns_message_t *msg;
+  rc = hsk__query(name, type, &msg);
 
-  return rc;
+  if (rc != HSK_SUCCESS)
+    return rc;
+
+  *host = parse_addr_records(msg, (char *)name, type);
+
+  if (*host == NULL) {
+    dns_message_free(msg);
+    return HSK_ENOMEM;
+  }
+
+  dns_message_free(msg);
+
+  return HSK_SUCCESS;
 }
 
-int32_t
-hsk_get_proof(const char *name, hsk_proof_t **proof) {
-  int32_t rc;
+static dns_text_t *
+parse_txt_records(dns_record_t *section, char *target, char *prefix) {
+  dns_record_t *slice = dns_get_records(section, target, DNS_TXT);
 
-  if (proof == NULL)
-    return ARES_EBADSTR;
+  if (slice == NULL)
+    return NULL;
 
-  *proof = NULL;
+  size_t slen = strlen(prefix);
+  dns_record_t *c;
 
-  if (!hsk_is_tld(name))
-    return ARES_EBADSTR;
+  for (c = slice; c; c = c->next) {
+    dns_text_t *text = NULL;
 
-  uint8_t *abuf;
-  int32_t alen;
+    if (!dns_read_txt_record(c, &text)) {
+      dns_record_free_list(slice);
+      return NULL;
+    }
 
-  rc = _hsk_query(name, ns_t_txt, &abuf, &alen);
+    if (!text)
+      continue;
 
-  if (rc != ARES_SUCCESS)
-    return rc;
-
-  struct ares_txt_ext *txt;
-
-  rc = ares_parse_txt_reply_ext(abuf, alen, &txt);
-
-  free(abuf);
-
-  if (rc != ARES_SUCCESS)
-    return rc;
-
-  struct ares_txt_ext *c;
-  bool in_proof = false;
-  size_t size = 0;
-
-  for (c = txt; c; c = c->next) {
-    if (c->record_start) {
-      if (in_proof)
-        break;
-
-      if (strncmp((char *)c->txt, "hsk:proof", c->length) == 0)
-        in_proof = true;
-
+    if (!text->next) {
+      dns_text_free_list(text);
       continue;
     }
 
-    if (!in_proof)
+    if (text->data_len != slen) {
+      dns_text_free_list(text);
       continue;
+    }
 
-    size += c->length;
+    if (memcmp(text->data, prefix, slen) != 0) {
+      dns_text_free_list(text);
+      continue;
+    }
+
+    dns_text_t *n = text->next;
+    dns_text_free(text);
+    dns_record_free_list(slice);
+
+    return n;
   }
 
+  dns_record_free_list(slice);
+
+  return NULL;
+}
+
+static bool
+parse_raw_record(
+  dns_record_t *section,
+  char *target,
+  char *prefix,
+  uint8_t **out,
+  size_t *outlen
+) {
+  dns_text_t *txt = parse_txt_records(section, target, prefix);
+
+  if (txt == NULL)
+    return false;
+
+  size_t size = 0;
+  dns_text_t *c;
+
+  for (c = txt; c; c = c->next)
+    size += c->data_len;
+
   if (size > 10240) {
-    ares_free_data(txt);
-    return ARES_EBADSTR;
+    dns_text_free_list(txt);
+    return false;
   }
 
   char *b64 = malloc(size + 1);
 
   if (b64 == NULL) {
-    ares_free_data(txt);
-    return ARES_ENOMEM;
+    dns_text_free_list(txt);
+    return false;
   }
 
   char *s = b64;
-  in_proof = false;
 
   for (c = txt; c; c = c->next) {
-    if (c->record_start) {
-      if (in_proof)
-        break;
-
-      if (strncmp((char *)c->txt, "hsk:proof", c->length) == 0)
-        in_proof = true;
-
-      continue;
-    }
-
-    if (!in_proof)
-      continue;
-
-    memcpy(s, c->txt, c->length);
-    s += c->length;
+    memcpy(s, c->data, c->data_len);
+    s += c->data_len;
   }
 
   *s = '\0';
 
-  ares_free_data(txt);
+  dns_text_free_list(txt);
 
-  hsk_raw_node_t *head = NULL;
+  *out = b64_decode(b64, size, outlen);
+
+  if (*out == NULL)
+    return false;
+
+  return true;
+}
+
+int32_t
+hsk_parse_proof(dns_record_t *section, char *name, hsk_proof_t **proof) {
+  uint8_t *b64;
+  size_t b64_len;
+
+  if (!parse_raw_record(section, name, "hsk:proof", &b64, &b64_len))
+    return HSK_ENOMEM;
+
+  uint8_t *data = b64;
+  size_t data_len = b64_len;
+
+  hsk_proof_t *p = hsk_proof_alloc();
+
+  if (p == NULL)
+    goto fail;
+
+  if (!read_bytes(&data, &data_len, p->block_hash, 32))
+    goto fail;
+
+  size_t count;
+
+  if (!read_varsize(&data, &data_len, &count))
+    goto fail;
+
   hsk_raw_node_t *parent = NULL;
-  hsk_raw_node_t *grandparent = NULL;
 
-  s = b64;
+  int32_t i;
+  for (i = 0; i < count; i++) {
+    hsk_raw_node_t *node = hsk_raw_node_alloc();
 
-  for (;;) {
-    int32_t i = 0;
-    char *last = s;
+    if (node == NULL)
+      goto fail;
 
-    for (s = last; *s; s++) {
-      if (*s == ':')
-        break;
-      i += 1;
-    }
+    if (!alloc_varbytes(&data, &data_len, &node->data, &node->data_len))
+      goto fail;
 
-    hsk_raw_node_t *node = malloc(sizeof(hsk_raw_node_t));
-
-    if (node == NULL) {
-      free(b64);
-      return ARES_ENOMEM;
-    }
-
-    node->next = NULL;
-    node->data = b64_decode(last, i, &node->len);
-
-    if (node->data == NULL) {
-      free(b64);
-      free(node);
-      return ARES_ENOMEM;
-    }
-
-    if (head == NULL)
-      head = node;
+    if (p->nodes == NULL)
+      p->nodes = node;
 
     if (parent)
       parent->next = node;
 
-    grandparent = parent;
     parent = node;
+  }
 
-    if (*s == 0)
-      break;
-
-    s += 1;
+  if (data_len > 0) {
+    if (!alloc_varbytes(&data, &data_len, &p->data, &p->data_len))
+      goto fail;
   }
 
   free(b64);
 
-  if (!head)
-    return ARES_EBADSTR;
-
-  if (!head->next) {
-    free(head->data);
-    free(head);
-    return ARES_EBADSTR;
-  }
-
-  if (!head->next->next) {
-    free(head->next->data);
-    free(head->next);
-    free(head->data);
-    free(head);
-    return ARES_EBADSTR;
-  }
-
-  hsk_proof_t *p = malloc(sizeof(hsk_proof_t));
-
-  if (head->len != 32 || p == NULL) {
-    if (p)
-      free(p);
-    hsk_raw_node_t *c, *n;
-    for (c = head; c; c = n) {
-      n = c->next;
-      free(c->data);
-      free(c);
-    }
-    if (p)
-      return ARES_EBADSTR;
-    return ARES_ENOMEM;
-  }
-
-  assert(parent != NULL);
-  assert(grandparent != NULL);
-
-  p->block_hash = head->data;
-  p->nodes = head->next;
-  free(head);
-  p->data = parent;
-  grandparent->next = NULL;
-
   *proof = p;
 
-  return ARES_SUCCESS;
+  return HSK_SUCCESS;
+
+fail:
+  if (b64)
+    free(b64);
+
+  if (p)
+    hsk_proof_free(p);
+
+  return HSK_ENOMEM;
+}
+
+int32_t
+hsk_parse_header(dns_record_t *section, char *name, hsk_header_t *hdr) {
+  uint8_t *data;
+  size_t data_len;
+
+  if (!parse_raw_record(section, name, "hsk:header", &data, &data_len))
+    return HSK_ENOMEM;
+
+  if (!hsk_decode_header(data, data_len, hdr)) {
+    free(data);
+    return HSK_ENOMEM;
+  }
+
+  free(data);
+
+  return HSK_SUCCESS;
+}
+
+int32_t
+hsk_get_proof(char *name, hsk_proof_t **proof) {
+  int32_t rc;
+
+  if (proof == NULL)
+    return HSK_EBADSTR;
+
+  *proof = NULL;
+
+  if (!hsk_is_sld(name))
+    return HSK_EBADSTR;
+
+  dns_message_t *msg;
+  rc = hsk__query(name, DNS_TXT, &msg);
+
+  if (rc != HSK_SUCCESS)
+    return rc;
+
+  rc = hsk_parse_proof(msg->answer, name, proof);
+
+  if (rc != HSK_SUCCESS) {
+    dns_message_free(msg);
+    return rc;
+  }
+
+  dns_message_free(msg);
+
+  return HSK_SUCCESS;
+}
+
+int32_t
+hsk_verify_dns(dns_message_t *msg, char *name, int32_t type) {
+  int32_t rc = HSK_SUCCESS;
+  hsk_proof_t *proof = NULL;
+  char *tld = NULL;
+  uint8_t *dhash = NULL;
+  hsk_resource_t *res = NULL;
+  dns_record_t *section = NULL;
+
+  if (!hsk_is_sld(name))
+    goto cleanup;
+
+  dns_record_t *proof_section = msg->additional;
+
+  if (type == DNS_TXT)
+    proof_section = msg->answer;
+
+  rc = hsk_parse_proof(proof_section, name, &proof);
+
+  if (rc != HSK_SUCCESS)
+    goto cleanup;
+
+  hsk_header_t hdr;
+  rc = hsk_parse_header(proof_section, name, &hdr);
+
+  if (rc != HSK_SUCCESS)
+    goto cleanup;
+
+  uint8_t hash[32];
+  hsk_hash_header(&hdr, hash);
+
+  if (memcmp(proof->block_hash, hash, 32) != 0) {
+    rc = HSK_EHASHMISMATCH;
+    goto cleanup;
+  }
+
+  rc = hsk_verify_pow(&hdr);
+
+  if (rc != HSK_SUCCESS)
+    goto cleanup;
+
+  tld = hsk_to_tld(name);
+
+  if (tld == NULL) {
+    rc = HSK_ENOMEM;
+    goto cleanup;
+  }
+
+  size_t dhash_len = 0;
+
+  rc = hsk_verify_name(hdr.trie_root, tld, proof->nodes, &dhash, &dhash_len);
+
+  if (rc != HSK_SUCCESS)
+    goto cleanup;
+
+  if (!dhash) {
+    if (proof->data) {
+      rc = HSK_ERECORDMISMATCH;
+      goto cleanup;
+    }
+
+    if (msg->nscount != 1) {
+      rc = HSK_ERECORDMISMATCH;
+      goto cleanup;
+    }
+
+    if (msg->authority->type != DNS_SOA) {
+      rc = HSK_ERECORDMISMATCH;
+      goto cleanup;
+    }
+
+    if (type == DNS_TXT) {
+      if (msg->ancount != 2) {
+        rc = HSK_ERECORDMISMATCH;
+        goto cleanup;
+      }
+      if (msg->arcount != 0) {
+        rc = HSK_ERECORDMISMATCH;
+        goto cleanup;
+      }
+      if (msg->answer->type != DNS_TXT
+          || msg->answer->next->type != DNS_TXT) {
+        rc = HSK_ERECORDMISMATCH;
+        goto cleanup;
+      }
+    } else {
+      if (msg->ancount != 0) {
+        rc = HSK_ERECORDMISMATCH;
+        goto cleanup;
+      }
+      if (msg->arcount != 2) {
+        rc = HSK_ERECORDMISMATCH;
+        goto cleanup;
+      }
+      if (msg->additional->type != DNS_TXT
+          || msg->additional->next->type != DNS_TXT) {
+        rc = HSK_ERECORDMISMATCH;
+        goto cleanup;
+      }
+    }
+
+    goto cleanup;
+  }
+
+  if (dhash_len != 32) {
+    rc = HSK_EHASHMISMATCH;
+    goto cleanup;
+  }
+
+  hsk_blake2b(proof->data, proof->data_len, hash);
+
+  if (memcmp(hash, dhash, 32) != 0) {
+    rc = HSK_EHASHMISMATCH;
+    goto cleanup;
+  }
+
+  if (!proof->data) {
+    rc = HSK_ERECORDMISMATCH;
+    goto cleanup;
+  }
+
+  if (!hsk_decode_resource(proof->data, proof->data_len, &res)) {
+    rc = HSK_EENCODING;
+    goto cleanup;
+  }
+
+  if (type != DNS_A && type != DNS_AAAA)
+    goto cleanup;
+
+  hsk_host_record_t *canonical =
+    (hsk_host_record_t *)hsk_resource_get(res, HSK_CANONICAL);
+
+  // Verify glue.
+  if (canonical) {
+    dns_record_t *cname = msg->answer;
+
+    if (!cname || cname->type != DNS_CNAME) {
+      rc = HSK_ERECORDMISMATCH;
+      goto cleanup;
+    }
+
+    if (dns_name_cmp(cname->name, name) != 0) {
+      rc = HSK_ERECORDMISMATCH;
+      goto cleanup;
+    }
+
+    if (canonical->target.type != HSK_INAME)
+      goto cleanup;
+
+    char n[1021];
+
+    if (!dns_read_cname_record(cname, n)) {
+      rc = HSK_ERECORDMISMATCH;
+      goto cleanup;
+    }
+
+    if (dns_name_cmp(n, canonical->target.name) != 0) {
+      rc = HSK_ERECORDMISMATCH;
+      goto cleanup;
+    }
+
+    goto cleanup;
+  }
+
+  uint8_t hsk_type = type == DNS_A ? HSK_INET4 : HSK_INET6;
+
+  if (!hsk_resource_has(res, hsk_type)) {
+    if (msg->ancount != 0) {
+      rc = HSK_ERECORDMISMATCH;
+      goto cleanup;
+    }
+    if (msg->nscount != 1) {
+      rc = HSK_ERECORDMISMATCH;
+      goto cleanup;
+    }
+    if (msg->authority->type != DNS_SOA) {
+      rc = HSK_ERECORDMISMATCH;
+      goto cleanup;
+    }
+    goto cleanup;
+  }
+
+  if (msg->ancount == 0) {
+    rc = HSK_ERECORDMISMATCH;
+    goto cleanup;
+  }
+
+  size_t ipsize = type == DNS_A ? 4 : 16;
+  int32_t checked = 0;
+  dns_record_t *cur = msg->answer;
+  hsk_record_t *c, *n;
+
+  for (c = res->records; c; c = c->next) {
+    if (c->type == hsk_type) {
+      hsk_host_record_t *cc = (hsk_host_record_t *)c;
+
+      if (!cur) {
+        rc = HSK_ERECORDMISMATCH;
+        goto cleanup;
+      }
+
+      if (memcmp(cur->rd, cc->target.addr, ipsize) != 0) {
+        rc = HSK_ERECORDMISMATCH;
+        goto cleanup;
+      }
+
+      cur = cur->next;
+      checked += 1;
+    }
+  }
+
+  if (checked != msg->ancount) {
+    rc = HSK_ERECORDMISMATCH;
+    goto cleanup;
+  }
+
+cleanup:
+  if (proof)
+    hsk_proof_free(proof);
+
+  if (tld)
+    free(tld);
+
+  if (dhash)
+    free(dhash);
+
+  if (res)
+    hsk_free_resource(res);
+
+  return rc;
 }
 
 void
@@ -652,13 +985,13 @@ hsk_gethostbyname(const char *name) {
   if (name == NULL)
     return NULL;
 
-  if (!hsk_is_hsk(name))
+  if (!hsk_is_hsk((char *)name))
     return copy_hostent(gethostbyname(name));
 
   struct hostent *host = NULL;
-  int32_t rc = _hsk_gethostbyname(name, AF_INET, &host);
+  int32_t rc = hsk__gethostbyname((char *)name, AF_INET, &host);
 
-  if (rc != ARES_SUCCESS)
+  if (rc != HSK_SUCCESS)
     return NULL;
 
   return host;
@@ -669,13 +1002,13 @@ hsk_gethostbyname2(const char *name, int32_t af) {
   if (name == NULL)
     return NULL;
 
-  if (!hsk_is_hsk(name))
+  if (!hsk_is_hsk((char *)name))
     return copy_hostent(gethostbyname2(name, af));
 
   struct hostent *host = NULL;
-  int32_t rc = _hsk_gethostbyname(name, af, &host);
+  int32_t rc = hsk__gethostbyname((char *)name, af, &host);
 
-  if (rc != ARES_SUCCESS)
+  if (rc != HSK_SUCCESS)
     return NULL;
 
   return host;
@@ -739,7 +1072,7 @@ hsk_getaddrinfo(
   const struct addrinfo *hints,
   struct addrinfo **res
 ) {
-  if (!hsk_is_hsk(node))
+  if (!hsk_is_hsk((char *)node))
     return getaddrinfo(node, service, hints, res);
 
   if (res == NULL)
@@ -837,81 +1170,81 @@ hsk_getaddrinfo(
   int32_t t = l - i;
 
   for (; i < l; i++) {
-    int32_t rc = _hsk_gethostbyname(node, types[i], &host);
+    int32_t rc = hsk__gethostbyname((char *)node, types[i], &host);
 
     switch (rc) {
-      case ARES_SUCCESS:
+      case HSK_SUCCESS:
         break;
-      case ARES_ENODATA:
+      case HSK_ENODATA:
         if (--t == 0) {
           code = EAI_FAIL;
           goto cleanup;
         }
         continue;
-      case ARES_EFORMERR:
+      case HSK_EFORMERR:
         code = EAI_FAIL;
         goto cleanup;
-      case ARES_ESERVFAIL:
+      case HSK_ESERVFAIL:
         code = EAI_FAIL;
         goto cleanup;
-      case ARES_ENOTIMP:
+      case HSK_ENOTIMP:
         code = EAI_FAIL;
         goto cleanup;
-      case ARES_EREFUSED:
+      case HSK_EREFUSED:
         code = EAI_FAIL;
         goto cleanup;
-      case ARES_EBADQUERY:
+      case HSK_EBADQUERY:
         code = EAI_FAIL;
         goto cleanup;
-      case ARES_EBADNAME:
+      case HSK_EBADNAME:
         code = EAI_FAIL;
         goto cleanup;
-      case ARES_EBADFAMILY:
+      case HSK_EBADFAMILY:
         code = EAI_FAMILY;
         goto cleanup;
-      case ARES_EBADRESP:
+      case HSK_EBADRESP:
         code = EAI_SYSTEM;
         goto cleanup;
-      case ARES_ECONNREFUSED:
+      case HSK_ECONNREFUSED:
         code = EAI_FAIL;
         goto cleanup;
-      case ARES_ETIMEOUT:
+      case HSK_ETIMEOUT:
         code = EAI_AGAIN;
         goto cleanup;
-      case ARES_EOF:
+      case HSK_EOF:
         code = EAI_SYSTEM;
         goto cleanup;
-      case ARES_EFILE:
+      case HSK_EFILE:
         code = EAI_SYSTEM;
         goto cleanup;
-      case ARES_ENOMEM:
+      case HSK_ENOMEM:
         code = EAI_MEMORY;
         goto cleanup;
-      case ARES_EDESTRUCTION:
+      case HSK_EDESTRUCTION:
         code = EAI_SYSTEM;
         goto cleanup;
-      case ARES_EBADSTR:
+      case HSK_EBADSTR:
         code = EAI_SYSTEM;
         goto cleanup;
-      case ARES_EBADFLAGS:
+      case HSK_EBADFLAGS:
         code = EAI_BADFLAGS;
         goto cleanup;
-      case ARES_ENONAME:
+      case HSK_ENONAME:
         code = EAI_NONAME;
         goto cleanup;
-      case ARES_EBADHINTS:
+      case HSK_EBADHINTS:
         code = EAI_BADFLAGS;
         goto cleanup;
-      case ARES_ENOTINITIALIZED:
+      case HSK_ENOTINITIALIZED:
         code = EAI_SYSTEM;
         goto cleanup;
-      case ARES_ELOADIPHLPAPI:
+      case HSK_ELOADIPHLPAPI:
         code = EAI_SYSTEM;
         goto cleanup;
-      case ARES_EADDRGETNETWORKPARAMS:
+      case HSK_EADDRGETNETWORKPARAMS:
         code = EAI_SYSTEM;
         goto cleanup;
-      case ARES_ECANCELLED:
+      case HSK_ECANCELLED:
         code = EAI_AGAIN;
         goto cleanup;
       default:

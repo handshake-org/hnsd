@@ -11,7 +11,7 @@ static inline bool
 read_u8(uint8_t **data, size_t *len, uint8_t *out) {
   if (*len < 1)
     return false;
-  *out = *data[0];
+  *out = (*data)[0];
   *data += 1;
   *len -= 1;
   return true;
@@ -25,7 +25,7 @@ read_u16(uint8_t **data, size_t *len, uint16_t *out) {
   memcpy(out, data, 2);
 #else
   *out = 0;
-  *out |= ((uint16_t)(*data)[1]) << 8; // SEGFAULT
+  *out |= ((uint16_t)(*data)[1]) << 8;
   *out |= (uint16_t)(*data)[0];
 #endif
   *data += 2;
@@ -91,6 +91,77 @@ read_i32(uint8_t **data, size_t *len, int32_t *out) {
 static inline bool
 read_i64(uint8_t **data, size_t *len, int64_t *out) {
   return read_u64(data, len, (uint64_t *)out);
+}
+
+static inline bool
+read_u16be(uint8_t **data, size_t *len, uint16_t *out) {
+  if (*len < 2)
+    return false;
+#ifdef HSK_BIG_ENDIAN
+  memcpy(out, data, 2);
+#else
+  *out = 0;
+  *out |= ((uint16_t)(*data)[0]) << 8;
+  *out |= (uint16_t)(*data)[1];
+#endif
+  *data += 2;
+  *len -= 2;
+  return true;
+}
+
+static inline bool
+read_u32be(uint8_t **data, size_t *len, uint32_t *out) {
+  if (*len < 4)
+    return false;
+#ifdef HSK_BIG_ENDIAN
+  memcpy(out, data, 4);
+#else
+  *out = 0;
+  *out |= ((uint16_t)(*data)[0]) << 24;
+  *out |= ((uint16_t)(*data)[1]) << 16;
+  *out |= ((uint16_t)(*data)[2]) << 8;
+  *out |= (uint16_t)(*data)[3];
+#endif
+  *data += 4;
+  *len -= 4;
+  return true;
+}
+
+static inline bool
+read_u64be(uint8_t **data, size_t *len, uint64_t *out) {
+  if (*len < 8)
+    return false;
+#ifdef HSK_BIG_ENDIAN
+  memcpy(out, data, 8);
+#else
+  *out = 0;
+  *out |= ((uint64_t)(*data)[0]) << 56;
+  *out |= ((uint64_t)(*data)[1]) << 48;
+  *out |= ((uint64_t)(*data)[2]) << 40;
+  *out |= ((uint64_t)(*data)[3]) << 32;
+  *out |= ((uint64_t)(*data)[4]) << 24;
+  *out |= ((uint64_t)(*data)[5]) << 16;
+  *out |= ((uint64_t)(*data)[6]) << 8;
+  *out |= (uint64_t)(*data)[7];
+#endif
+  *data += 8;
+  *len -= 8;
+  return true;
+}
+
+static inline bool
+read_i16be(uint8_t **data, size_t *len, int16_t *out) {
+  return read_u16be(data, len, (uint16_t *)out);
+}
+
+static inline bool
+read_i32be(uint8_t **data, size_t *len, int32_t *out) {
+  return read_u32be(data, len, (uint32_t *)out);
+}
+
+static inline bool
+read_i64be(uint8_t **data, size_t *len, int64_t *out) {
+  return read_u64be(data, len, (uint64_t *)out);
 }
 
 static inline bool
@@ -190,7 +261,7 @@ static inline size_t
 write_u8(uint8_t **data, uint8_t out) {
   if (data == NULL || *data == NULL)
     return 1;
-  *data[0] = out;
+  (*data)[0] = out;
   *data += 1;
   return 1;
 }
@@ -202,8 +273,8 @@ write_u16(uint8_t **data, uint16_t out) {
 #ifdef HSK_LITTLE_ENDIAN
   memcpy(*data, &out, 2);
 #else
-  *data[0] = (uint8_t)out;
-  *data[1] = (uint8_t)(out >> 8);
+  (*data)[0] = (uint8_t)out;
+  (*data)[1] = (uint8_t)(out >> 8);
 #endif
   *data += 2;
   return 2;
@@ -216,10 +287,10 @@ write_u32(uint8_t **data, uint32_t out) {
 #ifdef HSK_LITTLE_ENDIAN
   memcpy(*data, &out, 4);
 #else
-  *data[0] = (uint8_t)out;
-  *data[1] = (uint8_t)(out >> 8);
-  *data[2] = (uint8_t)(out >> 16);
-  *data[3] = (uint8_t)(out >> 24);
+  (*data)[0] = (uint8_t)out;
+  (*data)[1] = (uint8_t)(out >> 8);
+  (*data)[2] = (uint8_t)(out >> 16);
+  (*data)[3] = (uint8_t)(out >> 24);
 #endif
   *data += 4;
   return 4;
@@ -232,14 +303,14 @@ write_u64(uint8_t **data, uint64_t out) {
 #ifdef HSK_LITTLE_ENDIAN
   memcpy(*data, &out, 8);
 #else
-  *data[0] = (uint8_t)out;
-  *data[1] = (uint8_t)(out >> 8);
-  *data[2] = (uint8_t)(out >> 16);
-  *data[3] = (uint8_t)(out >> 24);
-  *data[4] = (uint8_t)(out >> 32);
-  *data[5] = (uint8_t)(out >> 40);
-  *data[6] = (uint8_t)(out >> 48);
-  *data[7] = (uint8_t)(out >> 56);
+  (*data)[0] = (uint8_t)out;
+  (*data)[1] = (uint8_t)(out >> 8);
+  (*data)[2] = (uint8_t)(out >> 16);
+  (*data)[3] = (uint8_t)(out >> 24);
+  (*data)[4] = (uint8_t)(out >> 32);
+  (*data)[5] = (uint8_t)(out >> 40);
+  (*data)[6] = (uint8_t)(out >> 48);
+  (*data)[7] = (uint8_t)(out >> 56);
 #endif
   *data += 8;
   return 8;
@@ -247,22 +318,87 @@ write_u64(uint8_t **data, uint64_t out) {
 
 static inline size_t
 write_i8(uint8_t **data, int8_t out) {
-  return write_u64(data, (uint8_t)out);
+  return write_u8(data, (uint8_t)out);
 }
 
 static inline size_t
 write_i16(uint8_t **data, int16_t out) {
-  return write_u64(data, (uint16_t)out);
+  return write_u16(data, (uint16_t)out);
 }
 
 static inline size_t
 write_i32(uint8_t **data, int32_t out) {
-  return write_u64(data, (uint32_t)out);
+  return write_u32(data, (uint32_t)out);
 }
 
 static inline size_t
 write_i64(uint8_t **data, int64_t out) {
   return write_u64(data, (uint64_t)out);
+}
+
+static inline size_t
+write_u16be(uint8_t **data, uint16_t out) {
+  if (data == NULL || *data == NULL)
+    return 2;
+#ifdef HSK_BIG_ENDIAN
+  memcpy(*data, &out, 2);
+#else
+  (*data)[1] = (uint8_t)out;
+  (*data)[0] = (uint8_t)(out >> 8);
+#endif
+  *data += 2;
+  return 2;
+}
+
+static inline size_t
+write_u32be(uint8_t **data, uint32_t out) {
+  if (data == NULL || *data == NULL)
+    return 4;
+#ifdef HSK_BIG_ENDIAN
+  memcpy(*data, &out, 4);
+#else
+  (*data)[3] = (uint8_t)out;
+  (*data)[2] = (uint8_t)(out >> 8);
+  (*data)[1] = (uint8_t)(out >> 16);
+  (*data)[0] = (uint8_t)(out >> 24);
+#endif
+  *data += 4;
+  return 4;
+}
+
+static inline size_t
+write_u64be(uint8_t **data, uint64_t out) {
+  if (data == NULL || *data == NULL)
+    return 8;
+#ifdef HSK_BIG_ENDIAN
+  memcpy(*data, &out, 8);
+#else
+  (*data)[7] = (uint8_t)out;
+  (*data)[6] = (uint8_t)(out >> 8);
+  (*data)[5] = (uint8_t)(out >> 16);
+  (*data)[4] = (uint8_t)(out >> 24);
+  (*data)[3] = (uint8_t)(out >> 32);
+  (*data)[2] = (uint8_t)(out >> 40);
+  (*data)[1] = (uint8_t)(out >> 48);
+  (*data)[0] = (uint8_t)(out >> 56);
+#endif
+  *data += 8;
+  return 8;
+}
+
+static inline size_t
+write_i16be(uint8_t **data, int16_t out) {
+  return write_u16be(data, (uint16_t)out);
+}
+
+static inline size_t
+write_i32be(uint8_t **data, int32_t out) {
+  return write_u32be(data, (uint32_t)out);
+}
+
+static inline size_t
+write_i64be(uint8_t **data, int64_t out) {
+  return write_u64be(data, (uint64_t)out);
 }
 
 static inline size_t
@@ -279,7 +415,7 @@ read_varint(uint8_t **data, size_t *data_len, uint64_t *value) {
   if (data_len == 0)
     return false;
 
-  uint8_t prefix = *data[0];
+  uint8_t prefix = (*data)[0];
 
   *data += 1;
   *data_len -= 1;

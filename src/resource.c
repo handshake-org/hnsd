@@ -59,7 +59,7 @@ hsk_read_compressed(
   if (real_size > 512)
     return false;
 
-  char *str = malloc(real_size);
+  char *str = malloc(real_size + 1);
 
   if (str == NULL)
     return false;
@@ -84,6 +84,7 @@ hsk_read_compressed(
     s += 1;
   }
 
+  *s ='\0';
   *out = str;
 
   return true;
@@ -477,7 +478,9 @@ hsk_read_extra_record(
   hsk_extra_record_t *rec
 ) {
   uint8_t size;
-  read_u8(data, data_len, &size);
+
+  if (!read_u8(data, data_len, &size))
+    return false;
 
   if (!alloc_bytes(data, data_len, &rec->data, size))
     return false;
@@ -658,6 +661,9 @@ hsk_alloc_record(uint8_t type) {
 
   if (r == NULL)
     return NULL;
+
+  if (type == HSK_INAME || type == HSK_HNAME)
+    type = HSK_CANONICAL;
 
   r->type = type;
   r->next = NULL;
@@ -979,4 +985,19 @@ done:
     free(st.sizes);
 
   return result;
+}
+
+hsk_record_t *
+hsk_resource_get(hsk_resource_t *res, uint8_t type) {
+  hsk_record_t *c, *n;
+  for (c = res->records; c; c = c->next) {
+    if (c->type == type)
+      return c;
+  }
+  return NULL;
+}
+
+bool
+hsk_resource_has(hsk_resource_t *res, uint8_t type) {
+  return hsk_resource_get(res, type) != NULL;
 }

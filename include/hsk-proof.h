@@ -14,14 +14,15 @@
 // Proofs
 typedef struct _raw_node {
   uint8_t *data;
-  size_t len;
+  size_t data_len;
   struct _raw_node *next;
 } hsk_raw_node_t;
 
 typedef struct {
-  uint8_t *block_hash;
+  uint8_t block_hash[32];
   hsk_raw_node_t *nodes;
-  hsk_raw_node_t *data;
+  uint8_t *data;
+  size_t data_len;
 } hsk_proof_t;
 
 // Node types
@@ -86,4 +87,25 @@ hsk_verify_name(
   uint8_t **data,
   size_t *data_len
 );
+
+void
+hsk_raw_node_init(hsk_raw_node_t *n);
+
+hsk_raw_node_t *
+hsk_raw_node_alloc();
+
+void
+hsk_raw_node_free(hsk_raw_node_t *n);
+
+void
+hsk_raw_node_free_list(hsk_raw_node_t *n);
+
+void
+hsk_proof_init(hsk_proof_t *p);
+
+hsk_proof_t *
+hsk_proof_alloc();
+
+void
+hsk_proof_free(hsk_proof_t *p);
 #endif

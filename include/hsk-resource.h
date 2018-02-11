@@ -163,7 +163,7 @@ typedef struct {
 } hsk_resource_t;
 
 void
-hsk_free_resource(hsk_resource_t *rs);
+hsk_free_resource(hsk_resource_t *res);
 
 bool
 hsk_decode_resource(
@@ -171,4 +171,10 @@ hsk_decode_resource(
   size_t data_len,
   hsk_resource_t **res
 );
+
+hsk_record_t *
+hsk_resource_get(hsk_resource_t *res, uint8_t type);
+
+bool
+hsk_resource_has(hsk_resource_t *res, uint8_t type);
 #endif

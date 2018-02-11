@@ -97,13 +97,13 @@ to_bits(uint8_t *target, uint32_t *bits) {
 
 static bool
 read_sol(uint8_t **data, size_t *data_len, uint32_t *sol, uint8_t sol_size) {
-  int32_t size = (int32_t)sol_size << 1;
 #ifdef HSK_LITTLE_ENDIAN
+  int32_t size = (int32_t)sol_size << 2;
   if (!read_bytes(data, data_len, (uint8_t *)sol, size))
     return false;
 #else
   int32_t i;
-  for (i = 0; i < size; i++) {
+  for (i = 0; i < sol_size; i++) {
     if (!read_u32(data, data_len, sol + i))
       return false;
   }
@@ -113,14 +113,14 @@ read_sol(uint8_t **data, size_t *data_len, uint32_t *sol, uint8_t sol_size) {
 
 static size_t
 write_sol(uint8_t **data, uint32_t *sol, uint8_t sol_size) {
-  int32_t size = (int32_t)sol_size << 1;
 #ifdef HSK_LITTLE_ENDIAN
+  int32_t size = (int32_t)sol_size << 2;
   return write_bytes(data, (uint8_t *)sol, size);
 #else
   int32_t i;
-  for (i = 0; i < size; i++)
+  for (i = 0; i < sol_size; i++)
     write_u32(data, sol[i]);
-  return size;
+  return (int32_t)sol_size << 2;
 #endif
 }
 
@@ -140,6 +140,9 @@ hsk_read_header(uint8_t **data, size_t *data_len, hsk_header_t *hdr) {
   if (!read_bytes(data, data_len, hdr->merkle_root, 32))
     return false;
 
+  if (!read_bytes(data, data_len, hdr->witness_root, 32))
+    return false;
+
   if (!read_bytes(data, data_len, hdr->trie_root, 32))
     return false;
 
@@ -155,10 +158,18 @@ hsk_read_header(uint8_t **data, size_t *data_len, hsk_header_t *hdr) {
   if (!read_u8(data, data_len, &hdr->sol_size))
     return false;
 
+  if (hdr->sol_size > 42)
+    return false;
+
   if (!read_sol(data, data_len, hdr->sol, hdr->sol_size))
     return false;
 
   return true;
+}
+
+bool
+hsk_decode_header(uint8_t *data, size_t data_len, hsk_header_t *hdr) {
+  return hsk_read_header(&data, &data_len, hdr);
 }
 
 int32_t
@@ -167,6 +178,7 @@ hsk_write_header(hsk_header_t *hdr, uint8_t **data) {
   s += write_u32(data, hdr->version);
   s += write_bytes(data, hdr->prev_block, 32);
   s += write_bytes(data, hdr->merkle_root, 32);
+  s += write_bytes(data, hdr->witness_root, 32);
   s += write_bytes(data, hdr->trie_root, 32);
   s += write_u64(data, hdr->time);
   s += write_u32(data, hdr->bits);
@@ -192,11 +204,11 @@ hsk_write_pre(hsk_header_t *hdr, uint8_t **data) {
   s += write_u32(data, hdr->version);
   s += write_bytes(data, hdr->prev_block, 32);
   s += write_bytes(data, hdr->merkle_root, 32);
+  s += write_bytes(data, hdr->witness_root, 32);
   s += write_bytes(data, hdr->trie_root, 32);
   s += write_u64(data, hdr->time);
   s += write_u32(data, hdr->bits);
   s += write_bytes(data, hdr->nonce, 16);
-  s += write_u8(data, hdr->sol_size);
   return s;
 }
 
@@ -230,7 +242,7 @@ hsk_hash_pre(hsk_header_t *hdr, uint8_t *hash) {
 
 int32_t
 hsk_hash_sol(hsk_header_t *hdr, uint8_t *hash) {
-  int32_t size = (int32_t)hdr->sol_size << 1;
+  int32_t size = (int32_t)hdr->sol_size << 2;
   uint8_t raw[size];
   encode_sol(raw, hdr->sol, hdr->sol_size);
   hsk_blake2b(raw, size, hash);
@@ -243,7 +255,7 @@ hsk_verify_pow(hsk_header_t *hdr) {
   if (!to_target(hdr->bits, target))
     return HSK_NEGTARGET;
 
-  int32_t size = (int32_t)hdr->sol_size << 1;
+  int32_t size = (int32_t)hdr->sol_size << 2;
 
   uint8_t raw[size];
   encode_sol(raw, hdr->sol, hdr->sol_size);
@@ -251,11 +263,15 @@ hsk_verify_pow(hsk_header_t *hdr) {
   uint8_t hash[32];
   hsk_blake2b(raw, size, hash);
 
-  if (memcmp(hash, target, 32) > 0)
+  // if (memcmp(hash, target, 32) > 0)
+  if (memcmp(target, hash, 32) > 0)
     return HSK_HIGHHASH;
 
   hsk_cuckoo_t ctx;
-  assert(hsk_cuckoo_init(&ctx, 30, 42, 50, false) == 0);
+  // testnet:
+  assert(hsk_cuckoo_init(&ctx, 16, 18, 50, false) == 0);
+  // main:
+  // assert(hsk_cuckoo_init(&ctx, 30, 42, 50, false) == 0);
 
   size_t psize = hsk_size_pre(hdr);
   uint8_t pre[psize];
@@ -285,7 +301,8 @@ hsk_compare_header(hsk_header_t *a, hsk_header_t *b) {
     return 1;
 
   // Compare targets (backwards).
-  int32_t cmp = memcmp(bt, at, 32);
+  // int32_t cmp = memcmp(bt, at, 32);
+  int32_t cmp = memcmp(at, at, 32);
 
   if (cmp != 0)
     return cmp;
@@ -299,5 +316,6 @@ hsk_compare_header(hsk_header_t *a, hsk_header_t *b) {
   hsk_hash_sol(b, ahash);
 
   // Compare hashes (backwards).
-  return memcmp(bhash, ahash, 32);
+  // return memcmp(bhash, ahash, 32);
+  return memcmp(ahash, bhash, 32);
 }

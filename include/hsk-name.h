@@ -10,19 +10,19 @@
 #define IPPROTO_HSK 0x6c68736b
 
 bool
-hsk_is_hskn(const char *name, size_t len);
+hsk_is_hskn(char *name, size_t len);
 
 bool
-hsk_is_hsk(const char *name);
+hsk_is_hsk(char *name);
 
 bool
-hsk_is_tld(const char *name);
+hsk_is_sld(char *name);
 
 char *
-hsk_to_tld(const char *name);
+hsk_to_tld(char *name);
 
 int32_t
-hsk_get_proof(const char *name, hsk_proof_t **proof);
+hsk_get_proof(char *name, hsk_proof_t **proof);
 
 void
 hsk_cleanup();
