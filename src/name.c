@@ -887,7 +887,7 @@ hsk_verify_dns(dns_message_t *msg, char *name, int32_t type) {
     if (canonical->target.type != HSK_INAME)
       goto cleanup;
 
-    char n[1021];
+    char n[1017];
 
     if (!dns_read_cname_record(cname, n)) {
       rc = HSK_ERECORDMISMATCH;

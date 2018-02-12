@@ -114,16 +114,25 @@ dns_parse_name(
             case 0x40 /*@*/:
             case 0x22 /*"*/:
             case 0x5c /*\\*/: {
+              if (noff + 2 >= max)
+                return -1;
+
               if (name) {
                 name[noff + 0] = '\\';
                 name[noff + 1] = b;
               }
+
               noff += 2;
               max += 1;
+
               break;
             }
+
             default: {
               if (b < 0x20 || b > 0x7e) {
+                if (noff + 4 >= max)
+                  return -1;
+
                 if (name) {
                   char *fmt = "\\%u";
                   if (b < 10)
@@ -132,19 +141,22 @@ dns_parse_name(
                     fmt = "\\0%u";
                   sprintf(name + noff, fmt, (uint32_t)b);
                 }
+
                 noff += 4;
                 max += 3;
               } else {
+                if (noff + 1 >= max)
+                  return -1;
+
                 if (name)
                   name[noff] = b;
+
                 noff += 1;
               }
+
               break;
             }
           }
-
-          if (noff >= max)
-            return -1;
         }
 
         if (name)
@@ -766,21 +778,21 @@ dns_record_t *
 dns_get_record(dns_record_t *rr, char *target, uint8_t type) {
   dns_record_t *c;
 
-  char glue[1021];
+  char glue[1017];
 
   if (target)
     strcpy(glue, target);
 
   for (c = rr; c; c = c->next) {
     if (!target) {
-      if (c->type == type)
+      if (c->type == type || type == DNS_ANY)
         return c;
       continue;
     }
 
     if (c->type == DNS_CNAME) {
       if (dns_name_cmp(c->name, glue) == 0) {
-        if (type == DNS_CNAME)
+        if (type == DNS_CNAME || type == DNS_ANY)
           return c;
 
         if (!dns_read_cname_record(c, glue))
@@ -824,7 +836,9 @@ dns_get_records(dns_record_t *rr, char *target, uint8_t type) {
 
     parent = r;
 
-    target = c->name;
+    if (target)
+      target = c->name;
+
     c = c->next;
   }
 
