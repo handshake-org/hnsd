@@ -478,6 +478,7 @@ hsk_verify_proof(
   }
 
   rc = HSK_ENORESULT;
+  goto fail;
 
 fail:
   hsk_free_node(hn, true);
