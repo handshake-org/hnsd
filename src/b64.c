@@ -27,6 +27,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include <stdbool.h>
 #include <stdint.h>
 #include <ctype.h>
 
@@ -43,8 +44,8 @@ static const char b64_table[] = {
   '4', '5', '6', '7', '8', '9', '+', '/'
 };
 
-uint8_t *
-b64_decode(const char *src, size_t len, size_t *decsize) {
+bool
+b64_decode(const char *src, size_t len, uint8_t **out, size_t *out_len) {
   int32_t i = 0;
   int32_t j = 0;
   int32_t l = 0;
@@ -56,7 +57,7 @@ b64_decode(const char *src, size_t len, size_t *decsize) {
   // alloc
   dec = (uint8_t *)malloc(1);
   if (dec == NULL)
-    return NULL;
+    return false;
 
   // parse until end of source
   while (len--) {
@@ -92,7 +93,7 @@ b64_decode(const char *src, size_t len, size_t *decsize) {
       dec = (uint8_t *)realloc(dec, size + 3);
 
       if (dec == NULL)
-        return NULL;
+        return false;
 
       for (i = 0; i < 3; i++)
         dec[size++] = buf[i];
@@ -128,7 +129,7 @@ b64_decode(const char *src, size_t len, size_t *decsize) {
     dec = (uint8_t *)realloc(dec, size + (i - 1));
 
     if (dec == NULL)
-      return NULL;
+      return false;
 
     for (j = 0; (j < i - 1); j++)
       dec[size++] = buf[j];
@@ -137,13 +138,13 @@ b64_decode(const char *src, size_t len, size_t *decsize) {
   // Make sure we have enough space to add '\0' character at end.
   dec = (uint8_t *)realloc(dec, size + 1);
   if (dec == NULL)
-    return NULL;
+    return false;
 
   dec[size] = '\0';
 
   // Return back the size of decoded string if demanded.
-  if (decsize != NULL)
-    *decsize = size;
+  *out = dec;
+  *out_len = size;
 
-  return dec;
+  return true;
 }

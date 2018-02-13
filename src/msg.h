@@ -12,19 +12,15 @@ typedef struct _dns_question {
 } dns_question_t;
 
 typedef struct _dns_record {
-  void *parent;
   char *name;
   uint16_t type;
   uint16_t class;
   uint32_t ttl;
-  uint16_t rd_len;
-  uint8_t *rd;
+  void *rd;
   struct _dns_record *next;
 } dns_record_t;
 
 typedef struct {
-  size_t pd_len;
-  uint8_t *pd;
   uint16_t id;
   uint16_t flags;
   uint16_t qdcount;
@@ -42,6 +38,95 @@ typedef struct _dns_text {
   uint8_t *data;
   struct _dns_text *next;
 } dns_text_t;
+
+typedef struct {
+  size_t rd_len;
+  uint8_t *rd;
+} dns_unknown_rd_t;
+
+typedef struct {
+  char *ns;
+  char *mbox;
+  uint32_t serial;
+  uint32_t refresh;
+  uint32_t retry;
+  uint32_t expire;
+  uint32_t minttl;
+} dns_soa_rd_t;
+
+typedef struct {
+  uint8_t addr[4];
+} dns_a_rd_t;
+
+typedef struct {
+  uint8_t addr[16];
+} dns_aaaa_rd_t;
+
+typedef struct {
+  char *target;
+} dns_cname_rd_t;
+
+typedef struct {
+  char *target;
+} dns_dname_rd_t;
+
+typedef struct {
+  char *ns;
+} dns_ns_rd_t;
+
+typedef struct {
+  uint16_t preference;
+  char *mx;
+} dns_mx_rd_t;
+
+typedef struct {
+  char *ptr;
+} dns_ptr_rd_t;
+
+typedef struct {
+  uint16_t priority;
+  uint16_t weight;
+  uint16_t port;
+  char *target;
+} dns_srv_rd_t;
+
+typedef struct {
+  dns_text_t *text;
+} dns_txt_rd_t;
+
+typedef struct {
+  uint16_t key_tag;
+  uint8_t algorithm;
+  uint8_t digest_type;
+  size_t digest_len;
+  uint8_t *digest;
+} dns_ds_rd_t;
+
+typedef struct {
+  uint8_t usage;
+  uint8_t selector;
+  uint8_t matching_type;
+  size_t certificate_len;
+  uint8_t *certificate;
+} dns_tlsa_rd_t;
+
+typedef struct {
+  uint8_t algorithm;
+  uint8_t type;
+  size_t fingerprint_len;
+  uint8_t *fingerprint;
+} dns_sshfp_rd_t;
+
+typedef struct {
+  size_t public_key_len;
+  uint8_t *public_key;
+} dns_openpgpkey_rd_t;
+
+typedef struct {
+  char *target;
+  uint8_t type;
+  dns_record_t *current;
+} dns_iterator_t;
 
 // Opcodes
 #define DNS_QUERY 0

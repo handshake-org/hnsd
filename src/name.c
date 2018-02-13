@@ -377,16 +377,7 @@ cb_after_query(
   ret->msg = NULL;
 
   if (abuf) {
-    uint8_t *data = malloc(alen * sizeof(char));
-
-    if (data == NULL) {
-      ret->status = HSK_ENOMEM;
-      return;
-    }
-
-    memcpy(data, abuf, alen);
-
-    if (!dns_decode_message(data, alen, &ret->msg)) {
+    if (!dns_message_decode(abuf, alen, &ret->msg)) {
       ret->status = HSK_ENOMEM;
       return;
     }
@@ -397,13 +388,7 @@ static struct hostent *
 parse_addr_records(dns_message_t *msg, char *target, uint8_t type) {
   assert(type == DNS_A || type == DNS_AAAA);
 
-  dns_record_t *section = dns_get_records(msg->answer, target, type);
-  struct hostent *host = NULL;
-
-  if (section == NULL)
-    goto fail;
-
-  host = malloc(sizeof(struct hostent));
+  struct hostent *host = malloc(sizeof(struct hostent));
 
   if (host == NULL)
     goto fail;
@@ -414,15 +399,22 @@ parse_addr_records(dns_message_t *msg, char *target, uint8_t type) {
   host->h_length = 0;
   host->h_addr_list = NULL;
 
-  dns_record_t *c;
+  dns_iterator_t it;
+  dns_iterator_init(&it, msg->answer, target, type);
 
   int32_t len = 0;
-  for (c = section; c; c = c->next) {
+  for (;;) {
+    dns_record_t *c = dns_iterator_next(&it);
+
+    if (c == NULL)
+      break;
+
     if (!host->h_name) {
       host->h_name = strdup(c->name);
       if (!host->h_name)
         goto fail;
     }
+
     len += 1;
   }
 
@@ -438,44 +430,52 @@ parse_addr_records(dns_message_t *msg, char *target, uint8_t type) {
   if (!host->h_addr_list)
     goto fail;
 
-  for (c = section; c; c = c->next) {
-    uint8_t *sa = (uint8_t *)malloc(sizeof(struct sockaddr));
+  host->h_addr_list[0] = NULL;
 
-    if (sa == NULL)
-      goto fail;
+  uint8_t *sa = (uint8_t *)malloc(len * sizeof(struct sockaddr));
 
-    if (type == DNS_A) {
-      if (!dns_read_a_record(c, sa))
-        goto fail;
-    } else {
-      if (!dns_read_aaaa_record(c, sa))
-        goto fail;
-    }
+  if (sa == NULL)
+    goto fail;
+
+  host->h_addr_list[0] = sa;
+
+  dns_iterator_init(&it, msg->answer, target, type);
+
+  for (;;) {
+    dns_record_t *c = dns_iterator_next(&it);
+
+    if (c == NULL)
+      break;
+
+    if (type == DNS_A)
+      memcpy(sa, ((dns_a_rd_t *)c->rd)->addr, 4);
+    else
+      memcpy(sa, ((dns_aaaa_rd_t *)c->rd)->addr, 16);
 
     host->h_addr_list[host->h_length] = (char *)sa;
     host->h_length += 1;
+
+    sa += sizeof(struct sockaddr);
   }
 
   host->h_addr_list[host->h_length] = NULL;
 
-  dns_record_free_list(section);
-
   return host;
 
 fail:
-  if (section)
-    dns_record_free_list(section);
-
   if (host) {
     if (host->h_name)
       free(host->h_name);
+
     if (host->h_aliases)
       free(host->h_aliases);
+
     if (host->h_addr_list) {
-      while (host->h_length--)
-        free(host->h_addr_list[host->h_length]);
+      if (host->h_addr_list[0])
+        free(host->h_addr_list[0]);
       free(host->h_addr_list);
     }
+
     free(host);
   }
 
@@ -488,8 +488,6 @@ hsk__gethostbyname(char *name, int32_t af, struct hostent **host) {
 
   if (host == NULL)
     return HSK_EBADSTR;
-
-  *host = NULL;
 
   if (name == NULL)
     return HSK_EBADSTR;
@@ -514,62 +512,48 @@ hsk__gethostbyname(char *name, int32_t af, struct hostent **host) {
   if (rc != HSK_SUCCESS)
     return rc;
 
-  *host = parse_addr_records(msg, (char *)name, type);
+  struct hostent *h = parse_addr_records(msg, (char *)name, type);
 
-  if (*host == NULL) {
+  if (h == NULL) {
     dns_message_free(msg);
     return HSK_ENOMEM;
   }
 
   dns_message_free(msg);
+  *host = h;
 
   return HSK_SUCCESS;
 }
 
 static dns_text_t *
-parse_txt_records(dns_record_t *section, char *target, char *prefix) {
-  dns_record_t *slice = dns_get_records(section, target, DNS_TXT);
-
-  if (slice == NULL)
-    return NULL;
-
+find_txt_record(dns_record_t *section, char *target, char *prefix) {
   size_t slen = strlen(prefix);
-  dns_record_t *c;
 
-  for (c = slice; c; c = c->next) {
-    dns_text_t *text = NULL;
+  dns_iterator_t it;
+  dns_iterator_init(&it, section, target, DNS_TXT);
 
-    if (!dns_read_txt_record(c, &text)) {
-      dns_record_free_list(slice);
-      return NULL;
-    }
+  for (;;) {
+    dns_record_t *c = dns_iterator_next(&it);
+
+    if (c == NULL)
+      break;
+
+    dns_text_t *text = ((dns_txt_rd_t *)c->rd)->text;
 
     if (!text)
       continue;
 
-    if (!text->next) {
-      dns_text_free_list(text);
+    if (!text->next)
       continue;
-    }
 
-    if (text->data_len != slen) {
-      dns_text_free_list(text);
+    if (text->data_len != slen)
       continue;
-    }
 
-    if (memcmp(text->data, prefix, slen) != 0) {
-      dns_text_free_list(text);
+    if (memcmp(text->data, prefix, slen) != 0)
       continue;
-    }
 
-    dns_text_t *n = text->next;
-    dns_text_free(text);
-    dns_record_free_list(slice);
-
-    return n;
+    return text->next;
   }
-
-  dns_record_free_list(slice);
 
   return NULL;
 }
@@ -580,60 +564,55 @@ parse_raw_record(
   char *target,
   char *prefix,
   uint8_t **out,
-  size_t *outlen
+  size_t *out_len
 ) {
-  dns_text_t *txt = parse_txt_records(section, target, prefix);
+  dns_text_t *text = find_txt_record(section, target, prefix);
 
-  if (txt == NULL)
+  if (text == NULL)
     return false;
 
   size_t size = 0;
   dns_text_t *c;
 
-  for (c = txt; c; c = c->next)
+  for (c = text; c; c = c->next)
     size += c->data_len;
 
-  if (size > 10240) {
-    dns_text_free_list(txt);
+  if (size > 10240)
     return false;
-  }
 
   char *b64 = malloc(size + 1);
 
-  if (b64 == NULL) {
-    dns_text_free_list(txt);
+  if (b64 == NULL)
     return false;
-  }
 
   char *s = b64;
 
-  for (c = txt; c; c = c->next) {
+  for (c = text; c; c = c->next) {
     memcpy(s, c->data, c->data_len);
     s += c->data_len;
   }
 
   *s = '\0';
 
-  dns_text_free_list(txt);
-
-  *out = b64_decode(b64, size, outlen);
-
-  if (*out == NULL)
+  if (!b64_decode(b64, size, out, out_len)) {
+    free(b64);
     return false;
+  }
+
+  free(b64);
 
   return true;
 }
 
 int32_t
 hsk_parse_proof(dns_record_t *section, char *name, hsk_proof_t **proof) {
-  uint8_t *b64;
-  size_t b64_len;
+  uint8_t *data_;
+  size_t data_len;
 
-  if (!parse_raw_record(section, name, "hsk:proof", &b64, &b64_len))
+  if (!parse_raw_record(section, name, "hsk:proof", &data_, &data_len))
     return HSK_ENOMEM;
 
-  uint8_t *data = b64;
-  size_t data_len = b64_len;
+  uint8_t *data = data_;
 
   hsk_proof_t *p = hsk_proof_alloc();
 
@@ -674,15 +653,15 @@ hsk_parse_proof(dns_record_t *section, char *name, hsk_proof_t **proof) {
       goto fail;
   }
 
-  free(b64);
+  free(data_);
 
   *proof = p;
 
   return HSK_SUCCESS;
 
 fail:
-  if (b64)
-    free(b64);
+  if (data_)
+    free(data_);
 
   if (p)
     hsk_proof_free(p);
@@ -887,14 +866,9 @@ hsk_verify_dns(dns_message_t *msg, char *name, int32_t type) {
     if (canonical->target.type != HSK_INAME)
       goto cleanup;
 
-    char n[1017];
+    char *target = ((dns_cname_rd_t *)cname->rd)->target;
 
-    if (!dns_read_cname_record(cname, n)) {
-      rc = HSK_ERECORDMISMATCH;
-      goto cleanup;
-    }
-
-    if (dns_name_cmp(n, canonical->target.name) != 0) {
+    if (dns_name_cmp(target, canonical->target.name) != 0) {
       rc = HSK_ERECORDMISMATCH;
       goto cleanup;
     }
@@ -902,9 +876,9 @@ hsk_verify_dns(dns_message_t *msg, char *name, int32_t type) {
     goto cleanup;
   }
 
-  uint8_t hsk_type = type == DNS_A ? HSK_INET4 : HSK_INET6;
+  uint8_t htype = type == DNS_A ? HSK_INET4 : HSK_INET6;
 
-  if (!hsk_resource_has(res, hsk_type)) {
+  if (!hsk_resource_has(res, htype)) {
     if (msg->ancount != 0) {
       rc = HSK_ERECORDMISMATCH;
       goto cleanup;
@@ -925,23 +899,31 @@ hsk_verify_dns(dns_message_t *msg, char *name, int32_t type) {
     goto cleanup;
   }
 
-  size_t ipsize = type == DNS_A ? 4 : 16;
   int32_t checked = 0;
   dns_record_t *cur = msg->answer;
-  hsk_record_t *c, *n;
+  hsk_record_t *c;
 
   for (c = res->records; c; c = c->next) {
-    if (c->type == hsk_type) {
+    if (c->type == htype) {
       hsk_host_record_t *cc = (hsk_host_record_t *)c;
 
-      if (!cur) {
+      if (!cur || cur->type != type) {
         rc = HSK_ERECORDMISMATCH;
         goto cleanup;
       }
 
-      if (memcmp(cur->rd, cc->target.addr, ipsize) != 0) {
-        rc = HSK_ERECORDMISMATCH;
-        goto cleanup;
+      if (type == DNS_A) {
+        uint8_t *addr = ((dns_a_rd_t *)cur->rd)->addr;
+        if (memcmp(addr, cc->target.addr, 4) != 0) {
+          rc = HSK_ERECORDMISMATCH;
+          goto cleanup;
+        }
+      } else {
+        uint8_t *addr = ((dns_aaaa_rd_t *)cur->rd)->addr;
+        if (memcmp(addr, cc->target.addr, 16) != 0) {
+          rc = HSK_ERECORDMISMATCH;
+          goto cleanup;
+        }
       }
 
       cur = cur->next;
@@ -1393,6 +1375,6 @@ cleanup:
   if (host)
     ares_free_hostent(host);
   if (ri)
-    freeaddrinfo(ri);
+    hsk_freeaddrinfo(ri);
   return code;
 }

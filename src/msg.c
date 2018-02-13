@@ -75,7 +75,8 @@ int32_t
 dns_parse_name(
   uint8_t **data_,
   size_t *data_len_,
-  dns_message_t *msg,
+  uint8_t *pd,
+  size_t pd_len,
   char *name
 ) {
   uint8_t *data = *data_;
@@ -169,7 +170,7 @@ dns_parse_name(
       }
 
       case 0xc0: {
-        if (!msg)
+        if (!pd)
           return -1;
 
         if (off >= data_len)
@@ -189,8 +190,8 @@ dns_parse_name(
 
         off = ((c ^ 0xc0) << 8) | c1;
 
-        data = msg->pd;
-        data_len = msg->pd_len;
+        data = pd;
+        data_len = pd_len;
 
         break;
       }
@@ -226,25 +227,27 @@ bool
 dns_read_name(
   uint8_t **data,
   size_t *data_len,
-  dns_message_t *msg,
+  uint8_t *pd,
+  size_t pd_len,
   char *name
 ) {
-  return dns_parse_name(data, data_len, msg, name) != -1;
+  return dns_parse_name(data, data_len, pd, pd_len, name) != -1;
 }
 
 int32_t
-dns_size_name(uint8_t *data, size_t data_len, dns_message_t *msg) {
-  return dns_parse_name(&data, &data_len, msg, NULL);
+dns_size_name(uint8_t *data, size_t data_len, uint8_t *pd, size_t pd_len) {
+  return dns_parse_name(&data, &data_len, pd, pd_len, NULL);
 }
 
 bool
 dns_alloc_name(
   uint8_t **data,
   size_t *data_len,
-  dns_message_t *msg,
+  uint8_t *pd,
+  size_t pd_len,
   char **name
 ) {
-  int32_t size = dns_size_name(*data, *data_len, msg);
+  int32_t size = dns_size_name(*data, *data_len, pd, pd_len);
 
   if (size == -1)
     return false;
@@ -254,7 +257,7 @@ dns_alloc_name(
   if (*name == NULL)
     return false;
 
-  assert(dns_read_name(data, data_len, msg, *name));
+  assert(dns_read_name(data, data_len, pd, pd_len, *name));
 
   return true;
 }
@@ -264,8 +267,6 @@ dns_message_init(dns_message_t *msg) {
   if (msg == NULL)
     return;
 
-  msg->pd_len = 0;
-  msg->pd = NULL;
   msg->id = 0;
   msg->flags = 0;
   msg->qdcount = 0;
@@ -294,12 +295,10 @@ dns_record_init(dns_record_t *rr) {
   if (rr == NULL)
     return;
 
-  rr->parent = NULL;
   rr->name = NULL;
   rr->type = 0;
   rr->class = 0;
   rr->ttl = 0;
-  rr->rd_len = 0;
   rr->rd = NULL;
   rr->next = NULL;
 }
@@ -361,46 +360,10 @@ dns_record_free(dns_record_t *rr) {
   if (rr->name)
     free(rr->name);
 
-  if (!rr->parent && rr->rd)
-    free(rr->rd);
+  if (rr->rd)
+    dns_rd_free(rr->type, rr->rd);
 
   free(rr);
-}
-
-dns_record_t *
-dns_record_clone(dns_record_t *rr) {
-  if (rr == NULL)
-    return NULL;
-
-  dns_record_t *r = dns_record_alloc();
-
-  if (r == NULL)
-    return NULL;
-
-  r->parent = rr->parent;
-  r->type = rr->type;
-  r->class = rr->class;
-  r->ttl = rr->ttl;
-  r->rd_len = rr->rd_len;
-
-  r->name = strdup(rr->name);
-
-  if (r->name == NULL)
-    goto fail;
-
-  if (rr->parent) {
-    r->rd = rr->rd;
-  } else {
-    r->rd = malloc(rr->rd_len);
-    if (r->rd == NULL)
-      goto fail;
-    memcpy(r->rd, rr->rd, rr->rd_len);
-  }
-
-  return r;
-fail:
-  dns_record_free(r);
-  return NULL;
 }
 
 void
@@ -425,9 +388,6 @@ void
 dns_message_free(dns_message_t *msg) {
   if (msg == NULL)
     return;
-
-  if (msg->pd)
-    free(msg->pd);
 
   dns_question_free_list(msg->question);
   dns_record_free_list(msg->answer);
@@ -457,62 +417,611 @@ dns_text_free_list(dns_text_t *text) {
 }
 
 bool
-dns_read_question(
+dns_question_read(
   uint8_t **data,
   size_t *data_len,
-  dns_message_t *msg,
+  uint8_t *pd,
+  size_t pd_len,
   dns_question_t *qs
 ) {
-  if (!dns_alloc_name(data, data_len, msg, &qs->name))
-    return false;
+  if (!dns_alloc_name(data, data_len, pd, pd_len, &qs->name))
+    goto fail;
 
   if (!read_u16be(data, data_len, &qs->type))
-    return false;
+    goto fail;
 
   if (!read_u16be(data, data_len, &qs->class))
-    return false;
+    goto fail;
 
   return true;
+
+fail:
+  if (qs->name) {
+    free(qs->name);
+    qs->name = NULL;
+  }
+
+  return false;
+}
+
+void
+dns_init_rd(uint16_t type, void *rd) {
+  if (rd == NULL)
+    return;
+
+  switch (type) {
+    case DNS_SOA: {
+      dns_soa_rd_t *r = (dns_soa_rd_t *)rd;
+      r->ns = NULL;
+      r->mbox = NULL;
+      r->serial = 0;
+      r->refresh = 0;
+      r->retry = 0;
+      r->expire = 0;
+      r->minttl = 0;
+      break;
+    }
+    case DNS_A: {
+      dns_a_rd_t *r = (dns_a_rd_t *)rd;
+      memset(r->addr, 0, 4);
+      break;
+    }
+    case DNS_AAAA: {
+      dns_aaaa_rd_t *r = (dns_aaaa_rd_t *)rd;
+      memset(r->addr, 0, 16);
+      break;
+    }
+    case DNS_CNAME: {
+      dns_cname_rd_t *r = (dns_cname_rd_t *)rd;
+      r->target = NULL;
+      break;
+    }
+    case DNS_DNAME: {
+      dns_dname_rd_t *r = (dns_dname_rd_t *)rd;
+      r->target = NULL;
+      break;
+    }
+    case DNS_NS: {
+      dns_ns_rd_t *r = (dns_ns_rd_t *)rd;
+      r->ns = NULL;
+      break;
+    }
+    case DNS_MX: {
+      dns_mx_rd_t *r = (dns_mx_rd_t *)rd;
+      r->preference = 0;
+      r->mx = NULL;
+      break;
+    }
+    case DNS_PTR: {
+      dns_ptr_rd_t *r = (dns_ptr_rd_t *)rd;
+      r->ptr = NULL;
+      break;
+    }
+    case DNS_SRV: {
+      dns_srv_rd_t *r = (dns_srv_rd_t *)rd;
+      r->priority = 0;
+      r->weight = 0;
+      r->port = 0;
+      r->target = NULL;
+      break;
+    }
+    case DNS_TXT: {
+      dns_txt_rd_t *r = (dns_txt_rd_t *)rd;
+      r->text = NULL;
+      break;
+    }
+    case DNS_DS: {
+      dns_ds_rd_t *r = (dns_ds_rd_t *)rd;
+      r->key_tag = 0;
+      r->algorithm = 0;
+      r->digest_type = 0;
+      r->digest_len = 0;
+      r->digest = NULL;
+      break;
+    }
+    case DNS_TLSA: {
+      dns_tlsa_rd_t *r = (dns_tlsa_rd_t *)rd;
+      r->usage = 0;
+      r->selector = 0;
+      r->matching_type = 0;
+      r->certificate_len = 0;
+      r->certificate = NULL;
+      break;
+    }
+    case DNS_SSHFP: {
+      dns_sshfp_rd_t *r = (dns_sshfp_rd_t *)rd;
+      r->algorithm = 0;
+      r->type = 0;
+      r->fingerprint_len = 0;
+      r->fingerprint = NULL;
+      break;
+    }
+    case DNS_OPENPGPKEY: {
+      dns_openpgpkey_rd_t *r = (dns_openpgpkey_rd_t *)rd;
+      r->public_key_len = 0;
+      r->public_key = NULL;
+      break;
+    }
+    default: {
+      dns_unknown_rd_t *r = (dns_unknown_rd_t *)rd;
+      r->rd_len = 0;
+      r->rd = NULL;
+      break;
+    }
+  }
+}
+
+void *
+dns_rd_alloc(uint16_t type) {
+  void *rd;
+
+  switch (type) {
+    case DNS_SOA: {
+      rd = (void *)malloc(sizeof(dns_soa_rd_t));
+      break;
+    }
+    case DNS_A: {
+      rd = (void *)malloc(sizeof(dns_a_rd_t));
+      break;
+    }
+    case DNS_AAAA: {
+      rd = (void *)malloc(sizeof(dns_aaaa_rd_t));
+      break;
+    }
+    case DNS_CNAME: {
+      rd = (void *)malloc(sizeof(dns_cname_rd_t));
+      break;
+    }
+    case DNS_DNAME: {
+      rd = (void *)malloc(sizeof(dns_dname_rd_t));
+      break;
+    }
+    case DNS_NS: {
+      rd = (void *)malloc(sizeof(dns_ns_rd_t));
+      break;
+    }
+    case DNS_MX: {
+      rd = (void *)malloc(sizeof(dns_mx_rd_t));
+      break;
+    }
+    case DNS_PTR: {
+      rd = (void *)malloc(sizeof(dns_ptr_rd_t));
+      break;
+    }
+    case DNS_SRV: {
+      rd = (void *)malloc(sizeof(dns_srv_rd_t));
+      break;
+    }
+    case DNS_TXT: {
+      rd = (void *)malloc(sizeof(dns_txt_rd_t));
+      break;
+    }
+    case DNS_DS: {
+      rd = (void *)malloc(sizeof(dns_ds_rd_t));
+      break;
+    }
+    case DNS_TLSA: {
+      rd = (void *)malloc(sizeof(dns_tlsa_rd_t));
+      break;
+    }
+    case DNS_SSHFP: {
+      rd = (void *)malloc(sizeof(dns_sshfp_rd_t));
+      break;
+    }
+    case DNS_OPENPGPKEY: {
+      rd = (void *)malloc(sizeof(dns_openpgpkey_rd_t));
+      break;
+    }
+    default: {
+      rd = (void *)malloc(sizeof(dns_unknown_rd_t));
+      break;
+    }
+  }
+
+  dns_init_rd(type, rd);
+
+  return rd;
+}
+
+void
+dns_rd_free(uint16_t type, void *rd) {
+  if (rd == NULL)
+    return;
+
+  switch (type) {
+    case DNS_SOA: {
+      dns_soa_rd_t *r = (dns_soa_rd_t *)rd;
+      if (r->ns)
+        free(r->ns);
+      if (r->mbox)
+        free(r->mbox);
+      break;
+    }
+    case DNS_A: {
+      dns_a_rd_t *r = (dns_a_rd_t *)rd;
+      break;
+    }
+    case DNS_AAAA: {
+      dns_aaaa_rd_t *r = (dns_aaaa_rd_t *)rd;
+      break;
+    }
+    case DNS_CNAME: {
+      dns_cname_rd_t *r = (dns_cname_rd_t *)rd;
+      if (r->target)
+        free(r->target);
+      break;
+    }
+    case DNS_DNAME: {
+      dns_dname_rd_t *r = (dns_dname_rd_t *)rd;
+      if (r->target)
+        free(r->target);
+      break;
+    }
+    case DNS_NS: {
+      dns_ns_rd_t *r = (dns_ns_rd_t *)rd;
+      if (r->ns)
+        free(r->ns);
+      break;
+    }
+    case DNS_MX: {
+      dns_mx_rd_t *r = (dns_mx_rd_t *)rd;
+      if (r->mx)
+        free(r->mx);
+      break;
+    }
+    case DNS_PTR: {
+      dns_ptr_rd_t *r = (dns_ptr_rd_t *)rd;
+      if (r->ptr)
+        free(r->ptr);
+      break;
+    }
+    case DNS_SRV: {
+      dns_srv_rd_t *r = (dns_srv_rd_t *)rd;
+      if (r->target)
+        free(r->target);
+      break;
+    }
+    case DNS_TXT: {
+      dns_txt_rd_t *r = (dns_txt_rd_t *)rd;
+      if (r->text)
+        dns_text_free_list(r->text);
+      break;
+    }
+    case DNS_DS: {
+      dns_ds_rd_t *r = (dns_ds_rd_t *)rd;
+      if (r->digest)
+        free(r->digest);
+      break;
+    }
+    case DNS_TLSA: {
+      dns_tlsa_rd_t *r = (dns_tlsa_rd_t *)rd;
+      if (r->certificate)
+        free(r->certificate);
+      break;
+    }
+    case DNS_SSHFP: {
+      dns_sshfp_rd_t *r = (dns_sshfp_rd_t *)rd;
+      if (r->fingerprint)
+        free(r->fingerprint);
+      break;
+    }
+    case DNS_OPENPGPKEY: {
+      dns_openpgpkey_rd_t *r = (dns_openpgpkey_rd_t *)rd;
+      if (r->public_key)
+        free(r->public_key);
+      break;
+    }
+    default: {
+      dns_unknown_rd_t *r = (dns_unknown_rd_t *)rd;
+      if (r->rd)
+        free(r->rd);
+      break;
+    }
+  }
+
+  free(rd);
 }
 
 bool
-dns_read_record(
+dns_read_rd(
   uint8_t **data,
   size_t *data_len,
-  dns_message_t *msg,
-  dns_record_t *rr
+  uint8_t *pd,
+  size_t pd_len,
+  uint16_t type,
+  void *rd
 ) {
-  if (!dns_alloc_name(data, data_len, msg, &rr->name))
-    return false;
+  switch (type) {
+    case DNS_SOA: {
+      dns_soa_rd_t *r = (dns_soa_rd_t *)rd;
 
-  if (!read_u16be(data, data_len, &rr->type))
-    return false;
+      if (!dns_alloc_name(data, data_len, pd, pd_len, &r->ns))
+        goto fail_soa;
 
-  if (!read_u16be(data, data_len, &rr->class))
-    return false;
+      if (!dns_alloc_name(data, data_len, pd, pd_len, &r->mbox))
+        goto fail_soa;
 
-  if (!read_u32be(data, data_len, &rr->ttl))
-    return false;
+      if (!read_u32be(data, data_len, &r->serial))
+        goto fail_soa;
 
-  if (!read_u16be(data, data_len, &rr->rd_len))
-    return false;
+      if (!read_u32be(data, data_len, &r->refresh))
+        goto fail_soa;
 
-  if (msg) {
-    rr->parent = msg;
-    if (!slice_bytes(data, data_len, &rr->rd, rr->rd_len))
+      if (!read_u32be(data, data_len, &r->retry))
+        goto fail_soa;
+
+      if (!read_u32be(data, data_len, &r->expire))
+        goto fail_soa;
+
+      if (!read_u32be(data, data_len, &r->minttl))
+        goto fail_soa;
+
+      break;
+
+fail_soa:
+      if (r->ns) {
+        free(r->ns);
+        r->ns = NULL;
+      }
+
+      if (r->mbox) {
+        free(r->mbox);
+        r->mbox = NULL;
+      }
+
       return false;
-  } else {
-    if (!alloc_bytes(data, data_len, &rr->rd, rr->rd_len))
+    }
+    case DNS_A: {
+      dns_a_rd_t *r = (dns_a_rd_t *)rd;
+
+      if (!read_bytes(data, data_len, r->addr, 4))
+        return false;
+
+      break;
+    }
+    case DNS_AAAA: {
+      dns_aaaa_rd_t *r = (dns_aaaa_rd_t *)rd;
+
+      if (!read_bytes(data, data_len, r->addr, 16))
+        return false;
+
+      break;
+    }
+    case DNS_CNAME: {
+      dns_cname_rd_t *r = (dns_cname_rd_t *)rd;
+
+      if (!dns_alloc_name(data, data_len, pd, pd_len, &r->target))
+        return false;
+
+      break;
+    }
+    case DNS_DNAME: {
+      dns_dname_rd_t *r = (dns_dname_rd_t *)rd;
+
+      if (!dns_alloc_name(data, data_len, pd, pd_len, &r->target))
+        return false;
+
+      break;
+    }
+    case DNS_NS: {
+      dns_ns_rd_t *r = (dns_ns_rd_t *)rd;
+
+      if (!dns_alloc_name(data, data_len, pd, pd_len, &r->ns))
+        return false;
+
+      break;
+    }
+    case DNS_MX: {
+      dns_mx_rd_t *r = (dns_mx_rd_t *)rd;
+
+      if (!read_u16be(data, data_len, &r->preference))
+        return false;
+
+      if (!dns_alloc_name(data, data_len, pd, pd_len, &r->mx))
+        return false;
+
+      break;
+    }
+    case DNS_PTR: {
+      dns_ptr_rd_t *r = (dns_ptr_rd_t *)rd;
+
+      if (!dns_alloc_name(data, data_len, pd, pd_len, &r->ptr))
+        return false;
+
+      break;
+    }
+    case DNS_SRV: {
+      dns_srv_rd_t *r = (dns_srv_rd_t *)rd;
+
+      if (!read_u16be(data, data_len, &r->priority))
+        return false;
+
+      if (!read_u16be(data, data_len, &r->weight))
+        return false;
+
+      if (!read_u16be(data, data_len, &r->port))
+        return false;
+
+      if (!dns_alloc_name(data, data_len, pd, pd_len, &r->target))
+        return false;
+
+      break;
+    }
+    case DNS_TXT: {
+      dns_txt_rd_t *r = (dns_txt_rd_t *)rd;
+      dns_text_t *parent = NULL;
+
+      while (*data_len > 0) {
+        dns_text_t *text = dns_text_alloc();
+
+        if (text == NULL)
+          goto fail_txt;
+
+        if (!read_u8(data, data_len, &text->data_len))
+          goto fail_txt;
+
+        if (!alloc_bytes(data, data_len, &text->data, text->data_len))
+          goto fail_txt;
+
+        if (r->text == NULL)
+          r->text = text;
+
+        if (parent)
+          parent->next = text;
+
+        parent = text;
+      }
+
+      break;
+
+fail_txt:
+      if (r->text) {
+        dns_text_free_list(r->text);
+        r->text = NULL;
+      }
       return false;
+    }
+    case DNS_DS: {
+      dns_ds_rd_t *r = (dns_ds_rd_t *)rd;
+
+      if (!read_u16be(data, data_len, &r->key_tag))
+        return false;
+
+      if (!read_u8(data, data_len, &r->algorithm))
+        return false;
+
+      if (!read_u8(data, data_len, &r->digest_type))
+        return false;
+
+      r->digest_len = *data_len;
+
+      if (!alloc_bytes(data, data_len, &r->digest, *data_len))
+        return false;
+
+      break;
+    }
+    case DNS_TLSA: {
+      dns_tlsa_rd_t *r = (dns_tlsa_rd_t *)rd;
+
+      if (!read_u8(data, data_len, &r->usage))
+        return false;
+
+      if (!read_u8(data, data_len, &r->selector))
+        return false;
+
+      if (!read_u8(data, data_len, &r->matching_type))
+        return false;
+
+      r->certificate_len = *data_len;
+
+      if (!alloc_bytes(data, data_len, &r->certificate, *data_len))
+        return false;
+
+      break;
+    }
+    case DNS_SSHFP: {
+      dns_sshfp_rd_t *r = (dns_sshfp_rd_t *)rd;
+
+      if (!read_u8(data, data_len, &r->algorithm))
+        return false;
+
+      if (!read_u8(data, data_len, &r->type))
+        return false;
+
+      r->fingerprint_len = *data_len;
+
+      if (!alloc_bytes(data, data_len, &r->fingerprint, *data_len))
+        return false;
+
+      break;
+    }
+    case DNS_OPENPGPKEY: {
+      dns_openpgpkey_rd_t *r = (dns_openpgpkey_rd_t *)rd;
+
+      r->public_key_len = *data_len;
+
+      if (!alloc_bytes(data, data_len, &r->public_key, *data_len))
+        return false;
+
+      break;
+    }
+    default: {
+      dns_unknown_rd_t *r = (dns_unknown_rd_t *)rd;
+
+      r->rd_len = *data_len;
+
+      if (!alloc_bytes(data, data_len, &r->rd, *data_len))
+        return false;
+
+      break;
+    }
   }
 
   return true;
 }
 
 bool
-dns_read_message(uint8_t **data, size_t *data_len, dns_message_t *msg) {
-  msg->pd = *data;
-  msg->pd_len = *data_len;
+dns_record_read(
+  uint8_t **data,
+  size_t *data_len,
+  uint8_t *pd,
+  size_t pd_len,
+  dns_record_t *rr
+) {
+  if (!dns_alloc_name(data, data_len, pd, pd_len, &rr->name))
+    goto fail;
+
+  if (!read_u16be(data, data_len, &rr->type))
+    goto fail;
+
+  if (!read_u16be(data, data_len, &rr->class))
+    goto fail;
+
+  if (!read_u32be(data, data_len, &rr->ttl))
+    goto fail;
+
+  uint16_t len;
+
+  if (!read_u16be(data, data_len, &len))
+    goto fail;
+
+  if (*data_len < len)
+    goto fail;
+
+  rr->rd = dns_rd_alloc(rr->type);
+
+  if (rr->rd == NULL)
+    goto fail;
+
+  uint8_t *rd = *data;
+  size_t rdlen = (size_t)len;
+
+  if (!dns_read_rd(&rd, &rdlen, pd, pd_len, rr->type, rr->rd))
+    goto fail;
+
+  *data += len;
+  *data_len -= len;
+
+  return true;
+
+fail:
+  if (rr->name) {
+    free(rr->name);
+    rr->name = NULL;
+  }
+
+  if (rr->rd) {
+    free(rr->rd);
+    rr->rd = NULL;
+  }
+
+  return false;
+}
+
+bool
+dns_message_read(uint8_t **data, size_t *data_len, dns_message_t *msg) {
+  uint8_t *pd = *data;
+  size_t pd_len = *data_len;
 
   if (!read_u16be(data, data_len, &msg->id))
     return false;
@@ -545,7 +1054,7 @@ dns_read_message(uint8_t **data, size_t *data_len, dns_message_t *msg) {
       if (qs == NULL)
         goto fail;
 
-      if (!dns_read_question(data, data_len, msg, qs))
+      if (!dns_question_read(data, data_len, pd, pd_len, qs))
         goto fail;
 
       if (msg->question == NULL)
@@ -570,7 +1079,7 @@ dns_read_message(uint8_t **data, size_t *data_len, dns_message_t *msg) {
     if (rr == NULL)
       goto fail;
 
-    if (!dns_read_record(data, data_len, msg, rr))
+    if (!dns_record_read(data, data_len, pd, pd_len, rr))
       goto fail;
 
     if (msg->answer == NULL)
@@ -594,7 +1103,7 @@ dns_read_message(uint8_t **data, size_t *data_len, dns_message_t *msg) {
     if (rr == NULL)
       goto fail;
 
-    if (!dns_read_record(data, data_len, msg, rr))
+    if (!dns_record_read(data, data_len, pd, pd_len, rr))
       goto fail;
 
     if (msg->authority == NULL)
@@ -616,7 +1125,7 @@ dns_read_message(uint8_t **data, size_t *data_len, dns_message_t *msg) {
     if (rr == NULL)
       goto fail;
 
-    if (!dns_read_record(data, data_len, msg, rr))
+    if (!dns_record_read(data, data_len, pd, pd_len, rr))
       goto fail;
 
     if (msg->additional == NULL)
@@ -640,15 +1149,13 @@ fail:
 }
 
 bool
-dns_decode_message(uint8_t *data, size_t data_len, dns_message_t **msg) {
-  *msg = NULL;
-
+dns_message_decode(uint8_t *data, size_t data_len, dns_message_t **msg) {
   dns_message_t *m = dns_message_alloc();
 
   if (m == NULL)
     return false;
 
-  if (!dns_read_message(&data, &data_len, m))
+  if (!dns_message_read(&data, &data_len, m))
     return false;
 
   *msg = m;
@@ -656,132 +1163,11 @@ dns_decode_message(uint8_t *data, size_t data_len, dns_message_t **msg) {
   return true;
 }
 
-bool
-dns_read_a_record(dns_record_t *rr, uint8_t *ipv4) {
-  if (rr->type != DNS_A)
-    return false;
-
-  uint8_t *rd = rr->rd;
-  size_t rd_len = rr->rd_len;
-
-  return read_bytes(&rd, &rd_len, ipv4, 4);
-}
-
-bool
-dns_alloc_a_record(dns_record_t *rr, uint8_t **ipv4) {
-  if (rr->type != DNS_A)
-    return false;
-
-  uint8_t *rd = rr->rd;
-  size_t rd_len = rr->rd_len;
-
-  return alloc_bytes(&rd, &rd_len, ipv4, 4);
-}
-
-bool
-dns_read_aaaa_record(dns_record_t *rr, uint8_t *ipv6) {
-  if (rr->type != DNS_AAAA)
-    return false;
-
-  uint8_t *rd = rr->rd;
-  size_t rd_len = rr->rd_len;
-
-  return read_bytes(&rd, &rd_len, ipv6, 16);
-}
-
-bool
-dns_alloc_aaaa_record(dns_record_t *rr, uint8_t **ipv6) {
-  if (rr->type != DNS_AAAA)
-    return false;
-
-  uint8_t *rd = rr->rd;
-  size_t rd_len = rr->rd_len;
-
-  return alloc_bytes(&rd, &rd_len, ipv6, 16);
-}
-
-bool
-dns_read_cname_record(dns_record_t *rr, char *name) {
-  if (rr->type != DNS_CNAME)
-    return false;
-
-  uint8_t *rd = rr->rd;
-  size_t rd_len = rr->rd_len;
-
-  return dns_read_name(&rd, &rd_len, rr->parent, name);
-}
-
-bool
-dns_alloc_cname_record(dns_record_t *rr, char **name) {
-  if (rr->type != DNS_CNAME)
-    return false;
-
-  uint8_t *rd = rr->rd;
-  size_t rd_len = rr->rd_len;
-
-  return dns_alloc_name(&rd, &rd_len, rr->parent, name);
-}
-
-bool
-dns_read_ns_record(dns_record_t *rr, char **name) {
-  if (rr->type != DNS_NS)
-    return false;
-
-  uint8_t *rd = rr->rd;
-  size_t rd_len = rr->rd_len;
-
-  return dns_alloc_name(&rd, &rd_len, rr->parent, name);
-}
-
-bool
-dns_read_txt_record(dns_record_t *rr, dns_text_t **text) {
-  if (rr->type != DNS_TXT)
-    return false;
-
-  *text = NULL;
-
-  uint8_t *rd = rr->rd;
-  size_t rd_len = rr->rd_len;
-
-  dns_text_t *parent = NULL;
-
-  while (rd_len > 0) {
-    dns_text_t *t = dns_text_alloc();
-
-    if (t == NULL)
-      goto fail;
-
-    if (!read_u8(&rd, &rd_len, &t->data_len))
-      goto fail;
-
-    if (!alloc_bytes(&rd, &rd_len, &t->data, t->data_len))
-      goto fail;
-
-    if (*text == NULL)
-      *text = t;
-
-    if (parent)
-      parent->next = t;
-
-    parent = t;
-  }
-
-  return true;
-
-fail:
-  dns_text_free_list(*text);
-  *text = NULL;
-  return false;
-}
-
 dns_record_t *
 dns_get_record(dns_record_t *rr, char *target, uint8_t type) {
   dns_record_t *c;
 
-  char glue[1017];
-
-  if (target)
-    strcpy(glue, target);
+  char *glue = target;
 
   for (c = rr; c; c = c->next) {
     if (!target) {
@@ -795,8 +1181,7 @@ dns_get_record(dns_record_t *rr, char *target, uint8_t type) {
         if (type == DNS_CNAME || type == DNS_ANY)
           return c;
 
-        if (!dns_read_cname_record(c, glue))
-          return NULL;
+        glue = ((dns_cname_rd_t *)c->rd)->target;
       }
       continue;
     }
@@ -811,40 +1196,34 @@ dns_get_record(dns_record_t *rr, char *target, uint8_t type) {
   return NULL;
 }
 
+void
+dns_iterator_init(
+  dns_iterator_t *it,
+  dns_record_t *section,
+  char *target,
+  uint8_t type
+) {
+  it->target = target;
+  it->type = type;
+  it->current = section;
+}
+
 dns_record_t *
-dns_get_records(dns_record_t *rr, char *target, uint8_t type) {
-  dns_record_t *head = NULL;
-  dns_record_t *parent = NULL;
-  dns_record_t *c = rr;
+dns_iterator_next(dns_iterator_t *it) {
+  if (it->current == NULL)
+    return NULL;
 
-  while (c) {
-    c = dns_get_record(c, target, type);
+  dns_record_t *c = dns_get_record(it->current, it->target, it->type);
 
-    if (c == NULL)
-      break;
-
-    dns_record_t *r = dns_record_clone(c);
-
-    if (r == NULL)
-      goto fail;
-
-    if (head == NULL)
-      head = r;
-
-    if (parent)
-      parent->next = r;
-
-    parent = r;
-
-    if (target)
-      target = c->name;
-
-    c = c->next;
+  if (c == NULL) {
+    it->current = NULL;
+    return NULL;
   }
 
-  return head;
+  if (it->target)
+    it->target = c->name;
 
-fail:
-  dns_record_free(head);
-  return NULL;
+  it->current = c->next;
+
+  return c;
 }
