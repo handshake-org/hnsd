@@ -422,6 +422,8 @@ hsk_verify_proof(
     hsk_free_node(hn, true);
     hn = NULL;
 
+    node = NULL;
+
     if (!hsk_decode_node(c->data, c->data_len, &node)) {
       rc = HSK_EMALFORMEDNODE;
       goto fail;
