@@ -863,7 +863,7 @@ hsk_verify_dns(dns_message_t *msg, char *name, int32_t type) {
       goto cleanup;
     }
 
-    if (canonical->target.type != HSK_INAME)
+    if (canonical->target.type != HSK_NAME)
       goto cleanup;
 
     char *target = ((dns_cname_rd_t *)cname->rd)->target;

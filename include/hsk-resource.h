@@ -5,22 +5,21 @@
 #define HSK_INET6 2
 #define HSK_ONION 3
 #define HSK_ONIONNG 4
-#define HSK_INAME 5
-#define HSK_HNAME 6
-#define HSK_CANONICAL 7
-#define HSK_DELEGATE 8
-#define HSK_NS 9
-#define HSK_SERVICE 10
-#define HSK_URL 11
-#define HSK_EMAIL 12
-#define HSK_TEXT 13
-#define HSK_LOCATION 14
-#define HSK_MAGNET 15
-#define HSK_DS 16
-#define HSK_TLS 17
-#define HSK_SSH 18
-#define HSK_PGP 19
-#define HSK_ADDR 20
+#define HSK_NAME 5
+#define HSK_CANONICAL 6
+#define HSK_DELEGATE 7
+#define HSK_NS 8
+#define HSK_SERVICE 9
+#define HSK_URL 10
+#define HSK_EMAIL 11
+#define HSK_TEXT 12
+#define HSK_LOCATION 13
+#define HSK_MAGNET 14
+#define HSK_DS 15
+#define HSK_TLS 16
+#define HSK_SSH 17
+#define HSK_PGP 18
+#define HSK_ADDR 19
 #define HSK_EXTRA 255
 
 // Records
@@ -35,7 +34,7 @@ typedef struct {
   char *name;
 } hsk_target_t;
 
-// host(inet4,inet6,onion,onionng,iname,hname), canonical, delagate, ns
+// host(inet4,inet6,onion,onionng,name), canonical, delagate, ns
 typedef struct {
   uint8_t type;
   struct hsk_record_t *next;
@@ -46,8 +45,7 @@ typedef hsk_host_record_t hsk_inet4_record_t;
 typedef hsk_host_record_t hsk_inet6_record_t;
 typedef hsk_host_record_t hsk_onion_record_t;
 typedef hsk_host_record_t hsk_onionng_record_t;
-typedef hsk_host_record_t hsk_iname_record_t;
-typedef hsk_host_record_t hsk_hname_record_t;
+typedef hsk_host_record_t hsk_name_record_t;
 typedef hsk_host_record_t hsk_canonical_record_t;
 typedef hsk_host_record_t hsk_delegate_record_t;
 typedef hsk_host_record_t hsk_ns_record_t;

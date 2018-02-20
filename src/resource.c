@@ -133,8 +133,7 @@ hsk_read_target(
     case HSK_ONIONNG: {
       return read_bytes(data, data_len, target->addr, 33);
     }
-    case HSK_INAME:
-    case HSK_HNAME: {
+    case HSK_NAME: {
       return hsk_read_compressed(data, data_len, st, &target->name);
     }
     default: {
@@ -503,8 +502,7 @@ hsk_init_record(hsk_record_t *r) {
     case HSK_INET6:
     case HSK_ONION:
     case HSK_ONIONNG:
-    case HSK_INAME:
-    case HSK_HNAME:
+    case HSK_NAME:
     case HSK_CANONICAL:
     case HSK_DELEGATE:
     case HSK_NS: {
@@ -610,8 +608,7 @@ hsk_alloc_record(uint8_t type) {
     case HSK_INET6:
     case HSK_ONION:
     case HSK_ONIONNG:
-    case HSK_INAME:
-    case HSK_HNAME:
+    case HSK_NAME:
     case HSK_CANONICAL:
     case HSK_DELEGATE:
     case HSK_NS: {
@@ -662,7 +659,7 @@ hsk_alloc_record(uint8_t type) {
   if (r == NULL)
     return NULL;
 
-  if (type == HSK_INAME || type == HSK_HNAME)
+  if (type == HSK_NAME)
     type = HSK_CANONICAL;
 
   r->type = type;
@@ -682,8 +679,7 @@ hsk_free_record(hsk_record_t *r) {
     case HSK_INET6:
     case HSK_ONION:
     case HSK_ONIONNG:
-    case HSK_INAME:
-    case HSK_HNAME:
+    case HSK_NAME:
     case HSK_CANONICAL:
     case HSK_DELEGATE:
     case HSK_NS: {
@@ -807,8 +803,7 @@ hsk_read_record(
     case HSK_INET6:
     case HSK_ONION:
     case HSK_ONIONNG:
-    case HSK_INAME:
-    case HSK_HNAME: {
+    case HSK_NAME: {
       hsk_host_record_t *rec = (hsk_host_record_t *)*r;
       result = hsk_read_target(data, data_len, type, st, &rec->target);
       break;
