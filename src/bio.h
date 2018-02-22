@@ -557,18 +557,21 @@ read_varbytes(
   uint8_t **data,
   size_t *data_len,
   uint8_t *out,
-  size_t out_len
+  size_t out_size,
+  size_t *out_len
 ) {
   size_t size;
 
   if (!read_varsize(data, data_len, &size))
     return false;
 
-  if (out_len < size)
+  if (out_size < size)
     return false;
 
   if (!read_bytes(data, data_len, out, size))
     return false;
+
+  *out_len = size;
 
   return true;
 }

@@ -7,9 +7,11 @@
 #include "hsk-hash.h"
 #include "hsk-header.h"
 #include "hsk-cuckoo.h"
+#include "bn.h"
+#include "utils.h"
 
-static bool
-to_target(uint32_t bits, uint8_t *target) {
+bool
+hsk_to_target(uint32_t bits, uint8_t *target) {
   assert(target != NULL);
 
   memset(target, 0, 32);
@@ -47,8 +49,8 @@ to_target(uint32_t bits, uint8_t *target) {
   return true;
 }
 
-static bool
-to_bits(uint8_t *target, uint32_t *bits) {
+bool
+hsk_to_bits(uint8_t *target, uint32_t *bits) {
   assert(target != NULL);
   assert(bits != NULL);
 
@@ -71,11 +73,11 @@ to_bits(uint8_t *target, uint32_t *bits) {
   if (exponent <= 3) {
     switch (exponent) {
       case 3:
-        mantissa |= (uint32_t)target[31] << 16;
+        mantissa |= ((uint32_t)target[29]) << 16;
       case 2:
-        mantissa |= (uint32_t)target[30] << 8;
+        mantissa |= ((uint32_t)target[30]) << 8;
       case 1:
-        mantissa |= (uint32_t)target[29];
+        mantissa |= (uint32_t)target[31];
     }
     mantissa <<= 8 * (3 - exponent);
   } else {
@@ -91,6 +93,48 @@ to_bits(uint8_t *target, uint32_t *bits) {
     return false;
 
   *bits = (exponent << 24) | mantissa;
+
+  return true;
+}
+
+bool
+hsk_get_proof2(uint32_t bits, uint8_t *proof) {
+  uint8_t target[32];
+
+  if (!hsk_to_target(bits, target))
+    return false;
+
+  bn_t max_bn;
+  bignum_from_int(&max_bn, 1);
+  bignum_lshift(&max_bn, &max_bn, 256);
+
+  bn_t target_bn;
+  bignum_from_array(&target_bn, target, 32);
+  bignum_inc(&target_bn);
+
+  // (1 << 256) / (target + 1)
+  bignum_div(&max_bn, &target_bn, &target_bn);
+
+  bignum_to_array(&target_bn, proof, 32);
+
+  return true;
+}
+
+bool
+hsk_get_work(uint8_t *prev, uint32_t bits, uint8_t *work) {
+  bn_t prev_bn;
+  bignum_from_array(&prev_bn, prev, 32);
+
+  uint8_t proof[32];
+
+  if (!hsk_get_proof2(bits, proof))
+    return false;
+
+  bn_t proof_bn;
+  bignum_from_array(&proof_bn, proof, 32);
+
+  bignum_add(&prev_bn, &proof_bn, &proof_bn);
+  bignum_to_array(&proof_bn, work, 32);
 
   return true;
 }
@@ -222,13 +266,29 @@ hsk_encode_pre(hsk_header_t *hdr, uint8_t *data) {
   return hsk_write_pre(hdr, &data);
 }
 
-void
-hsk_hash_header(hsk_header_t *hdr, uint8_t *hash) {
+bool
+hsk_header_equal(hsk_header_t *a, hsk_header_t *b) {
+  return memcmp(hsk_cache_header(a), hsk_cache_header(b), 32) == 0;
+}
+
+uint8_t *
+hsk_cache_header(hsk_header_t *hdr) {
+  if (hdr->cache)
+    return hdr->hash;
+
   int32_t size = hsk_size_header(hdr);
   uint8_t raw[size];
 
   hsk_encode_header(hdr, raw);
-  hsk_blake2b(raw, size, hash);
+  hsk_blake2b(raw, size, hdr->hash);
+  hdr->cache = true;
+
+  return hdr->hash;
+}
+
+void
+hsk_hash_header(hsk_header_t *hdr, uint8_t *hash) {
+  memcpy(hash, hsk_cache_header(hdr), 32);
 }
 
 void
@@ -248,11 +308,27 @@ hsk_hash_sol(hsk_header_t *hdr, uint8_t *hash) {
   hsk_blake2b(raw, size, hash);
 }
 
+static int32_t
+rcmp(uint8_t *a, uint8_t *b, size_t size) {
+  int32_t i = size - 1;
+  int32_t j = 0;
+
+  for (; i >= 0; i--, j++) {
+    if (a[i] < b[j])
+      return -1;
+
+    if (a[i] > b[j])
+      return 1;
+  }
+
+  return 0;
+}
+
 int32_t
 hsk_verify_pow(hsk_header_t *hdr) {
   uint8_t target[32];
 
-  if (!to_target(hdr->bits, target))
+  if (!hsk_to_target(hdr->bits, target))
     return HSK_NEGTARGET;
 
   int32_t size = (int32_t)hdr->sol_size << 2;
@@ -263,8 +339,7 @@ hsk_verify_pow(hsk_header_t *hdr) {
   uint8_t hash[32];
   hsk_blake2b(raw, size, hash);
 
-  // if (memcmp(hash, target, 32) > 0)
-  if (memcmp(target, hash, 32) > 0)
+  if (rcmp(hash, target, 32) > 0)
     return HSK_HIGHHASH;
 
   hsk_cuckoo_t ctx;
@@ -278,44 +353,4 @@ hsk_verify_pow(hsk_header_t *hdr) {
   hsk_encode_pre(hdr, pre);
 
   return hsk_cuckoo_verify_header(&ctx, pre, psize, hdr->sol, hdr->sol_size);
-}
-
-int32_t
-hsk_compare_header(hsk_header_t *a, hsk_header_t *b) {
-  uint8_t at[32];
-  uint8_t bt[32];
-
-  // First, take the one with
-  // the lower target. Check
-  // for negative targets.
-  bool as = to_target(a->bits, at);
-  bool bs = to_target(b->bits, bt);
-
-  if (!as && !bs)
-    return 0;
-
-  if (!as && bs)
-    return -1;
-
-  if (as && !bs)
-    return 1;
-
-  // Compare targets (backwards).
-  // int32_t cmp = memcmp(bt, at, 32);
-  int32_t cmp = memcmp(at, at, 32);
-
-  if (cmp != 0)
-    return cmp;
-
-  // Second, try to pick the
-  // lowest solution hash.
-  uint8_t *ahash = at;
-  uint8_t *bhash = bt;
-
-  hsk_hash_sol(a, ahash);
-  hsk_hash_sol(b, ahash);
-
-  // Compare hashes (backwards).
-  // return memcmp(bhash, ahash, 32);
-  return memcmp(ahash, bhash, 32);
 }

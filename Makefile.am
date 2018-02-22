@@ -32,24 +32,20 @@ libhsk_la_SOURCES = src/b64.c \
                     src/resource.c \
                     src/siphash.c \
                     src/hash.c \
-                    src/header.c
+                    src/header.c \
+                    src/packets.c \
+                    src/map.c \
+                    src/utils.c \
+                    src/sha256.c \
+                    src/bn.c
 
 EXTRA_DIST = include \
              README.md \
              LICENSE
 
-# TESTS = test/run-tests
-# check_PROGRAMS = test/run-tests
-# test_run_tests_CFLAGS =
-# test_run_tests_LDFLAGS =
-# test_run_tests_SOURCES = test/test.c
-# test_run_tests_LDADD = libhsk.la
-
-# DIST_SUBDIRS = test
-
 PROGS = hsk
 noinst_PROGRAMS = $(PROGS)
-hsk_SOURCES = test/hsk.c
+hsk_SOURCES = src/daemon.c
 hsk_LDADD = $(top_builddir)/libhsk.la
 hsk_LDFLAGS = -static
 hsk_CFLAGS = $(AM_CFLAGS)
