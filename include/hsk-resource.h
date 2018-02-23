@@ -182,7 +182,7 @@ hsk_resource_to_dns(
   char *fqdn,
   uint16_t type,
   bool edns,
-  bool ds,
+  bool dnssec,
   uint8_t **wire,
   size_t *wire_len
 );
@@ -192,7 +192,7 @@ hsk_resource_root(
   uint16_t id,
   uint16_t type,
   bool edns,
-  bool ds,
+  bool dnssec,
   uint8_t **wire,
   size_t *wire_len
 );
@@ -203,7 +203,7 @@ hsk_resource_to_nx(
   char *fqdn,
   uint16_t type,
   bool edns,
-  bool ds,
+  bool dnssec,
   uint8_t **wire,
   size_t *wire_len
 );

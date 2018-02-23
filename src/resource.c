@@ -1542,7 +1542,7 @@ hsk_resource_to_dns(
   char *fqdn,
   uint16_t type,
   bool edns,
-  bool ds,
+  bool dnssec,
   uint8_t **wire,
   size_t *wire_len
 ) {
@@ -1602,8 +1602,13 @@ hsk_resource_to_dns(
   ldns_pkt_set_id(res, id);
   ldns_pkt_set_qr(res, 1);
 
-  if (ds)
-    ldns_pkt_set_ad(res, 1);
+  if (edns) {
+    ldns_pkt_set_edns_udp_size(res, 4096);
+    if (dnssec) {
+      ldns_pkt_set_edns_do(res, 1);
+      ldns_pkt_set_ad(res, 1);
+    }
+  }
 
   ldns_rr_set_question(qs, 1);
   ldns_rr_set_type(qs, (ldns_rr_type)type);
@@ -1616,7 +1621,7 @@ hsk_resource_to_dns(
     if (hsk_resource_has(rs, HSK_NS)) {
       hsk_resource_to_ns(rs, name, ns);
       hsk_resource_to_nsip(rs, name, ad);
-      if (ds)
+      if (dnssec)
         hsk_resource_to_ds(rs, name, ns);
     } else if (hsk_resource_has(rs, HSK_DELEGATE)) {
       hsk_resource_to_dname(rs, name, an);
@@ -1690,7 +1695,7 @@ hsk_resource_to_dns(
     if (hsk_resource_has(rs, HSK_NS)) {
       hsk_resource_to_ns(rs, name, ns);
       hsk_resource_to_nsip(rs, name, ad);
-      if (ds)
+      if (dnssec)
         hsk_resource_to_ds(rs, name, ns);
     }
   }
@@ -1783,7 +1788,7 @@ hsk_resource_root(
   uint16_t id,
   uint16_t type,
   bool edns,
-  bool ds,
+  bool dnssec,
   uint8_t **wire,
   size_t *wire_len
 ) {
@@ -1824,8 +1829,13 @@ hsk_resource_root(
   ldns_pkt_set_qr(res, 1);
   ldns_pkt_set_aa(res, 1);
 
-  if (ds)
-    ldns_pkt_set_ad(res, 1);
+  if (edns) {
+    ldns_pkt_set_edns_udp_size(res, 4096);
+    if (dnssec) {
+      ldns_pkt_set_edns_do(res, 1);
+      ldns_pkt_set_ad(res, 1);
+    }
+  }
 
   ldns_rr_set_question(qs, 1);
   ldns_rr_set_type(qs, (ldns_rr_type)type);
@@ -1857,7 +1867,7 @@ hsk_resource_root(
     hsk_resource_root_to_soa(ns);
   }
 
-  // if (ds)
+  // if (dnssec)
   //   dnssec.signMessage(res, '.', key.pub, key.priv);
 
   ldns_pkt_push_rr_list(res, LDNS_SECTION_QUESTION, qd);
@@ -1882,7 +1892,7 @@ hsk_resource_to_nx(
   char *fqdn,
   uint16_t type,
   bool edns,
-  bool ds,
+  bool dnssec,
   uint8_t **wire,
   size_t *wire_len
 ) {
@@ -1924,8 +1934,13 @@ hsk_resource_to_nx(
   ldns_pkt_set_qr(res, 1);
   ldns_pkt_set_aa(res, 1);
 
-  if (ds)
-    ldns_pkt_set_ad(res, 1);
+  if (edns) {
+    ldns_pkt_set_edns_udp_size(res, 4096);
+    if (dnssec) {
+      ldns_pkt_set_edns_do(res, 1);
+      ldns_pkt_set_ad(res, 1);
+    }
+  }
 
   ldns_rr_set_question(qs, 1);
   ldns_rr_set_type(qs, (ldns_rr_type)type);
@@ -1939,7 +1954,7 @@ hsk_resource_to_nx(
   // We should also be giving an NSEC proof
   // here, but I don't think it's possible
   // with the current construction.
-  // if (ds)
+  // if (dnssec)
   //   dnssec.signMessage(res, '.', key.pub, key.priv);
 
   ldns_pkt_push_rr_list(res, LDNS_SECTION_QUESTION, qd);

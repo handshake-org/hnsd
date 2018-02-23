@@ -482,10 +482,13 @@ pool_on_recv(
     free(fqdn);
     ldns_pkt_free(req);
 
+    bool edns = ldns_pkt_edns_udp_size(req) == 4096;
+    bool dnssec = ldns_pkt_edns_do(req);
+
     uint8_t *wire;
     size_t wire_len;
 
-    if (!hsk_resource_root(id, type, false, false, &wire, &wire_len))
+    if (!hsk_resource_root(id, type, edns, dnssec, &wire, &wire_len))
       return;
 
     pool_send(pool, wire, wire_len, addr, true);
@@ -540,6 +543,8 @@ pool_respond_dns(
 
   ldns_rr *qs = ldns_rr_list_rr(ldns_pkt_question(req), 0);
 
+  bool edns = ldns_pkt_edns_udp_size(req) == 4096;
+  bool dnssec = ldns_pkt_edns_do(req);
   uint16_t id = ldns_pkt_id(req);
   uint16_t type = (uint16_t)ldns_rr_get_type(qs);
 
@@ -547,7 +552,7 @@ pool_respond_dns(
 
   // Doesn't exist.
   if (data == NULL) {
-    if (!hsk_resource_to_nx(id, fqdn, type, false, false, &wire, &wire_len)) {
+    if (!hsk_resource_to_nx(id, fqdn, type, edns, dnssec, &wire, &wire_len)) {
       free(dr);
       return;
     }
@@ -564,7 +569,7 @@ pool_respond_dns(
     return;
   }
 
-  if (!hsk_resource_to_dns(rs, id, fqdn, type, false, false, &wire, &wire_len)) {
+  if (!hsk_resource_to_dns(rs, id, fqdn, type, edns, dnssec, &wire, &wire_len)) {
     hsk_free_resource(rs);
     free(dr);
     return;
