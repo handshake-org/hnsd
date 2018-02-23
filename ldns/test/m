@@ -1,3 +1,0 @@
-#!/bin/bash
-
-egrep -v '^#' ../doc/function_manpages | sed 's/, /\n/g' | sed 's/|.*$//' | sort | uniq

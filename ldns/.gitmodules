@@ -1,3 +1,0 @@
-[submodule "contrib/DNS-LDNS"]
-	path = contrib/DNS-LDNS
-	url = https://github.com/wtoorop/DNS-LDNS
