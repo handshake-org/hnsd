@@ -2,7 +2,7 @@
 # CFLAGS = -Wall -std=gnu11 -O2
 # LDFLAGS =
 
-SUBDIRS = cares uv
+SUBDIRS = cares uv ldns
 
 ACLOCAL_AMFLAGS = -I m4
 
@@ -21,7 +21,7 @@ CLEANFILES =
 
 lib_LTLIBRARIES = libhsk.la
 
-libhsk_la_LIBADD = -lcares -luv
+libhsk_la_LIBADD = -lcares -luv -lldns
 libhsk_la_CFLAGS = @CFLAGS@
 libhsk_la_LDFLAGS = -no-undefined -version-info 0:0:0
 libhsk_la_SOURCES = src/b64.c \

@@ -8,6 +8,7 @@ fi
 
 ACLOCAL=${ACLOCAL:-aclocal}
 AUTOCONF=${AUTOCONF:-autoconf}
+AUTORECONF=${AUTORECONF:-autoreconf}
 AUTOMAKE=${AUTOMAKE:-automake}
 LIBTOOLIZE=${LIBTOOLIZE:-libtoolize}
 
@@ -23,6 +24,12 @@ pushd uv
 if ! test -f configure; then
   ./autogen.sh
 fi
+popd
+
+pushd ldns
+"$LIBTOOLIZE" -c --install
+# "$ACLOCAL" -I m4
+"$AUTORECONF"
 popd
 
 "$LIBTOOLIZE" --copy

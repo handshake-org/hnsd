@@ -50,5 +50,5 @@ AC_CHECK_HEADERS([ \
 ])
 
 AC_CONFIG_FILES([Makefile libhsk.pc])
-AC_CONFIG_SUBDIRS([cares uv])
+AC_CONFIG_SUBDIRS([cares uv ldns])
 AC_OUTPUT
