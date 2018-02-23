@@ -21,7 +21,7 @@ CLEANFILES =
 
 lib_LTLIBRARIES = libhsk.la
 
-libhsk_la_LIBADD = -lcares -luv -lldns
+libhsk_la_LIBADD = -lcares -luv -lldns -lssl -lcrypto
 libhsk_la_CFLAGS = @CFLAGS@
 libhsk_la_LDFLAGS = -no-undefined -version-info 0:0:0
 libhsk_la_SOURCES = src/b64.c \
@@ -37,6 +37,7 @@ libhsk_la_SOURCES = src/b64.c \
                     src/map.c \
                     src/utils.c \
                     src/sha256.c \
+                    src/key.c \
                     src/bn.c
 
 EXTRA_DIST = include \
