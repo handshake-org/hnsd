@@ -573,6 +573,7 @@ pool_respond_dns(
   if (rc != LDNS_STATUS_OK) {
     printf("error creating dns response: %s\n",
       ldns_get_errorstr_by_id(rc));
+    free(dr);
     return;
   }
 
