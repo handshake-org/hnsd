@@ -156,7 +156,6 @@ typedef struct {
 typedef struct {
   uint8_t version;
   uint32_t ttl;
-  bool compat;
   hsk_record_t *records;
 } hsk_resource_t;
 
@@ -175,4 +174,37 @@ hsk_resource_get(hsk_resource_t *res, uint8_t type);
 
 bool
 hsk_resource_has(hsk_resource_t *res, uint8_t type);
+
+bool
+hsk_resource_to_dns(
+  hsk_resource_t *rs,
+  uint16_t id,
+  char *fqdn,
+  uint16_t type,
+  bool edns,
+  bool ds,
+  uint8_t **wire,
+  size_t *wire_len
+);
+
+bool
+hsk_resource_root(
+  uint16_t id,
+  uint16_t type,
+  bool edns,
+  bool ds,
+  uint8_t **wire,
+  size_t *wire_len
+);
+
+bool
+hsk_resource_to_nx(
+  uint16_t id,
+  char *fqdn,
+  uint16_t type,
+  bool edns,
+  bool ds,
+  uint8_t **wire,
+  size_t *wire_len
+);
 #endif

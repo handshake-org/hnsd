@@ -147,3 +147,95 @@ xrealloc(void *ptr, size_t size) {
   }
   return data;
 }
+
+void
+label_split(char *fqdn, uint8_t *labels, int32_t *count) {
+  size_t len = strlen(fqdn);
+  bool dot = false;
+  int32_t i;
+  int32_t j = 0;
+
+  for (i = 0; i < len; i++) {
+    if (dot) {
+      if (labels)
+        labels[j++] = i;
+      dot = false;
+      continue;
+    }
+
+    if (fqdn[i] == '.') {
+      dot = true;
+      continue;
+    }
+  }
+
+  if (count)
+    *count = j;
+}
+
+int32_t
+label_count(char *fqdn) {
+  int32_t count;
+  label_split(fqdn, NULL, &count);
+  return count;
+}
+
+void
+label_from2(char *fqdn, uint8_t *labels, int32_t count, int32_t idx, char *ret) {
+  if (idx < 0)
+    idx += count;
+
+  if (idx >= count) {
+    ret[0] = '\0';
+    return;
+  }
+
+  size_t start = (size_t)labels[idx];
+  size_t end = strlen(fqdn);
+  size_t len = end - start;
+
+  memcpy(ret, fqdn + start, len);
+
+  ret[len] = '\0';
+}
+
+void
+label_from(char *fqdn, int32_t idx, char *ret) {
+  uint8_t labels[255];
+  int32_t count;
+  label_split(fqdn, labels, &count);
+  label_from2(fqdn, labels, count, idx, ret);
+}
+
+void
+label_get2(char *fqdn, uint8_t *labels, int32_t count, int32_t idx, char *ret) {
+  if (idx < 0)
+    idx += count;
+
+  if (idx >= count) {
+    ret[0] = '\0';
+    return;
+  }
+
+  size_t start = (size_t)labels[idx];
+  size_t end;
+
+  if (idx + 1 >= count)
+    end = strlen(fqdn);
+  else
+    end = ((size_t)labels[idx + 1]) - 1;
+
+  size_t len = end - start;
+
+  memcpy(ret, fqdn + start, len);
+
+  ret[len] = '\0';
+}
+
+void
+label_get(char *fqdn, int32_t idx, char *ret) {
+  uint8_t labels[255];
+  int32_t count;
+  label_split(fqdn, labels, &count);
+  label_get2(fqdn, labels, count, idx, ret);
+}

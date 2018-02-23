@@ -33,4 +33,21 @@ xmalloc(size_t);
 void *
 xrealloc(void *, size_t);
 
+void
+label_split(char *fqdn, uint8_t *labels, int32_t *count);
+
+int32_t
+label_count(char *fqdn);
+
+void
+label_from2(char *fqdn, uint8_t *labels, int32_t count, int32_t idx, char *ret);
+
+void
+label_from(char *fqdn, int32_t idx, char *ret);
+
+void
+label_get2(char *fqdn, uint8_t *labels, int32_t count, int32_t idx, char *ret);
+
+void
+label_get(char *fqdn, int32_t idx, char *ret);
 #endif

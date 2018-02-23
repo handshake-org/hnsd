@@ -457,11 +457,12 @@ pool_on_recv(
   printf("received dns query:\n");
   ldns_rr_print(stdout, qs);
 
+  uint16_t id = ldns_pkt_id(req);
   const ldns_rdf *rdf = ldns_rr_owner(qs);
   const ldns_rr_type type = ldns_rr_get_type(qs);
   const ldns_rr_class class = ldns_rr_get_class(qs);
 
-  if (class != LDNS_RR_CLASS_IN && class != LDNS_RR_CLASS_ANY) {
+  if (class != LDNS_RR_CLASS_IN) {
     ldns_pkt_free(req);
     return;
   }
@@ -478,6 +479,17 @@ pool_on_recv(
 
   // Authoritative.
   if (size == 1) {
+    free(fqdn);
+    ldns_pkt_free(req);
+
+    uint8_t *wire;
+    size_t wire_len;
+
+    if (!hsk_resource_root(id, type, false, false, &wire, &wire_len))
+      return;
+
+    pool_send(pool, wire, wire_len, addr, true);
+
     return;
   }
 
@@ -498,6 +510,7 @@ pool_on_recv(
   dr->req = req;
   memcpy((void *)&dr->addr, (void *)addr, sizeof(struct sockaddr));
   memcpy(dr->fqdn, fqdn, size + 1);
+  free(fqdn);
 
   pool_resolve(pool, name, pool_respond_dns, (void *)dr);
 }
@@ -522,60 +535,42 @@ pool_respond_dns(
     return;
   }
 
-  // Doesn't exist.
-  if (data == NULL) {
-    ldns_pkt_free(req);
-    free(dr);
-    return;
-  }
-
-  hsk_resource_t *resource;
-
-  if (!hsk_decode_resource(data, data_len, &resource)) {
-    ldns_pkt_free(req);
-    free(dr);
-    return;
-  }
-
-  ldns_rr *qs = ldns_rr_list_rr(ldns_pkt_question(req), 0);
-
-  ldns_pkt *res = ldns_pkt_new();
-
-  ldns_rr_list *qd = ldns_rr_list_new();
-  ldns_rr_list_push_rr(qd, ldns_rr_clone(qs));
-
-  ldns_rr_list *an = ldns_rr_list_new();
-  ldns_rr_list *ns = ldns_rr_list_new();
-  ldns_rr_list *ad = ldns_rr_list_new();
-
-  ldns_pkt_set_qr(res, 1);
-  ldns_pkt_set_aa(res, 1);
-  ldns_pkt_set_id(res, ldns_pkt_id(req));
-
-  ldns_pkt_push_rr_list(res, LDNS_SECTION_QUESTION, qd);
-  ldns_pkt_push_rr_list(res, LDNS_SECTION_ANSWER, an);
-  ldns_pkt_push_rr_list(res, LDNS_SECTION_AUTHORITY, ns);
-  ldns_pkt_push_rr_list(res, LDNS_SECTION_ADDITIONAL, ad);
-
   uint8_t *wire;
   size_t wire_len;
 
-  ldns_status rc = ldns_pkt2wire(&wire, res, &wire_len);
+  ldns_rr *qs = ldns_rr_list_rr(ldns_pkt_question(req), 0);
 
-  hsk_free_resource(resource);
+  uint16_t id = ldns_pkt_id(req);
+  uint16_t type = (uint16_t)ldns_rr_get_type(qs);
+
   ldns_pkt_free(req);
-  ldns_pkt_free(res);
-  ldns_rr_list_free(qd);
-  ldns_rr_list_free(an);
-  ldns_rr_list_free(ns);
-  ldns_rr_list_free(ad);
 
-  if (rc != LDNS_STATUS_OK) {
-    printf("error creating dns response: %s\n",
-      ldns_get_errorstr_by_id(rc));
+  // Doesn't exist.
+  if (data == NULL) {
+    if (!hsk_resource_to_nx(id, fqdn, type, false, false, &wire, &wire_len)) {
+      free(dr);
+      return;
+    }
+    pool_send(pool, wire, wire_len, addr, true);
     free(dr);
     return;
   }
+
+  hsk_resource_t *rs;
+
+  if (!hsk_decode_resource(data, data_len, &rs)) {
+    ldns_pkt_free(req);
+    free(dr);
+    return;
+  }
+
+  if (!hsk_resource_to_dns(rs, id, fqdn, type, false, false, &wire, &wire_len)) {
+    hsk_free_resource(rs);
+    free(dr);
+    return;
+  }
+
+  hsk_free_resource(rs);
 
   pool_send(pool, wire, wire_len, addr, true);
 
@@ -1627,7 +1622,7 @@ on_connect(uv_connect_t *conn, int status) {
   hsk_peer_t *peer = (hsk_peer_t *)socket->data;
   hsk_pool_t *pool = (hsk_pool_t *)peer->pool;
 
-  free(conn); // XXX
+  free(conn);
 
   if (status != 0) {
     peer_log(peer, "failed connecting: %d\n", status);
