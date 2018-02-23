@@ -121,7 +121,7 @@ typedef struct {
   hash_map_t *prevs;
   int64_t height;
   hsk_header_t *tip;
-  uv_udp_t *dns;
+  uv_udp_t *udp;
   uint8_t ub[HSK_UDP_BUFFER];
   hash_map_t *resolutions;
 } hsk_pool_t;
@@ -222,10 +222,10 @@ pool_respond_dns(
 );
 
 static void
-peer_send_getproof(hsk_peer_t *, uint8_t *, uint32_t *);
+peer_send_getproof(hsk_peer_t *, uint8_t *, uint8_t *);
 
 static void
-pool_send_getproof(hsk_pool_t *, uint8_t *, uint32_t *);
+pool_send_getproof(hsk_pool_t *, uint8_t *, uint8_t *);
 
 static void
 pool_send(
@@ -276,7 +276,7 @@ pool_init(hsk_pool_t *pool, uv_loop_t *loop) {
 
   pool->height = 0;
   pool->tip = NULL;
-  pool->dns = NULL;
+  pool->udp = NULL;
 
   pool->resolutions = hash_map_alloc();
 
@@ -304,7 +304,7 @@ pool_init(hsk_pool_t *pool, uv_loop_t *loop) {
 
 static void
 pool_init_udp(hsk_pool_t *pool) {
-  uv_loop *loop = pool->loop;
+  uv_loop_t *loop = pool->loop;
 
   pool->udp = xmalloc(sizeof(uv_udp_t));
   pool->udp->data = (void *)pool;
@@ -312,13 +312,13 @@ pool_init_udp(hsk_pool_t *pool) {
   uv_udp_init(loop, pool->udp);
 
   int32_t value = HSK_UDP_BUFFER;
-  uv_send_buffer_size(pool->udp, &value);
-  uv_recv_buffer_size(pool->udp, &value);
+  uv_send_buffer_size((uv_handle_t *)pool->udp, &value);
+  uv_recv_buffer_size((uv_handle_t *)pool->udp, &value);
 
   struct sockaddr_in addr;
 
   uv_ip4_addr("127.0.0.1", HSK_UDP_PORT, &addr);
-  uv_udp_bind(pool->udp, &addr, 0);
+  uv_udp_bind(pool->udp, (struct sockaddr *)&addr, 0);
 
   uv_udp_recv_start(pool->udp, alloc_udp, recv_cb);
 }
@@ -381,7 +381,7 @@ pool_refill(hsk_pool_t *pool) {
 }
 
 static void
-pool_send_getproof(hsk_pool_t *pool, uint8_t *name_hash, uint32_t *root) {
+pool_send_getproof(hsk_pool_t *pool, uint8_t *name_hash, uint8_t *root) {
   hsk_peer_t *peer = pool->head;
 
   if (!peer)
@@ -397,7 +397,8 @@ pool_resolve(
   hsk_resolve_cb_t callback,
   void *arg
 ) {
-  hsk__name_req *r = xmalloc(sizeof(hsk__name_req));
+  uint8_t *root = pool->tip->trie_root;
+  hsk__name_req_t *r = xmalloc(sizeof(hsk__name_req_t));
 
   strcpy(r->name, name);
 
@@ -416,7 +417,7 @@ pool_resolve(
 
   hash_map_set(pool->resolutions, r->hash, (void *)r);
 
-  pool_send_getproof(pool, r->hash, pool->tip->trie_root);
+  pool_send_getproof(pool, r->hash, root);
 }
 
 static void
@@ -451,7 +452,7 @@ pool_on_recv(
   }
 
   // Grab the first question.
-  ldns_rr *qs = ldns_rr_list_rr(question, 0);
+  ldns_rr *qs = ldns_rr_list_rr(qd, 0);
 
   printf("received dns query:\n");
   ldns_rr_print(stdout, qs);
@@ -559,7 +560,7 @@ pool_respond_dns(
   uint8_t *wire;
   size_t wire_len;
 
-  ldns_status status = ldns_pkt2wire(&wire, res, &wire_len);
+  ldns_status rc = ldns_pkt2wire(&wire, res, &wire_len);
 
   hsk_free_resource(resource);
   ldns_pkt_free(req);
@@ -569,9 +570,9 @@ pool_respond_dns(
   ldns_rr_list_free(ns);
   ldns_rr_list_free(ad);
 
-  if (status != LDNS_STATUS_OK) {
+  if (rc != LDNS_STATUS_OK) {
     printf("error creating dns response: %s\n",
-      ldns_get_errorstr_by_id(status));
+      ldns_get_errorstr_by_id(rc));
     return;
   }
 
@@ -1238,12 +1239,12 @@ peer_send_getheaders(hsk_peer_t *peer, uint8_t *stop) {
 }
 
 static void
-peer_send_getproof(hsk_peer_t *peer, uint8_t *name_hash, uint32_t *root) {
+peer_send_getproof(hsk_peer_t *peer, uint8_t *name_hash, uint8_t *root) {
   hsk_getproof_msg_t msg = { .cmd = MSG_GETPROOF };
   hsk_msg_init((hsk_msg_t *)&msg);
 
-  memcpy(msg->name_hash, name_hash, 32);
-  memcpy(msg->root, root, 32);
+  memcpy(msg.name_hash, name_hash, 32);
+  memcpy(msg.root, root, 32);
 
   peer_send(peer, (hsk_msg_t *)&msg);
 }
@@ -1707,7 +1708,7 @@ recv_cb(
     pool,
     (uint8_t *)buf->base,
     (size_t)nread,
-    addr,
+    (struct sockaddr *)addr,
     (uint32_t)flags
   );
 }

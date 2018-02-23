@@ -26,12 +26,6 @@ if ! test -f configure; then
 fi
 popd
 
-pushd ldns
-"$LIBTOOLIZE" -c --install
-# "$ACLOCAL" -I m4
-"$AUTORECONF"
-popd
-
 "$LIBTOOLIZE" --copy
 "$ACLOCAL" -I m4
 "$AUTOCONF"
