@@ -29,6 +29,7 @@
 #define HSK_BUFFER_SIZE 32768
 #define HSK_UDP_BUFFER 4096
 #define HSK_UDP_PORT 5369
+// #define HSK_UDP_PORT 53
 #define HSK_MAX_MESSAGE (4 * 1000 * 1000)
 #define HSK_POOL_SIZE 8
 #define HSK_USER_AGENT "/hskd:0.0.0/"
@@ -371,6 +372,28 @@ pool_init_udp(hsk_pool_t *pool) {
   uv_udp_recv_start(pool->udp, alloc_udp, recv_cb);
 }
 
+static const char root_hints[] = ""
+  ". 518400 IN NS .\n"
+  ". 518400 IN A 127.0.0.1\n";
+
+static const char root_data[] = ""
+  ". NS .\n"
+  ". A 127.0.0.1\n";
+
+static const char trust_anchors[] = ""
+  ". 3600 IN DS 40564 8 2 BAF3CB9FC976E2CDCB49DD9E34BAA2B4C5E8EE7B1574E24ABABD9911C24FF412\n";
+
+static const char trust_anchor[] = ""
+  ". DS 40564 8 2 BAF3CB9FC976E2CDCB49DD9E34BAA2B4C5E8EE7B1574E24ABABD9911C24FF412";
+
+void
+poll_cb(uv_poll_t *handle, int status, int events) {
+  hsk_pool_t *pool = (hsk_pool_t *)handle->data;
+
+  if (status == 0 && (events & UV_READABLE))
+    ub_process(pool->ub_ctx);
+}
+
 static void
 pool_init_unbound(hsk_pool_t *pool) {
   uv_loop_t *loop = pool->loop;
@@ -379,42 +402,38 @@ pool_init_unbound(hsk_pool_t *pool) {
   assert(pool->ub_ctx != NULL);
 
   assert(ub_ctx_async(pool->ub_ctx, 1) == 0);
-  ub_ctx_set_option(pool->ub_ctx, "server:do-tcp", "no");
-  ub_ctx_set_option(pool->ub_ctx, "server:logfile", "");
-  ub_ctx_set_option(pool->ub_ctx, "server:use-syslog", "no");
-  // ub_ctx_set_option(pool->ub_ctx, "server:root-hints", "filename");
-  ub_ctx_set_option(pool->ub_ctx, "server:harden-dnssec-stripped", "yes"); // default
-  ub_ctx_set_option(pool->ub_ctx, "server:harden-below-nxdomain", "no"); // default
-  ub_ctx_set_option(pool->ub_ctx, "server:qname-minimisation", "no"); // default
-  ub_ctx_set_option(pool->ub_ctx, "server:do-not-query-localhost", "no");
-  ub_ctx_set_option(pool->ub_ctx, "server:minimal-responses", "no"); // default
-  // ub_ctx_set_option(pool->ub_ctx, "server:trust-anchor-file", "filename");
-  // ub_ctx_set_option(pool->ub_ctx, "server:trust-anchor", ". 3600 IN DS 40564 8 2 BAF3CB9FC976E2CDCB49DD9E34BAA2B4C5E8EE7B1574E24ABABD9911C24FF412");
-  ub_ctx_set_option(pool->ub_ctx, "server:trust-anchor-signaling", "yes"); // default
-  // ub_ctx_set_option(pool->ub_ctx, "server:local-zone", "redirect");
-  // ub_ctx_set_option(pool->ub_ctx, "server:local-data", ""); // rrs
-  // ub_ctx_set_option(pool->ub_ctx, "stub-zone:name", ".");
-  // ub_ctx_set_option(pool->ub_ctx, "stub-zone:stub-host", "localhost.");
-  // ub_ctx_set_option(pool->ub_ctx, "stub-zone:stub-addr", "127.0.0.1@5369");
-  // ub_ctx_set_stub(pool->ub_ctx, ".", "127.0.0.1@5369", 1);
 
-  // ub_ctx_add_ta(pool->ub_ctx, ". 3600 IN DS 40564 8 2 BAF3CB9FC976E2CDCB49DD9E34BAA2B4C5E8EE7B1574E24ABABD9911C24FF412");
+  assert(ub_ctx_set_option(pool->ub_ctx, "do-tcp:", "no") == 0);
+  assert(ub_ctx_set_option(pool->ub_ctx, "logfile:", "") == 0);
+  assert(ub_ctx_set_option(pool->ub_ctx, "use-syslog:", "no") == 0);
+  assert(ub_ctx_set_option(pool->ub_ctx, "domain-insecure:", ".") == 0);
+  // assert(ub_ctx_set_option(pool->ub_ctx, "root-hints:", "/home/chjj/root.hints") == 0);
+  assert(ub_ctx_set_option(pool->ub_ctx, "root-hints:", "") == 0);
+  assert(ub_ctx_set_option(pool->ub_ctx, "harden-dnssec-stripped:", "yes") == 0); // default
+  assert(ub_ctx_set_option(pool->ub_ctx, "harden-below-nxdomain:", "no") == 0); // default
+  assert(ub_ctx_set_option(pool->ub_ctx, "qname-minimisation:", "no") == 0); // default
+  assert(ub_ctx_set_option(pool->ub_ctx, "do-not-query-localhost:", "no") == 0);
+  assert(ub_ctx_set_option(pool->ub_ctx, "minimal-responses:", "no") == 0); // default
+  // assert(ub_ctx_set_option(pool->ub_ctx, "trust-anchor-file:", "filename") == 0);
+  assert(ub_ctx_set_option(pool->ub_ctx, "trust-anchor-signaling:", "yes") == 0); // default
 
-  ub_ctx_print_local_zones(pool->ub_ctx);
-  // int ub_ctx_print_local_zones(struct ub_ctx* ctx)
-  // int ub_ctx_set_option(struct ub_ctx* ctx, const char* opt, const char* val)
-  // int ub_ctx_zone_remove(struct ub_ctx* ctx, const char *zone_name)
-  // int ub_ctx_zone_add(struct ub_ctx* ctx, const char *zone_name, const char *zone_type)
-  // int ub_ctx_data_add(struct ub_ctx* ctx, const char *data)
-  // int ub_ctx_data_remove(struct ub_ctx* ctx, const char *data)
-
-  // if (!pool->ub_ctx->do_thread)
-  //   assert(ub_ctx_async(pool->ub_ctx, 0) == 0);
+  assert(ub_ctx_set_stub(pool->ub_ctx, ".", "127.0.0.1@5369", 0) == 0);
+  // assert(ub_ctx_add_ta(pool->ub_ctx, trust_anchor) == 0);
+  // assert(ub_ctx_zone_remove(pool->ub_ctx, ".") == 0);
+  // assert(ub_ctx_data_remove(pool->ub_ctx, ".") == 0);
+  assert(ub_ctx_zone_add(pool->ub_ctx, ".", "nodefault") == 0);
+  // assert(ub_ctx_data_add(pool->ub_ctx, ". NS .") == 0);
+  // assert(ub_ctx_data_add(pool->ub_ctx, ". A 127.0.0.1") == 0);
 
   pool->udp2 = xmalloc(sizeof(uv_udp_t));
   pool->udp2->data = (void *)pool;
 
   uv_udp_init(loop, pool->udp2);
+
+  uv_poll_t *poll = xmalloc(sizeof(uv_poll_t));
+  poll->data = (void *)pool;
+  uv_poll_init(pool->loop, poll, ub_fd(pool->ub_ctx));
+  uv_poll_start(poll, UV_READABLE, poll_cb);
 
   int32_t value = HSK_UDP_BUFFER;
   uv_send_buffer_size((uv_handle_t *)pool->udp2, &value);
@@ -795,8 +814,6 @@ pool_on_recv2(
     printf("resolve error: %s\n", ub_strerror(r));
     return;
   }
-
-  ub_wait(pool->ub_ctx);
 }
 
 static void
