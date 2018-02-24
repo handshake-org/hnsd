@@ -28,8 +28,9 @@
 
 #define HSK_BUFFER_SIZE 32768
 #define HSK_UDP_BUFFER 4096
-#define HSK_UDP_PORT 5369
-// #define HSK_UDP_PORT 53
+#define HSK_NS_PORT 5369
+#define HSK_NS_PORT_STR "5369"
+#define HSK_UB_PORT 53
 #define HSK_MAX_MESSAGE (4 * 1000 * 1000)
 #define HSK_POOL_SIZE 8
 #define HSK_USER_AGENT "/hskd:0.0.0/"
@@ -366,7 +367,7 @@ pool_init_udp(hsk_pool_t *pool) {
 
   struct sockaddr_in addr;
 
-  uv_ip4_addr("127.0.0.1", HSK_UDP_PORT, &addr);
+  uv_ip4_addr("127.0.0.1", HSK_NS_PORT, &addr);
   uv_udp_bind(pool->udp, (struct sockaddr *)&addr, 0);
 
   uv_udp_recv_start(pool->udp, alloc_udp, recv_cb);
@@ -417,7 +418,7 @@ pool_init_unbound(hsk_pool_t *pool) {
   // assert(ub_ctx_set_option(pool->ub_ctx, "trust-anchor-file:", "filename") == 0);
   assert(ub_ctx_set_option(pool->ub_ctx, "trust-anchor-signaling:", "yes") == 0); // default
 
-  assert(ub_ctx_set_stub(pool->ub_ctx, ".", "127.0.0.1@5369", 0) == 0);
+  assert(ub_ctx_set_stub(pool->ub_ctx, ".", "127.0.0.1@" HSK_NS_PORT_STR, 0) == 0);
   // assert(ub_ctx_add_ta(pool->ub_ctx, trust_anchor) == 0);
   // assert(ub_ctx_zone_remove(pool->ub_ctx, ".") == 0);
   // assert(ub_ctx_data_remove(pool->ub_ctx, ".") == 0);
@@ -441,7 +442,7 @@ pool_init_unbound(hsk_pool_t *pool) {
 
   struct sockaddr_in addr;
 
-  uv_ip4_addr("127.0.0.1", HSK_UDP_PORT + 1, &addr);
+  uv_ip4_addr("127.0.0.1", HSK_UB_PORT, &addr);
   uv_udp_bind(pool->udp2, (struct sockaddr *)&addr, 0);
 
   uv_udp_recv_start(pool->udp2, alloc_udp2, recv_cb2);
