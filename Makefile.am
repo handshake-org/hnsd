@@ -2,7 +2,7 @@
 # CFLAGS = -Wall -std=gnu11 -O2
 # LDFLAGS =
 
-SUBDIRS = cares uv ldns
+SUBDIRS = cares uv ldns unbound
 
 ACLOCAL_AMFLAGS = -I m4
 
@@ -21,7 +21,15 @@ CLEANFILES =
 
 lib_LTLIBRARIES = libhsk.la
 
-libhsk_la_LIBADD = -lcares -luv -lldns -lssl -lcrypto
+# libhsk_la_LIBADD = -lcares -luv -lldns -lssl -lcrypto -lunbound
+libhsk_la_LIBADD = \
+  -lssl \
+  -lcrypto \
+  $(top_builddir)/cares/.libs/libcares.la \
+  $(top_builddir)/uv/.libs/libuv.la \
+  $(top_builddir)/ldns/.libs/libldns.la \
+  $(top_builddir)/unbound/.libs/libunbound.la
+
 libhsk_la_CFLAGS = @CFLAGS@
 libhsk_la_LDFLAGS = -no-undefined -version-info 0:0:0
 libhsk_la_SOURCES = src/b64.c \

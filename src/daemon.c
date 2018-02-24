@@ -9,6 +9,7 @@
 #include <uv.h>
 
 #include <ldns/ldns.h>
+#include "unbound/unbound.h"
 
 #include "bio.h"
 #include "map.h"
@@ -124,6 +125,9 @@ typedef struct {
   uv_udp_t *udp;
   uint8_t ub[HSK_UDP_BUFFER];
   hash_map_t *resolutions;
+  uv_udp_t *udp2;
+  uint8_t ub2[HSK_UDP_BUFFER];
+  struct ub_ctx *ub_ctx;
 } hsk_pool_t;
 
 typedef struct {
@@ -157,6 +161,7 @@ typedef struct hsk__name_req {
 } hsk__name_req_t;
 
 typedef struct {
+  hsk_pool_t *pool;
   ldns_pkt *req;
   struct sockaddr addr;
   char fqdn[256];
@@ -205,6 +210,21 @@ recv_cb(
   unsigned
 );
 
+static void
+alloc_udp2(uv_handle_t *handle, size_t size, uv_buf_t *buf);
+
+static void
+send_cb2(uv_udp_send_t *, int);
+
+static void
+recv_cb2(
+  uv_udp_t *,
+  ssize_t,
+  const uv_buf_t *,
+  const struct sockaddr *,
+  unsigned
+);
+
 static bool
 peer_parse(hsk_peer_t *, uint8_t *, size_t);
 
@@ -212,7 +232,20 @@ static void
 pool_init_udp(hsk_pool_t *);
 
 static void
+pool_init_unbound(hsk_pool_t *);
+
+static void
 pool_respond_dns(
+  hsk_pool_t *,
+  char *,
+  int32_t,
+  uint8_t *,
+  size_t,
+  void *
+);
+
+static void
+pool_respond_unbound(
   hsk_pool_t *,
   char *,
   int32_t,
@@ -235,6 +268,18 @@ pool_send(
   struct sockaddr *,
   bool
 );
+
+static void
+pool_send2(
+  hsk_pool_t *pool,
+  uint8_t *data,
+  size_t data_len,
+  struct sockaddr *addr,
+  bool should_free
+);
+
+static void
+respond_dns2(void *data, int32_t status, struct ub_result *result);
 
 /*
  * Helpers
@@ -279,6 +324,8 @@ pool_init(hsk_pool_t *pool, uv_loop_t *loop) {
   pool->udp = NULL;
 
   pool->resolutions = hash_map_alloc();
+  pool->udp2 = NULL;
+  pool->ub_ctx = NULL;
 
   size_t size = hex_decode_size((char *)genesis_hex);
   uint8_t raw[size];
@@ -300,6 +347,7 @@ pool_init(hsk_pool_t *pool, uv_loop_t *loop) {
   pool->tip = tip;
 
   pool_init_udp(pool);
+  pool_init_unbound(pool);
 }
 
 static void
@@ -321,6 +369,63 @@ pool_init_udp(hsk_pool_t *pool) {
   uv_udp_bind(pool->udp, (struct sockaddr *)&addr, 0);
 
   uv_udp_recv_start(pool->udp, alloc_udp, recv_cb);
+}
+
+static void
+pool_init_unbound(hsk_pool_t *pool) {
+  uv_loop_t *loop = pool->loop;
+
+  pool->ub_ctx = ub_ctx_create();
+  assert(pool->ub_ctx != NULL);
+
+  assert(ub_ctx_async(pool->ub_ctx, 1) == 0);
+  ub_ctx_set_option(pool->ub_ctx, "server:do-tcp", "no");
+  ub_ctx_set_option(pool->ub_ctx, "server:logfile", "");
+  ub_ctx_set_option(pool->ub_ctx, "server:use-syslog", "no");
+  // ub_ctx_set_option(pool->ub_ctx, "server:root-hints", "filename");
+  ub_ctx_set_option(pool->ub_ctx, "server:harden-dnssec-stripped", "yes"); // default
+  ub_ctx_set_option(pool->ub_ctx, "server:harden-below-nxdomain", "no"); // default
+  ub_ctx_set_option(pool->ub_ctx, "server:qname-minimisation", "no"); // default
+  ub_ctx_set_option(pool->ub_ctx, "server:do-not-query-localhost", "no");
+  ub_ctx_set_option(pool->ub_ctx, "server:minimal-responses", "no"); // default
+  // ub_ctx_set_option(pool->ub_ctx, "server:trust-anchor-file", "filename");
+  // ub_ctx_set_option(pool->ub_ctx, "server:trust-anchor", ". 3600 IN DS 40564 8 2 BAF3CB9FC976E2CDCB49DD9E34BAA2B4C5E8EE7B1574E24ABABD9911C24FF412");
+  ub_ctx_set_option(pool->ub_ctx, "server:trust-anchor-signaling", "yes"); // default
+  // ub_ctx_set_option(pool->ub_ctx, "server:local-zone", "redirect");
+  // ub_ctx_set_option(pool->ub_ctx, "server:local-data", ""); // rrs
+  // ub_ctx_set_option(pool->ub_ctx, "stub-zone:name", ".");
+  // ub_ctx_set_option(pool->ub_ctx, "stub-zone:stub-host", "localhost.");
+  // ub_ctx_set_option(pool->ub_ctx, "stub-zone:stub-addr", "127.0.0.1@5369");
+  // ub_ctx_set_stub(pool->ub_ctx, ".", "127.0.0.1@5369", 1);
+
+  // ub_ctx_add_ta(pool->ub_ctx, ". 3600 IN DS 40564 8 2 BAF3CB9FC976E2CDCB49DD9E34BAA2B4C5E8EE7B1574E24ABABD9911C24FF412");
+
+  ub_ctx_print_local_zones(pool->ub_ctx);
+  // int ub_ctx_print_local_zones(struct ub_ctx* ctx)
+  // int ub_ctx_set_option(struct ub_ctx* ctx, const char* opt, const char* val)
+  // int ub_ctx_zone_remove(struct ub_ctx* ctx, const char *zone_name)
+  // int ub_ctx_zone_add(struct ub_ctx* ctx, const char *zone_name, const char *zone_type)
+  // int ub_ctx_data_add(struct ub_ctx* ctx, const char *data)
+  // int ub_ctx_data_remove(struct ub_ctx* ctx, const char *data)
+
+  // if (!pool->ub_ctx->do_thread)
+  //   assert(ub_ctx_async(pool->ub_ctx, 0) == 0);
+
+  pool->udp2 = xmalloc(sizeof(uv_udp_t));
+  pool->udp2->data = (void *)pool;
+
+  uv_udp_init(loop, pool->udp2);
+
+  int32_t value = HSK_UDP_BUFFER;
+  uv_send_buffer_size((uv_handle_t *)pool->udp2, &value);
+  uv_recv_buffer_size((uv_handle_t *)pool->udp2, &value);
+
+  struct sockaddr_in addr;
+
+  uv_ip4_addr("127.0.0.1", HSK_UDP_PORT + 1, &addr);
+  uv_udp_bind(pool->udp2, (struct sockaddr *)&addr, 0);
+
+  uv_udp_recv_start(pool->udp2, alloc_udp2, recv_cb2);
 }
 
 static hsk_pool_t *
@@ -510,6 +615,7 @@ pool_on_recv(
   name[nsize] = '\0';
 
   hsk__dns_req_t *dr = xmalloc(sizeof(hsk__dns_req_t));
+  dr->pool = pool;
   dr->req = req;
   memcpy((void *)&dr->addr, (void *)addr, sizeof(struct sockaddr));
   memcpy(dr->fqdn, fqdn, size + 1);
@@ -603,6 +709,177 @@ pool_send(
   };
 
   int status = uv_udp_send(req, pool->udp, bufs, 1, addr, send_cb);
+
+  if (status != 0) {
+    free(sd);
+    free(req);
+    if (should_free)
+      free(data);
+    printf("failed sending: %d\n", status);
+    return;
+  }
+}
+
+static void
+pool_on_recv2(
+  hsk_pool_t *pool,
+  uint8_t *data,
+  size_t data_len,
+  struct sockaddr *addr,
+  uint32_t flags
+) {
+  ldns_pkt *req;
+  ldns_status rc = ldns_wire2pkt(&req, data, data_len);
+
+  if (rc != LDNS_STATUS_OK) {
+    printf("bad dns message: %s\n", ldns_get_errorstr_by_id(rc));
+    return;
+  }
+
+  ldns_pkt_opcode opcode = ldns_pkt_get_opcode(req);
+  ldns_pkt_rcode rcode = ldns_pkt_get_rcode(req);
+  ldns_rr_list *qd = ldns_pkt_question(req);
+  ldns_rr_list *an = ldns_pkt_answer(req);
+  ldns_rr_list *ns = ldns_pkt_authority(req);
+
+  if (opcode != LDNS_PACKET_QUERY
+      || rcode != LDNS_RCODE_NOERROR
+      || ldns_rr_list_rr_count(qd) != 1
+      || ldns_rr_list_rr_count(an) != 0
+      || ldns_rr_list_rr_count(ns) != 0) {
+    ldns_pkt_free(req);
+    return;
+  }
+
+  // Grab the first question.
+  ldns_rr *qs = ldns_rr_list_rr(qd, 0);
+
+  printf("received recursive dns query:\n");
+  ldns_rr_print(stdout, qs);
+
+  uint16_t id = ldns_pkt_id(req);
+  bool edns = ldns_pkt_edns_udp_size(req) == 4096;
+  bool dnssec = ldns_pkt_edns_do(req);
+  const ldns_rdf *rdf = ldns_rr_owner(qs);
+  const ldns_rr_type rrtype = ldns_rr_get_type(qs);
+  const ldns_rr_class rrclass = ldns_rr_get_class(qs);
+
+  if (rrclass != LDNS_RR_CLASS_IN) {
+    ldns_pkt_free(req);
+    return;
+  }
+
+  char *name = ldns_rdf2str(rdf);
+  assert(name != NULL);
+  uint16_t type = (uint16_t)rrtype;
+  uint16_t class = (uint16_t)rrclass;
+
+  hsk__dns_req_t *dr = xmalloc(sizeof(hsk__dns_req_t));
+  dr->pool = pool;
+  dr->req = req;
+  memcpy((void *)&dr->addr, (void *)addr, sizeof(struct sockaddr));
+  strcpy(dr->fqdn, name);
+  free(name);
+
+  int32_t r = ub_resolve_async(
+    pool->ub_ctx,
+    dr->fqdn,
+    type,
+    class,
+    (void *)dr,
+    respond_dns2,
+    NULL
+  );
+
+  if (r != 0) {
+    printf("resolve error: %s\n", ub_strerror(r));
+    return;
+  }
+
+  ub_wait(pool->ub_ctx);
+}
+
+static void
+pool_respond_dns2(
+  hsk_pool_t *pool,
+  ldns_pkt *req,
+  int32_t status,
+  struct ub_result *result,
+  struct sockaddr *addr
+) {
+  if (status != 0) {
+    printf("resolve error: %s\n", ub_strerror(status));
+    return;
+  }
+
+  uint16_t id = ldns_pkt_id(req);
+  bool edns = ldns_pkt_edns_udp_size(req) == 4096;
+  bool dnssec = ldns_pkt_edns_do(req);
+
+  // result->havedata
+  // result->nxdomain
+  // result->secure
+  // result->bogus
+
+  ldns_pkt *res;
+  ldns_status rc = ldns_wire2pkt(&res, result->answer_packet, result->answer_len);
+
+  if (rc != LDNS_STATUS_OK) {
+    printf("bad dns message: %s\n", ldns_get_errorstr_by_id(rc));
+    return;
+  }
+
+  ldns_pkt_set_id(res, id);
+
+  if (edns) {
+    ldns_pkt_set_edns_udp_size(res, 4096);
+    if (dnssec) {
+      ldns_pkt_set_edns_do(res, 1);
+      if (result->secure && !result->bogus)
+        ldns_pkt_set_ad(res, 1);
+      else
+        ldns_pkt_set_ad(res, 0);
+    }
+  }
+
+  uint8_t *wire;
+  size_t wire_len;
+
+  ldns_status r = ldns_pkt2wire(&wire, res, &wire_len);
+
+  ldns_pkt_free(res);
+
+  // ldns_pkt_print();
+  if (r == LDNS_STATUS_OK)
+    pool_send2(pool, wire, wire_len, addr, true);
+
+  // if (result->havedata) {
+  //   printf("The address is %s\n",
+  //     inet_ntoa(*(struct in_addr*)result->data[0]));
+  // }
+}
+
+static void
+pool_send2(
+  hsk_pool_t *pool,
+  uint8_t *data,
+  size_t data_len,
+  struct sockaddr *addr,
+  bool should_free
+) {
+  hsk__send_data_t *sd = (hsk__send_data_t *)xmalloc(sizeof(hsk__send_data_t));
+  sd->pool = pool;
+  sd->data = (void *)data;
+  sd->should_free = should_free;
+
+  uv_udp_send_t *req = (uv_udp_send_t *)xmalloc(sizeof(uv_udp_send_t));
+  req->data = (void *)sd;
+
+  uv_buf_t bufs[] = {
+    { .base = data, .len = data_len }
+  };
+
+  int status = uv_udp_send(req, pool->udp2, bufs, 1, addr, send_cb2);
 
   if (status != 0) {
     free(sd);
@@ -1712,6 +1989,78 @@ recv_cb(
     (struct sockaddr *)addr,
     (uint32_t)flags
   );
+}
+
+static void
+alloc_udp2(uv_handle_t *handle, size_t size, uv_buf_t *buf) {
+  hsk_pool_t *pool = (hsk_pool_t *)handle->data;
+  buf->base = (char *)pool->ub2;
+  buf->len = HSK_UDP_BUFFER;
+}
+
+static void
+send_cb2(uv_udp_send_t *req, int status) {
+  hsk__send_data_t *sd = (hsk__send_data_t *)req->data;
+  hsk_pool_t *pool = sd->pool;
+
+  if (sd->should_free) {
+    free(sd->data);
+    sd->data = NULL;
+  }
+
+  free(sd);
+  req->data = NULL;
+
+  free(req);
+
+  if (status < 0) {
+    printf("send error: %d\n", status);
+    return;
+  }
+}
+
+static void
+recv_cb2(
+  uv_udp_t *socket,
+  ssize_t nread,
+  const uv_buf_t *buf,
+  const struct sockaddr *addr,
+  unsigned flags
+) {
+  hsk_pool_t *pool = (hsk_pool_t *)socket->data;
+
+  if (nread < 0) {
+    printf("udp read error: %d\n", nread);
+    return;
+  }
+
+  // No more data to read.
+  if (nread == 0 && addr == NULL) {
+    printf("udp nodata\n");
+    return;
+  }
+
+  if (addr == NULL) {
+    printf("udp noaddr\n");
+    return;
+  }
+
+  pool_on_recv2(
+    pool,
+    (uint8_t *)buf->base,
+    (size_t)nread,
+    (struct sockaddr *)addr,
+    (uint32_t)flags
+  );
+}
+
+static void
+respond_dns2(void *data, int32_t status, struct ub_result *result) {
+  hsk__dns_req_t *dr = (hsk__dns_req_t *)data;
+  pool_respond_dns2(dr->pool, dr->req, status, result, &dr->addr);
+  ldns_pkt_free(dr->req);
+  free(dr);
+  ub_resolve_free(result);
 }
 
 /*
