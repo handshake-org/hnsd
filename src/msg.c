@@ -1,1229 +1,772 @@
 #include <assert.h>
+#include <stdint.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
-#include <strings.h>
 
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <sys/time.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
-#include <netdb.h>
-#include <unistd.h>
-
-#include <stdint.h>
-#include <limits.h>
-#include <ifaddrs.h>
-#include <stdbool.h>
-#include <errno.h>
-#include <ctype.h>
-
+#include "hsk-header.h"
+#include "hsk-proof.h"
 #include "bio.h"
 #include "msg.h"
 
+void
+hsk_addr_init(hsk_addr_t *addr) {
+  if (addr == NULL)
+    return;
+  addr->time = 0;
+  addr->services = 0;
+  addr->type = 0;
+  memset(addr->addr, 0, 36);
+  addr->port = 0;
+}
+
+bool
+hsk_addr_read(uint8_t **data, size_t *data_len, hsk_addr_t *addr) {
+  if (!read_u64(data, data_len, &addr->time))
+    return false;
+
+  if (!read_u64(data, data_len, &addr->services))
+    return false;
+
+  if (!read_u8(data, data_len, &addr->type))
+    return false;
+
+  if (!read_bytes(data, data_len, addr->addr, 36))
+    return false;
+
+  if (!read_u16(data, data_len, &addr->port))
+    return false;
+
+  return true;
+}
+
 int32_t
-dns_name_cmp(char *a, char *b) {
-  if (a == NULL && b == NULL)
-    return 0;
+hsk_addr_write(hsk_addr_t *addr, uint8_t **data) {
+  int32_t s = 0;
+  s += write_u64(data, addr->time);
+  s += write_u64(data, addr->services);
+  s += write_u8(data, addr->type);
+  s += write_bytes(data, addr->addr, 36);
+  s += write_u16(data, addr->port);
+  return s;
+}
 
-  if (a == NULL)
-    return -1;
+bool
+hsk_version_msg_read(uint8_t **data, size_t *data_len, hsk_version_msg_t *msg) {
+  if (!read_u32(data, data_len, &msg->version))
+    return false;
 
-  if (b == NULL)
-    return 1;
+  if (!read_u64(data, data_len, &msg->services))
+    return false;
 
-  size_t alen = strlen(a);
-  size_t blen = strlen(b);
+  if (!read_u64(data, data_len, &msg->time))
+    return false;
 
-  if (alen > 0 && a[alen - 1] == '.')
-    alen -= 1;
+  if (!hsk_addr_read(data, data_len, &msg->remote))
+    return false;
 
-  if (blen > 0 && b[blen - 1] == '.')
-    blen -= 1;
+  if (!hsk_addr_read(data, data_len, &msg->local))
+    return false;
 
-  size_t len = alen < blen ? alen : blen;
+  if (!read_u64(data, data_len, &msg->nonce))
+    return false;
 
-  int32_t i;
-  for (i = 0; i < len; i++) {
-    char ai = a[i];
-    char bi = b[i];
+  uint8_t size;
+  if (!read_u8(data, data_len, &size))
+    return false;
 
-    if (ai >= 0x41 && ai <= 0x5a)
-      ai |= 0x61 - 0x41;
+  if (!read_ascii(data, data_len, msg->agent, (size_t)size))
+    return false;
 
-    if (bi >= 0x41 && bi <= 0x5a)
-      bi |= 0x61 - 0x41;
+  if (!read_u32(data, data_len, &msg->height))
+    return false;
 
-    if (ai < bi)
-      return -1;
+  if (!read_u8(data, data_len, &msg->no_relay))
+    return false;
 
-    if (ai > bi)
-      return 1;
-  }
+  msg->no_relay = !msg->no_relay;
 
-  if (alen < blen)
-    return -1;
+  return true;
+}
 
-  if (alen > blen)
-    return 1;
+int32_t
+hsk_version_msg_write(hsk_version_msg_t *msg, uint8_t **data) {
+  int32_t s = 0;
+  s += write_u32(data, msg->version);
+  s += write_u64(data, msg->services);
+  s += write_u64(data, msg->time);
+  s += hsk_addr_write(&msg->remote, data);
+  s += hsk_addr_write(&msg->local, data);
+  s += write_u64(data, msg->nonce);
+  size_t size = strlen(msg->agent);
+  s += write_u8(data, size);
+  s += write_bytes(data, msg->agent, size);
+  s += write_u32(data, msg->height);
+  s += write_u8(data, msg->no_relay ? 0 : 1);
+  return s;
+}
 
+bool
+hsk_verack_msg_read(uint8_t **data, size_t *data_len, hsk_verack_msg_t *msg) {
+  return true;
+}
+
+int32_t
+hsk_verack_msg_write(hsk_verack_msg_t *msg, uint8_t **data) {
   return 0;
 }
 
-int32_t
-dns_parse_name(
-  uint8_t **data_,
-  size_t *data_len_,
-  uint8_t *pd,
-  size_t pd_len,
-  char *name
-) {
-  uint8_t *data = *data_;
-  size_t data_len = *data_len_;
-  int32_t off = 0;
-  int32_t noff = 0;
-  int32_t res = 0;
-  int32_t max = 255;
-  int32_t ptr = 0;
-
-  for (;;) {
-    if (off >= data_len)
-      return -1;
-
-    uint8_t c = data[off];
-    off += 1;
-
-    if (c == 0x00)
-      break;
-
-    switch (c & 0xc0) {
-      case 0x00: {
-        if (off + c > data_len)
-          return -1; // EOF
-
-        int32_t j;
-        for (j = off; j < off + c; j++) {
-          uint8_t b = data[j];
-
-          switch (b) {
-            case 0x2e /*.*/:
-            case 0x28 /*(*/:
-            case 0x29 /*)*/:
-            case 0x3b /*;*/:
-            case 0x20 /* */:
-            case 0x40 /*@*/:
-            case 0x22 /*"*/:
-            case 0x5c /*\\*/: {
-              if (noff + 2 >= max)
-                return -1;
-
-              if (name) {
-                name[noff + 0] = '\\';
-                name[noff + 1] = b;
-              }
-
-              noff += 2;
-              max += 1;
-
-              break;
-            }
-
-            default: {
-              if (b < 0x20 || b > 0x7e) {
-                if (noff + 4 >= max)
-                  return -1;
-
-                if (name) {
-                  char *fmt = "\\%u";
-                  if (b < 10)
-                    fmt = "\\00%u";
-                  else if (b < 100)
-                    fmt = "\\0%u";
-                  sprintf(name + noff, fmt, (uint32_t)b);
-                }
-
-                noff += 4;
-                max += 3;
-              } else {
-                if (noff + 1 >= max)
-                  return -1;
-
-                if (name)
-                  name[noff] = b;
-
-                noff += 1;
-              }
-
-              break;
-            }
-          }
-        }
-
-        if (name)
-          name[noff] = '.';
-
-        noff += 1;
-        off += c;
-
-        break;
-      }
-
-      case 0xc0: {
-        if (!pd)
-          return -1;
-
-        if (off >= data_len)
-          return -1;
-
-        uint8_t c1 = data[off];
-
-        off += 1;
-
-        if (ptr == 0)
-          res = off;
-
-        ptr += 1;
-
-        if (ptr > 10)
-          return -1;
-
-        off = ((c ^ 0xc0) << 8) | c1;
-
-        data = pd;
-        data_len = pd_len;
-
-        break;
-      }
-
-      default: {
-        return -1;
-      }
-    }
-  }
-
-  if (ptr == 0)
-    res = off;
-
-  if (noff == 0) {
-    if (name)
-      name[noff] = '.';
-    noff += 1;
-  }
-
-  if (noff >= max)
-    return -1;
-
-  if (name)
-    name[noff] = '\0';
-
-  *data_ += res;
-  *data_len_ -= res;
-
-  return noff;
-}
-
 bool
-dns_read_name(
-  uint8_t **data,
-  size_t *data_len,
-  uint8_t *pd,
-  size_t pd_len,
-  char *name
-) {
-  return dns_parse_name(data, data_len, pd, pd_len, name) != -1;
+hsk_ping_msg_read(uint8_t **data, size_t *data_len, hsk_ping_msg_t *msg) {
+  if (!read_u64(data, data_len, &msg->nonce))
+    return false;
+  return true;
 }
 
 int32_t
-dns_size_name(uint8_t *data, size_t data_len, uint8_t *pd, size_t pd_len) {
-  return dns_parse_name(&data, &data_len, pd, pd_len, NULL);
+hsk_ping_msg_write(hsk_ping_msg_t *msg, uint8_t **data) {
+  int32_t s = 0;
+  s += write_u64(data, msg->nonce);
+  return s;
 }
 
 bool
-dns_alloc_name(
-  uint8_t **data,
-  size_t *data_len,
-  uint8_t *pd,
-  size_t pd_len,
-  char **name
-) {
-  int32_t size = dns_size_name(*data, *data_len, pd, pd_len);
+hsk_pong_msg_read(uint8_t **data, size_t *data_len, hsk_pong_msg_t *msg) {
+  if (!read_u64(data, data_len, &msg->nonce))
+    return false;
+  return true;
+}
 
-  if (size == -1)
+int32_t
+hsk_pong_msg_write(hsk_pong_msg_t *msg, uint8_t **data) {
+  int32_t s = 0;
+  s += write_u64(data, msg->nonce);
+  return s;
+}
+
+bool
+hsk_getaddr_msg_read(uint8_t **data, size_t *data_len, hsk_getaddr_msg_t *msg) {
+  return true;
+}
+
+int32_t
+hsk_getaddr_msg_write(hsk_getaddr_msg_t *msg, uint8_t **data) {
+  return 0;
+}
+
+bool
+hsk_addr_msg_read(uint8_t **data, size_t *data_len, hsk_addr_msg_t *msg) {
+  if (!read_varsize(data, data_len, &msg->addr_count))
     return false;
 
-  *name = malloc(size + 1);
-
-  if (*name == NULL)
+  if (msg->addr_count > 1000)
     return false;
 
-  assert(dns_read_name(data, data_len, pd, pd_len, *name));
+  int32_t i;
+
+  for (i = 0; i < msg->addr_count; i++) {
+    if (!hsk_addr_read(data, data_len, &msg->addrs[i]))
+      return false;
+  }
 
   return true;
 }
 
+int32_t
+hsk_addr_msg_write(hsk_addr_msg_t *msg, uint8_t **data) {
+  int32_t s = 0;
+
+  s += write_varsize(data, msg->addr_count);
+
+  int32_t i;
+
+  for (i = 0; i < msg->addr_count; i++)
+    s += hsk_addr_write(&msg->addrs[i], data);
+
+  return s;
+}
+
+bool
+hsk_getheaders_msg_read(uint8_t **data, size_t *data_len, hsk_getheaders_msg_t *msg) {
+  if (!read_varsize(data, data_len, &msg->hash_count))
+    return false;
+
+  if (msg->hash_count > 64)
+    return false;
+
+  int32_t i;
+
+  for (i = 0; i < msg->hash_count; i++) {
+    if (!read_bytes(data, data_len, msg->hashes[i], 32))
+      return false;
+  }
+
+  if (!read_bytes(data, data_len, msg->stop, 32))
+    return false;
+
+  return true;
+}
+
+int32_t
+hsk_getheaders_msg_write(hsk_getheaders_msg_t *msg, uint8_t **data) {
+  int32_t s = 0;
+
+  s += write_varsize(data, msg->hash_count);
+
+  int32_t i;
+
+  for (i = 0; i < msg->hash_count; i++)
+    s += write_bytes(data, msg->hashes[i], 32);
+
+  s += write_bytes(data, msg->stop, 32);
+
+  return s;
+}
+
+bool
+hsk_headers_msg_read(uint8_t **data, size_t *data_len, hsk_headers_msg_t *msg) {
+  if (!read_varsize(data, data_len, &msg->header_count))
+    return false;
+
+  if (msg->header_count > 2000)
+    return false;
+
+  hsk_header_t *tail = NULL;
+  int32_t i;
+
+  for (i = 0; i < msg->header_count; i++) {
+    hsk_header_t *h = hsk_header_alloc();
+
+    if (h == NULL)
+      goto fail;
+
+    if (!hsk_header_read(data, data_len, h))
+      goto fail;
+
+    if (msg->headers == NULL)
+      msg->headers = h;
+
+    if (tail)
+      tail->next = h;
+
+    tail = h;
+  }
+
+  return true;
+
+fail: ;
+  hsk_header_t *c, *n;
+  for (c = msg->headers; c; c = n) {
+    n = c->next;
+    free(c);
+  }
+  return false;
+}
+
+int32_t
+hsk_headers_msg_write(hsk_headers_msg_t *msg, uint8_t **data) {
+  int32_t s = 0;
+
+  s += write_varsize(data, msg->header_count);
+
+  hsk_header_t *c;
+
+  for (c = msg->headers; c; c = c->next)
+    s += hsk_header_write(c, data);
+
+  return s;
+}
+
+bool
+hsk_sendheaders_msg_read(uint8_t **data, size_t *data_len, hsk_sendheaders_msg_t *msg) {
+  return true;
+}
+
+int32_t
+hsk_sendheaders_msg_write(hsk_sendheaders_msg_t *msg, uint8_t **data) {
+  return 0;
+}
+
+bool
+hsk_getproof_msg_read(uint8_t **data, size_t *data_len, hsk_getproof_msg_t *msg) {
+  if (!read_bytes(data, data_len, msg->name_hash, 32))
+    return false;
+
+  if (!read_bytes(data, data_len, msg->root, 32))
+    return false;
+
+  return true;
+}
+
+int32_t
+hsk_getproof_msg_write(hsk_getproof_msg_t *msg, uint8_t **data) {
+  int32_t s = 0;
+  s += write_bytes(data, msg->name_hash, 32);
+  s += write_bytes(data, msg->root, 32);
+  return s;
+}
+
+bool
+hsk_proof_msg_read(uint8_t **data, size_t *data_len, hsk_proof_msg_t *msg) {
+  if (!read_bytes(data, data_len, msg->name_hash, 32))
+    return false;
+
+  if (!read_bytes(data, data_len, msg->root, 32))
+    return false;
+
+  if (!read_varsize(data, data_len, &msg->node_count))
+    return false;
+
+  hsk_raw_node_t *tail = NULL;
+  int32_t i;
+
+  for (i = 0; i < msg->node_count; i++) {
+    hsk_raw_node_t *n = hsk_raw_node_alloc();
+
+    if (n == NULL)
+      goto fail;
+
+    if (!alloc_varbytes(data, data_len, &n->data, &n->data_len))
+      goto fail;
+
+    if (msg->nodes == NULL)
+      msg->nodes = n;
+
+    if (tail)
+      tail->next = n;
+
+    tail = n;
+  }
+
+  if (!read_varsize(data, data_len, &msg->data_len))
+    goto fail;
+
+  if (msg->data_len > 512)
+    goto fail;
+
+  if (!read_bytes(data, data_len, msg->data, msg->data_len))
+    goto fail;
+
+  return true;
+
+fail:
+  hsk_raw_node_free_list(msg->nodes);
+  return false;
+}
+
+int32_t
+hsk_proof_msg_write(hsk_proof_msg_t *msg, uint8_t **data) {
+  int32_t s = 0;
+
+  s += write_bytes(data, msg->name_hash, 32);
+  s += write_bytes(data, msg->root, 32);
+  s += write_varsize(data, msg->node_count);
+
+  hsk_raw_node_t *c;
+  for (c = msg->nodes; c; c = c->next)
+    s += write_varbytes(data, c->data, c->data_len);
+
+  s += write_varbytes(data, msg->data, msg->data_len);
+
+  return s;
+}
+
+uint8_t
+hsk_msg_cmd(char *cmd) {
+  if (strcmp(cmd, "version") == 0)
+    return HSK_MSG_VERSION;
+
+  if (strcmp(cmd, "verack") == 0)
+    return HSK_MSG_VERACK;
+
+  if (strcmp(cmd, "ping") == 0)
+    return HSK_MSG_PING;
+
+  if (strcmp(cmd, "pong") == 0)
+    return HSK_MSG_PONG;
+
+  if (strcmp(cmd, "getaddr") == 0)
+    return HSK_MSG_GETADDR;
+
+  if (strcmp(cmd, "addr") == 0)
+    return HSK_MSG_ADDR;
+
+  if (strcmp(cmd, "getheaders") == 0)
+    return HSK_MSG_GETHEADERS;
+
+  if (strcmp(cmd, "headers") == 0)
+    return HSK_MSG_HEADERS;
+
+  if (strcmp(cmd, "sendheaders") == 0)
+    return HSK_MSG_SENDHEADERS;
+
+  if (strcmp(cmd, "getproof") == 0)
+    return HSK_MSG_GETPROOF;
+
+  if (strcmp(cmd, "proof") == 0)
+    return HSK_MSG_PROOF;
+
+  return HSK_MSG_UNKNOWN;
+}
+
+const char *
+hsk_msg_str(uint8_t cmd) {
+  switch (cmd) {
+    case HSK_MSG_VERSION: {
+      return "version";
+    }
+    case HSK_MSG_VERACK: {
+      return "verack";
+    }
+    case HSK_MSG_PING: {
+      return "ping";
+    }
+    case HSK_MSG_PONG: {
+      return "pong";
+    }
+    case HSK_MSG_GETADDR: {
+      return "getaddr";
+    }
+    case HSK_MSG_ADDR: {
+      return "addr";
+    }
+    case HSK_MSG_GETHEADERS: {
+      return "getheaders";
+    }
+    case HSK_MSG_HEADERS: {
+      return "headers";
+    }
+    case HSK_MSG_SENDHEADERS: {
+      return "sendheaders";
+    }
+    case HSK_MSG_GETPROOF: {
+      return "getproof";
+    }
+    case HSK_MSG_PROOF: {
+      return "proof";
+    }
+    default: {
+      return "unknown";
+    }
+  }
+}
+
 void
-dns_message_init(dns_message_t *msg) {
+hsk_msg_init(hsk_msg_t *msg) {
   if (msg == NULL)
     return;
 
-  msg->id = 0;
-  msg->flags = 0;
-  msg->qdcount = 0;
-  msg->ancount = 0;
-  msg->nscount = 0;
-  msg->arcount = 0;
-  msg->question = NULL;
-  msg->answer = NULL;
-  msg->authority = NULL;
-  msg->additional = NULL;
+  switch (msg->cmd) {
+    case HSK_MSG_VERSION: {
+      hsk_version_msg_t *m = (hsk_version_msg_t *)msg;
+      m->cmd = HSK_MSG_VERSION;
+      m->version = 0;
+      m->services = 0;
+      m->time = 0;
+      hsk_addr_init(&m->remote);
+      hsk_addr_init(&m->local);
+      m->nonce = 0;
+      memset(m->agent, 0, 256);
+      m->height = 0;
+      m->no_relay = false;
+      break;
+    }
+    case HSK_MSG_VERACK: {
+      hsk_verack_msg_t *m = (hsk_verack_msg_t *)msg;
+      m->cmd = HSK_MSG_VERACK;
+      break;
+    }
+    case HSK_MSG_PING: {
+      hsk_ping_msg_t *m = (hsk_ping_msg_t *)msg;
+      m->cmd = HSK_MSG_PING;
+      m->nonce = 0;
+      break;
+    }
+    case HSK_MSG_PONG: {
+      hsk_pong_msg_t *m = (hsk_pong_msg_t *)msg;
+      m->cmd = HSK_MSG_PONG;
+      m->nonce = 0;
+      break;
+    }
+    case HSK_MSG_GETADDR: {
+      hsk_getaddr_msg_t *m = (hsk_getaddr_msg_t *)msg;
+      m->cmd = HSK_MSG_GETADDR;
+      break;
+    }
+    case HSK_MSG_ADDR: {
+      hsk_addr_msg_t *m = (hsk_addr_msg_t *)msg;
+      m->cmd = HSK_MSG_ADDR;
+      m->addr_count = 0;
+      int32_t i;
+      for (i = 0; i < 1000; i++)
+        hsk_addr_init(&m->addrs[i]);
+      break;
+    }
+    case HSK_MSG_GETHEADERS: {
+      hsk_getheaders_msg_t *m = (hsk_getheaders_msg_t *)msg;
+      m->cmd = HSK_MSG_GETHEADERS;
+      int32_t i;
+      for (i = 0; i < 64; i++)
+        memset(m->hashes[i], 0, 32);
+      memset(m->stop, 0, 32);
+      break;
+    }
+    case HSK_MSG_HEADERS: {
+      hsk_headers_msg_t *m = (hsk_headers_msg_t *)msg;
+      m->cmd = HSK_MSG_HEADERS;
+      m->header_count = 0;
+      m->headers = NULL;
+      break;
+    }
+    case HSK_MSG_SENDHEADERS: {
+      hsk_sendheaders_msg_t *m = (hsk_sendheaders_msg_t *)msg;
+      m->cmd = HSK_MSG_SENDHEADERS;
+      break;
+    }
+    case HSK_MSG_GETPROOF: {
+      hsk_getproof_msg_t *m = (hsk_getproof_msg_t *)msg;
+      m->cmd = HSK_MSG_GETPROOF;
+      memset(m->name_hash, 0, 32);
+      memset(m->root, 0, 32);
+      break;
+    }
+    case HSK_MSG_PROOF: {
+      hsk_proof_msg_t *m = (hsk_proof_msg_t *)msg;
+      m->cmd = HSK_MSG_PROOF;
+      memset(m->name_hash, 0, 32);
+      memset(m->root, 0, 32);
+      m->nodes = NULL;
+      m->data_len = 0;
+      memset(m->data, 0, 512);
+      break;
+    }
+  }
 }
 
-void
-dns_question_init(dns_question_t *qs) {
-  if (qs == NULL)
-    return;
+hsk_msg_t *
+hsk_msg_alloc(uint8_t cmd) {
+  hsk_msg_t *msg = NULL;
 
-  qs->name = NULL;
-  qs->type = 0;
-  qs->class = 0;
-  qs->next = NULL;
-}
+  switch (cmd) {
+    case HSK_MSG_VERSION: {
+      msg = (hsk_msg_t *)malloc(sizeof(hsk_version_msg_t));
+      break;
+    }
+    case HSK_MSG_VERACK: {
+      msg = (hsk_msg_t *)malloc(sizeof(hsk_verack_msg_t));
+      break;
+    }
+    case HSK_MSG_PING: {
+      msg = (hsk_msg_t *)malloc(sizeof(hsk_ping_msg_t));
+      break;
+    }
+    case HSK_MSG_PONG: {
+      msg = (hsk_msg_t *)malloc(sizeof(hsk_pong_msg_t));
+      break;
+    }
+    case HSK_MSG_GETADDR: {
+      msg = (hsk_msg_t *)malloc(sizeof(hsk_getaddr_msg_t));
+      break;
+    }
+    case HSK_MSG_ADDR: {
+      msg = (hsk_msg_t *)malloc(sizeof(hsk_addr_msg_t));
+      break;
+    }
+    case HSK_MSG_GETHEADERS: {
+      msg = (hsk_msg_t *)malloc(sizeof(hsk_getheaders_msg_t));
+      break;
+    }
+    case HSK_MSG_HEADERS: {
+      msg = (hsk_msg_t *)malloc(sizeof(hsk_headers_msg_t));
+      break;
+    }
+    case HSK_MSG_SENDHEADERS: {
+      msg = (hsk_msg_t *)malloc(sizeof(hsk_sendheaders_msg_t));
+      break;
+    }
+    case HSK_MSG_GETPROOF: {
+      msg = (hsk_msg_t *)malloc(sizeof(hsk_getproof_msg_t));
+      break;
+    }
+    case HSK_MSG_PROOF: {
+      msg = (hsk_msg_t *)malloc(sizeof(hsk_proof_msg_t));
+      break;
+    }
+  }
 
-void
-dns_record_init(dns_record_t *rr) {
-  if (rr == NULL)
-    return;
+  if (msg)
+    msg->cmd = cmd;
 
-  rr->name = NULL;
-  rr->type = 0;
-  rr->class = 0;
-  rr->ttl = 0;
-  rr->rd = NULL;
-  rr->next = NULL;
-}
+  hsk_msg_init(msg);
 
-void
-dns_text_init(dns_text_t *text) {
-  if (text == NULL)
-    return;
-
-  text->data_len = 0;
-  text->data = NULL;
-  text->next = NULL;
-}
-
-dns_message_t *
-dns_message_alloc(void) {
-  dns_message_t *msg = malloc(sizeof(dns_message_t));
-  dns_message_init(msg);
   return msg;
 }
 
-dns_question_t *
-dns_question_alloc(void) {
-  dns_question_t *qs = malloc(sizeof(dns_question_t));
-  dns_question_init(qs);
-  return qs;
-}
-
-dns_record_t *
-dns_record_alloc(void) {
-  dns_record_t *rr = malloc(sizeof(dns_record_t));
-  dns_record_init(rr);
-  return rr;
-}
-
-dns_text_t *
-dns_text_alloc(void) {
-  dns_text_t *text = malloc(sizeof(dns_text_t));
-  dns_text_init(text);
-  return text;
-}
-
 void
-dns_question_free(dns_question_t *qs) {
-  if (qs == NULL)
-    return;
-
-  if (qs->name)
-    free(qs->name);
-
-  free(qs);
-}
-
-void
-dns_record_free(dns_record_t *rr) {
-  if (rr == NULL)
-    return;
-
-  if (rr->name)
-    free(rr->name);
-
-  if (rr->rd)
-    dns_rd_free(rr->type, rr->rd);
-
-  free(rr);
-}
-
-void
-dns_question_free_list(dns_question_t *qs) {
-  dns_question_t *c, *n;
-  for (c = qs; c; c = n) {
-    n = c->next;
-    dns_question_free(c);
-  }
-}
-
-void
-dns_record_free_list(dns_record_t *rr) {
-  dns_record_t *c, *n;
-  for (c = rr; c; c = n) {
-    n = c->next;
-    dns_record_free(c);
-  }
-}
-
-void
-dns_message_free(dns_message_t *msg) {
+hsk_msg_free(hsk_msg_t *msg) {
   if (msg == NULL)
     return;
 
-  dns_question_free_list(msg->question);
-  dns_record_free_list(msg->answer);
-  dns_record_free_list(msg->authority);
-  dns_record_free_list(msg->additional);
-  free(msg);
-}
-
-void
-dns_text_free(dns_text_t *text) {
-  if (text == NULL)
-    return;
-
-  if (text->data)
-    free(text->data);
-
-  free(text);
-}
-
-void
-dns_text_free_list(dns_text_t *text) {
-  dns_text_t *c, *n;
-  for (c = text; c; c = n) {
-    n = c->next;
-    dns_text_free(c);
+  switch (msg->cmd) {
+    case HSK_MSG_VERSION: {
+      hsk_version_msg_t *m = (hsk_version_msg_t *)msg;
+      free(m);
+      break;
+    }
+    case HSK_MSG_VERACK: {
+      hsk_verack_msg_t *m = (hsk_verack_msg_t *)msg;
+      free(m);
+      break;
+    }
+    case HSK_MSG_PING: {
+      hsk_ping_msg_t *m = (hsk_ping_msg_t *)msg;
+      free(m);
+      break;
+    }
+    case HSK_MSG_PONG: {
+      hsk_pong_msg_t *m = (hsk_pong_msg_t *)msg;
+      free(m);
+      break;
+    }
+    case HSK_MSG_GETADDR: {
+      hsk_getaddr_msg_t *m = (hsk_getaddr_msg_t *)msg;
+      free(m);
+      break;
+    }
+    case HSK_MSG_ADDR: {
+      hsk_addr_msg_t *m = (hsk_addr_msg_t *)msg;
+      free(m);
+      break;
+    }
+    case HSK_MSG_GETHEADERS: {
+      hsk_getheaders_msg_t *m = (hsk_getheaders_msg_t *)msg;
+      free(m);
+      break;
+    }
+    case HSK_MSG_HEADERS: {
+      hsk_headers_msg_t *m = (hsk_headers_msg_t *)msg;
+      hsk_header_t *c, *n;
+      for (c = m->headers; c; c = n) {
+        n = c->next;
+        free(c);
+      }
+      free(m);
+      break;
+    }
+    case HSK_MSG_SENDHEADERS: {
+      hsk_sendheaders_msg_t *m = (hsk_sendheaders_msg_t *)msg;
+      free(m);
+      break;
+    }
+    case HSK_MSG_GETPROOF: {
+      hsk_getproof_msg_t *m = (hsk_getproof_msg_t *)msg;
+      free(m);
+      break;
+    }
+    case HSK_MSG_PROOF: {
+      hsk_proof_msg_t *m = (hsk_proof_msg_t *)msg;
+      hsk_raw_node_free_list(m->nodes);
+      free(m);
+      break;
+    }
   }
 }
 
 bool
-dns_question_read(
-  uint8_t **data,
-  size_t *data_len,
-  uint8_t *pd,
-  size_t pd_len,
-  dns_question_t *qs
-) {
-  if (!dns_alloc_name(data, data_len, pd, pd_len, &qs->name))
-    goto fail;
-
-  if (!read_u16be(data, data_len, &qs->type))
-    goto fail;
-
-  if (!read_u16be(data, data_len, &qs->class))
-    goto fail;
-
-  return true;
-
-fail:
-  if (qs->name) {
-    free(qs->name);
-    qs->name = NULL;
-  }
-
-  return false;
-}
-
-void
-dns_init_rd(uint16_t type, void *rd) {
-  if (rd == NULL)
-    return;
-
-  switch (type) {
-    case DNS_SOA: {
-      dns_soa_rd_t *r = (dns_soa_rd_t *)rd;
-      r->ns = NULL;
-      r->mbox = NULL;
-      r->serial = 0;
-      r->refresh = 0;
-      r->retry = 0;
-      r->expire = 0;
-      r->minttl = 0;
-      break;
+hsk_msg_read(uint8_t **data, size_t *data_len, hsk_msg_t *msg) {
+  switch (msg->cmd) {
+    case HSK_MSG_VERSION: {
+      return hsk_version_msg_read(data, data_len, (hsk_version_msg_t *)msg);
     }
-    case DNS_A: {
-      dns_a_rd_t *r = (dns_a_rd_t *)rd;
-      memset(r->addr, 0, 4);
-      break;
+    case HSK_MSG_VERACK: {
+      return hsk_verack_msg_read(data, data_len, (hsk_verack_msg_t *)msg);
     }
-    case DNS_AAAA: {
-      dns_aaaa_rd_t *r = (dns_aaaa_rd_t *)rd;
-      memset(r->addr, 0, 16);
-      break;
+    case HSK_MSG_PING: {
+      return hsk_ping_msg_read(data, data_len, (hsk_ping_msg_t *)msg);
     }
-    case DNS_CNAME: {
-      dns_cname_rd_t *r = (dns_cname_rd_t *)rd;
-      r->target = NULL;
-      break;
+    case HSK_MSG_PONG: {
+      return hsk_pong_msg_read(data, data_len, (hsk_pong_msg_t *)msg);
     }
-    case DNS_DNAME: {
-      dns_dname_rd_t *r = (dns_dname_rd_t *)rd;
-      r->target = NULL;
-      break;
+    case HSK_MSG_GETADDR: {
+      return hsk_getaddr_msg_read(data, data_len, (hsk_getaddr_msg_t *)msg);
     }
-    case DNS_NS: {
-      dns_ns_rd_t *r = (dns_ns_rd_t *)rd;
-      r->ns = NULL;
-      break;
+    case HSK_MSG_ADDR: {
+      return hsk_addr_msg_read(data, data_len, (hsk_addr_msg_t *)msg);
     }
-    case DNS_MX: {
-      dns_mx_rd_t *r = (dns_mx_rd_t *)rd;
-      r->preference = 0;
-      r->mx = NULL;
-      break;
+    case HSK_MSG_GETHEADERS: {
+      return hsk_getheaders_msg_read(data, data_len, (hsk_getheaders_msg_t *)msg);
     }
-    case DNS_PTR: {
-      dns_ptr_rd_t *r = (dns_ptr_rd_t *)rd;
-      r->ptr = NULL;
-      break;
+    case HSK_MSG_HEADERS: {
+      return hsk_headers_msg_read(data, data_len, (hsk_headers_msg_t *)msg);
     }
-    case DNS_SRV: {
-      dns_srv_rd_t *r = (dns_srv_rd_t *)rd;
-      r->priority = 0;
-      r->weight = 0;
-      r->port = 0;
-      r->target = NULL;
-      break;
+    case HSK_MSG_SENDHEADERS: {
+      return hsk_sendheaders_msg_read(data, data_len, (hsk_sendheaders_msg_t *)msg);
     }
-    case DNS_TXT: {
-      dns_txt_rd_t *r = (dns_txt_rd_t *)rd;
-      r->text = NULL;
-      break;
+    case HSK_MSG_GETPROOF: {
+      return hsk_getproof_msg_read(data, data_len, (hsk_getproof_msg_t *)msg);
     }
-    case DNS_DS: {
-      dns_ds_rd_t *r = (dns_ds_rd_t *)rd;
-      r->key_tag = 0;
-      r->algorithm = 0;
-      r->digest_type = 0;
-      r->digest_len = 0;
-      r->digest = NULL;
-      break;
-    }
-    case DNS_TLSA: {
-      dns_tlsa_rd_t *r = (dns_tlsa_rd_t *)rd;
-      r->usage = 0;
-      r->selector = 0;
-      r->matching_type = 0;
-      r->certificate_len = 0;
-      r->certificate = NULL;
-      break;
-    }
-    case DNS_SSHFP: {
-      dns_sshfp_rd_t *r = (dns_sshfp_rd_t *)rd;
-      r->algorithm = 0;
-      r->type = 0;
-      r->fingerprint_len = 0;
-      r->fingerprint = NULL;
-      break;
-    }
-    case DNS_OPENPGPKEY: {
-      dns_openpgpkey_rd_t *r = (dns_openpgpkey_rd_t *)rd;
-      r->public_key_len = 0;
-      r->public_key = NULL;
-      break;
+    case HSK_MSG_PROOF: {
+      return hsk_proof_msg_read(data, data_len, (hsk_proof_msg_t *)msg);
     }
     default: {
-      dns_unknown_rd_t *r = (dns_unknown_rd_t *)rd;
-      r->rd_len = 0;
-      r->rd = NULL;
-      break;
-    }
-  }
-}
-
-void *
-dns_rd_alloc(uint16_t type) {
-  void *rd;
-
-  switch (type) {
-    case DNS_SOA: {
-      rd = (void *)malloc(sizeof(dns_soa_rd_t));
-      break;
-    }
-    case DNS_A: {
-      rd = (void *)malloc(sizeof(dns_a_rd_t));
-      break;
-    }
-    case DNS_AAAA: {
-      rd = (void *)malloc(sizeof(dns_aaaa_rd_t));
-      break;
-    }
-    case DNS_CNAME: {
-      rd = (void *)malloc(sizeof(dns_cname_rd_t));
-      break;
-    }
-    case DNS_DNAME: {
-      rd = (void *)malloc(sizeof(dns_dname_rd_t));
-      break;
-    }
-    case DNS_NS: {
-      rd = (void *)malloc(sizeof(dns_ns_rd_t));
-      break;
-    }
-    case DNS_MX: {
-      rd = (void *)malloc(sizeof(dns_mx_rd_t));
-      break;
-    }
-    case DNS_PTR: {
-      rd = (void *)malloc(sizeof(dns_ptr_rd_t));
-      break;
-    }
-    case DNS_SRV: {
-      rd = (void *)malloc(sizeof(dns_srv_rd_t));
-      break;
-    }
-    case DNS_TXT: {
-      rd = (void *)malloc(sizeof(dns_txt_rd_t));
-      break;
-    }
-    case DNS_DS: {
-      rd = (void *)malloc(sizeof(dns_ds_rd_t));
-      break;
-    }
-    case DNS_TLSA: {
-      rd = (void *)malloc(sizeof(dns_tlsa_rd_t));
-      break;
-    }
-    case DNS_SSHFP: {
-      rd = (void *)malloc(sizeof(dns_sshfp_rd_t));
-      break;
-    }
-    case DNS_OPENPGPKEY: {
-      rd = (void *)malloc(sizeof(dns_openpgpkey_rd_t));
-      break;
-    }
-    default: {
-      rd = (void *)malloc(sizeof(dns_unknown_rd_t));
-      break;
-    }
-  }
-
-  dns_init_rd(type, rd);
-
-  return rd;
-}
-
-void
-dns_rd_free(uint16_t type, void *rd) {
-  if (rd == NULL)
-    return;
-
-  switch (type) {
-    case DNS_SOA: {
-      dns_soa_rd_t *r = (dns_soa_rd_t *)rd;
-      if (r->ns)
-        free(r->ns);
-      if (r->mbox)
-        free(r->mbox);
-      break;
-    }
-    case DNS_A: {
-      dns_a_rd_t *r = (dns_a_rd_t *)rd;
-      break;
-    }
-    case DNS_AAAA: {
-      dns_aaaa_rd_t *r = (dns_aaaa_rd_t *)rd;
-      break;
-    }
-    case DNS_CNAME: {
-      dns_cname_rd_t *r = (dns_cname_rd_t *)rd;
-      if (r->target)
-        free(r->target);
-      break;
-    }
-    case DNS_DNAME: {
-      dns_dname_rd_t *r = (dns_dname_rd_t *)rd;
-      if (r->target)
-        free(r->target);
-      break;
-    }
-    case DNS_NS: {
-      dns_ns_rd_t *r = (dns_ns_rd_t *)rd;
-      if (r->ns)
-        free(r->ns);
-      break;
-    }
-    case DNS_MX: {
-      dns_mx_rd_t *r = (dns_mx_rd_t *)rd;
-      if (r->mx)
-        free(r->mx);
-      break;
-    }
-    case DNS_PTR: {
-      dns_ptr_rd_t *r = (dns_ptr_rd_t *)rd;
-      if (r->ptr)
-        free(r->ptr);
-      break;
-    }
-    case DNS_SRV: {
-      dns_srv_rd_t *r = (dns_srv_rd_t *)rd;
-      if (r->target)
-        free(r->target);
-      break;
-    }
-    case DNS_TXT: {
-      dns_txt_rd_t *r = (dns_txt_rd_t *)rd;
-      if (r->text)
-        dns_text_free_list(r->text);
-      break;
-    }
-    case DNS_DS: {
-      dns_ds_rd_t *r = (dns_ds_rd_t *)rd;
-      if (r->digest)
-        free(r->digest);
-      break;
-    }
-    case DNS_TLSA: {
-      dns_tlsa_rd_t *r = (dns_tlsa_rd_t *)rd;
-      if (r->certificate)
-        free(r->certificate);
-      break;
-    }
-    case DNS_SSHFP: {
-      dns_sshfp_rd_t *r = (dns_sshfp_rd_t *)rd;
-      if (r->fingerprint)
-        free(r->fingerprint);
-      break;
-    }
-    case DNS_OPENPGPKEY: {
-      dns_openpgpkey_rd_t *r = (dns_openpgpkey_rd_t *)rd;
-      if (r->public_key)
-        free(r->public_key);
-      break;
-    }
-    default: {
-      dns_unknown_rd_t *r = (dns_unknown_rd_t *)rd;
-      if (r->rd)
-        free(r->rd);
-      break;
-    }
-  }
-
-  free(rd);
-}
-
-bool
-dns_read_rd(
-  uint8_t **data,
-  size_t *data_len,
-  uint8_t *pd,
-  size_t pd_len,
-  uint16_t type,
-  void *rd
-) {
-  switch (type) {
-    case DNS_SOA: {
-      dns_soa_rd_t *r = (dns_soa_rd_t *)rd;
-
-      if (!dns_alloc_name(data, data_len, pd, pd_len, &r->ns))
-        goto fail_soa;
-
-      if (!dns_alloc_name(data, data_len, pd, pd_len, &r->mbox))
-        goto fail_soa;
-
-      if (!read_u32be(data, data_len, &r->serial))
-        goto fail_soa;
-
-      if (!read_u32be(data, data_len, &r->refresh))
-        goto fail_soa;
-
-      if (!read_u32be(data, data_len, &r->retry))
-        goto fail_soa;
-
-      if (!read_u32be(data, data_len, &r->expire))
-        goto fail_soa;
-
-      if (!read_u32be(data, data_len, &r->minttl))
-        goto fail_soa;
-
-      break;
-
-fail_soa:
-      if (r->ns) {
-        free(r->ns);
-        r->ns = NULL;
-      }
-
-      if (r->mbox) {
-        free(r->mbox);
-        r->mbox = NULL;
-      }
-
       return false;
     }
-    case DNS_A: {
-      dns_a_rd_t *r = (dns_a_rd_t *)rd;
+  }
+}
 
-      if (!read_bytes(data, data_len, r->addr, 4))
-        return false;
-
-      break;
+int32_t
+hsk_msg_write(hsk_msg_t *msg, uint8_t **data) {
+  switch (msg->cmd) {
+    case HSK_MSG_VERSION: {
+      return hsk_version_msg_write((hsk_version_msg_t *)msg, data);
     }
-    case DNS_AAAA: {
-      dns_aaaa_rd_t *r = (dns_aaaa_rd_t *)rd;
-
-      if (!read_bytes(data, data_len, r->addr, 16))
-        return false;
-
-      break;
+    case HSK_MSG_VERACK: {
+      return hsk_verack_msg_write((hsk_verack_msg_t *)msg, data);
     }
-    case DNS_CNAME: {
-      dns_cname_rd_t *r = (dns_cname_rd_t *)rd;
-
-      if (!dns_alloc_name(data, data_len, pd, pd_len, &r->target))
-        return false;
-
-      break;
+    case HSK_MSG_PING: {
+      return hsk_ping_msg_write((hsk_ping_msg_t *)msg, data);
     }
-    case DNS_DNAME: {
-      dns_dname_rd_t *r = (dns_dname_rd_t *)rd;
-
-      if (!dns_alloc_name(data, data_len, pd, pd_len, &r->target))
-        return false;
-
-      break;
+    case HSK_MSG_PONG: {
+      return hsk_pong_msg_write((hsk_pong_msg_t *)msg, data);
     }
-    case DNS_NS: {
-      dns_ns_rd_t *r = (dns_ns_rd_t *)rd;
-
-      if (!dns_alloc_name(data, data_len, pd, pd_len, &r->ns))
-        return false;
-
-      break;
+    case HSK_MSG_GETADDR: {
+      return hsk_getaddr_msg_write((hsk_getaddr_msg_t *)msg, data);
     }
-    case DNS_MX: {
-      dns_mx_rd_t *r = (dns_mx_rd_t *)rd;
-
-      if (!read_u16be(data, data_len, &r->preference))
-        return false;
-
-      if (!dns_alloc_name(data, data_len, pd, pd_len, &r->mx))
-        return false;
-
-      break;
+    case HSK_MSG_ADDR: {
+      return hsk_addr_msg_write((hsk_addr_msg_t *)msg, data);
     }
-    case DNS_PTR: {
-      dns_ptr_rd_t *r = (dns_ptr_rd_t *)rd;
-
-      if (!dns_alloc_name(data, data_len, pd, pd_len, &r->ptr))
-        return false;
-
-      break;
+    case HSK_MSG_GETHEADERS: {
+      return hsk_getheaders_msg_write((hsk_getheaders_msg_t *)msg, data);
     }
-    case DNS_SRV: {
-      dns_srv_rd_t *r = (dns_srv_rd_t *)rd;
-
-      if (!read_u16be(data, data_len, &r->priority))
-        return false;
-
-      if (!read_u16be(data, data_len, &r->weight))
-        return false;
-
-      if (!read_u16be(data, data_len, &r->port))
-        return false;
-
-      if (!dns_alloc_name(data, data_len, pd, pd_len, &r->target))
-        return false;
-
-      break;
+    case HSK_MSG_HEADERS: {
+      return hsk_headers_msg_write((hsk_headers_msg_t *)msg, data);
     }
-    case DNS_TXT: {
-      dns_txt_rd_t *r = (dns_txt_rd_t *)rd;
-      dns_text_t *parent = NULL;
-
-      while (*data_len > 0) {
-        dns_text_t *text = dns_text_alloc();
-
-        if (text == NULL)
-          goto fail_txt;
-
-        if (!read_u8(data, data_len, &text->data_len))
-          goto fail_txt;
-
-        if (!alloc_bytes(data, data_len, &text->data, text->data_len))
-          goto fail_txt;
-
-        if (r->text == NULL)
-          r->text = text;
-
-        if (parent)
-          parent->next = text;
-
-        parent = text;
-      }
-
-      break;
-
-fail_txt:
-      if (r->text) {
-        dns_text_free_list(r->text);
-        r->text = NULL;
-      }
-      return false;
+    case HSK_MSG_SENDHEADERS: {
+      return hsk_sendheaders_msg_write((hsk_sendheaders_msg_t *)msg, data);
     }
-    case DNS_DS: {
-      dns_ds_rd_t *r = (dns_ds_rd_t *)rd;
-
-      if (!read_u16be(data, data_len, &r->key_tag))
-        return false;
-
-      if (!read_u8(data, data_len, &r->algorithm))
-        return false;
-
-      if (!read_u8(data, data_len, &r->digest_type))
-        return false;
-
-      r->digest_len = *data_len;
-
-      if (!alloc_bytes(data, data_len, &r->digest, *data_len))
-        return false;
-
-      break;
+    case HSK_MSG_GETPROOF: {
+      return hsk_getproof_msg_write((hsk_getproof_msg_t *)msg, data);
     }
-    case DNS_TLSA: {
-      dns_tlsa_rd_t *r = (dns_tlsa_rd_t *)rd;
-
-      if (!read_u8(data, data_len, &r->usage))
-        return false;
-
-      if (!read_u8(data, data_len, &r->selector))
-        return false;
-
-      if (!read_u8(data, data_len, &r->matching_type))
-        return false;
-
-      r->certificate_len = *data_len;
-
-      if (!alloc_bytes(data, data_len, &r->certificate, *data_len))
-        return false;
-
-      break;
-    }
-    case DNS_SSHFP: {
-      dns_sshfp_rd_t *r = (dns_sshfp_rd_t *)rd;
-
-      if (!read_u8(data, data_len, &r->algorithm))
-        return false;
-
-      if (!read_u8(data, data_len, &r->type))
-        return false;
-
-      r->fingerprint_len = *data_len;
-
-      if (!alloc_bytes(data, data_len, &r->fingerprint, *data_len))
-        return false;
-
-      break;
-    }
-    case DNS_OPENPGPKEY: {
-      dns_openpgpkey_rd_t *r = (dns_openpgpkey_rd_t *)rd;
-
-      r->public_key_len = *data_len;
-
-      if (!alloc_bytes(data, data_len, &r->public_key, *data_len))
-        return false;
-
-      break;
+    case HSK_MSG_PROOF: {
+      return hsk_proof_msg_write((hsk_proof_msg_t *)msg, data);
     }
     default: {
-      dns_unknown_rd_t *r = (dns_unknown_rd_t *)rd;
-
-      r->rd_len = *data_len;
-
-      if (!alloc_bytes(data, data_len, &r->rd, *data_len))
-        return false;
-
-      break;
+      return -1;
     }
   }
-
-  return true;
 }
 
 bool
-dns_record_read(
-  uint8_t **data,
-  size_t *data_len,
-  uint8_t *pd,
-  size_t pd_len,
-  dns_record_t *rr
-) {
-  if (!dns_alloc_name(data, data_len, pd, pd_len, &rr->name))
-    goto fail;
-
-  if (!read_u16be(data, data_len, &rr->type))
-    goto fail;
-
-  if (!read_u16be(data, data_len, &rr->class))
-    goto fail;
-
-  if (!read_u32be(data, data_len, &rr->ttl))
-    goto fail;
-
-  uint16_t len;
-
-  if (!read_u16be(data, data_len, &len))
-    goto fail;
-
-  if (*data_len < len)
-    goto fail;
-
-  rr->rd = dns_rd_alloc(rr->type);
-
-  if (rr->rd == NULL)
-    goto fail;
-
-  uint8_t *rd = *data;
-  size_t rdlen = (size_t)len;
-
-  if (!dns_read_rd(&rd, &rdlen, pd, pd_len, rr->type, rr->rd))
-    goto fail;
-
-  *data += len;
-  *data_len -= len;
-
-  return true;
-
-fail:
-  if (rr->name) {
-    free(rr->name);
-    rr->name = NULL;
-  }
-
-  if (rr->rd) {
-    free(rr->rd);
-    rr->rd = NULL;
-  }
-
-  return false;
+hsk_msg_decode(uint8_t *data, size_t data_len, hsk_msg_t *msg) {
+  return hsk_msg_read(&data, &data_len, msg);
 }
 
-bool
-dns_message_read(uint8_t **data, size_t *data_len, dns_message_t *msg) {
-  uint8_t *pd = *data;
-  size_t pd_len = *data_len;
-
-  if (!read_u16be(data, data_len, &msg->id))
-    return false;
-
-  if (!read_u16be(data, data_len, &msg->flags))
-    return false;
-
-  if (!read_u16be(data, data_len, &msg->qdcount))
-    return false;
-
-  if (!read_u16be(data, data_len, &msg->ancount))
-    return false;
-
-  if (!read_u16be(data, data_len, &msg->nscount))
-    return false;
-
-  if (!read_u16be(data, data_len, &msg->arcount))
-    return false;
-
-  uint32_t i;
-
-  {
-    dns_question_t *parent = NULL;
-    for (i = 0; i < msg->qdcount; i++) {
-      if (*data_len == 0)
-        break;
-
-      dns_question_t *qs = dns_question_alloc();
-
-      if (qs == NULL)
-        goto fail;
-
-      if (!dns_question_read(data, data_len, pd, pd_len, qs))
-        goto fail;
-
-      if (msg->question == NULL)
-        msg->question = qs;
-
-      if (parent)
-        parent->next = qs;
-
-      parent = qs;
-    }
-  }
-
-  dns_record_t *parent = NULL;
-  for (i = 0; i < msg->ancount; i++) {
-    if (msg->flags & DNS_TC) {
-      if (*data_len == 0)
-        break;
-    }
-
-    dns_record_t *rr = dns_record_alloc();
-
-    if (rr == NULL)
-      goto fail;
-
-    if (!dns_record_read(data, data_len, pd, pd_len, rr))
-      goto fail;
-
-    if (msg->answer == NULL)
-      msg->answer = rr;
-
-    if (parent)
-      parent->next = rr;
-
-    parent = rr;
-  }
-
-  parent = NULL;
-  for (i = 0; i < msg->nscount; i++) {
-    if (msg->flags & DNS_TC) {
-      if (*data_len == 0)
-        break;
-    }
-
-    dns_record_t *rr = dns_record_alloc();
-
-    if (rr == NULL)
-      goto fail;
-
-    if (!dns_record_read(data, data_len, pd, pd_len, rr))
-      goto fail;
-
-    if (msg->authority == NULL)
-      msg->authority = rr;
-
-    if (parent)
-      parent->next = rr;
-
-    parent = rr;
-  }
-
-  parent = NULL;
-  for (i = 0; i < msg->arcount; i++) {
-    if (*data_len == 0)
-      break;
-
-    dns_record_t *rr = dns_record_alloc();
-
-    if (rr == NULL)
-      goto fail;
-
-    if (!dns_record_read(data, data_len, pd, pd_len, rr))
-      goto fail;
-
-    if (msg->additional == NULL)
-      msg->additional = rr;
-
-    if (parent)
-      parent->next = rr;
-
-    parent = rr;
-  }
-
-  return true;
-
-fail:
-  dns_question_free_list(msg->question);
-  dns_record_free_list(msg->answer);
-  dns_record_free_list(msg->authority);
-  dns_record_free_list(msg->additional);
-  dns_message_init(msg);
-  return false;
+int32_t
+hsk_msg_encode(hsk_msg_t *msg, uint8_t *data) {
+  return hsk_msg_write(msg, &data);
 }
 
-bool
-dns_message_decode(uint8_t *data, size_t data_len, dns_message_t **msg) {
-  dns_message_t *m = dns_message_alloc();
-
-  if (m == NULL)
-    return false;
-
-  if (!dns_message_read(&data, &data_len, m))
-    return false;
-
-  *msg = m;
-
-  return true;
-}
-
-dns_record_t *
-dns_get_record(dns_record_t *rr, char *target, uint8_t type) {
-  dns_record_t *c;
-
-  char *glue = target;
-
-  for (c = rr; c; c = c->next) {
-    if (!target) {
-      if (c->type == type || type == DNS_ANY)
-        return c;
-      continue;
-    }
-
-    if (c->type == DNS_CNAME) {
-      if (dns_name_cmp(c->name, glue) == 0) {
-        if (type == DNS_CNAME || type == DNS_ANY)
-          return c;
-
-        glue = ((dns_cname_rd_t *)c->rd)->target;
-      }
-      continue;
-    }
-
-    if (c->type == type || type == DNS_ANY) {
-      if (dns_name_cmp(c->name, glue) == 0)
-        return c;
-      continue;
-    }
-  }
-
-  return NULL;
-}
-
-void
-dns_iterator_init(
-  dns_iterator_t *it,
-  dns_record_t *section,
-  char *target,
-  uint8_t type
-) {
-  it->target = target;
-  it->type = type;
-  it->current = section;
-}
-
-dns_record_t *
-dns_iterator_next(dns_iterator_t *it) {
-  if (it->current == NULL)
-    return NULL;
-
-  dns_record_t *c = dns_get_record(it->current, it->target, it->type);
-
-  if (c == NULL) {
-    it->current = NULL;
-    return NULL;
-  }
-
-  if (it->target)
-    it->target = c->name;
-
-  it->current = c->next;
-
-  return c;
+int32_t
+hsk_msg_size(hsk_msg_t *msg) {
+  return hsk_msg_write(msg, NULL);
 }

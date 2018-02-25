@@ -1,12 +1,13 @@
 #ifndef _HSK_HSK_H
 #define _HSK_HSK_H
 
+#include "hsk-chain.h"
+#include "hsk-constants.h"
 #include "hsk-error.h"
-#include "hsk-name.h"
-#include "hsk-proof.h"
-#include "hsk-cuckoo.h"
-#include "hsk-header.h"
-#include "hsk-resource.h"
 #include "hsk-hash.h"
+#include "hsk-header.h"
+#include "hsk-map.h"
+#include "hsk-proof.h"
+#include "hsk-resource.h"
 
 #endif

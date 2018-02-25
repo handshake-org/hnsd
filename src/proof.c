@@ -69,7 +69,7 @@ decompress(uint8_t *data, size_t data_len, uint8_t **dec, size_t *dec_len) {
 }
 
 void
-hsk_init_node(uint8_t type, hsk_node_t *node) {
+hsk_node_init(uint8_t type, hsk_node_t *node) {
   switch (type) {
     case HSK_NULLNODE: {
       break;
@@ -112,7 +112,7 @@ hsk_init_node(uint8_t type, hsk_node_t *node) {
 }
 
 bool
-hsk_alloc_node(uint8_t type, hsk_node_t **node) {
+hsk_node_alloc(uint8_t type, hsk_node_t **node) {
   *node = NULL;
 
   switch (type) {
@@ -153,7 +153,7 @@ hsk_alloc_node(uint8_t type, hsk_node_t **node) {
     }
   }
 
-  hsk_init_node(type, *node);
+  hsk_node_init(type, *node);
 
   return true;
 }
@@ -215,7 +215,7 @@ hsk_free_node(hsk_node_t *node, bool recurse) {
 }
 
 bool
-hsk_read_node(uint8_t **data, size_t *data_len, hsk_node_t **node) {
+hsk_node_read(uint8_t **data, size_t *data_len, hsk_node_t **node) {
   uint8_t type;
 
   *node = NULL;
@@ -223,7 +223,7 @@ hsk_read_node(uint8_t **data, size_t *data_len, hsk_node_t **node) {
   if (!read_u8(data, data_len, &type))
     return false;
 
-  if (!hsk_alloc_node(type, node))
+  if (!hsk_node_alloc(type, node))
     return false;
 
   switch (type) {
@@ -251,7 +251,7 @@ hsk_read_node(uint8_t **data, size_t *data_len, hsk_node_t **node) {
       if (!decompress(out, out_len, &n->key, &n->key_len))
         goto fail;
 
-      if (!hsk_read_node(data, data_len, &n->value))
+      if (!hsk_node_read(data, data_len, &n->value))
         goto fail;
 
       return true;
@@ -261,7 +261,7 @@ hsk_read_node(uint8_t **data, size_t *data_len, hsk_node_t **node) {
 
       int32_t i;
       for (i = 0; i < 17; i++) {
-        if (!hsk_read_node(data, data_len, &n->children[i]))
+        if (!hsk_node_read(data, data_len, &n->children[i]))
           goto fail;
       }
 
@@ -287,8 +287,8 @@ fail:
 }
 
 bool
-hsk_decode_node(uint8_t *data, size_t data_len, hsk_node_t **node) {
-  return hsk_read_node(&data, &data_len, node);
+hsk_node_decode(uint8_t *data, size_t data_len, hsk_node_t **node) {
+  return hsk_node_read(&data, &data_len, node);
 }
 
 static bool
@@ -372,7 +372,7 @@ next_child(hsk_node_t **node, uint8_t **kk, size_t *kl) {
 }
 
 int32_t
-hsk_verify_proof(
+hsk_proof_verify(
   uint8_t *root,
   uint8_t *key,
   hsk_raw_node_t *nodes,
@@ -411,7 +411,7 @@ hsk_verify_proof(
   hsk_raw_node_t *c;
 
   for (c = nodes; c; c = c->next) {
-    hsk_blake2b(c->data, c->data_len, hash);
+    hsk_hash_blake2b(c->data, c->data_len, hash);
 
     if (memcmp(hash, h, 32) != 0) {
       rc = HSK_EHASHMISMATCH;
@@ -424,7 +424,7 @@ hsk_verify_proof(
 
     node = NULL;
 
-    if (!hsk_decode_node(c->data, c->data_len, &node)) {
+    if (!hsk_node_decode(c->data, c->data_len, &node)) {
       rc = HSK_EMALFORMEDNODE;
       goto fail;
     }
@@ -489,7 +489,7 @@ fail:
 }
 
 int32_t
-hsk_verify_name(
+hsk_proof_verify_name(
   uint8_t *root,
   char *name,
   hsk_raw_node_t *nodes,
@@ -497,8 +497,8 @@ hsk_verify_name(
   size_t *data_len
 ) {
   uint8_t key[32];
-  hsk_blake2b(name, strlen(name), key);
-  return hsk_verify_proof(root, key, nodes, data, data_len);
+  hsk_hash_blake2b(name, strlen(name), key);
+  return hsk_proof_verify(root, key, nodes, data, data_len);
 }
 
 void
@@ -531,10 +531,10 @@ hsk_raw_node_free(hsk_raw_node_t *n) {
 
 void
 hsk_raw_node_free_list(hsk_raw_node_t *n) {
-  hsk_raw_node_t *c, *nn;
-  for (c = n; c; c = nn) {
-    nn = c->next;
-    hsk_raw_node_free(c);
+  hsk_raw_node_t *node, *next;
+  for (node = n; node; node = next) {
+    next = node->next;
+    hsk_raw_node_free(node);
   }
 }
 

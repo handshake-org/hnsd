@@ -1,11 +1,14 @@
 #include <assert.h>
 #include <stdint.h>
+#include <stdbool.h>
+#include <stdlib.h>
 
+#include "hsk-hash.h"
 #include "blake2b.h"
 #include "sha256.h"
 
 int32_t
-hsk_blake2b(uint8_t *data, size_t data_len, uint8_t *hash) {
+hsk_hash_blake2b(uint8_t *data, size_t data_len, uint8_t *hash) {
   assert(hash != NULL);
   blake2b_ctx ctx;
   assert(blake2b_init(&ctx, 32) == 0);
@@ -14,7 +17,7 @@ hsk_blake2b(uint8_t *data, size_t data_len, uint8_t *hash) {
 }
 
 void
-hsk_sha256(uint8_t *data, size_t data_len, uint8_t *hash) {
+hsk_hash_sha256(uint8_t *data, size_t data_len, uint8_t *hash) {
   assert(hash != NULL);
   sha256_ctx ctx;
   sha256_init(&ctx);
@@ -23,7 +26,7 @@ hsk_sha256(uint8_t *data, size_t data_len, uint8_t *hash) {
 }
 
 void
-hsk_hash256(uint8_t *data, size_t data_len, uint8_t *hash) {
+hsk_hash_hash256(uint8_t *data, size_t data_len, uint8_t *hash) {
   assert(hash != NULL);
   sha256_ctx ctx;
   sha256_init(&ctx);

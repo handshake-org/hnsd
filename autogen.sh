@@ -14,12 +14,6 @@ LIBTOOLIZE=${LIBTOOLIZE:-libtoolize}
 
 set -ex
 
-pushd cares
-if ! test -f configure; then
-  ./buildconf
-fi
-popd
-
 pushd uv
 if ! test -f configure; then
   ./autogen.sh

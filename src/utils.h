@@ -8,46 +8,80 @@
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <netinet/in.h>
 
 int64_t
-now(void);
+hsk_now(void);
 
 size_t
-hex_encode_size(size_t);
+hsk_hex_encode_size(size_t);
 
 char *
-hex_encode(uint8_t *, size_t, char *);
+hsk_hex_encode(uint8_t *, size_t, char *);
 
 char *
-hex_encode32(uint8_t *);
+hsk_hex_encode32(uint8_t *);
 
 size_t
-hex_decode_size(char *);
+hsk_hex_decode_size(char *);
 
 bool
-hex_decode(char *, uint8_t *);
-
-void *
-xmalloc(size_t);
-
-void *
-xrealloc(void *, size_t);
+hsk_hex_decode(char *, uint8_t *);
 
 void
-label_split(char *fqdn, uint8_t *labels, int32_t *count);
+hsk_label_split(char *fqdn, uint8_t *labels, int32_t *count);
 
 int32_t
-label_count(char *fqdn);
+hsk_label_count(char *fqdn);
 
 void
-label_from2(char *fqdn, uint8_t *labels, int32_t count, int32_t idx, char *ret);
+hsk_label_from2(
+  char *fqdn,
+  uint8_t *labels,
+  int32_t count,
+  int32_t idx,
+  char *ret
+);
 
 void
-label_from(char *fqdn, int32_t idx, char *ret);
+hsk_label_from(char *fqdn, int32_t idx, char *ret);
 
 void
-label_get2(char *fqdn, uint8_t *labels, int32_t count, int32_t idx, char *ret);
+hsk_label_get2(
+  char *fqdn,
+  uint8_t *labels,
+  int32_t count,
+  int32_t idx,
+  char *ret
+);
 
 void
-label_get(char *fqdn, int32_t idx, char *ret);
+hsk_label_get(char *fqdn, int32_t idx, char *ret);
+
+bool
+hsk_set_inet(
+  struct sockaddr *addr,
+  int32_t sin_family,
+  uint8_t *sin_addr,
+  uint16_t sin_port
+);
+
+bool
+hsk_get_inet(
+  struct sockaddr *addr,
+  int32_t *sin_family,
+  uint8_t *sin_addr,
+  uint16_t *sin_port
+);
+
+bool
+hsk_inet2string(
+  struct sockaddr *src,
+  char *dst,
+  size_t dst_len,
+  uint16_t port
+);
+
+bool
+hsk_string2inet(char *src, struct sockaddr *dst, uint16_t port);
 #endif

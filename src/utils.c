@@ -6,9 +6,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
+#include <arpa/inet.h>
+#include <netinet/in.h>
+#include "uv.h"
 
 int64_t
-now(void) {
+hsk_now(void) {
   time_t n = time(NULL);
   if (n < 0)
     abort();
@@ -41,12 +44,12 @@ to_char(uint8_t n) {
 }
 
 size_t
-hex_encode_size(size_t data_len) {
+hsk_hex_encode_size(size_t data_len) {
   return (data_len << 1) + 1;
 }
 
 bool
-hex_encode(uint8_t *data, size_t data_len, char *str) {
+hsk_hex_encode(uint8_t *data, size_t data_len, char *str) {
   if (data == NULL && data_len != 0)
     return false;
 
@@ -80,21 +83,21 @@ hex_encode(uint8_t *data, size_t data_len, char *str) {
 }
 
 char *
-hex_encode32(uint8_t *data) {
+hsk_hex_encode32(uint8_t *data) {
   static char str[65];
-  assert(hex_encode(data, 32, str));
+  assert(hsk_hex_encode(data, 32, str));
   return str;
 }
 
 size_t
-hex_decode_size(char *str) {
+hsk_hex_decode_size(char *str) {
   if (str == NULL)
     return 0;
   return strlen(str) >> 1;
 }
 
 bool
-hex_decode(char *str, uint8_t *data) {
+hsk_hex_decode(char *str, uint8_t *data) {
   if (str == NULL)
     return true;
 
@@ -128,34 +131,17 @@ hex_decode(char *str, uint8_t *data) {
   return true;
 }
 
-void *
-xmalloc(size_t size) {
-  void *data = malloc(size);
-  if (size > 0 && data == NULL) {
-    fprintf(stderr, "malloc failed: out-of-memory\n");
-    abort();
-  }
-  return data;
-}
-
-void *
-xrealloc(void *ptr, size_t size) {
-  void *data = realloc(ptr, size);
-  if (size > 0 && data == NULL) {
-    fprintf(stderr, "realloc failed: out-of-memory\n");
-    abort();
-  }
-  return data;
-}
-
 void
-label_split(char *fqdn, uint8_t *labels, int32_t *count) {
+hsk_label_split(char *fqdn, uint8_t *labels, int32_t *count) {
   size_t len = strlen(fqdn);
   bool dot = false;
   int32_t i;
   int32_t j = 0;
 
   for (i = 0; i < len; i++) {
+    if (j == 255)
+      break;
+
     if (dot) {
       if (labels)
         labels[j++] = i;
@@ -174,14 +160,20 @@ label_split(char *fqdn, uint8_t *labels, int32_t *count) {
 }
 
 int32_t
-label_count(char *fqdn) {
+hsk_label_count(char *fqdn) {
   int32_t count;
-  label_split(fqdn, NULL, &count);
+  hsk_label_split(fqdn, NULL, &count);
   return count;
 }
 
 void
-label_from2(char *fqdn, uint8_t *labels, int32_t count, int32_t idx, char *ret) {
+hsk_label_from2(
+  char *fqdn,
+  uint8_t *labels,
+  int32_t count,
+  int32_t idx,
+  char *ret
+) {
   if (idx < 0)
     idx += count;
 
@@ -200,15 +192,21 @@ label_from2(char *fqdn, uint8_t *labels, int32_t count, int32_t idx, char *ret) 
 }
 
 void
-label_from(char *fqdn, int32_t idx, char *ret) {
+hsk_label_from(char *fqdn, int32_t idx, char *ret) {
   uint8_t labels[255];
   int32_t count;
-  label_split(fqdn, labels, &count);
-  label_from2(fqdn, labels, count, idx, ret);
+  hsk_label_split(fqdn, labels, &count);
+  hsk_label_from2(fqdn, labels, count, idx, ret);
 }
 
 void
-label_get2(char *fqdn, uint8_t *labels, int32_t count, int32_t idx, char *ret) {
+hsk_label_get2(
+  char *fqdn,
+  uint8_t *labels,
+  int32_t count,
+  int32_t idx,
+  char *ret
+) {
   if (idx < 0)
     idx += count;
 
@@ -233,9 +231,168 @@ label_get2(char *fqdn, uint8_t *labels, int32_t count, int32_t idx, char *ret) {
 }
 
 void
-label_get(char *fqdn, int32_t idx, char *ret) {
+hsk_label_get(char *fqdn, int32_t idx, char *ret) {
   uint8_t labels[255];
   int32_t count;
-  label_split(fqdn, labels, &count);
-  label_get2(fqdn, labels, count, idx, ret);
+  hsk_label_split(fqdn, labels, &count);
+  hsk_label_get2(fqdn, labels, count, idx, ret);
+}
+
+bool
+hsk_set_inet(
+  struct sockaddr *addr,
+  int32_t sin_family,
+  uint8_t *sin_addr,
+  uint16_t sin_port
+) {
+  if (!addr || !sin_addr)
+    return false;
+
+  if (sin_family == AF_INET) {
+    struct sockaddr_in *sai = (struct sockaddr_in *)addr;
+    sai->sin_family = AF_INET6;
+    memcpy((void *)&sai->sin_addr, sin_addr, 4);
+    if (sin_port)
+      sai->sin_port = htons(sin_port);
+  } else if (sin_family == AF_INET6) {
+    struct sockaddr_in6 *sai = (struct sockaddr_in6 *)addr;
+    sai->sin6_family = AF_INET6;
+    memcpy((void *)&sai->sin6_addr, sin_addr, 16);
+    if (sin_port)
+      sai->sin6_port = htons(sin_port);
+  } else {
+    return false;
+  }
+
+  return true;
+}
+
+bool
+hsk_get_inet(
+  struct sockaddr *addr,
+  int32_t *sin_family,
+  uint8_t *sin_addr,
+  uint16_t *sin_port
+) {
+  if (!addr || !sin_family || !sin_port)
+    return false;
+
+  if (addr->sa_family == AF_INET) {
+    struct sockaddr_in *sai = (struct sockaddr_in *)addr;
+    *sin_family = AF_INET;
+    // *sin_addr = (uint8_t *)&sai->sin_addr;
+    memcpy(sin_addr, (void *)&sai->sin_addr, 4);
+    if (sin_port)
+      *sin_port = ntohs(sai->sin_port);
+  } else if (addr->sa_family == AF_INET6) {
+    struct sockaddr_in6 *sai = (struct sockaddr_in6 *)addr;
+    *sin_family = AF_INET6;
+    // *sin_addr = (uint8_t *)&sai->sin6_addr;
+    memcpy(sin_addr, (void *)&sai->sin6_addr, 16);
+    if (sin_port)
+      *sin_port = ntohs(sai->sin6_port);
+  } else {
+    return false;
+  }
+
+  return true;
+}
+
+bool
+hsk_inet2string(
+  struct sockaddr *src,
+  char *dst,
+  size_t dst_len,
+  uint16_t port
+) {
+  if (!src || !dst)
+    return false;
+
+  void *sin_addr;
+  uint16_t sin_port = port;
+
+  if (src->sa_family == AF_INET) {
+    struct sockaddr_in *sai = (struct sockaddr_in *)src;
+    sin_addr = (void *)&sai->sin_addr;
+    if (sai->sin_port)
+      sin_port = ntohs(sai->sin_port);
+  } else if (src->sa_family == AF_INET6) {
+    struct sockaddr_in6 *sai = (struct sockaddr_in6 *)src;
+    sin_addr = (void *)&sai->sin6_addr;
+    if (sai->sin6_port)
+      sin_port = ntohs(sai->sin6_port);
+  } else {
+    return false;
+  }
+
+  if (uv_inet_ntop(src->sa_family, sin_addr, dst, dst_len) != 0)
+    return false;
+
+  if (port) {
+    size_t len = strlen(dst);
+
+    if (dst_len - len < 7)
+      return false;
+
+    sprintf(dst, "%s@%d", dst, sin_port);
+  }
+
+  return true;
+}
+
+bool
+hsk_string2inet(char *src, struct sockaddr *dst, uint16_t port) {
+  if (!src || !dst)
+    return false;
+
+  uint16_t sin_port = port;
+  char *at = strstr(src, "@");
+
+  if (port && at) {
+    int32_t i = 0;
+    uint32_t word = 0;
+    char *s = at + 1;
+
+    for (; *s; s++) {
+      int32_t ch = ((int32_t)*s) - 0x30;
+
+      if (ch < 0 || ch > 9)
+        return false;
+
+      if (i == 5)
+        return false;
+
+      word *= 10;
+      word += ch;
+
+      i += 1;
+    }
+
+    sin_port = (uint16_t)word;
+    *at = '\0';
+  } else if (!port && at) {
+    return false;
+  }
+
+  bool ret = true;
+  uint8_t sin_addr[16];
+
+  if (uv_inet_pton(AF_INET, src, (void *)sin_addr) == 0) {
+    struct sockaddr_in *sai = (struct sockaddr_in *)dst;
+    sai->sin_family = AF_INET;
+    memcpy(&sai->sin_addr, (void *)sin_addr, sizeof(struct in_addr));
+    sai->sin_port = htons(sin_port);
+  } else if (uv_inet_pton(AF_INET6, src, (void *)sin_addr) == 0) {
+    struct sockaddr_in6 *sai = (struct sockaddr_in6 *)dst;
+    sai->sin6_family = AF_INET6;
+    memcpy(&sai->sin6_addr, (void *)sin_addr, sizeof(struct in6_addr));
+    sai->sin6_port = htons(sin_port);
+  } else {
+    ret = false;
+  }
+
+  if (at)
+    *at = '@';
+
+  return ret;
 }

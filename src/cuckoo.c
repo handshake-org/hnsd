@@ -1,9 +1,12 @@
 #include <assert.h>
+#include <stdint.h>
+#include <stdbool.h>
+#include <stdlib.h>
 
+#include "hsk-cuckoo.h"
+#include "hsk-error.h"
 #include "blake2b.h"
 #include "siphash.h"
-#include "hsk-error.h"
-#include "hsk-cuckoo.h"
 
 int32_t
 hsk_cuckoo_init(

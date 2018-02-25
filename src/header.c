@@ -3,16 +3,64 @@
 #include <stdbool.h>
 
 #include "hsk-error.h"
-#include "bio.h"
+#include "hsk-constants.h"
 #include "hsk-hash.h"
 #include "hsk-header.h"
 #include "hsk-cuckoo.h"
+#include "bio.h"
 #include "bn.h"
 #include "utils.h"
 
+void
+hsk_header_init(hsk_header_t *hdr) {
+  if (!hdr)
+    return;
+
+  hdr->version = 0;
+  memset(hdr->prev_block, 0, 32);
+  memset(hdr->merkle_root, 0, 32);
+  memset(hdr->witness_root, 0, 32);
+  memset(hdr->trie_root, 0, 32);
+  hdr->time = 0;
+  hdr->bits = 0;
+  memset(hdr->nonce, 0, 16);
+  hdr->sol_size = 0;
+  memset(hdr->sol, 0, sizeof(uint32_t) * 42);
+
+  hdr->cache = false;
+  memset(hdr->hash, 0, 32);
+  hdr->height = 0;
+  memset(hdr->work, 0, 32);
+
+  hdr->next = NULL;
+}
+
+hsk_header_t *
+hsk_header_alloc(void) {
+  hsk_header_t *hdr = malloc(sizeof(hsk_header_t));
+  hsk_header_init(hdr);
+  return hdr;
+}
+
+hsk_header_t *
+hsk_header_clone(hsk_header_t *hdr) {
+  if (!hdr)
+    return NULL;
+
+  hsk_header_t *copy = malloc(sizeof(hsk_header_t));
+
+  if (!copy)
+    return NULL;
+
+  memcpy((void *)copy, (void *)hdr, sizeof(hsk_header_t));
+  copy->next = NULL;
+
+  return copy;
+}
+
 bool
-hsk_to_target(uint32_t bits, uint8_t *target) {
-  assert(target != NULL);
+hsk_pow_to_target(uint32_t bits, uint8_t *target) {
+  assert(target);
 
   memset(target, 0, 32);
 
@@ -50,9 +98,8 @@ hsk_to_target(uint32_t bits, uint8_t *target) {
 }
 
 bool
-hsk_to_bits(uint8_t *target, uint32_t *bits) {
-  assert(target != NULL);
-  assert(bits != NULL);
+hsk_pow_to_bits(uint8_t *target, uint32_t *bits) {
+  assert(target && bits);
 
   int32_t i;
 
@@ -98,10 +145,10 @@ hsk_to_bits(uint8_t *target, uint32_t *bits) {
 }
 
 bool
-hsk_get_proof2(uint32_t bits, uint8_t *proof) {
+hsk_header_get_proof(hsk_header_t *hdr, uint8_t *proof) {
   uint8_t target[32];
 
-  if (!hsk_to_target(bits, target))
+  if (!hsk_pow_to_target(hdr->bits, target))
     return false;
 
   bn_t max_bn;
@@ -121,20 +168,23 @@ hsk_get_proof2(uint32_t bits, uint8_t *proof) {
 }
 
 bool
-hsk_get_work(uint8_t *prev, uint32_t bits, uint8_t *work) {
+hsk_header_calc_work(hsk_header_t *hdr, hsk_header_t *prev) {
+  if (!prev)
+    return hsk_header_get_proof(hdr, hdr->work);
+
   bn_t prev_bn;
-  bignum_from_array(&prev_bn, prev, 32);
+  bignum_from_array(&prev_bn, prev->work, 32);
 
   uint8_t proof[32];
 
-  if (!hsk_get_proof2(bits, proof))
+  if (!hsk_header_get_proof(hdr, proof))
     return false;
 
   bn_t proof_bn;
   bignum_from_array(&proof_bn, proof, 32);
 
   bignum_add(&prev_bn, &proof_bn, &proof_bn);
-  bignum_to_array(&proof_bn, work, 32);
+  bignum_to_array(&proof_bn, hdr->work, 32);
 
   return true;
 }
@@ -174,7 +224,7 @@ encode_sol(uint8_t *data, uint32_t *sol, uint8_t sol_size) {
 }
 
 bool
-hsk_read_header(uint8_t **data, size_t *data_len, hsk_header_t *hdr) {
+hsk_header_read(uint8_t **data, size_t *data_len, hsk_header_t *hdr) {
   if (!read_u32(data, data_len, &hdr->version))
     return false;
 
@@ -212,12 +262,12 @@ hsk_read_header(uint8_t **data, size_t *data_len, hsk_header_t *hdr) {
 }
 
 bool
-hsk_decode_header(uint8_t *data, size_t data_len, hsk_header_t *hdr) {
-  return hsk_read_header(&data, &data_len, hdr);
+hsk_header_decode(uint8_t *data, size_t data_len, hsk_header_t *hdr) {
+  return hsk_header_read(&data, &data_len, hdr);
 }
 
 int32_t
-hsk_write_header(hsk_header_t *hdr, uint8_t **data) {
+hsk_header_write(hsk_header_t *hdr, uint8_t **data) {
   int32_t s = 0;
   s += write_u32(data, hdr->version);
   s += write_bytes(data, hdr->prev_block, 32);
@@ -233,17 +283,17 @@ hsk_write_header(hsk_header_t *hdr, uint8_t **data) {
 }
 
 int32_t
-hsk_size_header(hsk_header_t *hdr) {
-  return hsk_write_header(hdr, NULL);
+hsk_header_size(hsk_header_t *hdr) {
+  return hsk_header_write(hdr, NULL);
 }
 
 int32_t
 hsk_encode_header(hsk_header_t *hdr, uint8_t *data) {
-  return hsk_write_header(hdr, &data);
+  return hsk_header_write(hdr, &data);
 }
 
 int32_t
-hsk_write_pre(hsk_header_t *hdr, uint8_t **data) {
+hsk_header_write_pre(hsk_header_t *hdr, uint8_t **data) {
   int32_t s = 0;
   s += write_u32(data, hdr->version);
   s += write_bytes(data, hdr->prev_block, 32);
@@ -257,55 +307,55 @@ hsk_write_pre(hsk_header_t *hdr, uint8_t **data) {
 }
 
 int32_t
-hsk_size_pre(hsk_header_t *hdr) {
-  return hsk_write_pre(hdr, NULL);
+hsk_header_size_pre(hsk_header_t *hdr) {
+  return hsk_header_write_pre(hdr, NULL);
 }
 
 int32_t
-hsk_encode_pre(hsk_header_t *hdr, uint8_t *data) {
-  return hsk_write_pre(hdr, &data);
+hsk_header_encode_pre(hsk_header_t *hdr, uint8_t *data) {
+  return hsk_header_write_pre(hdr, &data);
 }
 
 bool
 hsk_header_equal(hsk_header_t *a, hsk_header_t *b) {
-  return memcmp(hsk_cache_header(a), hsk_cache_header(b), 32) == 0;
+  return memcmp(hsk_header_cache(a), hsk_header_cache(b), 32) == 0;
 }
 
 uint8_t *
-hsk_cache_header(hsk_header_t *hdr) {
+hsk_header_cache(hsk_header_t *hdr) {
   if (hdr->cache)
     return hdr->hash;
 
-  int32_t size = hsk_size_header(hdr);
+  int32_t size = hsk_header_size(hdr);
   uint8_t raw[size];
 
   hsk_encode_header(hdr, raw);
-  hsk_blake2b(raw, size, hdr->hash);
+  hsk_hash_blake2b(raw, size, hdr->hash);
   hdr->cache = true;
 
   return hdr->hash;
 }
 
 void
-hsk_hash_header(hsk_header_t *hdr, uint8_t *hash) {
-  memcpy(hash, hsk_cache_header(hdr), 32);
+hsk_header_hash(hsk_header_t *hdr, uint8_t *hash) {
+  memcpy(hash, hsk_header_cache(hdr), 32);
 }
 
 void
-hsk_hash_pre(hsk_header_t *hdr, uint8_t *hash) {
-  int32_t size = hsk_size_pre(hdr);
+hsk_header_hash_pre(hsk_header_t *hdr, uint8_t *hash) {
+  int32_t size = hsk_header_size_pre(hdr);
   uint8_t raw[size];
 
-  hsk_encode_pre(hdr, raw);
-  hsk_blake2b(raw, size, hash);
+  hsk_header_encode_pre(hdr, raw);
+  hsk_hash_blake2b(raw, size, hash);
 }
 
 int32_t
-hsk_hash_sol(hsk_header_t *hdr, uint8_t *hash) {
+hsk_header_hash_sol(hsk_header_t *hdr, uint8_t *hash) {
   int32_t size = (int32_t)hdr->sol_size << 2;
   uint8_t raw[size];
   encode_sol(raw, hdr->sol, hdr->sol_size);
-  hsk_blake2b(raw, size, hash);
+  hsk_hash_blake2b(raw, size, hash);
 }
 
 static int32_t
@@ -325,32 +375,35 @@ rcmp(uint8_t *a, uint8_t *b, size_t size) {
 }
 
 int32_t
-hsk_verify_pow(hsk_header_t *hdr) {
+hsk_header_verify_pow(hsk_header_t *hdr) {
   uint8_t target[32];
 
-  if (!hsk_to_target(hdr->bits, target))
+  if (!hsk_pow_to_target(hdr->bits, target))
     return HSK_NEGTARGET;
 
-  int32_t size = (int32_t)hdr->sol_size << 2;
+  int32_t size = ((int32_t)hdr->sol_size) << 2;
 
   uint8_t raw[size];
   encode_sol(raw, hdr->sol, hdr->sol_size);
 
   uint8_t hash[32];
-  hsk_blake2b(raw, size, hash);
+  hsk_hash_blake2b(raw, size, hash);
 
   if (rcmp(hash, target, 32) > 0)
     return HSK_HIGHHASH;
 
   hsk_cuckoo_t ctx;
-  // testnet:
-  assert(hsk_cuckoo_init(&ctx, 16, 18, 50, false) == 0);
-  // main:
-  // assert(hsk_cuckoo_init(&ctx, 30, 42, 50, false) == 0);
 
-  size_t psize = hsk_size_pre(hdr);
+  assert(hsk_cuckoo_init(&ctx,
+    HSK_CUCKOO_BITS,
+    HSK_CUCKOO_SIZE,
+    HSK_CUCKOO_EASE,
+    HSK_CUCKOO_LEGACY
+  ) == 0);
+
+  size_t psize = hsk_header_size_pre(hdr);
   uint8_t pre[psize];
-  hsk_encode_pre(hdr, pre);
+  hsk_header_encode_pre(hdr, pre);
 
   return hsk_cuckoo_verify_header(&ctx, pre, psize, hdr->sol, hdr->sol_size);
 }

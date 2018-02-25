@@ -57,21 +57,8 @@ typedef struct {
   size_t data_len;
 } hsk_valuenode_t;
 
-// Cuckoo cycle
 int32_t
-hsk_parse_node(
-  uint8_t *data,
-  size_t data_len,
-  hsk_node_t **node,
-  uint8_t **ret_data,
-  size_t *ret_len
-);
-
-void
-hsk_free_node(hsk_node_t *node, bool recurse);
-
-int32_t
-hsk_verify_proof(
+hsk_proof_verify(
   uint8_t *root,
   uint8_t *key,
   hsk_raw_node_t *nodes,
@@ -80,7 +67,7 @@ hsk_verify_proof(
 );
 
 int32_t
-hsk_verify_name(
+hsk_proof_verify_name(
   uint8_t *root,
   char *name,
   hsk_raw_node_t *nodes,

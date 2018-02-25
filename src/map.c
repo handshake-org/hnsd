@@ -33,7 +33,7 @@
 #include <stdbool.h>
 #include <stdio.h>
 
-#include "map.h"
+#include "hsk-map.h"
 
 void
 hsk_map_init(
@@ -103,6 +103,8 @@ void
 hsk_map_uninit(hsk_map_t *map) {
   if (!map)
     return;
+
+  hsk_map_clear(map);
 
   if (map->keys) {
     free(map->keys);
@@ -190,12 +192,6 @@ hsk_map_free(hsk_map_t *map) {
 
   hsk_map_uninit(map);
   free(map);
-}
-
-void
-hsk_map_deep_free(hsk_map_t *map) {
-  hsk_map_clear(map);
-  hsk_map_free(map);
 }
 
 void
@@ -458,18 +454,21 @@ void
 hsk_map_clear(hsk_map_t *map) {
   uint32_t k;
 
-  for (k = 0; k < map->n_buckets; k++) {
-    if (!hsk_map_exists(map, k))
-      continue;
+  if (map->is_map && map->free_func) {
+    for (k = 0; k < map->n_buckets; k++) {
+      if (!hsk_map_exists(map, k))
+        continue;
 
-    if (map->is_map && map->free_func) {
       void *value = map->vals[k];
+
       if (value)
         map->free_func(value);
-    }
 
-    hsk_map_delete(map, k);
+      hsk_map_delete(map, k);
+    }
   }
+
+  hsk_map_reset(map);
 }
 
 bool
