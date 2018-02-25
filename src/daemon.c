@@ -118,15 +118,15 @@ typedef struct {
   hsk_peer_t *head;
   hsk_peer_t *tail;
   int size;
-  hash_map_t *hashes;
-  int_map_t *heights;
-  hash_map_t *orphans;
-  hash_map_t *prevs;
+  hsk_map_t *hashes;
+  hsk_map_t *heights;
+  hsk_map_t *orphans;
+  hsk_map_t *prevs;
   int64_t height;
   hsk_header_t *tip;
   uv_udp_t *udp;
   uint8_t ub[HSK_UDP_BUFFER];
-  hash_map_t *resolutions;
+  hsk_map_t *resolutions;
   uv_udp_t *udp2;
   uint8_t ub2[HSK_UDP_BUFFER];
   struct ub_ctx *ub_ctx;
@@ -316,16 +316,16 @@ pool_init(hsk_pool_t *pool, uv_loop_t *loop) {
   pool->tail = NULL;
   pool->size = 0;
 
-  pool->hashes = hash_map_alloc();
-  pool->heights = int_map_alloc();
-  pool->orphans = hash_map_alloc();
-  pool->prevs = hash_map_alloc();
+  pool->hashes = hsk_map_alloc_hash_map(free);
+  pool->heights = hsk_map_alloc_int_map(NULL);
+  pool->orphans = hsk_map_alloc_hash_map(free);
+  pool->prevs = hsk_map_alloc_hash_map(NULL);
 
   pool->height = 0;
   pool->tip = NULL;
   pool->udp = NULL;
 
-  pool->resolutions = hash_map_alloc();
+  pool->resolutions = hsk_map_alloc_hash_map(free);
   pool->udp2 = NULL;
   pool->ub_ctx = NULL;
 
@@ -342,8 +342,9 @@ pool_init(hsk_pool_t *pool, uv_loop_t *loop) {
   assert(hsk_decode_header(raw, size, tip));
 
   assert(hsk_get_work((uint8_t *)ZERO_HASH, tip->bits, tip->work));
-  hash_map_set(pool->hashes, hsk_cache_header(tip), (void *)tip);
-  int_map_set(pool->heights, tip->height, (void *)tip);
+  hsk_map_set(pool->hashes, hsk_cache_header(tip), (void *)tip);
+  hsk_map_set(pool->heights, &tip->height, (void *)tip);
+  assert(hsk_map_get(pool->hashes, hsk_cache_header(tip)) == tip);
 
   pool->height = tip->height;
   pool->tip = tip;
@@ -535,12 +536,12 @@ pool_resolve(
   r->arg = arg;
   r->next = NULL;
 
-  hsk__name_req_t *nr = hash_map_get(pool->resolutions, r->hash);
+  hsk__name_req_t *nr = hsk_map_get(pool->resolutions, r->hash);
 
   if (nr)
     r->next = nr;
 
-  hash_map_set(pool->resolutions, r->hash, (void *)r);
+  hsk_map_set(pool->resolutions, r->hash, (void *)r);
 
   pool_send_getproof(pool, r->hash, root);
 }
@@ -935,7 +936,7 @@ pool_get_locator(hsk_pool_t *pool, hsk_getheaders_msg_t *msg) {
       height = 0;
 
     hsk_header_t *hdr =
-      (hsk_header_t *)int_map_get(pool->heights, height);
+      (hsk_header_t *)hsk_map_get(pool->heights, &height);
 
     assert(hdr);
 
@@ -954,7 +955,7 @@ pool_get_mtp(hsk_pool_t *pool, hsk_header_t *hdr) {
 
   for (i = 0; i < timespan && hdr; i++) {
     median[i] = (int64_t)hdr->time;
-    hdr = (hsk_header_t *)hash_map_get(pool->hashes, hdr->prev_block);
+    hdr = (hsk_header_t *)hsk_map_get(pool->hashes, hdr->prev_block);
     size += 1;
   }
 
@@ -985,7 +986,7 @@ pool_retarget(hsk_pool_t *pool, hsk_header_t *prev) {
     bn_t diff_bn;
     bignum_from_array(&diff_bn, diff, 32);
     bignum_add(&target_bn, &diff_bn, &target_bn);
-    first = (hsk_header_t *)hash_map_get(pool->hashes, first->prev_block);
+    first = (hsk_header_t *)hsk_map_get(pool->hashes, first->prev_block);
   }
 
   if (!first)
@@ -1058,7 +1059,7 @@ static hsk_header_t *
 pool_find_fork(hsk_pool_t *pool, hsk_header_t *fork, hsk_header_t *longer) {
   while (!hsk_header_equal(fork, longer)) {
     while (longer->height > fork->height) {
-      longer = hash_map_get(pool->hashes, longer->prev_block);
+      longer = hsk_map_get(pool->hashes, longer->prev_block);
       if (!longer)
         return NULL;
     }
@@ -1066,7 +1067,7 @@ pool_find_fork(hsk_pool_t *pool, hsk_header_t *fork, hsk_header_t *longer) {
     if (hsk_header_equal(fork, longer))
       return fork;
 
-    fork = hash_map_get(pool->hashes, fork->prev_block);
+    fork = hsk_map_get(pool->hashes, fork->prev_block);
 
     if (!fork)
       return NULL;
@@ -1097,7 +1098,7 @@ pool_reorganize(hsk_pool_t *pool, hsk_header_t *competitor) {
 
     tail = entry;
 
-    entry = hash_map_get(pool->hashes, entry->prev_block);
+    entry = hsk_map_get(pool->hashes, entry->prev_block);
     assert(entry);
   }
 
@@ -1112,7 +1113,7 @@ pool_reorganize(hsk_pool_t *pool, hsk_header_t *competitor) {
 
     connect = entry;
 
-    entry = hash_map_get(pool->hashes, entry->prev_block);
+    entry = hsk_map_get(pool->hashes, entry->prev_block);
     assert(entry);
   }
 
@@ -1121,7 +1122,7 @@ pool_reorganize(hsk_pool_t *pool, hsk_header_t *competitor) {
   for (c = disconnect; c; c = n) {
     n = c->next;
     c->next = NULL;
-    int_map_del(pool->heights, c->height);
+    hsk_map_del(pool->heights, &c->height);
   }
 
   // Connect blocks (backwards, save last).
@@ -1132,7 +1133,7 @@ pool_reorganize(hsk_pool_t *pool, hsk_header_t *competitor) {
     if (!n) // halt on last
       break;
 
-    int_map_set(pool->heights, c->height, (void *)c);
+    hsk_map_set(pool->heights, &c->height, (void *)c);
   }
 }
 
@@ -1151,12 +1152,12 @@ pool_add_block(hsk_pool_t *pool, hsk_header_t *h, hsk_peer_t *peer) {
     return HSK_EFAILURE;
   }
 
-  if (hash_map_has(pool->hashes, hash)) {
+  if (hsk_map_has(pool->hashes, hash)) {
     peer_log(peer, "  rejected: duplicate\n");
     return HSK_EFAILURE;
   }
 
-  if (hash_map_has(pool->orphans, hash)) {
+  if (hsk_map_has(pool->orphans, hash)) {
     peer_log(peer, "  rejected: duplicate-orphan\n");
     return HSK_EFAILURE;
   }
@@ -1169,12 +1170,12 @@ pool_add_block(hsk_pool_t *pool, hsk_header_t *h, hsk_peer_t *peer) {
   }
 
   hsk_header_t *prev =
-    (hsk_header_t *)hash_map_get(pool->hashes, hdr->prev_block);
+    (hsk_header_t *)hsk_map_get(pool->hashes, hdr->prev_block);
 
   if (prev == NULL) {
     peer_log(peer, "  stored as orphan\n");
-    hash_map_set(pool->orphans, hash, (void *)hdr);
-    hash_map_set(pool->prevs, hdr->prev_block, (void *)hdr);
+    hsk_map_set(pool->orphans, hash, (void *)hdr);
+    hsk_map_set(pool->prevs, hdr->prev_block, (void *)hdr);
     return HSK_EFAILURE;
   }
 
@@ -1197,7 +1198,7 @@ pool_add_block(hsk_pool_t *pool, hsk_header_t *h, hsk_peer_t *peer) {
   assert(hsk_get_work(prev->work, hdr->bits, hdr->work));
 
   if (memcmp(hdr->work, pool->tip->work, 32) <= 0) {
-    hash_map_set(pool->hashes, hash, (void *)hdr);
+    hsk_map_set(pool->hashes, hash, (void *)hdr);
     peer_log(peer, "  stored on alternate chain\n");
   } else {
     if (memcmp(hdr->prev_block, hsk_cache_header(pool->tip), 32) != 0) {
@@ -1205,8 +1206,8 @@ pool_add_block(hsk_pool_t *pool, hsk_header_t *h, hsk_peer_t *peer) {
       pool_reorganize(pool, hdr);
     }
 
-    hash_map_set(pool->hashes, hash, (void *)hdr);
-    int_map_set(pool->heights, hdr->height, (void *)hdr);
+    hsk_map_set(pool->hashes, hash, (void *)hdr);
+    hsk_map_set(pool->heights, &hdr->height, (void *)hdr);
 
     pool->height = hdr->height;
     pool->tip = hdr;
@@ -1627,7 +1628,7 @@ peer_handle_proof(hsk_peer_t *peer, hsk_proof_msg_t *msg) {
     return;
   }
 
-  hsk__name_req_t *reqs = hash_map_get(pool->resolutions, msg->name_hash);
+  hsk__name_req_t *reqs = hsk_map_get(pool->resolutions, msg->name_hash);
 
   if (reqs == NULL) {
     peer_log(peer, "received unsolicited proof\n");
@@ -1660,7 +1661,7 @@ peer_handle_proof(hsk_peer_t *peer, hsk_proof_msg_t *msg) {
   }
 
   if (dhash_len == 0) {
-    hash_map_del(pool->resolutions, msg->name_hash);
+    hsk_map_del(pool->resolutions, msg->name_hash);
 
     hsk__name_req_t *c, *n;
 
@@ -1690,7 +1691,7 @@ peer_handle_proof(hsk_peer_t *peer, hsk_proof_msg_t *msg) {
 
   free(dhash);
 
-  hash_map_del(pool->resolutions, msg->name_hash);
+  hsk_map_del(pool->resolutions, msg->name_hash);
 
   hsk__name_req_t *c, *n;
 
