@@ -56,6 +56,7 @@ static void
 hsk_ns_respond(
   char *,
   int32_t,
+  bool,
   uint8_t *,
   size_t,
   void *
@@ -256,11 +257,11 @@ hsk_ns_onrecv(
 
   // Authoritative.
   if (size == 1) {
-    free(fqdn);
-    ldns_pkt_free(req);
-
     bool edns = ldns_pkt_edns_udp_size(req) == 4096;
     bool dnssec = ldns_pkt_edns_do(req);
+
+    free(fqdn);
+    ldns_pkt_free(req);
 
     uint8_t *wire;
     size_t wire_len;
@@ -307,6 +308,7 @@ static void
 hsk_ns_respond(
   char *name,
   int32_t status,
+  bool exists,
   uint8_t *data,
   size_t data_len,
   void *arg
@@ -336,7 +338,7 @@ hsk_ns_respond(
   ldns_pkt_free(req);
 
   // Doesn't exist.
-  if (data == NULL) {
+  if (!exists) {
     if (!hsk_resource_to_nx(id, fqdn, type, edns, dnssec, &wire, &wire_len)) {
       free(dr);
       return;

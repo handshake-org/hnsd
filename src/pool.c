@@ -27,7 +27,7 @@
  * Types
  */
 
-typedef struct {
+typedef struct hsk_write_data_s {
   hsk_peer_t *peer;
   void *data;
   bool should_free;
@@ -39,6 +39,7 @@ typedef struct hsk_name_req_s {
   uint8_t root[32];
   hsk_resolve_cb callback;
   void *arg;
+  int64_t time;
   struct hsk_name_req_s *next;
 } hsk_name_req_t;
 
@@ -219,7 +220,14 @@ hsk_pool_refill(hsk_pool_t *pool) {
 
 static int32_t
 hsk_pool_send_getproof(hsk_pool_t *pool, uint8_t *name_hash, uint8_t *root) {
-  hsk_peer_t *peer = pool->head;
+  int32_t i = name_hash[0] % pool->size;
+
+  hsk_peer_t *peer;
+  for (peer = pool->head; peer; peer = peer->next) {
+    if (i == 0)
+      break;
+    i -= 1;
+  }
 
   if (!peer)
     return HSK_EBADARGS;
@@ -249,6 +257,7 @@ hsk_pool_resolve(
 
   req->callback = callback;
   req->arg = arg;
+  req->time = hsk_now();
   req->next = NULL;
 
   hsk_name_req_t *head = hsk_map_get(&pool->resolutions, req->hash);
@@ -287,6 +296,7 @@ hsk_peer_init(hsk_peer_t *peer, hsk_pool_t *pool) {
   peer->connected = false;
   peer->reading = false;
   memset(peer->read_buffer, 0, HSK_BUFFER_SIZE);
+  peer->valid_proofs = 0;
   peer->msg_hdr = false;
   peer->msg = (uint8_t *)malloc(24);
   peer->msg_pos = 0;
@@ -822,19 +832,14 @@ hsk_peer_handle_proof(hsk_peer_t *peer, hsk_proof_msg_t *msg) {
     return HSK_EHASHMISMATCH;
   }
 
-  uint8_t *dhash;
-  size_t dhash_len;
-
-  // TODO: Verify length in function.
-  // Have return pointer so dhash can be stack allocated.
-  // Add extra arg for bool *exists
-  // Make it a consensus rule that 0-length records cannot exist.
+  bool exists = false;
   int32_t rc = hsk_proof_verify(
-    reqs->root,
-    reqs->hash,
+    msg->root,
+    msg->name_hash,
     msg->nodes,
-    &dhash,
-    &dhash_len
+    msg->data,
+    msg->data_len,
+    &exists
   );
 
   if (rc != HSK_SUCCESS) {
@@ -842,46 +847,26 @@ hsk_peer_handle_proof(hsk_peer_t *peer, hsk_proof_msg_t *msg) {
     return rc;
   }
 
-  if (dhash_len == 0) {
-    hsk_map_del(&pool->resolutions, msg->name_hash);
-
-    hsk_name_req_t *c, *n;
-
-    for (c = reqs; c; c = n) {
-      n = c->next;
-      c->callback(c->name, HSK_SUCCESS, NULL, 0, c->arg);
-      free(c);
-    }
-
-    return HSK_SUCCESS;
-  }
-
-  if (dhash_len != 32) {
-    free(dhash);
-    hsk_peer_log(peer, "proof hash mismatch\n");
-    return HSK_EHASHMISMATCH;
-  }
-
-  uint8_t expected[32];
-  hsk_hash_blake2b(msg->data, msg->data_len, expected);
-
-  if (memcmp(dhash, expected, 32) != 0) {
-    free(dhash);
-    hsk_peer_log(peer, "proof hash mismatch\n");
-    return HSK_EHASHMISMATCH;
-  }
-
-  free(dhash);
-
   hsk_map_del(&pool->resolutions, msg->name_hash);
 
-  hsk_name_req_t *c, *n;
+  hsk_name_req_t *req, *next;
 
-  for (c = reqs; c; c = n) {
-    n = c->next;
-    c->callback(c->name, HSK_SUCCESS, msg->data, msg->data_len, c->arg);
-    free(c);
+  for (req = reqs; req; req = next) {
+    next = req->next;
+
+    req->callback(
+      req->name,
+      HSK_SUCCESS,
+      exists,
+      msg->data,
+      msg->data_len,
+      req->arg
+    );
+
+    free(req);
   }
+
+  peer->valid_proofs += 1;
 
   return HSK_SUCCESS;
 }

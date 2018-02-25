@@ -4,28 +4,18 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-// Node types
 #define HSK_NULLNODE 0
 #define HSK_HASHNODE 1
 #define HSK_SHORTNODE 2
 #define HSK_FULLNODE 3
 #define HSK_VALUENODE 4
 
-// Proofs
-typedef struct _raw_node {
+typedef struct hsk_raw_node_s {
   uint8_t *data;
   size_t data_len;
-  struct _raw_node *next;
+  struct hsk_raw_node_s *next;
 } hsk_raw_node_t;
 
-typedef struct {
-  uint8_t block_hash[32];
-  hsk_raw_node_t *nodes;
-  uint8_t *data;
-  size_t data_len;
-} hsk_proof_t;
-
-// Node types
 typedef struct {
   uint8_t type;
 } hsk_node_t;
@@ -62,17 +52,9 @@ hsk_proof_verify(
   uint8_t *root,
   uint8_t *key,
   hsk_raw_node_t *nodes,
-  uint8_t **data,
-  size_t *data_len
-);
-
-int32_t
-hsk_proof_verify_name(
-  uint8_t *root,
-  char *name,
-  hsk_raw_node_t *nodes,
-  uint8_t **data,
-  size_t *data_len
+  uint8_t *data,
+  size_t data_len,
+  bool *exists
 );
 
 void
@@ -86,13 +68,4 @@ hsk_raw_node_free(hsk_raw_node_t *n);
 
 void
 hsk_raw_node_free_list(hsk_raw_node_t *n);
-
-void
-hsk_proof_init(hsk_proof_t *p);
-
-hsk_proof_t *
-hsk_proof_alloc();
-
-void
-hsk_proof_free(hsk_proof_t *p);
 #endif

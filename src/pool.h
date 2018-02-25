@@ -34,6 +34,7 @@ typedef struct hsk_peer_s {
   bool connected;
   bool reading;
   uint8_t read_buffer[HSK_BUFFER_SIZE];
+  int32_t valid_proofs;
   bool msg_hdr;
   uint8_t *msg;
   size_t msg_pos;
@@ -56,6 +57,7 @@ typedef struct hsk_pool_s {
 typedef void (*hsk_resolve_cb)(
   char *name,
   int32_t status,
+  bool exists,
   uint8_t *data,
   size_t data_len,
   void *arg

@@ -2,14 +2,14 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-
 #include <stdint.h>
 #include <stdbool.h>
 
-#include "bio.h"
-#include "hsk-hash.h"
+#include "hsk-constants.h"
 #include "hsk-error.h"
+#include "hsk-hash.h"
 #include "hsk-proof.h"
+#include "bio.h"
 
 static bool
 to_nibbles(uint8_t *data, size_t data_len, uint8_t *nib, size_t nib_len) {
@@ -376,16 +376,18 @@ hsk_proof_verify(
   uint8_t *root,
   uint8_t *key,
   hsk_raw_node_t *nodes,
-  uint8_t **data,
-  size_t *data_len
+  uint8_t *data,
+  size_t data_len,
+  bool *exists
 ) {
   if (root == NULL
       || key == NULL
-      || nodes == NULL
-      || data == NULL
-      || data_len == NULL) {
+      || nodes == NULL) {
     return HSK_EBADARGS;
   }
+
+  if (data_len > HSK_MAX_DATA_SIZE)
+    return HSK_EHASHMISMATCH;
 
   // Nibble key & key length
   uint8_t k[65];
@@ -393,14 +395,12 @@ hsk_proof_verify(
   size_t kl = 65;
 
   // Current hash and hash buffer.
-  uint8_t *h = root;
+  uint8_t expect[32];
   uint8_t hash[32];
+  memcpy(expect, root, 32);
 
   // Current node.
   hsk_node_t *node = NULL;
-
-  // Last hash node (for freeing up).
-  hsk_node_t *hn = NULL;
 
   // Return code.
   int32_t rc = 0;
@@ -413,92 +413,80 @@ hsk_proof_verify(
   for (c = nodes; c; c = c->next) {
     hsk_hash_blake2b(c->data, c->data_len, hash);
 
-    if (memcmp(hash, h, 32) != 0) {
+    if (memcmp(hash, expect, 32) != 0) {
       rc = HSK_EHASHMISMATCH;
-      goto fail;
+      goto done;
     }
-
-    // Free up the last hash.
-    hsk_free_node(hn, true);
-    hn = NULL;
 
     node = NULL;
 
     if (!hsk_node_decode(c->data, c->data_len, &node)) {
       rc = HSK_EMALFORMEDNODE;
-      goto fail;
+      goto done;
     }
 
     rc = next_child(&node, &kk, &kl);
 
     if (rc != HSK_SUCCESS)
-      goto fail;
+      goto done;
 
     if (node == NULL) {
       if (c->next)
         return HSK_EEARLYEND;
-      *data = NULL;
-      *data_len = 0;
+
+      if (data_len != 0)
+        return HSK_EHASHMISMATCH;
+
+      if (exists)
+        *exists = false;
+
       return HSK_EPROOFOK;
     }
 
     switch (node->type) {
       case HSK_HASHNODE: {
-        h = ((hsk_hashnode_t *)node)->data;
-
-        // Save the last hash node to
-        // free up (the hash data is
-        // allocated in the struct
-        // itself).
-        hn = node;
+        memcpy(expect, ((hsk_hashnode_t *)node)->data, 32);
+        hsk_free_node(node, true);
         node = NULL;
-
         break;
       }
       case HSK_VALUENODE: {
         if (c->next) {
           rc = HSK_EEARLYEND;
-          goto fail;
+          goto done;
         }
 
         hsk_valuenode_t *n = (hsk_valuenode_t *)node;
 
-        *data = n->data;
-        *data_len = n->data_len;
+        if (n->data_len != 32) {
+          rc = HSK_EHASHMISMATCH;
+          goto done;
+        }
 
-        // Free up the node,
-        // but not the data.
-        free(node);
+        hsk_hash_blake2b(data, data_len, hash);
 
-        return HSK_EPROOFOK;
+        if (memcmp(hash, n->data, 32) != 0) {
+          rc = HSK_EHASHMISMATCH;
+          goto done;
+        }
+
+        if (exists)
+          *exists = true;
+
+        rc = HSK_EPROOFOK;
+        goto done;
       }
       default: {
         rc = HSK_EINVALIDNODE;
-        goto fail;
+        goto done;
       }
     }
   }
 
   rc = HSK_ENORESULT;
-  goto fail;
-
-fail:
-  hsk_free_node(hn, true);
+done:
   hsk_free_node(node, true);
   return rc;
-}
-
-int32_t
-hsk_proof_verify_name(
-  uint8_t *root,
-  char *name,
-  hsk_raw_node_t *nodes,
-  uint8_t **data,
-  size_t *data_len
-) {
-  uint8_t key[32];
-  hsk_hash_blake2b(name, strlen(name), key);
-  return hsk_proof_verify(root, key, nodes, data, data_len);
 }
 
 void
@@ -536,36 +524,4 @@ hsk_raw_node_free_list(hsk_raw_node_t *n) {
     next = node->next;
     hsk_raw_node_free(node);
   }
-}
-
-void
-hsk_proof_init(hsk_proof_t *p) {
-  if (p == NULL)
-    return;
-
-  memset(p->block_hash, 0, 32);
-  p->nodes = NULL;
-  p->data = NULL;
-  p->data_len = 0;
-}
-
-hsk_proof_t *
-hsk_proof_alloc() {
-  hsk_proof_t *p = malloc(sizeof(hsk_proof_t));
-  hsk_proof_init(p);
-  return p;
-}
-
-void
-hsk_proof_free(hsk_proof_t *p) {
-  if (p == NULL)
-    return;
-
-  if (p->nodes)
-    hsk_raw_node_free_list(p->nodes);
-
-  if (p->data)
-    free(p->data);
-
-  free(p);
 }
