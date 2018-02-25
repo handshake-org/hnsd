@@ -16,6 +16,11 @@
 
 #define HSK_BUFFER_SIZE 32768
 #define HSK_POOL_SIZE 8
+#define HSK_STATE_DISCONNECTED 0
+#define HSK_STATE_CONNECTING 2
+#define HSK_STATE_CONNECTED 3
+#define HSK_STATE_READING 4
+#define HSK_STATE_DISCONNECTING 5
 
 /*
  * Types
@@ -25,16 +30,20 @@ typedef struct hsk_peer_s {
   void *pool;
   hsk_chain_t *chain;
   uv_loop_t *loop;
-  uv_tcp_t *socket;
+  uv_tcp_t socket;
   uint64_t id;
   char host[60];
   int32_t family;
   uint8_t ip[16];
   uint16_t port;
-  bool connected;
-  bool reading;
+  int32_t state;
   uint8_t read_buffer[HSK_BUFFER_SIZE];
-  int32_t valid_proofs;
+  int32_t headers;
+  int32_t proofs;
+  int32_t height;
+  hsk_map_t resolutions;
+  int64_t getheaders_time;
+  int64_t version_time;
   bool msg_hdr;
   uint8_t *msg;
   size_t msg_pos;
@@ -47,6 +56,7 @@ typedef struct hsk_peer_s {
 typedef struct hsk_pool_s {
   uv_loop_t *loop;
   hsk_chain_t chain;
+  uv_timer_t timer;
   uint64_t peer_id;
   hsk_peer_t *head;
   hsk_peer_t *tail;

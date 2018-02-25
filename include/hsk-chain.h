@@ -38,6 +38,9 @@ hsk_chain_alloc(void);
 void
 hsk_chain_free(hsk_chain_t *chain);
 
+bool
+hsk_chain_synced(hsk_chain_t *chain);
+
 int32_t
 hsk_chain_add(hsk_chain_t *chain, hsk_header_t *h);
 #endif

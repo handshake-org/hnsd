@@ -66,6 +66,9 @@ static int32_t
 hsk_peer_close(hsk_peer_t *);
 
 static void
+hsk_peer_log(hsk_peer_t *, const char *, ...);
+
+static void
 hsk_peer_remove(hsk_peer_t *);
 
 static int32_t
@@ -88,6 +91,12 @@ after_write(uv_write_t *, int);
 
 static void
 after_read(uv_stream_t *, long int, const uv_buf_t *);
+
+static void
+after_close(uv_handle_t *);
+
+static void
+after_timer(uv_timer_t *);
 
 void
 hsk_chain_get_locator(hsk_chain_t *chain, hsk_getheaders_msg_t *msg);
@@ -158,7 +167,15 @@ hsk_pool_open(hsk_pool_t *pool) {
   if (!pool)
     return HSK_EBADARGS;
 
-  hsk_pool_refill(pool);
+  pool->timer.data = (void *)pool;
+
+  if (uv_timer_init(pool->loop, &pool->timer) != 0)
+    return HSK_EFAILURE;
+
+  if (uv_timer_start(&pool->timer, after_timer, 0, 3000) != 0)
+    return HSK_EFAILURE;
+
+  // hsk_pool_refill(pool);
 
   return HSK_SUCCESS;
 }
@@ -167,6 +184,9 @@ int32_t
 hsk_pool_close(hsk_pool_t *pool) {
   if (!pool)
     return HSK_EBADARGS;
+
+  if (uv_timer_stop(&pool->timer) != 0)
+    return HSK_EFAILURE;
 
   hsk_pool_uninit(pool);
 
@@ -287,16 +307,19 @@ hsk_peer_init(hsk_peer_t *peer, hsk_pool_t *pool) {
   peer->pool = (void *)pool;
   peer->chain = &pool->chain;
   peer->loop = pool->loop;
-  peer->socket = NULL;
   peer->id = pool->peer_id++;
   memset(peer->host, 0, sizeof(peer->host));
   peer->family = AF_INET;
   memset(peer->ip, 0, 16);
   peer->port = 0;
-  peer->connected = false;
-  peer->reading = false;
+  peer->state = HSK_STATE_DISCONNECTED;
   memset(peer->read_buffer, 0, HSK_BUFFER_SIZE);
-  peer->valid_proofs = 0;
+  peer->headers = 0;
+  peer->proofs = 0;
+  peer->height = 0;
+  hsk_map_init_hash_map(&peer->resolutions, NULL);
+  peer->getheaders_time = 0;
+  peer->version_time = 0;
   peer->msg_hdr = false;
   peer->msg = (uint8_t *)malloc(24);
   peer->msg_pos = 0;
@@ -324,12 +347,7 @@ hsk_peer_uninit(hsk_peer_t *peer) {
   if (!peer)
     return;
 
-  hsk_peer_close(peer);
-
-  if (peer->socket) {
-    free(peer->socket);
-    peer->socket = NULL;
-  }
+  hsk_map_uninit(&peer->resolutions);
 
   if (peer->msg) {
     free(peer->msg);
@@ -363,84 +381,58 @@ hsk_peer_free(hsk_peer_t *peer) {
 
 static int32_t
 hsk_peer_open(hsk_peer_t *peer, struct sockaddr *addr) {
-  assert(peer->pool && peer->loop && !peer->connected && !peer->socket);
+  assert(peer->pool && peer->loop && peer->state == HSK_STATE_DISCONNECTED);
 
-  int32_t rc = HSK_SUCCESS;
   hsk_pool_t *pool = (hsk_pool_t *)peer->pool;
   uv_loop_t *loop = pool->loop;
 
-  uv_tcp_t *socket = NULL;
-  uv_connect_t *conn = NULL;
+  if (uv_tcp_init(loop, &peer->socket) != 0)
+    return HSK_EFAILURE;
 
-  // Socket is uv_stream_t, also a uv_handle_t -- ends up on conn->handle.
-  socket = (uv_tcp_t *)malloc(sizeof(uv_tcp_t));
+  peer->socket.data = (void *)peer;
 
-  if (!socket) {
-    rc = HSK_ENOMEM;
-    goto fail;
-  }
+  if (!hsk_get_inet(addr, &peer->family, peer->ip, &peer->port))
+    return HSK_EBADARGS;
 
-  // Conn is uv_req_t, contains socket.
-  conn = (uv_connect_t *)malloc(sizeof(uv_connect_t));
+  if (!hsk_inet2string(addr, peer->host, sizeof(peer->host) - 1, HSK_PORT))
+    return HSK_EBADARGS;
 
-  if (!conn) {
-    rc = HSK_ENOMEM;
-    goto fail;
-  }
+  uv_connect_t *conn = malloc(sizeof(uv_connect_t));
 
-  if (uv_tcp_init(loop, socket) != 0) {
-    rc = HSK_EFAILURE;
-    goto fail;
-  }
+  if (!conn)
+    return HSK_ENOMEM;
 
-  // Make the peer reference the handle,
-  // and the handle reference the peer.
-  socket->data = (void *)peer;
-  peer->socket = socket;
-
-  if (!hsk_get_inet(addr, &peer->family, peer->ip, &peer->port)) {
-    rc = HSK_EBADARGS;
-    goto fail;
-  }
-
-  if (!hsk_inet2string(addr, peer->host, sizeof(peer->host) - 1, HSK_PORT)) {
-    rc = HSK_EBADARGS;
-    goto fail;
-  }
-
-  if (uv_tcp_connect(conn, socket, addr, on_connect) != 0) {
-    rc = HSK_EFAILURE;
-    goto fail;
-  }
-
-  return rc;
-
-fail:
-  if (socket)
-    free(socket);
-
-  if (conn)
+  if (uv_tcp_connect(conn, &peer->socket, addr, on_connect) != 0) {
     free(conn);
+    return HSK_EFAILURE;
+  }
 
-  return rc;
+  peer->state = HSK_STATE_CONNECTING;
+
+  return HSK_SUCCESS;
 }
 
 static int32_t
 hsk_peer_close(hsk_peer_t *peer) {
-  if (peer->reading) {
-    assert(peer->socket);
-    int32_t rc = uv_read_stop((uv_stream_t *)peer->socket);
-    if (rc != 0)
-      return rc;
-    peer->reading = false;
+  switch (peer->state) {
+    case HSK_STATE_DISCONNECTING:
+      return HSK_SUCCESS;
+    case HSK_STATE_READING:
+      assert(uv_read_stop((uv_stream_t *)&peer->socket) == 0);
+    case HSK_STATE_CONNECTED:
+    case HSK_STATE_CONNECTING:
+      uv_close((uv_handle_t *)&peer->socket, after_close);
+      hsk_peer_log(peer, "closing peer\n");
+      break;
+    case HSK_STATE_DISCONNECTED:
+      assert(false);
+      break;
+    default:
+      assert(false);
+      break;
   }
 
-  if (peer->connected) {
-    assert(peer->socket);
-    uv_close((uv_handle_t *)peer->socket, NULL);
-    peer->connected = false;
-  }
-
+  peer->state = HSK_STATE_DISCONNECTING;
   hsk_peer_remove(peer);
 
   return HSK_SUCCESS;
@@ -448,25 +440,7 @@ hsk_peer_close(hsk_peer_t *peer) {
 
 static int32_t
 hsk_peer_destroy(hsk_peer_t *peer) {
-  if (!peer)
-    return HSK_EBADARGS;
-
-  int32_t rc = hsk_peer_close(peer);
-
-  if (rc != HSK_SUCCESS)
-    return rc;
-
-  if (peer->socket) {
-    free(peer->socket);
-    peer->socket = NULL;
-  }
-
-  if (peer->msg) {
-    free(peer->msg);
-    peer->msg = NULL;
-  }
-
-  free(peer);
+  return hsk_peer_close(peer);
 }
 
 static void
@@ -543,6 +517,9 @@ hsk_peer_write(
   size_t data_len,
   bool should_free
 ) {
+  if (peer->state == HSK_STATE_DISCONNECTING)
+    return HSK_SUCCESS;
+
   int32_t rc = HSK_SUCCESS;
   hsk_write_data_t *wd = NULL;
   uv_write_t *req = NULL;
@@ -567,7 +544,7 @@ hsk_peer_write(
 
   req->data = (void *)wd;
 
-  uv_stream_t *stream = (uv_stream_t *)peer->socket;
+  uv_stream_t *stream = (uv_stream_t *)&peer->socket;
 
   uv_buf_t bufs[] = {
     { .base = data, .len = data_len }
@@ -579,7 +556,7 @@ hsk_peer_write(
     hsk_pool_t *pool = (hsk_pool_t *)peer->pool;
     hsk_peer_log(peer, "failed writing: %d\n", status);
     hsk_peer_destroy(peer);
-    hsk_pool_refill(pool);
+    // hsk_pool_refill(pool);
     rc = HSK_EFAILURE;
     goto fail;
   }
@@ -665,6 +642,8 @@ hsk_peer_send_version(hsk_peer_t *peer, hsk_version_msg_t *theirs) {
   strcpy(msg.agent, HSK_USER_AGENT);
   msg.height = pool->chain.height;
 
+  peer->version_time = hsk_now();
+
   return hsk_peer_send(peer, (hsk_msg_t *)&msg);
 }
 
@@ -709,6 +688,8 @@ hsk_peer_send_getheaders(hsk_peer_t *peer, uint8_t *stop) {
   if (stop)
     memcpy(msg.stop, stop, 32);
 
+  peer->getheaders_time = hsk_now();
+
   return hsk_peer_send(peer, (hsk_msg_t *)&msg);
 }
 
@@ -730,12 +711,17 @@ hsk_peer_handle_version(hsk_peer_t *peer, hsk_version_msg_t *msg) {
   if (rc != HSK_SUCCESS)
     return rc;
 
+  hsk_peer_log(peer, "received version: %s (%d)\n", msg->agent, msg->height);
+  peer->height = msg->height;
+
   return hsk_peer_send_version(peer, msg);
 }
 
 static int32_t
 hsk_peer_handle_verack(hsk_peer_t *peer, hsk_verack_msg_t *msg) {
   int32_t rc = hsk_peer_send_sendheaders(peer);
+
+  peer->version_time = 0;
 
   if (rc != HSK_SUCCESS)
     return rc;
@@ -799,7 +785,11 @@ hsk_peer_handle_headers(hsk_peer_t *peer, hsk_headers_msg_t *msg) {
       hsk_peer_log(peer, "failed adding block: %d\n", rc);
       return rc;
     }
+
+    peer->headers += 1;
   }
+
+  peer->getheaders_time = 0;
 
   if (msg->header_count == 2000) {
     hsk_peer_log(peer, "requesting more headers\n");
@@ -866,7 +856,7 @@ hsk_peer_handle_proof(hsk_peer_t *peer, hsk_proof_msg_t *msg) {
     free(req);
   }
 
-  peer->valid_proofs += 1;
+  peer->proofs += 1;
 
   return HSK_SUCCESS;
 }
@@ -924,6 +914,9 @@ hsk_peer_handle_msg(hsk_peer_t *peer, hsk_msg_t *msg) {
 
 static void
 hsk_peer_on_read(hsk_peer_t *peer, uint8_t *data, size_t data_len) {
+  if (peer->state != HSK_STATE_READING)
+    return;
+
   while (peer->msg_pos + data_len >= peer->msg_len) {
     size_t need = peer->msg_len - peer->msg_pos;
     memcpy(peer->msg + peer->msg_pos, data, need);
@@ -931,6 +924,7 @@ hsk_peer_on_read(hsk_peer_t *peer, uint8_t *data, size_t data_len) {
     data_len -= need;
     hsk_peer_parse(peer, peer->msg, peer->msg_len);
   }
+
   memcpy(peer->msg + peer->msg_pos, data, data_len);
   peer->msg_pos += data_len;
 }
@@ -1057,19 +1051,23 @@ done:
 static void
 on_connect(uv_connect_t *conn, int32_t status) {
   uv_tcp_t *socket = (uv_tcp_t *)conn->handle;
-  hsk_peer_t *peer = (hsk_peer_t *)socket->data;
-  hsk_pool_t *pool = (hsk_pool_t *)peer->pool;
-
   free(conn);
+
+  hsk_peer_t *peer = (hsk_peer_t *)socket->data;
+
+  if (!peer || peer->state != HSK_STATE_CONNECTING)
+    return;
+
+  hsk_pool_t *pool = (hsk_pool_t *)peer->pool;
 
   if (status != 0) {
     hsk_peer_log(peer, "failed connecting: %d\n", status);
     hsk_peer_destroy(peer);
-    hsk_pool_refill(pool);
+    // hsk_pool_refill(pool);
     return;
   }
 
-  peer->connected = true;
+  peer->state = HSK_STATE_CONNECTED;
   hsk_peer_log(peer, "connected\n");
 
   status = uv_read_start((uv_stream_t *)socket, alloc_buffer, after_read);
@@ -1077,11 +1075,11 @@ on_connect(uv_connect_t *conn, int32_t status) {
   if (status != 0) {
     hsk_peer_log(peer, "failed reading: %d\n", status);
     hsk_peer_destroy(peer);
-    hsk_pool_refill(pool);
+    // hsk_pool_refill(pool);
     return;
   }
 
-  peer->reading = true;
+  peer->state = HSK_STATE_READING;
 }
 
 static void
@@ -1103,7 +1101,7 @@ after_write(uv_write_t *req, int32_t status) {
   if (status != 0) {
     hsk_peer_log(peer, "write error: %d\n", status);
     hsk_peer_destroy(peer);
-    hsk_pool_refill(pool);
+    // hsk_pool_refill(pool);
     return;
   }
 }
@@ -1111,6 +1109,13 @@ after_write(uv_write_t *req, int32_t status) {
 static void
 alloc_buffer(uv_handle_t *handle, size_t size, uv_buf_t *buf) {
   hsk_peer_t *peer = (hsk_peer_t *)handle->data;
+
+  if (!peer) {
+    buf->base = NULL;
+    buf->len = 0;
+    return;
+  }
+
   buf->base = (char *)peer->read_buffer;
   buf->len = HSK_BUFFER_SIZE;
 }
@@ -1118,15 +1123,72 @@ alloc_buffer(uv_handle_t *handle, size_t size, uv_buf_t *buf) {
 static void
 after_read(uv_stream_t *stream, long int nread, const uv_buf_t *buf) {
   hsk_peer_t *peer = (hsk_peer_t *)stream->data;
+
+  if (!peer)
+    return;
+
   hsk_pool_t *pool = (hsk_pool_t *)peer->pool;
 
   if (nread < 0) {
     hsk_peer_log(peer, "read error: %d\n", nread);
     hsk_peer_destroy(peer);
-    // Why is this causing an assertion failure??
     // hsk_pool_refill(pool);
     return;
   }
 
   hsk_peer_on_read(peer, (uint8_t *)buf->base, (size_t)nread);
+}
+
+static void
+after_close(uv_handle_t *handle) {
+  hsk_peer_t *peer = handle->data;
+  assert(peer);
+  handle->data = NULL;
+  peer->state = HSK_STATE_DISCONNECTED;
+  hsk_peer_log(peer, "closed peer\n");
+  hsk_peer_free(peer);
+}
+
+static void
+after_timer(uv_timer_t *timer) {
+  hsk_pool_t *pool = timer->data;
+  assert(pool);
+
+  hsk_pool_refill(pool);
+
+  hsk_peer_t *peer, *next;
+
+  for (peer = pool->head; peer; peer = next) {
+    next = peer->next;
+
+    if (!hsk_chain_synced(pool->chain)) {
+      // TODO: Re-request in peer_destroy.
+      if (peer->getheaders_time && peer->getheaders_time + 30 > hsk_now()) {
+        hsk_peer_destroy(peer);
+        continue;
+      }
+    }
+
+    hsk_map_t *map = peer->resolutions;
+    hsk_map_iter_t i;
+
+    for (i = hsk_map_begin(map); i != hsk_map_end(map); i++) {
+      if (!hsk_map_exists(map, i))
+        continue;
+
+      hsk_name_req_t *req = (hsk_name_req_t *)hsk_map_value(map, i);
+      assert(req);
+
+      // TODO: Re-request in peer_destroy.
+      if (req->time + 10 > hsk_now()) {
+        hsk_peer_destroy(peer);
+        continue;
+      }
+    }
+
+    if (peer->version_time && peer->version_time + 10 > hsk_now()) {
+      hsk_peer_destroy(peer);
+      continue;
+    }
+  }
 }

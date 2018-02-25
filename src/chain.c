@@ -53,8 +53,8 @@ hsk_chain_init(hsk_chain_t *chain) {
   chain->tip = NULL;
   chain->genesis = NULL;
 
-  hsk_map_init_int_map(&chain->hashes, free);
-  hsk_map_init_hash_map(&chain->heights, NULL);
+  hsk_map_init_hash_map(&chain->hashes, free);
+  hsk_map_init_int_map(&chain->heights, NULL);
   hsk_map_init_hash_map(&chain->orphans, free);
   hsk_map_init_hash_map(&chain->prevs, NULL);
 
@@ -132,12 +132,42 @@ hsk_chain_free(hsk_chain_t *chain) {
 
 static void
 hsk_chain_log(hsk_chain_t *chain, const char *fmt, ...) {
-  printf("chain: ");
+  printf("chain (%d): ", chain->height);
 
   va_list args;
   va_start(args, fmt);
   vprintf(fmt, args);
   va_end(args);
+}
+
+static bool
+hsk_has_chainwork(hsk_chain_t *chain) {
+  return memcmp(chain->tip->work, HSK_CHAINWORK) >= 0;
+}
+
+static void
+hsk_chain_maybe_sync(hsk_chain_t *chain) {
+  if (chain->synced)
+    return;
+
+  if (HSK_USE_CHECKPOINTS) {
+    if (chain->height < HSK_LAST_CHECKPOINT)
+      return;
+  }
+
+  if (((int64_t)chain->tip->time) < hsk_now() - HSK_MAX_TIP_AGE)
+    return;
+
+  if (!hsk_chain_has_work(chain))
+    return;
+
+  hsk_chain_log(chain, "chain is fully synced\n");
+  chain->synced = true;
+}
+
+bool
+hsk_chain_synced(hsk_chain_t *chain) {
+  return chain->synced;
 }
 
 void
@@ -146,8 +176,8 @@ hsk_chain_get_locator(hsk_chain_t *chain, hsk_getheaders_msg_t *msg) {
 
   int32_t i = 0;
   hsk_header_t *tip = chain->tip;
-  int64_t height = chain->height;
-  int64_t step = 1;
+  int32_t height = chain->height;
+  int32_t step = 1;
 
   hsk_header_hash(tip, msg->hashes[i++]);
 
@@ -495,6 +525,8 @@ hsk_chain_add(hsk_chain_t *chain, hsk_header_t *h) {
 
     hsk_chain_log(chain, "  added to main chain\n");
     hsk_chain_log(chain, "  new height: %d\n", chain->height);
+
+    hsk_chain_maybe_sync(chain);
   }
 
   return rc;
