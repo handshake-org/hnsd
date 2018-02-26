@@ -190,7 +190,7 @@ hsk_chain_get_locator(hsk_chain_t *chain, hsk_getheaders_msg_t *msg) {
     if (i > 10)
       step *= 2;
 
-    if (i == 64 - 1)
+    if (i == sizeof(msg->hashes) - 1)
       height = 0;
 
     hsk_header_t *hdr =
