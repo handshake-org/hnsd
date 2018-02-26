@@ -358,7 +358,7 @@ hsk_map_resize(hsk_map_t *map, uint32_t new_n_buckets) {
 
 uint32_t
 hsk_map_put(hsk_map_t *map, void *key, int *ret) {
-  uint32_t x = map->n_buckets;
+  uint32_t x;
 
   // update the hash table
   if (map->n_occupied >= map->upper_bound) {
@@ -387,6 +387,8 @@ hsk_map_put(hsk_map_t *map, void *key, int *ret) {
     uint32_t k = map->hash_func(key);
     uint32_t i = k & mask;
     uint32_t last;
+
+    x = map->n_buckets;
 
     if (__hsk_isempty(map->flags, i)) {
       // for speed up
