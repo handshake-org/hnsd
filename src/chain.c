@@ -141,8 +141,8 @@ hsk_chain_log(hsk_chain_t *chain, const char *fmt, ...) {
 }
 
 static bool
-hsk_has_chainwork(hsk_chain_t *chain) {
-  return memcmp(chain->tip->work, HSK_CHAINWORK) >= 0;
+hsk_chain_has_work(hsk_chain_t *chain) {
+  return memcmp(chain->tip->work, HSK_CHAINWORK, 32) >= 0;
 }
 
 static void

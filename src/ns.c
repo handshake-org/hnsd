@@ -301,7 +301,10 @@ hsk_ns_onrecv(
   memcpy(dr->fqdn, fqdn, size + 1);
   free(fqdn);
 
-  hsk_pool_resolve(ns->pool, name, hsk_ns_respond, (void *)dr);
+  int32_t r = hsk_pool_resolve(ns->pool, name, hsk_ns_respond, (void *)dr);
+
+  if (r != HSK_SUCCESS)
+    hsk_ns_log(ns, "resolve error: %d\n", r);
 }
 
 static void
@@ -320,6 +323,7 @@ hsk_ns_respond(
   char *fqdn = dr->fqdn;
 
   if (status != HSK_SUCCESS) {
+    hsk_ns_log(ns, "resolve response error: %d\n", status);
     ldns_pkt_free(req);
     free(dr);
     return;

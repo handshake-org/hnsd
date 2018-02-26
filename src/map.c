@@ -434,7 +434,7 @@ hsk_map_put(hsk_map_t *map, void *key, int *ret) {
       *ret = 2;
   } else {
     // present and not deleted
-    map->keys[x] = key;
+    // map->keys[x] = key;
     if (ret)
       *ret = 0;
   }
@@ -452,9 +452,9 @@ hsk_map_delete(hsk_map_t *map, uint32_t x) {
 
 void
 hsk_map_clear(hsk_map_t *map) {
-  uint32_t k;
-
   if (map->is_map && map->free_func) {
+    uint32_t k;
+
     for (k = 0; k < map->n_buckets; k++) {
       if (!hsk_map_exists(map, k))
         continue;
@@ -463,8 +463,6 @@ hsk_map_clear(hsk_map_t *map) {
 
       if (value)
         map->free_func(value);
-
-      hsk_map_delete(map, k);
     }
   }
 

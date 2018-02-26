@@ -10,12 +10,37 @@
 #include <netinet/in.h>
 #include "uv.h"
 
+// Taken from:
+// https://github.com/wahern/dns/blob/master/src/dns.c
+#ifndef _HSK_RANDOM
+#if defined(HAVE_ARC4RANDOM)  \
+  || defined(__OpenBSD__)     \
+  || defined(__FreeBSD__)     \
+  || defined(__NetBSD__)      \
+  || defined(__APPLE__)
+#define _HSK_RANDOM arc4random
+#elif __linux
+#define _HSK_RANDOM random
+#else
+#define _HSK_RANDOM rand
+#endif
+#endif
+
 int64_t
 hsk_now(void) {
   time_t n = time(NULL);
-  if (n < 0)
-    abort();
+  assert(n >= 0);
   return (int64_t)n;
+}
+
+uint32_t
+hsk_random(void) {
+  return _HSK_RANDOM();
+}
+
+uint64_t
+hsk_nonce(void) {
+  return (((uint64_t)hsk_random()) << 32) + hsk_random();
 }
 
 static inline int32_t

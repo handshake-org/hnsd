@@ -20,6 +20,7 @@ typedef struct hsk_chain_s {
   int64_t height;
   hsk_header_t *tip;
   hsk_header_t *genesis;
+  bool synced;
 } hsk_chain_t;
 
 /*

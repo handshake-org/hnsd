@@ -26,6 +26,25 @@
  * Types
  */
 
+typedef void (*hsk_resolve_cb)(
+  char *name,
+  int32_t status,
+  bool exists,
+  uint8_t *data,
+  size_t data_len,
+  void *arg
+);
+
+typedef struct hsk_name_req_s {
+  char name[256];
+  uint8_t hash[32];
+  uint8_t root[32];
+  hsk_resolve_cb callback;
+  void *arg;
+  int64_t time;
+  struct hsk_name_req_s *next;
+} hsk_name_req_t;
+
 typedef struct hsk_peer_s {
   void *pool;
   hsk_chain_t *chain;
@@ -41,7 +60,7 @@ typedef struct hsk_peer_s {
   int32_t headers;
   int32_t proofs;
   int32_t height;
-  hsk_map_t resolutions;
+  hsk_map_t names;
   int64_t getheaders_time;
   int64_t version_time;
   bool msg_hdr;
@@ -61,17 +80,11 @@ typedef struct hsk_pool_s {
   hsk_peer_t *head;
   hsk_peer_t *tail;
   int32_t size;
-  hsk_map_t resolutions;
+  hsk_name_req_t *pending;
+  int32_t pending_count;
+  int64_t block_time;
+  int64_t getheaders_time;
 } hsk_pool_t;
-
-typedef void (*hsk_resolve_cb)(
-  char *name,
-  int32_t status,
-  bool exists,
-  uint8_t *data,
-  size_t data_len,
-  void *arg
-);
 
 /*
  * Pool

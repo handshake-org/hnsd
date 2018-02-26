@@ -4,7 +4,7 @@
 #define HSK_MAX_MESSAGE (4 * 1000 * 1000)
 #define HSK_USER_AGENT "/libhsk:0.0.0/"
 #define HSK_PROTO_VERSION 1
-
+#define HSK_SERVICES 0
 #define HSK_MAGIC 0x8efa1fbe
 #define HSK_PORT 13038
 

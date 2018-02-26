@@ -13,6 +13,12 @@
 int64_t
 hsk_now(void);
 
+uint32_t
+hsk_random(void);
+
+uint64_t
+hsk_nonce(void);
+
 size_t
 hsk_hex_encode_size(size_t);
 
