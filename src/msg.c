@@ -10,7 +10,7 @@
 #include "msg.h"
 
 void
-hsk_addr_init(hsk_addr_t *addr) {
+hsk_addr_init(hsk_netaddr_t *addr) {
   if (addr == NULL)
     return;
   addr->time = 0;
@@ -21,7 +21,7 @@ hsk_addr_init(hsk_addr_t *addr) {
 }
 
 bool
-hsk_addr_read(uint8_t **data, size_t *data_len, hsk_addr_t *addr) {
+hsk_addr_read(uint8_t **data, size_t *data_len, hsk_netaddr_t *addr) {
   if (!read_u64(data, data_len, &addr->time))
     return false;
 
@@ -41,7 +41,7 @@ hsk_addr_read(uint8_t **data, size_t *data_len, hsk_addr_t *addr) {
 }
 
 int32_t
-hsk_addr_write(hsk_addr_t *addr, uint8_t **data) {
+hsk_addr_write(hsk_netaddr_t *addr, uint8_t **data) {
   int32_t s = 0;
   s += write_u64(data, addr->time);
   s += write_u64(data, addr->services);

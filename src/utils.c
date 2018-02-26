@@ -275,7 +275,7 @@ hsk_set_inet(
 
   if (sin_family == AF_INET) {
     struct sockaddr_in *sai = (struct sockaddr_in *)addr;
-    sai->sin_family = AF_INET6;
+    sai->sin_family = AF_INET;
     memcpy((void *)&sai->sin_addr, sin_addr, 4);
     if (sin_port)
       sai->sin_port = htons(sin_port);

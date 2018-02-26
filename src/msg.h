@@ -29,7 +29,7 @@ typedef struct {
   uint8_t type;
   uint8_t addr[36];
   uint16_t port;
-} hsk_addr_t;
+} hsk_netaddr_t;
 
 typedef struct {
   uint8_t cmd;
@@ -41,8 +41,8 @@ typedef struct {
   uint32_t version;
   uint64_t services;
   uint64_t time;
-  hsk_addr_t remote;
-  hsk_addr_t local;
+  hsk_netaddr_t remote;
+  hsk_netaddr_t local;
   uint64_t nonce;
   char agent[256];
   uint32_t height;
@@ -75,7 +75,7 @@ typedef struct {
 typedef struct {
   uint8_t cmd; // 5
   size_t addr_count;
-  hsk_addr_t addrs[1000];
+  hsk_netaddr_t addrs[1000];
 } hsk_addr_msg_t;
 
 // us

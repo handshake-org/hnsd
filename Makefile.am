@@ -14,6 +14,8 @@ AM_CPPFLAGS = -I$(top_builddir)                  \
               -I$(top_srcdir)/unbound/libunbound
 
 include_HEADERS = include/hsk.h           \
+                  include/hsk-addr.h      \
+                  include/hsk-addrmgr.h   \
                   include/hsk-chain.h     \
                   include/hsk-constants.h \
                   include/hsk-cuckoo.h    \
@@ -22,7 +24,8 @@ include_HEADERS = include/hsk.h           \
                   include/hsk-header.h    \
                   include/hsk-map.h       \
                   include/hsk-proof.h     \
-                  include/hsk-resource.h
+                  include/hsk-resource.h  \
+                  include/hsk-timedata.h
 
 CLEANFILES =
 
@@ -36,7 +39,9 @@ libhsk_la_LIBADD = -lssl                                       \
 
 libhsk_la_CFLAGS = @CFLAGS@
 libhsk_la_LDFLAGS = -no-undefined -version-info 0:0:0
-libhsk_la_SOURCES = src/blake2b.c  \
+libhsk_la_SOURCES = src/addr.c     \
+                    src/addrmgr.c  \
+                    src/blake2b.c  \
                     src/bn.c       \
                     src/chain.c    \
                     src/cuckoo.c   \
@@ -51,6 +56,7 @@ libhsk_la_SOURCES = src/blake2b.c  \
                     src/resource.c \
                     src/sha256.c   \
                     src/siphash.c  \
+                    src/timedata.c \
                     src/utils.c
 
 EXTRA_DIST = include   \

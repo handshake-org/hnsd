@@ -1087,7 +1087,7 @@ hsk_peer_handle_addr(hsk_peer_t *peer, hsk_addr_msg_t *msg) {
   hsk_peer_log(peer, "received %d addrs\n", msg->addr_count);
   // int32_t i;
   // for (i = 0; i < m->addr_count; i++)
-  //   hsk_addr_t *addr = &m->addrs[i];
+  //   hsk_netaddr_t *addr = &m->addrs[i];
   return HSK_SUCCESS;
 }
 
