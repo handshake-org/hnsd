@@ -17,11 +17,11 @@
 #include "hsk-error.h"
 #include "hsk-constants.h"
 #include "hsk-map.h"
+#include "hsk-msg.h"
 #include "utils.h"
 #include "bn.h"
 #include "pool.h"
 #include "bio.h"
-#include "msg.h"
 
 /*
  * Types

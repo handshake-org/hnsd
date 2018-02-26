@@ -11,8 +11,8 @@
 #include "hsk-error.h"
 #include "hsk-header.h"
 #include "hsk-map.h"
+#include "hsk-msg.h"
 #include "bn.h"
-#include "msg.h"
 #include "utils.h"
 
 /*

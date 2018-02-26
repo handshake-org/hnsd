@@ -10,8 +10,8 @@
 #include "hsk-constants.h"
 #include "hsk-error.h"
 #include "hsk-map.h"
+#include "hsk-msg.h"
 #include "hsk-timedata.h"
-#include "msg.h"
 #include "utils.h"
 
 #define HSK_ADDR_MAX 2000
@@ -39,7 +39,7 @@ hsk_ip_type(uint8_t *ip) {
 }
 
 static bool
-hsk_addrentry_is_stale(hsk_addrentry_t *);
+hsk_addrman_is_stale(hsk_addrman_t *am, hsk_addrentry_t *);
 
 static double
 hsk_addrentry_chance(hsk_addrentry_t *, int64_t);
@@ -109,7 +109,7 @@ hsk_addrman_alloc_entry(hsk_addrman_t *am) {
 }
 
 bool
-hsk_addrman_add(hsk_addrman_t *am, hsk_addrentry_t *addr, bool src) {
+hsk_addrman_add_entry(hsk_addrman_t *am, hsk_addrentry_t *addr, bool src) {
   hsk_addrentry_t *entry = hsk_map_get(&am->map, addr);
 
   if (entry) {
@@ -125,7 +125,7 @@ hsk_addrman_add(hsk_addrman_t *am, hsk_addrentry_t *addr, bool src) {
     entry->services |= addr->services;
 
     // Online?
-    int64_t now = hsk_now();
+    int64_t now = hsk_timedata_now(am->td);
     if (now - addr->time < 24 * 60 * 60)
       interval = 60 * 60;
 
@@ -161,6 +161,8 @@ hsk_addrman_add(hsk_addrman_t *am, hsk_addrentry_t *addr, bool src) {
 
     if ((hsk_random() % factor) != 0)
       return false;
+
+    entry->ref_count += 1;
   } else {
     if (am->size + 1 == HSK_ADDR_MAX)
       return false;
@@ -175,21 +177,37 @@ hsk_addrman_add(hsk_addrman_t *am, hsk_addrentry_t *addr, bool src) {
 }
 
 bool
-hsk_addrman_add_addr(hsk_addrman_t *am, hsk_netaddr_t *addr) {
+hsk_addrman_add_addr(hsk_addrman_t *am, hsk_addr_t *addr) {
   hsk_addrentry_t *entry = hsk_addrman_alloc_entry(am);
 
   if (!entry)
     return false;
 
-  if (hsk_ip_type(addr->addr) == AF_INET) {
-    entry->af = AF_INET;
-    memcpy(entry->ip, addr->addr, 4);
-    entry->port = addr->port;
-  } else {
-    entry->af = AF_INET6;
-    memcpy(entry->ip, addr->addr, 16);
-    entry->port = addr->port;
-  }
+  if (!hsk_addr_is_valid(addr))
+    return false;
+
+  hsk_addr_copy((hsk_addr_t *)entry, addr);
+
+  entry->time = hsk_timedata_now(am->td);
+  entry->services = 1;
+  entry->attempts = 0;
+  entry->last_success = 0;
+  entry->last_attempt = 0;
+  entry->ref_count = 0;
+  entry->used = false;
+
+  return hsk_addrman_add_entry(am, entry, false);
+}
+
+bool
+hsk_addrman_add_na(hsk_addrman_t *am, hsk_netaddr_t *addr) {
+  hsk_addrentry_t *entry = hsk_addrman_alloc_entry(am);
+
+  if (!entry)
+    return false;
+
+  if (!hsk_addr_from_na((hsk_addr_t *)entry, addr))
+    return false;
 
   entry->time = addr->time;
   entry->services = addr->services;
@@ -199,7 +217,7 @@ hsk_addrman_add_addr(hsk_addrman_t *am, hsk_netaddr_t *addr) {
   entry->ref_count = 0;
   entry->used = false;
 
-  return hsk_addrman_add(am, entry, true);
+  return hsk_addrman_add_entry(am, entry, true);
 }
 
 int32_t
@@ -209,21 +227,10 @@ hsk_addrman_add_sa(hsk_addrman_t *am, struct sockaddr *addr) {
   if (!entry)
     return false;
 
-  if (addr->sa_family == AF_INET) {
-    struct sockaddr_in *sai = (struct sockaddr_in *)addr;
-    entry->af = AF_INET;
-    memcpy(entry->ip, (void *)&sai->sin_addr, 4);
-    entry->port = ntohs(sai->sin_port);
-  } else if (addr->sa_family == AF_INET6) {
-    struct sockaddr_in6 *sai = (struct sockaddr_in6 *)addr;
-    entry->af = AF_INET6;
-    memcpy(entry->ip, (void *)&sai->sin6_addr, 16);
-    entry->port = ntohs(sai->sin6_port);
-  } else {
+  if (!hsk_addr_from_sa((hsk_addr_t *)entry, addr))
     return false;
-  }
 
-  entry->time = hsk_now();
+  entry->time = hsk_timedata_now(am->td);
   entry->services = 1;
   entry->attempts = 0;
   entry->last_success = 0;
@@ -231,7 +238,7 @@ hsk_addrman_add_sa(hsk_addrman_t *am, struct sockaddr *addr) {
   entry->ref_count = 0;
   entry->used = false;
 
-  return hsk_addrman_add(am, entry, false);
+  return hsk_addrman_add_entry(am, entry, false);
 }
 
 int32_t
@@ -241,19 +248,10 @@ hsk_addrman_add_ip(hsk_addrman_t *am, int32_t af, uint8_t *ip, uint16_t port) {
   if (!entry)
     return false;
 
-  if (af == AF_INET) {
-    entry->af = AF_INET;
-    memcpy(entry->ip, (void *)ip, 4);
-    entry->port = port;
-  } else if (af == AF_INET6) {
-    entry->af = AF_INET6;
-    memcpy(entry->ip, (void *)ip, 16);
-    entry->port = port;
-  } else {
+  if (!hsk_addr_from_ip((hsk_addr_t *)entry, af, ip, port))
     return false;
-  }
 
-  entry->time = hsk_now();
+  entry->time = hsk_timedata_now(am->td);
   entry->services = 1;
   entry->attempts = 0;
   entry->last_success = 0;
@@ -261,52 +259,30 @@ hsk_addrman_add_ip(hsk_addrman_t *am, int32_t af, uint8_t *ip, uint16_t port) {
   entry->ref_count = 0;
   entry->used = false;
 
-  return hsk_addrman_add(am, entry, false);
-}
-
-hsk_addrentry_t *
-hsk_addrman_get_by_key(
-  hsk_addrman_t *am,
-  int32_t af,
-  uint8_t *ip,
-  uint16_t port
-) {
-  hsk_addr_t addr;
-  hsk_addr_get(af, ip, port, &addr);
-  return hsk_map_get(&am->map, &addr);
+  return hsk_addrman_add_entry(am, entry, false);
 }
 
 bool
-hsk_addrman_mark_attempt(
-  hsk_addrman_t *am,
-  int32_t af,
-  uint8_t *ip,
-  uint16_t port
-) {
-  hsk_addrentry_t *entry = hsk_addrman_get_by_key(am, af, ip, port);
+hsk_addrman_mark_attempt(hsk_addrman_t *am, hsk_addr_t *addr) {
+  hsk_addrentry_t *entry = hsk_map_get(&am->map, addr);
 
   if (!entry)
     return false;
 
   entry->attempts += 1;
-  entry->last_attempt = hsk_now();
+  entry->last_attempt = hsk_timedata_now(am->td);
 
   return true;
 }
 
 bool
-hsk_addrman_mark_success(
-  hsk_addrman_t *am,
-  int32_t af,
-  uint8_t *ip,
-  uint16_t port
-) {
-  hsk_addrentry_t *entry = hsk_addrman_get_by_key(am, af, ip, port);
+hsk_addrman_mark_success(hsk_addrman_t *am, hsk_addr_t *addr) {
+  hsk_addrentry_t *entry = hsk_map_get(&am->map, addr);
 
   if (!entry)
     return false;
 
-  int64_t now = hsk_now();
+  int64_t now = hsk_timedata_now(am->td);
 
   if (now - entry->time > 20 * 60) {
     entry->time = now;
@@ -317,19 +293,13 @@ hsk_addrman_mark_success(
 }
 
 bool
-hsk_addrman_mark_ack(
-  hsk_addrman_t *am,
-  int32_t af,
-  uint8_t *ip,
-  uint16_t port,
-  uint64_t services
-) {
-  hsk_addrentry_t *entry = hsk_addrman_get_by_key(am, af, ip, port);
+hsk_addrman_mark_ack(hsk_addrman_t *am, hsk_addr_t *addr, uint64_t services) {
+  hsk_addrentry_t *entry = hsk_map_get(&am->map, addr);
 
   if (!entry)
     return false;
 
-  int64_t now = hsk_now();
+  int64_t now = hsk_timedata_now(am->td);
 
   entry->services |= services;
 
@@ -347,12 +317,10 @@ hsk_addrman_clear_banned(hsk_addrman_t *am) {
 }
 
 bool
-hsk_addrman_add_ban(hsk_addrman_t *am, int32_t af, uint8_t *ip) {
-  hsk_addr_t addr;
-  hsk_addr_get(af, ip, 0, &addr);
-  hsk_banned_t *entry = hsk_map_get(&am->banned, &addr);
+hsk_addrman_add_ban(hsk_addrman_t *am, hsk_addr_t *addr) {
+  hsk_banned_t *entry = hsk_map_get(&am->banned, addr);
 
-  int64_t now = hsk_now();
+  int64_t now = hsk_timedata_now(am->td);
 
   if (entry) {
     entry->time = now;
@@ -364,9 +332,8 @@ hsk_addrman_add_ban(hsk_addrman_t *am, int32_t af, uint8_t *ip) {
   if (!ban)
     return false;
 
-  ban->af = af;
-  memcpy(ban->ip, ip, af == AF_INET ? 4 : 16);
-  ban->port = 0;
+  hsk_addr_copy((hsk_addr_t *)ban, addr);
+  ban->time = now;
 
   if (!hsk_map_set(&am->banned, ban, ban)) {
     free(ban);
@@ -377,15 +344,13 @@ hsk_addrman_add_ban(hsk_addrman_t *am, int32_t af, uint8_t *ip) {
 }
 
 bool
-hsk_addrman_is_banned(hsk_addrman_t *am, int32_t af, uint8_t *ip) {
-  hsk_addr_t addr;
-  hsk_addr_get(af, ip, 0, &addr);
-  hsk_banned_t *entry = hsk_map_get(&am->banned, &addr);
+hsk_addrman_is_banned(hsk_addrman_t *am, hsk_addr_t *addr) {
+  hsk_banned_t *entry = hsk_map_get(&am->banned, addr);
 
   if (!entry)
     return false;
 
-  int64_t now = hsk_now();
+  int64_t now = hsk_timedata_now(am->td);
 
   if (now > entry->time + HSK_BAN_TIME) {
     hsk_map_del(&am->banned, entry);
@@ -399,7 +364,7 @@ hsk_addrman_is_banned(hsk_addrman_t *am, int32_t af, uint8_t *ip) {
 static hsk_addrentry_t *
 hsk_addrman_search(hsk_addrman_t *am) {
   // randomly pick between fresh and used (track counts of each)
-  int64_t now = hsk_now();
+  int64_t now = hsk_timedata_now(am->td);
 
   double num = (double)(hsk_random() % (1 << 30));
   double factor = 1;
@@ -419,7 +384,7 @@ hsk_addrman_search(hsk_addrman_t *am) {
 
 hsk_addrentry_t *
 hsk_addrman_pick(hsk_addrman_t *am, hsk_map_t *map) {
-  int64_t now = hsk_now();
+  int64_t now = hsk_timedata_now(am->td);
   int32_t i;
 
   for (i = 0; i < 100; i++) {
@@ -431,22 +396,22 @@ hsk_addrman_pick(hsk_addrman_t *am, hsk_map_t *map) {
     if (hsk_map_has(map, entry))
       continue;
 
-    // if (!addr.isValid())
-    //   continue;
-    //
-    // if (!addr.hasServices(services))
-    //   continue;
-    //
-    // if (!this.options.onion && addr.isOnion())
+    if (!hsk_addr_is_valid((hsk_addr_t *)entry))
+      continue;
+
+    if (!(entry->services & 1))
+      continue;
+
+    // if (hsk_addr_is_onion(addr))
     //   continue;
 
     if (i < 30 && now - entry->last_attempt < 600)
       continue;
 
-    if (i < 50 && entry->port != HSK_PORT)
+    if (i < 50 && hsk_addr_get_port((hsk_addr_t *)entry) != HSK_PORT)
       continue;
 
-    if (i < 95 && hsk_addrman_is_banned(am, entry->af, entry->ip))
+    if (i < 95 && hsk_addrman_is_banned(am, (hsk_addr_t *)entry))
       continue;
 
     return entry;
@@ -456,32 +421,32 @@ hsk_addrman_pick(hsk_addrman_t *am, hsk_map_t *map) {
 }
 
 bool
+hsk_addrman_pick_addr(hsk_addrman_t *am, hsk_map_t *map, hsk_addr_t *addr) {
+  hsk_addrentry_t *entry = hsk_addrman_pick(am, map);
+
+  if (!entry)
+    return false;
+
+  hsk_addr_copy(addr, (hsk_addr_t *)entry);
+
+  return true;
+}
+
+bool
 hsk_addrman_pick_sa(hsk_addrman_t *am, hsk_map_t *map, struct sockaddr *addr) {
   hsk_addrentry_t *entry = hsk_addrman_pick(am, map);
 
   if (!entry)
     return false;
 
-  if (entry->af == AF_INET) {
-    struct sockaddr_in *sai = (struct sockaddr_in *)addr;
-    sai->sin_family = AF_INET;
-    memcpy((void *)&sai->sin_addr, entry->ip, 4);
-    sai->sin_port = htons(entry->port);
-  } else if (entry->af == AF_INET6) {
-    struct sockaddr_in6 *sai = (struct sockaddr_in6 *)addr;
-    sai->sin6_family = AF_INET6;
-    memcpy((void *)&sai->sin6_addr, entry->ip, 16);
-    sai->sin6_port = htons(entry->port);
-  } else {
-    assert(false);
-  }
+  hsk_addr_to_sa((hsk_addr_t *)entry, addr);
 
   return true;
 }
 
 static bool
-hsk_addrentry_is_stale(hsk_addrentry_t *entry) {
-  int64_t now = hsk_now();
+hsk_addrman_is_stale(hsk_addrman_t *am, hsk_addrentry_t *entry) {
+  int64_t now = hsk_timedata_now(am->td);
 
   if (entry->last_attempt && entry->last_attempt >= now - 60)
     return false;

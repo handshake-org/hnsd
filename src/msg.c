@@ -5,12 +5,12 @@
 #include <stdlib.h>
 
 #include "hsk-header.h"
+#include "hsk-msg.h"
 #include "hsk-proof.h"
 #include "bio.h"
-#include "msg.h"
 
 void
-hsk_addr_init(hsk_netaddr_t *addr) {
+hsk_netaddr_init(hsk_netaddr_t *addr) {
   if (addr == NULL)
     return;
   addr->time = 0;
@@ -463,8 +463,8 @@ hsk_msg_init(hsk_msg_t *msg) {
       m->version = 0;
       m->services = 0;
       m->time = 0;
-      hsk_addr_init(&m->remote);
-      hsk_addr_init(&m->local);
+      hsk_netaddr_init(&m->remote);
+      hsk_netaddr_init(&m->local);
       m->nonce = 0;
       memset(m->agent, 0, 256);
       m->height = 0;
@@ -499,7 +499,7 @@ hsk_msg_init(hsk_msg_t *msg) {
       m->addr_count = 0;
       int32_t i;
       for (i = 0; i < 1000; i++)
-        hsk_addr_init(&m->addrs[i]);
+        hsk_netaddr_init(&m->addrs[i]);
       break;
     }
     case HSK_MSG_GETHEADERS: {
