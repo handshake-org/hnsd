@@ -1,9 +1,11 @@
 #include <assert.h>
 #include <stdint.h>
 #include <stdbool.h>
+#include <string.h>
 
 #include "hsk-error.h"
 #include "hsk-map.h"
+#include "hsk-timedata.h"
 #include "utils.h"
 
 int32_t
@@ -52,9 +54,9 @@ hsk_timedata_insert(hsk_timedata_t *td, int64_t sample) {
 
   while (start <= end) {
     int32_t pos = (start + end) >> 1;
-    int32_t cmp = td->samples[pos] - key;
+    int32_t cmp = td->samples[pos] - sample;
 
-    if (cmp === 0) {
+    if (cmp == 0) {
       i = pos;
       break;
     }
@@ -86,7 +88,7 @@ hsk_timedata_add(hsk_timedata_t *td, char *id, int64_t time) {
   if (hsk_map_has(&td->known, id))
     return HSK_SUCCESS;
 
-  const *str = strdup(id);
+  char *str = strdup(id);
 
   if (!str)
     return HSK_ENOMEM;

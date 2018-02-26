@@ -3,9 +3,11 @@
 #include <stdbool.h>
 #include <arpa/inet.h>
 #include <netinet/in.h>
+#include <math.h>
 
 #include "hsk-addr.h"
 #include "hsk-addrmgr.h"
+#include "hsk-constants.h"
 #include "hsk-error.h"
 #include "hsk-map.h"
 #include "hsk-timedata.h"
@@ -19,6 +21,9 @@
 #define HSK_MAX_FAILURES 10
 #define HSK_MAX_REFS 8
 #define HSK_BAN_TIME 24 * 60 * 60
+
+#define max(x, y) (((x) > (y)) ? (x) : (y))
+#define min(x, y) (((x) < (y)) ? (x) : (y))
 
 static const uint8_t hsk_ipv6_mapped[] = {
   0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -71,16 +76,18 @@ fail:
 
 void
 hsk_addrman_uninit(hsk_addrman_t *am) {
-  if (!td)
+  if (!am)
     return;
 
-  free(am->slab);
+  free(am->addrs);
+  hsk_map_uninit(&am->map);
+  hsk_map_uninit(&am->banned);
 }
 
 hsk_addrman_t *
-hsk_addrman_alloc(void) {
+hsk_addrman_alloc(hsk_timedata_t *td) {
   hsk_addrman_t *am = malloc(sizeof(hsk_addrman_t));
-  hsk_addrman_init(am);
+  hsk_addrman_init(am, td);
   return am;
 }
 
@@ -103,7 +110,7 @@ hsk_addrman_alloc_entry(hsk_addrman_t *am) {
 
 bool
 hsk_addrman_add(hsk_addrman_t *am, hsk_addrentry_t *addr, bool src) {
-  hsk_addrentry_t *entry = hsk_map_get(&am->map, &addr->addr);
+  hsk_addrentry_t *entry = hsk_map_get(&am->map, addr);
 
   if (entry) {
     int32_t penalty = 2 * 60 * 60;
@@ -140,7 +147,7 @@ hsk_addrman_add(hsk_addrman_t *am, hsk_addrentry_t *addr, bool src) {
 
     // Do not update if the max
     // reference count is reached.
-    if (entry->ref_count === HSK_MAX_REFS)
+    if (entry->ref_count == HSK_MAX_REFS)
       return false;
 
     assert(entry->ref_count < HSK_MAX_REFS);
@@ -158,7 +165,7 @@ hsk_addrman_add(hsk_addrman_t *am, hsk_addrentry_t *addr, bool src) {
     if (am->size + 1 == HSK_ADDR_MAX)
       return false;
 
-    if (!hsk_map_set(&am->map, &addr->addr, addr))
+    if (!hsk_map_set(&am->map, addr, addr))
       return false;
 
     am->size += 1;
@@ -257,7 +264,7 @@ hsk_addrman_add_ip(hsk_addrman_t *am, int32_t af, uint8_t *ip, uint16_t port) {
   return hsk_addrman_add(am, entry, false);
 }
 
-hsk_addrentry_t *entry
+hsk_addrentry_t *
 hsk_addrman_get_by_key(
   hsk_addrman_t *am,
   int32_t af,
@@ -399,7 +406,7 @@ hsk_addrman_search(hsk_addrman_t *am) {
 
   for (;;) {
     int32_t i = hsk_random() % am->size;
-    hsk_entry_t *entry = am->addrs[i];
+    hsk_addrentry_t *entry = am->addrs[i];
 
     if (num < factor * hsk_addrentry_chance(entry, now) * (1 << 30))
       return entry;
@@ -411,7 +418,8 @@ hsk_addrman_search(hsk_addrman_t *am) {
 }
 
 hsk_addrentry_t *
-hsk_addrman_pick(hsk_addrman_t *am, hash_map_t *map) {
+hsk_addrman_pick(hsk_addrman_t *am, hsk_map_t *map) {
+  int64_t now = hsk_now();
   int32_t i;
 
   for (i = 0; i < 100; i++) {
@@ -435,7 +443,7 @@ hsk_addrman_pick(hsk_addrman_t *am, hash_map_t *map) {
     if (i < 30 && now - entry->last_attempt < 600)
       continue;
 
-    if (i < 50 && entry->port !== HSK_PORT)
+    if (i < 50 && entry->port != HSK_PORT)
       continue;
 
     if (i < 95 && hsk_addrman_is_banned(am, entry->af, entry->ip))
@@ -448,7 +456,7 @@ hsk_addrman_pick(hsk_addrman_t *am, hash_map_t *map) {
 }
 
 bool
-hsk_addrman_pick_sa(hsk_addrman_t *am, hash_map_t *map, struct sockaddr *addr) {
+hsk_addrman_pick_sa(hsk_addrman_t *am, hsk_map_t *map, struct sockaddr *addr) {
   hsk_addrentry_t *entry = hsk_addrman_pick(am, map);
 
   if (!entry)

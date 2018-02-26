@@ -475,6 +475,11 @@ hsk_peer_timeout_reqs(hsk_peer_t *peer) {
 
     assert(req);
 
+    // maybe need to delete before executing callback, callback may access the hash table
+    // call DELETE directly
+    // same for above? and any other cb loop
+    hsk_map_delete(map, i);
+
     for (; req; req = next) {
       next = req->next;
 
@@ -1161,6 +1166,7 @@ hsk_peer_handle_proof(hsk_peer_t *peer, hsk_proof_msg_t *msg) {
 
   hsk_peer_log(peer, "received proof for: %s\n", reqs->name);
 
+  // segfaulting here, `reqs` is a bad pointer.
   if (memcmp(msg->root, reqs->root, 32) != 0) {
     hsk_peer_log(peer, "proof hash mismatch (why?)\n");
     return HSK_EHASHMISMATCH;

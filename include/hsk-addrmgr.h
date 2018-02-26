@@ -34,10 +34,8 @@ typedef struct hsk_banned_t {
 
 typedef struct hsk_addrman_s {
   hsk_timedata_t *td;
-  size_t fresh_size;
-  hsk_addrentry_t **fresh;
-  size_t used_size;
-  hsk_addrentry_t **used;
+  size_t size;
+  hsk_addrentry_t **addrs;
   hsk_map_t map;
   hsk_map_t banned;
 } hsk_addrman_t;
@@ -49,7 +47,7 @@ void
 hsk_addrman_uninit(hsk_addrman_t *am);
 
 hsk_addrman_t *
-hsk_addrman_alloc(void);
+hsk_addrman_alloc(hsk_timedata_t *td);
 
 void
 hsk_addrman_free(hsk_addrman_t *am);
@@ -69,7 +67,7 @@ hsk_addrman_add_sa(hsk_addrman_t *am, struct sockaddr *addr);
 int32_t
 hsk_addrman_add_ip(hsk_addrman_t *am, int32_t af, uint8_t *ip, uint16_t port);
 
-hsk_addrentry_t *entry
+hsk_addrentry_t *
 hsk_addrman_get_by_key(
   hsk_addrman_t *am,
   int32_t af,
@@ -112,8 +110,8 @@ bool
 hsk_addrman_is_banned(hsk_addrman_t *am, int32_t af, uint8_t *ip);
 
 hsk_addrentry_t *
-hsk_addrman_pick(hsk_addrman_t *am, hash_map_t *map);
+hsk_addrman_pick(hsk_addrman_t *am, hsk_map_t *map);
 
 bool
-hsk_addrman_pick_sa(hsk_addrman_t *am, hash_map_t *map, struct sockaddr *addr);
+hsk_addrman_pick_sa(hsk_addrman_t *am, hsk_map_t *map, struct sockaddr *addr);
 #endif
