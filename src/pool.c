@@ -68,6 +68,9 @@ static int32_t
 hsk_peer_parse(hsk_peer_t *, uint8_t *, size_t);
 
 static int32_t
+hsk_peer_send_ping(hsk_peer_t *, uint64_t);
+
+static int32_t
 hsk_peer_send_getheaders(hsk_peer_t *, uint8_t *);
 
 static int32_t
@@ -255,7 +258,7 @@ hsk_pool_pick_prover(hsk_pool_t *pool, uint8_t *name_hash) {
       continue;
 
     if (peer->proofs > first_best->proofs
-        && peer->names.size < first_best->names.size) {
+        && peer->names.size <= first_best->names.size) {
       second_best = first_best;
       first_best = peer;
     }
@@ -366,6 +369,8 @@ hsk_pool_resend(hsk_pool_t *pool) {
   pool->pending = NULL;
   pool->pending_count = 0;
 
+  int64_t now = hsk_now();
+
   for (; req; req = next) {
     next = req->next;
 
@@ -373,7 +378,7 @@ hsk_pool_resend(hsk_pool_t *pool) {
     assert(peer);
 
     req->next = NULL;
-    req->time = hsk_now();
+    req->time = now;
 
     hsk_name_req_t *head = hsk_map_get(&peer->names, req->hash);
 
@@ -503,7 +508,7 @@ hsk_peer_is_overdue(hsk_peer_t *peer) {
     hsk_name_req_t *req = (hsk_name_req_t *)hsk_map_value(map, i);
     assert(req);
 
-    if (req->time + 5 < now)
+    if (now > req->time + 5)
       return true;
   }
 
@@ -521,30 +526,68 @@ hsk_pool_timer(hsk_pool_t *pool) {
     if (peer->state != HSK_STATE_READING)
       continue;
 
-    if (!hsk_chain_synced(&pool->chain)) {
-      if (peer->getheaders_time && peer->getheaders_time + 30 < now) {
-        hsk_peer_log(peer, "peer timed out: getheaders_time\n");
+    if (now > peer->conn_time + 60) {
+      if (peer->last_send == 0 || peer->last_recv == 0) {
+        hsk_peer_log(peer, "peer is stalling (no message)\n");
+        hsk_peer_destroy(peer);
+        continue;
+      }
+
+      if (now > peer->last_send + 20 * 60) {
+        hsk_peer_log(peer, "peer is stalling (no send)\n");
+        hsk_peer_destroy(peer);
+        continue;
+      }
+
+      if (now > peer->last_recv + 20 * 60) {
+        hsk_peer_log(peer, "peer is stalling (no recv)\n");
+        hsk_peer_destroy(peer);
+        continue;
+      }
+
+      if (peer->challenge && now > peer->last_ping + 20 * 60) {
+        hsk_peer_log(peer, "peer is stalling (ping)\n");
         hsk_peer_destroy(peer);
         continue;
       }
     }
 
-    if (peer->version_time && peer->version_time + 10 < now) {
-      hsk_peer_log(peer, "peer timed out: version_time\n");
+    if (now > peer->ping_timer + 30) {
+      peer->ping_timer = now;
+      if (peer->challenge) {
+        hsk_peer_log(peer, "peer has not responded to ping\n");
+      } else {
+        hsk_peer_log(peer, "pinging...\n");
+        peer->challenge = hsk_nonce();
+        peer->last_ping = now;
+        hsk_peer_send_ping(peer, peer->challenge);
+      }
+    }
+
+    if (!hsk_chain_synced(&pool->chain)) {
+      if (peer->getheaders_time && now > peer->getheaders_time + 30) {
+        hsk_peer_log(peer, "peer is stalling (headers)\n");
+        hsk_peer_destroy(peer);
+        continue;
+      }
+    }
+
+    if (peer->version_time && now > peer->version_time + 10) {
+      hsk_peer_log(peer, "peer is stalling (verack)\n");
       hsk_peer_destroy(peer);
       continue;
     }
 
     if (hsk_peer_is_overdue(peer)) {
-      hsk_peer_log(peer, "peer timed out: overdue\n");
+      hsk_peer_log(peer, "peer is stalling (overdue)\n");
       hsk_peer_destroy(peer);
       continue;
     }
   }
 
-  if (pool->block_time && pool->block_time + 10 * 60 < now) {
-    if (!pool->getheaders_time || pool->getheaders_time + 5 * 60 < now) {
-      hsk_pool_log(pool, "peer timed out: send_getheaders\n");
+  if (pool->block_time && now > pool->block_time + 10 * 60) {
+    if (!pool->getheaders_time || now > pool->getheaders_time + 5 * 60) {
+      hsk_pool_log(pool, "resending getheaders to pool\n");
       hsk_pool_send_getheaders(pool);
     }
   }
@@ -576,9 +619,17 @@ hsk_peer_init(hsk_peer_t *peer, hsk_pool_t *pool) {
   peer->headers = 0;
   peer->proofs = 0;
   peer->height = 0;
-  hsk_map_init_hash_map(&peer->names, NULL);
+  hsk_map_init_hash_map(&peer->names, free);
   peer->getheaders_time = 0;
   peer->version_time = 0;
+  peer->last_ping = 0;
+  peer->last_pong = 0;
+  peer->min_ping = 0;
+  peer->ping_timer = 0;
+  peer->challenge = 0;
+  peer->conn_time = 0;
+  peer->last_send = 0;
+  peer->last_recv = 0;
   peer->msg_hdr = false;
   peer->msg = (uint8_t *)malloc(24);
   peer->msg_pos = 0;
@@ -815,11 +866,13 @@ hsk_peer_write(
 
   if (status != 0) {
     hsk_pool_t *pool = (hsk_pool_t *)peer->pool;
-    hsk_peer_log(peer, "failed writing: %d\n", status);
+    hsk_peer_log(peer, "failed writing: %s\n", uv_strerror(status));
     hsk_peer_destroy(peer);
     rc = HSK_EFAILURE;
     goto fail;
   }
+
+  peer->last_send = hsk_now();
 
   return rc;
 
@@ -996,7 +1049,36 @@ hsk_peer_handle_ping(hsk_peer_t *peer, hsk_ping_msg_t *msg) {
 
 static int32_t
 hsk_peer_handle_pong(hsk_peer_t *peer, hsk_pong_msg_t *msg) {
+  if (!peer->challenge) {
+    hsk_peer_log(peer, "peer sent an unsolicited pong\n");
+    return HSK_SUCCESS;
+  }
+
+  if (msg->nonce != peer->challenge) {
+    if (msg->nonce == 0) {
+      hsk_peer_log(peer, "peer sent a zero nonce\n");
+      peer->challenge = 0;
+      return HSK_SUCCESS;
+    }
+    hsk_peer_log(peer, "peer sent the wrong nonce\n");
+    return HSK_SUCCESS;
+  }
+
   hsk_peer_log(peer, "received pong\n");
+
+  int64_t now = hsk_now();
+  if (hsk_now() >= peer->last_ping) {
+    int64_t min = now - peer->last_ping;
+    peer->last_pong = now;
+    if (!peer->min_ping)
+      peer->min_ping = min;
+    peer->min_ping = peer->min_ping < min ? peer->min_ping : min;
+  } else {
+    hsk_peer_log(peer, "timing mismatch\n");
+  }
+
+  peer->challenge = 0;
+
   return HSK_SUCCESS;
 }
 
@@ -1179,6 +1261,8 @@ hsk_peer_on_read(hsk_peer_t *peer, uint8_t *data, size_t data_len) {
   if (peer->state != HSK_STATE_READING)
     return;
 
+  peer->last_recv = hsk_now();
+
   while (peer->msg_pos + data_len >= peer->msg_len) {
     size_t need = peer->msg_len - peer->msg_pos;
     memcpy(peer->msg + peer->msg_pos, data, need);
@@ -1340,6 +1424,7 @@ on_connect(uv_connect_t *conn, int32_t status) {
   }
 
   peer->state = HSK_STATE_READING;
+  peer->conn_time = hsk_now();
 }
 
 static void
@@ -1390,7 +1475,7 @@ after_read(uv_stream_t *stream, long int nread, const uv_buf_t *buf) {
 
   if (nread < 0) {
     if (nread != UV_EOF)
-      hsk_peer_log(peer, "read error: %s\n", uv_err_name(nread));
+      hsk_peer_log(peer, "read error: %s\n", uv_strerror(nread));
     hsk_peer_destroy(peer);
     return;
   }
@@ -1400,7 +1485,7 @@ after_read(uv_stream_t *stream, long int nread, const uv_buf_t *buf) {
 
 static void
 after_close(uv_handle_t *handle) {
-  hsk_peer_t *peer = handle->data;
+  hsk_peer_t *peer = (hsk_peer_t *)handle->data;
   assert(peer);
   handle->data = NULL;
   peer->state = HSK_STATE_DISCONNECTED;
@@ -1410,7 +1495,7 @@ after_close(uv_handle_t *handle) {
 
 static void
 after_timer(uv_timer_t *timer) {
-  hsk_pool_t *pool = timer->data;
+  hsk_pool_t *pool = (hsk_pool_t *)timer->data;
   assert(pool);
   hsk_pool_timer(pool);
 }

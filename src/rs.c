@@ -79,6 +79,9 @@ after_poll(uv_poll_t *, int, int);
 static void
 after_resolve(void *, int32_t, struct ub_result *);
 
+static void
+after_close(uv_handle_t *);
+
 /*
  * Recursive NS
  */
@@ -194,6 +197,11 @@ hsk_rs_close(hsk_rs_t *ns) {
     if (uv_udp_recv_stop(&ns->socket) != 0)
       return HSK_EFAILURE;
     ns->receiving = false;
+  }
+
+  if (ns->bound) {
+    uv_close((uv_handle_t *)&ns->socket, after_close);
+    ns->bound = false;
   }
 
   if (ns->polling) {
@@ -568,4 +576,13 @@ after_resolve(void *data, int32_t status, struct ub_result *result) {
   ldns_pkt_free(dr->req);
   free(dr);
   ub_resolve_free(result);
+}
+
+static void
+after_close(uv_handle_t *handle) {
+  hsk_rs_t *ns = (hsk_rs_t *)handle->data;
+  // assert(ns);
+  // handle->data = NULL;
+  // ns->bound = false;
+  // hsk_rs_free(peer);
 }

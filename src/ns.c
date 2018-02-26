@@ -71,6 +71,9 @@ hsk_ns_send(
   bool
 );
 
+static void
+after_close(uv_handle_t *);
+
 /*
  * Root Nameserver
  */
@@ -137,6 +140,11 @@ hsk_ns_close(hsk_ns_t *ns) {
     if (uv_udp_recv_stop(&ns->socket) != 0)
       return HSK_EFAILURE;
     ns->receiving = false;
+  }
+
+  if (ns->bound) {
+    uv_close((uv_handle_t *)&ns->socket, after_close);
+    ns->bound = false;
   }
 
   ns->socket.data = NULL;
@@ -506,4 +514,13 @@ after_recv(
     (struct sockaddr *)addr,
     (uint32_t)flags
   );
+}
+
+static void
+after_close(uv_handle_t *handle) {
+  hsk_ns_t *ns = (hsk_ns_t *)handle->data;
+  // assert(ns);
+  // handle->data = NULL;
+  // ns->bound = false;
+  // hsk_ns_free(peer);
 }

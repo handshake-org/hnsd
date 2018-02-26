@@ -63,6 +63,14 @@ typedef struct hsk_peer_s {
   hsk_map_t names;
   int64_t getheaders_time;
   int64_t version_time;
+  int64_t last_ping;
+  int64_t last_pong;
+  int64_t min_ping;
+  int64_t ping_timer;
+  uint64_t challenge;
+  int64_t conn_time;
+  int64_t last_send;
+  int64_t last_recv;
   bool msg_hdr;
   uint8_t *msg;
   size_t msg_pos;
