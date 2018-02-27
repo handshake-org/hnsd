@@ -316,9 +316,10 @@ void bignum_mul(struct bn* a, struct bn* b, struct bn* c)
 
   struct bn row;
   struct bn tmp;
+  struct bn cc;
   int i, j;
 
-  bignum_init(c);
+  bignum_init(&cc);
 
   for (i = 0; i < BN_ARRAY_SIZE; ++i)
   {
@@ -335,8 +336,10 @@ void bignum_mul(struct bn* a, struct bn* b, struct bn* c)
         bignum_add(&tmp, &row, &row);
       }
     }
-    bignum_add(c, &row, c);
+    bignum_add(&cc, &row, &cc);
   }
+
+  bignum_assign(c, &cc);
 }
 
 
@@ -557,13 +560,14 @@ void bignum_pow(struct bn* a, struct bn* b, struct bn* c)
   require(c, "c is null");
 
   struct bn tmp;
+  struct bn cc;
 
-  bignum_init(c);
+  bignum_init(&cc);
 
-  if (bignum_cmp(b, c) == EQUAL)
+  if (bignum_cmp(b, &cc) == EQUAL)
   {
     /* Return 1 when exponent is 0 -- n^0 = 1 */
-    bignum_inc(c);
+    bignum_inc(&cc);
   }
   else
   {
@@ -577,16 +581,18 @@ void bignum_pow(struct bn* a, struct bn* b, struct bn* c)
     {
 
       /* c = tmp * tmp */
-      bignum_mul(&tmp, a, c);
+      bignum_mul(&tmp, a, &cc);
       /* Decrement b by one */
       bignum_dec(b);
 
-      bignum_assign(&tmp, c);
+      bignum_assign(&tmp, &cc);
     }
 
     /* c = tmp */
-    bignum_assign(c, &tmp);
+    bignum_assign(&cc, &tmp);
   }
+
+  bignum_assign(c, &cc);
 }
 
 

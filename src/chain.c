@@ -270,8 +270,6 @@ hsk_chain_retarget(hsk_chain_t *chain, hsk_header_t *prev) {
   int64_t diff = end - start;
   int64_t actual = timespan + ((diff - timespan) / 4);
 
-  assert(actual >= 0);
-
   if (actual < min)
     actual = min;
 
@@ -284,8 +282,8 @@ hsk_chain_retarget(hsk_chain_t *chain, hsk_header_t *prev) {
   bn_t timespan_bn;
   bignum_from_int(&timespan_bn, timespan);
 
-  bignum_mul(&target_bn, &actual_bn, &target_bn);
   bignum_div(&target_bn, &timespan_bn, &target_bn);
+  bignum_mul(&target_bn, &actual_bn, &target_bn);
 
   bn_t limit_bn;
   bignum_from_array(&limit_bn, limit, 32);
@@ -474,6 +472,12 @@ hsk_chain_add(hsk_chain_t *chain, hsk_header_t *h) {
       goto fail;
     }
 
+    if (chain->orphans.size > 10000) {
+      hsk_chain_log(chain, "clearing orphans: %d\n", chain->orphans.size);
+      hsk_map_clear(&chain->orphans);
+      hsk_map_clear(&chain->prevs);
+    }
+
     return HSK_SUCCESS;
   }
 
@@ -488,7 +492,9 @@ hsk_chain_add(hsk_chain_t *chain, hsk_header_t *h) {
   uint32_t bits = hsk_chain_get_target(chain, hdr->time, prev);
 
   if (hdr->bits != bits) {
-    hsk_chain_log(chain, "  rejected: bad-diffbits\n");
+    hsk_chain_log(chain,
+      "  rejected: bad-diffbits: %x != %x\n",
+      hdr->bits, bits);
     rc = HSK_EBADDIFFBITS;
     goto fail;
   }

@@ -759,10 +759,10 @@ hsk_peer_close(hsk_peer_t *peer) {
       hsk_peer_log(peer, "closing peer\n");
       break;
     case HSK_STATE_DISCONNECTED:
-      hsk_peer_log(peer, "closed peer\n");
+      hsk_peer_log(peer, "closed peer (never opened)\n");
       hsk_peer_remove(peer);
       hsk_peer_free(peer);
-      break;
+      return HSK_SUCCESS;
     default:
       assert(false);
       break;
@@ -1123,10 +1123,17 @@ hsk_peer_handle_pong(hsk_peer_t *peer, hsk_pong_msg_t *msg) {
 
 static int32_t
 hsk_peer_handle_addr(hsk_peer_t *peer, hsk_addr_msg_t *msg) {
+  hsk_pool_t *pool = (hsk_pool_t *)peer->pool;
+
   hsk_peer_log(peer, "received %d addrs\n", msg->addr_count);
-  // int32_t i;
-  // for (i = 0; i < m->addr_count; i++)
-  //   hsk_netaddr_t *addr = &m->addrs[i];
+
+  int32_t i;
+
+  for (i = 0; i < msg->addr_count; i++) {
+    hsk_netaddr_t *addr = &msg->addrs[i];
+    hsk_addrman_add_na(&pool->am, addr);
+  }
+
   return HSK_SUCCESS;
 }
 
@@ -1463,6 +1470,7 @@ on_connect(uv_connect_t *conn, int32_t status) {
   }
 
   hsk_addrman_mark_success(&pool->am, &peer->addr);
+
   peer->state = HSK_STATE_READING;
   peer->conn_time = hsk_now();
 }

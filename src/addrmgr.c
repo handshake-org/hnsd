@@ -154,6 +154,7 @@ hsk_addrman_add_entry(hsk_addrman_t *am, hsk_addrentry_t *addr, bool src) {
     if (entry->used)
       return false;
 
+#if 0
     assert(entry->ref_count > 0);
 
     if (entry->ref_count == HSK_MAX_REFS)
@@ -172,8 +173,7 @@ hsk_addrman_add_entry(hsk_addrman_t *am, hsk_addrentry_t *addr, bool src) {
 
     if ((hsk_random() % factor) != 0)
       return false;
-
-    entry->ref_count += 1;
+#endif
   } else {
     if (am->size + 1 == HSK_ADDR_MAX)
       return false;

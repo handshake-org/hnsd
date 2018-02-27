@@ -389,6 +389,7 @@ hsk_addr_equal(void *a, void *b) {
 bool
 hsk_addr_is_null(hsk_addr_t *addr) {
   assert(addr);
+
   if (hsk_addr_is_ip4(addr)) {
     // 0.0.0.0
     return addr->ip[12] == 0
@@ -396,6 +397,7 @@ hsk_addr_is_null(hsk_addr_t *addr) {
       && addr->ip[14] == 0
       && addr->ip[15] == 0;
   }
+
   // ::
   return memcmp(addr->ip, hsk_zero_ip, 16) == 0;
 }

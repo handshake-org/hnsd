@@ -129,15 +129,16 @@ hsk_pow_to_bits(uint8_t *target, uint32_t *bits) {
     mantissa <<= 8 * (3 - exponent);
   } else {
     int32_t shift = exponent - 3;
-    for (; i < 31 - shift; i++) {
+    for (; i < 32 - shift; i++) {
       mantissa <<= 8;
       mantissa |= target[i];
     }
   }
 
-  // No negatives.
-  if (mantissa & 0x800000)
-    return false;
+  if (mantissa & 0x800000) {
+    mantissa >>= 8;
+    exponent += 1;
+  }
 
   *bits = (exponent << 24) | mantissa;
 
