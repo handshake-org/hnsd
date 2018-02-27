@@ -214,8 +214,8 @@ hsk_addrman_add_entry(hsk_addrman_t *am, hsk_netaddr_t *na, bool src) {
     return false;
 
   hsk_addr_copy(&entry->addr, &na->addr);
-  entry->time = hsk_timedata_now(am->td);
-  entry->services = 1;
+  entry->time = na->time;
+  entry->services = na->services;
   entry->attempts = 0;
   entry->last_success = 0;
   entry->last_attempt = 0;
