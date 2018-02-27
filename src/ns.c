@@ -10,6 +10,7 @@
 #include "uv.h"
 #include "ldns/ldns.h"
 
+#include "hsk-addr.h"
 #include "hsk-constants.h"
 #include "hsk-error.h"
 #include "hsk-resource.h"
@@ -38,19 +39,7 @@ typedef struct {
  */
 
 static void
-alloc_buffer(uv_handle_t *handle, size_t size, uv_buf_t *buf);
-
-static void
-after_send(uv_udp_send_t *, int);
-
-static void
-after_recv(
-  uv_udp_t *,
-  ssize_t,
-  const uv_buf_t *,
-  const struct sockaddr *,
-  unsigned
-);
+hsk_ns_log(hsk_ns_t *, const char *, ...);
 
 static void
 hsk_ns_respond(
@@ -72,6 +61,22 @@ hsk_ns_send(
 );
 
 static void
+alloc_buffer(uv_handle_t *handle, size_t size, uv_buf_t *buf);
+
+static void
+after_send(uv_udp_send_t *, int);
+
+static void
+after_recv(
+  uv_udp_t *,
+  ssize_t,
+  const uv_buf_t *,
+  const struct sockaddr *,
+  unsigned
+);
+
+
+static void
 after_close(uv_handle_t *);
 
 /*
@@ -85,8 +90,10 @@ hsk_ns_init(hsk_ns_t *ns, uv_loop_t *loop, hsk_pool_t *pool) {
 
   ns->loop = loop;
   ns->pool = pool;
+  ns->ip = NULL;
+  hsk_addr_init(&ns->_ip);
   ns->socket.data = (void *)ns;
-  memset(ns->read_buffer, 0, sizeof ns->read_buffer);
+  memset(ns->read_buffer, 0, sizeof(ns->read_buffer));
   ns->bound = false;
   ns->receiving = false;
 
@@ -98,6 +105,12 @@ hsk_ns_uninit(hsk_ns_t *ns) {
   if (!ns)
     return;
   ns->socket.data = NULL;
+}
+
+void
+hsk_ns_set_ip(hsk_ns_t *ns, struct sockaddr *addr) {
+  if (hsk_addr_from_sa(&ns->_ip, addr))
+    ns->ip = &ns->_ip;
 }
 
 int32_t
@@ -127,6 +140,14 @@ hsk_ns_open(hsk_ns_t *ns, struct sockaddr *addr) {
     return HSK_EFAILURE;
 
   ns->receiving = true;
+
+  if (!ns->ip)
+    hsk_ns_set_ip(ns, addr);
+
+  char host[HSK_MAX_HOST];
+  assert(hsk_sa_to_string(addr, host, HSK_MAX_HOST, HSK_NS_PORT));
+
+  hsk_ns_log(ns, "root nameserver listening on: %s\n", host);
 
   return HSK_SUCCESS;
 }
@@ -274,7 +295,17 @@ hsk_ns_onrecv(
     uint8_t *wire;
     size_t wire_len;
 
-    if (!hsk_resource_root(id, type, edns, dnssec, &wire, &wire_len))
+    bool result = hsk_resource_root(
+      id,
+      type,
+      edns,
+      dnssec,
+      ns->ip,
+      &wire,
+      &wire_len
+    );
+
+    if (!result)
       return;
 
     hsk_ns_send(ns, wire, wire_len, addr, true);

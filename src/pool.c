@@ -40,14 +40,17 @@ typedef struct hsk_write_data_s {
  * Templates
  */
 
-static int32_t
-hsk_pool_refill(hsk_pool_t *);
-
 static hsk_peer_t *
 hsk_peer_alloc(hsk_pool_t *);
 
 static void
 hsk_peer_free(hsk_peer_t *);
+
+static void
+hsk_pool_log(hsk_pool_t *pool, const char *fmt, ...);
+
+static int32_t
+hsk_pool_refill(hsk_pool_t *);
 
 static void
 hsk_peer_push(hsk_peer_t *);
@@ -118,6 +121,7 @@ hsk_pool_init(hsk_pool_t *pool, uv_loop_t *loop) {
   pool->head = NULL;
   pool->tail = NULL;
   pool->size = 0;
+  pool->max_size = HSK_POOL_SIZE;
   pool->pending = NULL;
   pool->pending_count = 0;
   pool->block_time = 0;
@@ -131,7 +135,8 @@ hsk_pool_uninit(hsk_pool_t *pool) {
   if (!pool)
     return;
 
-  hsk_map_uninit(&pool->peers);
+  // segfaulting?
+  // hsk_map_uninit(&pool->peers);
 
   hsk_peer_t *peer, *next;
   for (peer = pool->head; peer; peer = next) {
@@ -151,6 +156,13 @@ hsk_pool_uninit(hsk_pool_t *pool) {
   hsk_chain_uninit(&pool->chain);
   hsk_addrman_uninit(&pool->am);
   hsk_timedata_uninit(&pool->td);
+}
+
+void
+hsk_pool_set_size(hsk_pool_t *pool, int32_t max_size) {
+  if (max_size <= 0)
+    return;
+  pool->max_size = max_size;
 }
 
 hsk_pool_t *
@@ -189,6 +201,8 @@ hsk_pool_open(hsk_pool_t *pool) {
 
   if (uv_timer_start(&pool->timer, after_timer, 3000, 3000) != 0)
     return HSK_EFAILURE;
+
+  hsk_pool_log(pool, "pool opened (size=%d)\n", pool->max_size);
 
   hsk_pool_refill(pool);
 
@@ -235,7 +249,7 @@ hsk_pool_getaddr(hsk_pool_t *pool, hsk_addr_t *addr) {
 
 static int32_t
 hsk_pool_refill(hsk_pool_t *pool) {
-  while (pool->size < HSK_POOL_SIZE) {
+  while (pool->size < pool->max_size) {
     hsk_peer_t *peer = hsk_peer_alloc(pool);
 
     hsk_addr_t addr;
@@ -829,6 +843,7 @@ hsk_peer_remove(hsk_peer_t *peer) {
       pool->tail = NULL;
     pool->head = peer->next;
     peer->next = NULL;
+    assert(pool->size > 0);
     pool->size -= 1;
     assert(hsk_map_del(&pool->peers, &peer->addr));
     return;
@@ -850,6 +865,7 @@ hsk_peer_remove(hsk_peer_t *peer) {
 
   prev->next = peer->next;
 
+  assert(pool->size > 0);
   pool->size -= 1;
 
   assert(hsk_map_del(&pool->peers, &peer->addr));

@@ -9,6 +9,7 @@
 #include "ldns/ldns.h"
 
 #include "bio.h"
+#include "hsk-addr.h"
 #include "hsk-resource.h"
 #include "hsk-error.h"
 #include "utils.h"
@@ -1812,8 +1813,11 @@ hsk_resource_root_to_ns(ldns_rr_list *an) {
 }
 
 void
-hsk_resource_root_to_a(ldns_rr_list *an) {
-  static const uint8_t ip[] = { 127, 0, 0, 1 };
+hsk_resource_root_to_a(ldns_rr_list *an, hsk_addr_t *addr) {
+  if (!addr || !hsk_addr_is_ip4(addr))
+    return;
+
+  uint8_t *ip = hsk_addr_get_ip(addr);
 
   ldns_rr *rr = ldns_rr_new();
   ldns_rr_set_ttl(rr, 518400);
@@ -1828,11 +1832,11 @@ hsk_resource_root_to_a(ldns_rr_list *an) {
 }
 
 void
-hsk_resource_root_to_aaaa(ldns_rr_list *an) {
-  static const uint8_t ip[] = {
-    0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 1
-  };
+hsk_resource_root_to_aaaa(ldns_rr_list *an, hsk_addr_t *addr) {
+  if (!addr || !hsk_addr_is_ip6(addr))
+    return;
+
+  uint8_t *ip = hsk_addr_get_ip(addr);
 
   ldns_rr *rr = ldns_rr_new();
   ldns_rr_set_ttl(rr, 518400);
@@ -1862,6 +1866,7 @@ hsk_resource_root(
   uint16_t type,
   bool edns,
   bool dnssec,
+  hsk_addr_t *addr,
   uint8_t **wire,
   size_t *wire_len
 ) {
@@ -1922,20 +1927,28 @@ hsk_resource_root(
     case LDNS_RR_TYPE_NS:
       hsk_resource_root_to_ns(an);
       hsk_dnssec_sign(an, LDNS_RR_TYPE_NS, dnssec);
-      hsk_resource_root_to_a(ad);
-      hsk_dnssec_sign(ad, LDNS_RR_TYPE_A, dnssec);
-      // hsk_resource_root_to_aaaa(rs, ad);
-      // hsk_dnssec_sign(ad, LDNS_RR_TYPE_AAAA, dnssec);
+      if (hsk_addr_is_ip4(addr)) {
+        hsk_resource_root_to_a(ad, addr);
+        hsk_dnssec_sign(ad, LDNS_RR_TYPE_A, dnssec);
+      }
+      if (hsk_addr_is_ip6(addr)) {
+        hsk_resource_root_to_aaaa(ad, addr);
+        hsk_dnssec_sign(ad, LDNS_RR_TYPE_AAAA, dnssec);
+      }
       break;
     case LDNS_RR_TYPE_SOA:
       hsk_resource_root_to_soa(an);
       hsk_dnssec_sign(an, LDNS_RR_TYPE_SOA, dnssec);
       hsk_resource_root_to_ns(ns);
       hsk_dnssec_sign(ns, LDNS_RR_TYPE_NS, dnssec);
-      hsk_resource_root_to_a(ad);
-      hsk_dnssec_sign(ad, LDNS_RR_TYPE_A, dnssec);
-      // hsk_resource_root_to_aaaa(ad);
-      // hsk_dnssec_sign(ad, LDNS_RR_TYPE_AAAA, dnssec);
+      if (hsk_addr_is_ip4(addr)) {
+        hsk_resource_root_to_a(ad, addr);
+        hsk_dnssec_sign(ad, LDNS_RR_TYPE_A, dnssec);
+      }
+      if (hsk_addr_is_ip6(addr)) {
+        hsk_resource_root_to_aaaa(ad, addr);
+        hsk_dnssec_sign(ad, LDNS_RR_TYPE_AAAA, dnssec);
+      }
       break;
     case LDNS_RR_TYPE_DNSKEY:
       hsk_resource_root_to_dnskey(an);

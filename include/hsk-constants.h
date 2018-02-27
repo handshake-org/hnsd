@@ -60,8 +60,11 @@ static const uint8_t HSK_ZERO_HASH[32] = {
   0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
 };
 
+#define HSK_NS_IP "127.0.0.1"
 #define HSK_NS_PORT 5369
+#define HSK_RS_IP "127.0.0.1"
 #define HSK_RS_PORT 53
+#define HSK_RS_A "127.0.0.1"
 
 static const char HSK_TRUST_ANCHOR[] = ". DS 40564 8 2 "
   "BAF3CB9FC976E2CDCB49DD9E34BAA2B4C5E8EE7B1574E24ABABD9911C24FF412";

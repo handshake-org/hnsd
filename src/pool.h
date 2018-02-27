@@ -93,6 +93,7 @@ typedef struct hsk_pool_s {
   hsk_peer_t *head;
   hsk_peer_t *tail;
   int32_t size;
+  int32_t max_size;
   hsk_name_req_t *pending;
   int32_t pending_count;
   int64_t block_time;
@@ -108,6 +109,9 @@ hsk_pool_init(hsk_pool_t *pool, uv_loop_t *loop);
 
 void
 hsk_pool_uninit(hsk_pool_t *pool);
+
+void
+hsk_pool_set_size(hsk_pool_t *pool, int32_t max_size);
 
 hsk_pool_t *
 hsk_pool_alloc(uv_loop_t *loop);

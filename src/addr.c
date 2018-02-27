@@ -358,6 +358,43 @@ hsk_addr_to_string(hsk_addr_t *addr, char *dst, size_t dst_len, uint16_t fb) {
   return true;
 }
 
+bool
+hsk_sa_from_string(struct sockaddr *sa, char *src, uint16_t port) {
+  assert(sa && src);
+
+  hsk_addr_t addr;
+
+  if (!hsk_addr_from_string(&addr, src, port))
+    return false;
+
+  return hsk_addr_to_sa(&addr, sa);
+}
+
+bool
+hsk_sa_to_string(
+  struct sockaddr *sa,
+  char *dst,
+  size_t dst_len,
+  uint16_t fb
+) {
+  assert(sa && dst);
+
+  hsk_addr_t addr;
+
+  if (!hsk_addr_from_sa(&addr, sa))
+    return false;
+
+  if (!hsk_addr_to_string(&addr, dst, dst_len, fb))
+    return false;
+
+  return true;
+}
+
+void
+hsk_sa_copy(struct sockaddr *sa, struct sockaddr *other) {
+  memcpy((void *)sa, (void *)other, sizeof(struct sockaddr_storage));
+}
+
 static inline uint32_t
 hsk_hash_data(uint32_t hash, uint8_t *data, size_t size) {
   assert(data);

@@ -22,6 +22,10 @@
 #define HSK_ADDR 19
 #define HSK_EXTRA 255
 
+#include <stdint.h>
+#include <stdbool.h>
+#include "hsk-addr.h"
+
 // Records
 typedef struct _record {
   uint8_t type;
@@ -193,6 +197,7 @@ hsk_resource_root(
   uint16_t type,
   bool edns,
   bool dnssec,
+  hsk_addr_t *addr,
   uint8_t **wire,
   size_t *wire_len
 );
