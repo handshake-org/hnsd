@@ -982,7 +982,7 @@ hsk_peer_send(hsk_peer_t *peer, hsk_msg_t *msg) {
 }
 
 static int32_t
-hsk_peer_send_version(hsk_peer_t *peer, hsk_version_msg_t *theirs) {
+hsk_peer_send_version(hsk_peer_t *peer) {
   hsk_pool_t *pool = (hsk_pool_t *)peer->pool;
 
   hsk_version_msg_t msg = { .cmd = HSK_MSG_VERSION };
@@ -992,14 +992,15 @@ hsk_peer_send_version(hsk_peer_t *peer, hsk_version_msg_t *theirs) {
   msg.services = HSK_SERVICES;
   msg.time = hsk_timedata_now(&pool->td);
 
-  if (theirs) {
-    msg.remote.time = theirs->time;
-    msg.remote.services = theirs->services;
+  hsk_addrentry_t *entry = hsk_addrman_get(&pool->am, &peer->addr);
+
+  if (entry) {
+    msg.remote.time = entry->time;
+    msg.remote.services = entry->services;
   }
 
-  msg.remote.type = 0;
-  memcpy(msg.remote.addr, peer->addr.ip, 16);
-  msg.remote.port = peer->addr.port;
+  hsk_addr_copy(&msg.remote.addr, &peer->addr);
+
   msg.nonce = hsk_nonce();
   strcpy(msg.agent, HSK_USER_AGENT);
   msg.height = pool->chain.height;
@@ -1081,7 +1082,7 @@ hsk_peer_handle_version(hsk_peer_t *peer, hsk_version_msg_t *msg) {
   if (rc != HSK_SUCCESS)
     return rc;
 
-  return hsk_peer_send_version(peer, msg);
+  return hsk_peer_send_version(peer);
 }
 
 static int32_t
@@ -1141,6 +1142,9 @@ hsk_peer_handle_pong(hsk_peer_t *peer, hsk_pong_msg_t *msg) {
 static int32_t
 hsk_peer_handle_addr(hsk_peer_t *peer, hsk_addr_msg_t *msg) {
   hsk_pool_t *pool = (hsk_pool_t *)peer->pool;
+
+  if (msg->addr_count > 1000)
+    return HSK_EFAILURE;
 
   hsk_peer_log(peer, "received %d addrs\n", msg->addr_count);
 

@@ -9,7 +9,7 @@
 
 #include "uv.h"
 #include "hsk-addr.h"
-#include "hsk-msg.h"
+#include "bio.h"
 
 static const uint8_t hsk_ip4_mapped[12] = {
   0x00, 0x00, 0x00, 0x00,
@@ -181,18 +181,14 @@ hsk_addr_set_port(hsk_addr_t *addr, uint16_t port) {
 bool
 hsk_addr_from_na(hsk_addr_t *addr, hsk_netaddr_t *na) {
   assert(addr && na);
-  addr->type = na->type;
-  memcpy(addr->ip, na->addr, 36);
-  addr->port = na->port;
+  hsk_addr_copy(addr, &na->addr);
   return true;
 }
 
 bool
 hsk_addr_to_na(hsk_addr_t *addr, hsk_netaddr_t *na) {
   assert(addr && na);
-  na->type = addr->type;
-  memcpy(na->addr, addr->ip, 36);
-  na->port = addr->port;
+  hsk_addr_copy(&na->addr, addr);
   return true;
 }
 
@@ -644,6 +640,9 @@ bool
 hsk_addr_is_valid(hsk_addr_t *addr) {
   assert(addr);
 
+  if (addr->type != 0)
+    return false;
+
   if (memcmp(addr->ip, hsk_shifted, sizeof(hsk_shifted)) == 0)
     return false;
 
@@ -696,12 +695,42 @@ hsk_addr_is_routable(hsk_addr_t *addr) {
   return true;
 }
 
-uint16_t
-hsk_addr_ip_type(uint8_t *ip) {
-  assert(ip);
+void
+hsk_netaddr_init(hsk_netaddr_t *na) {
+  if (na == NULL)
+    return;
+  na->time = 0;
+  na->services = 0;
+  hsk_addr_init(&na->addr);
+}
 
-  if (memcmp(ip, hsk_ip4_mapped, 12) == 0)
-    return AF_INET;
+bool
+hsk_netaddr_read(uint8_t **data, size_t *data_len, hsk_netaddr_t *na) {
+  if (!read_u64(data, data_len, &na->time))
+    return false;
 
-  return AF_INET6;
+  if (!read_u64(data, data_len, &na->services))
+    return false;
+
+  if (!read_u8(data, data_len, &na->addr.type))
+    return false;
+
+  if (!read_bytes(data, data_len, na->addr.ip, 36))
+    return false;
+
+  if (!read_u16(data, data_len, &na->addr.port))
+    return false;
+
+  return true;
+}
+
+int32_t
+hsk_netaddr_write(hsk_netaddr_t *na, uint8_t **data) {
+  int32_t s = 0;
+  s += write_u64(data, na->time);
+  s += write_u64(data, na->services);
+  s += write_u8(data, na->addr.type);
+  s += write_bytes(data, na->addr.ip, 36);
+  s += write_u16(data, na->addr.port);
+  return s;
 }

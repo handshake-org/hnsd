@@ -6,6 +6,7 @@
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include "hsk-addr.h"
 #include "hsk-header.h"
 #include "hsk-proof.h"
 
@@ -21,15 +22,6 @@
 #define HSK_MSG_GETPROOF 31
 #define HSK_MSG_PROOF 32
 #define HSK_MSG_UNKNOWN 255
-
-// bidirectional
-typedef struct {
-  uint64_t time;
-  uint64_t services;
-  uint8_t type;
-  uint8_t addr[36];
-  uint16_t port;
-} hsk_netaddr_t;
 
 typedef struct {
   uint8_t cmd;

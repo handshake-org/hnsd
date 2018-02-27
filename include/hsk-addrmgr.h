@@ -10,7 +10,6 @@
 #include "hsk-addr.h"
 #include "hsk-timedata.h"
 #include "hsk-map.h"
-#include "hsk-msg.h"
 
 typedef struct hsk_addrentry_s {
   hsk_addr_t addr;
@@ -50,21 +49,24 @@ void
 hsk_addrman_free(hsk_addrman_t *am);
 
 hsk_addrentry_t *
-hsk_addrman_alloc_entry(hsk_addrman_t *am);
+hsk_addrman_alloc_entry(hsk_addrman_t *am, bool *alloc);
+
+hsk_addrentry_t *
+hsk_addrman_get(hsk_addrman_t *am, hsk_addr_t *addr);
 
 bool
-hsk_addrman_add_entry(hsk_addrman_t *am, hsk_addrentry_t *addr, bool src);
+hsk_addrman_add_entry(hsk_addrman_t *am, hsk_netaddr_t *na, bool src);
 
 bool
 hsk_addrman_add_addr(hsk_addrman_t *am, hsk_addr_t *addr);
 
 bool
-hsk_addrman_add_na(hsk_addrman_t *am, hsk_netaddr_t *addr);
+hsk_addrman_add_na(hsk_addrman_t *am, hsk_netaddr_t *na);
 
-int32_t
-hsk_addrman_add_sa(hsk_addrman_t *am, struct sockaddr *addr);
+bool
+hsk_addrman_add_sa(hsk_addrman_t *am, struct sockaddr *sa);
 
-int32_t
+bool
 hsk_addrman_add_ip(hsk_addrman_t *am, int32_t af, uint8_t *ip, uint16_t port);
 
 bool
@@ -92,5 +94,5 @@ bool
 hsk_addrman_pick_addr(hsk_addrman_t *am, hsk_map_t *map, hsk_addr_t *addr);
 
 bool
-hsk_addrman_pick_sa(hsk_addrman_t *am, hsk_map_t *map, struct sockaddr *addr);
+hsk_addrman_pick_sa(hsk_addrman_t *am, hsk_map_t *map, struct sockaddr *sa);
 #endif

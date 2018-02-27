@@ -10,7 +10,6 @@
 #include "hsk-constants.h"
 #include "hsk-error.h"
 #include "hsk-map.h"
-#include "hsk-msg.h"
 #include "hsk-timedata.h"
 #include "utils.h"
 #include "seeds.h"
@@ -111,11 +110,31 @@ hsk_addrman_free(hsk_addrman_t *am) {
 }
 
 hsk_addrentry_t *
-hsk_addrman_alloc_entry(hsk_addrman_t *am) {
-  if (am->size == HSK_ADDR_MAX)
+hsk_addrman_alloc_entry(hsk_addrman_t *am, bool *alloc) {
+  if (am->size == HSK_ADDR_MAX) {
+    int32_t i;
+    for (i = 0; i < min(am->size, 10); i++) {
+      int32_t index = hsk_random() % am->size;
+      hsk_addrentry_t *entry = &am->addrs[index];
+      if (hsk_addrman_is_stale(am, entry)) {
+        hsk_map_del(&am->map, &entry->addr);
+        *alloc = false;
+        return entry;
+      }
+    }
+    *alloc = false;
     return NULL;
+  }
+
   assert(am->size < HSK_ADDR_MAX);
-  return &am->addrs[am->size];
+
+  hsk_addrentry_t *entry = &am->addrs[am->size];
+
+  am->size += 1;
+
+  *alloc = true;
+
+  return entry;
 }
 
 static void
@@ -128,33 +147,40 @@ hsk_addrman_log(hsk_addrman_t *am, const char *fmt, ...) {
   va_end(args);
 }
 
+hsk_addrentry_t *
+hsk_addrman_get(hsk_addrman_t *am, hsk_addr_t *addr) {
+  return hsk_map_get(&am->map, addr);
+}
+
 bool
-hsk_addrman_add_entry(hsk_addrman_t *am, hsk_addrentry_t *addr, bool src) {
-  hsk_addrentry_t *entry = hsk_map_get(&am->map, addr);
+hsk_addrman_add_entry(hsk_addrman_t *am, hsk_netaddr_t *na, bool src) {
+  hsk_addrentry_t *entry = hsk_map_get(&am->map, &na->addr);
+
+  char host[HSK_MAX_HOST];
+  hsk_addr_to_string(&na->addr, host, HSK_MAX_HOST, HSK_PORT);
 
   if (entry) {
     int32_t penalty = 2 * 60 * 60;
     int32_t interval = 24 * 60 * 60;
+    int64_t now = hsk_timedata_now(am->td);
 
     if (!src)
       penalty = 0;
 
-    entry->services |= addr->services;
+    entry->services |= na->services;
 
-    int64_t now = hsk_timedata_now(am->td);
-    if (now - addr->time < 24 * 60 * 60)
+    if (now - na->time < 24 * 60 * 60)
       interval = 60 * 60;
 
-    if (entry->time < addr->time - interval - penalty)
-      entry->time = addr->time;
+    if (entry->time < na->time - interval - penalty)
+      entry->time = na->time;
 
-    if (entry->time && addr->time <= entry->time)
+    if (entry->time && na->time <= entry->time)
       return false;
 
     if (entry->used)
       return false;
 
-#if 0
     assert(entry->ref_count > 0);
 
     if (entry->ref_count == HSK_MAX_REFS)
@@ -173,105 +199,80 @@ hsk_addrman_add_entry(hsk_addrman_t *am, hsk_addrentry_t *addr, bool src) {
 
     if ((hsk_random() % factor) != 0)
       return false;
-#endif
-  } else {
-    if (am->size + 1 == HSK_ADDR_MAX)
-      return false;
 
-    if (!hsk_map_set(&am->map, addr, addr))
-      return false;
+    entry->ref_count += 1;
 
-    char host[HSK_MAX_HOST];
-    hsk_addr_to_string(&addr->addr, host, HSK_MAX_HOST, 0);
-    hsk_addrman_log(am, "added addr to addrman: %s\n", host);
+    hsk_addrman_log(am, "saw existing addr: %s\n", host);
 
-    am->size += 1;
+    return true;
   }
+
+  bool alloc = false;
+  entry = hsk_addrman_alloc_entry(am, &alloc);
+
+  if (!entry)
+    return false;
+
+  hsk_addr_copy(&entry->addr, &na->addr);
+  entry->time = hsk_timedata_now(am->td);
+  entry->services = 1;
+  entry->attempts = 0;
+  entry->last_success = 0;
+  entry->last_attempt = 0;
+  entry->ref_count = 1;
+  entry->used = false;
+
+  if (!hsk_map_set(&am->map, &entry->addr, entry)) {
+    if (alloc)
+      am->size -= 1;
+    return false;
+  }
+
+  hsk_addrman_log(am, "added addr: %s\n", host);
 
   return true;
 }
 
 bool
 hsk_addrman_add_addr(hsk_addrman_t *am, hsk_addr_t *addr) {
-  hsk_addrentry_t *entry = hsk_addrman_alloc_entry(am);
+  hsk_netaddr_t na;
 
-  if (!entry)
-    return false;
+  hsk_addr_copy(&na.addr, addr);
+  na.time = hsk_timedata_now(am->td);
+  na.services = 1;
 
-  hsk_addr_copy(&entry->addr, addr);
-
-  entry->time = hsk_timedata_now(am->td);
-  entry->services = 1;
-  entry->attempts = 0;
-  entry->last_success = 0;
-  entry->last_attempt = 0;
-  entry->ref_count = 0;
-  entry->used = false;
-
-  return hsk_addrman_add_entry(am, entry, false);
+  return hsk_addrman_add_entry(am, &na, false);
 }
 
 bool
-hsk_addrman_add_na(hsk_addrman_t *am, hsk_netaddr_t *addr) {
-  hsk_addrentry_t *entry = hsk_addrman_alloc_entry(am);
-
-  if (!entry)
-    return false;
-
-  if (!hsk_addr_from_na(&entry->addr, addr))
-    return false;
-
-  entry->time = addr->time;
-  entry->services = addr->services;
-  entry->attempts = 0;
-  entry->last_success = 0;
-  entry->last_attempt = 0;
-  entry->ref_count = 0;
-  entry->used = false;
-
-  return hsk_addrman_add_entry(am, entry, true);
+hsk_addrman_add_na(hsk_addrman_t *am, hsk_netaddr_t *na) {
+  return hsk_addrman_add_entry(am, na, true);
 }
 
-int32_t
-hsk_addrman_add_sa(hsk_addrman_t *am, struct sockaddr *addr) {
-  hsk_addrentry_t *entry = hsk_addrman_alloc_entry(am);
+bool
+hsk_addrman_add_sa(hsk_addrman_t *am, struct sockaddr *sa) {
+  hsk_netaddr_t na;
 
-  if (!entry)
+  if (!hsk_addr_from_sa(&na.addr, sa))
     return false;
 
-  if (!hsk_addr_from_sa(&entry->addr, addr))
-    return false;
+  na.time = hsk_timedata_now(am->td);
+  na.services = 1;
 
-  entry->time = hsk_timedata_now(am->td);
-  entry->services = 1;
-  entry->attempts = 0;
-  entry->last_success = 0;
-  entry->last_attempt = 0;
-  entry->ref_count = 0;
-  entry->used = false;
-
-  return hsk_addrman_add_entry(am, entry, false);
+  return hsk_addrman_add_entry(am, &na, false);
 }
 
-int32_t
+bool
 hsk_addrman_add_ip(hsk_addrman_t *am, int32_t af, uint8_t *ip, uint16_t port) {
-  hsk_addrentry_t *entry = hsk_addrman_alloc_entry(am);
+  hsk_netaddr_t na;
 
-  if (!entry)
+  if (!hsk_addr_from_ip(&na.addr, af, ip, port))
     return false;
 
-  if (!hsk_addr_from_ip(&entry->addr, af, ip, port))
-    return false;
+  na.time = hsk_timedata_now(am->td);
+  na.services = 1;
 
-  entry->time = hsk_timedata_now(am->td);
-  entry->services = 1;
-  entry->attempts = 0;
-  entry->last_success = 0;
-  entry->last_attempt = 0;
-  entry->ref_count = 0;
-  entry->used = false;
-
-  return hsk_addrman_add_entry(am, entry, false);
+  return hsk_addrman_add_entry(am, &na, false);
 }
 
 bool
@@ -448,13 +449,13 @@ hsk_addrman_pick_addr(hsk_addrman_t *am, hsk_map_t *map, hsk_addr_t *addr) {
 }
 
 bool
-hsk_addrman_pick_sa(hsk_addrman_t *am, hsk_map_t *map, struct sockaddr *addr) {
+hsk_addrman_pick_sa(hsk_addrman_t *am, hsk_map_t *map, struct sockaddr *sa) {
   hsk_addrentry_t *entry = hsk_addrman_pick(am, map);
 
   if (!entry)
     return false;
 
-  hsk_addr_to_sa(&entry->addr, addr);
+  hsk_addr_to_sa(&entry->addr, sa);
 
   return true;
 }

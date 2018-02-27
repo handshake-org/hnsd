@@ -9,8 +9,6 @@
 #include <arpa/inet.h>
 #include <netinet/in.h>
 
-#include "hsk-msg.h"
-
 // INET6_ADDRSTRLEN + 11
 #define HSK_MAX_HOST 57
 
@@ -19,6 +17,12 @@ typedef struct hsk_addr_s {
   uint8_t ip[36];
   uint16_t port;
 } hsk_addr_t;
+
+typedef struct {
+  uint64_t time;
+  uint64_t services;
+  hsk_addr_t addr;
+} hsk_netaddr_t;
 
 void
 hsk_addr_init(hsk_addr_t *addr);
@@ -166,6 +170,12 @@ hsk_addr_is_valid(hsk_addr_t *addr);
 bool
 hsk_addr_is_routable(hsk_addr_t *addr);
 
-uint16_t
-hsk_addr_ip_type(uint8_t *ip);
+void
+hsk_netaddr_init(hsk_netaddr_t *addr);
+
+bool
+hsk_netaddr_read(uint8_t **data, size_t *data_len, hsk_netaddr_t *addr);
+
+int32_t
+hsk_netaddr_write(hsk_netaddr_t *addr, uint8_t **data);
 #endif

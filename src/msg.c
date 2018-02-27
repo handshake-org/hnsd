@@ -4,53 +4,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "hsk-addr.h"
 #include "hsk-header.h"
 #include "hsk-msg.h"
 #include "hsk-proof.h"
 #include "bio.h"
 #include "utils.h"
-
-void
-hsk_netaddr_init(hsk_netaddr_t *addr) {
-  if (addr == NULL)
-    return;
-  addr->time = 0;
-  addr->services = 0;
-  addr->type = 0;
-  memset(addr->addr, 0, 36);
-  addr->port = 0;
-}
-
-bool
-hsk_addr_read(uint8_t **data, size_t *data_len, hsk_netaddr_t *addr) {
-  if (!read_u64(data, data_len, &addr->time))
-    return false;
-
-  if (!read_u64(data, data_len, &addr->services))
-    return false;
-
-  if (!read_u8(data, data_len, &addr->type))
-    return false;
-
-  if (!read_bytes(data, data_len, addr->addr, 36))
-    return false;
-
-  if (!read_u16(data, data_len, &addr->port))
-    return false;
-
-  return true;
-}
-
-int32_t
-hsk_addr_write(hsk_netaddr_t *addr, uint8_t **data) {
-  int32_t s = 0;
-  s += write_u64(data, addr->time);
-  s += write_u64(data, addr->services);
-  s += write_u8(data, addr->type);
-  s += write_bytes(data, addr->addr, 36);
-  s += write_u16(data, addr->port);
-  return s;
-}
 
 bool
 hsk_version_msg_read(uint8_t **data, size_t *data_len, hsk_version_msg_t *msg) {
@@ -63,10 +22,10 @@ hsk_version_msg_read(uint8_t **data, size_t *data_len, hsk_version_msg_t *msg) {
   if (!read_u64(data, data_len, &msg->time))
     return false;
 
-  if (!hsk_addr_read(data, data_len, &msg->remote))
+  if (!hsk_netaddr_read(data, data_len, &msg->remote))
     return false;
 
-  if (!hsk_addr_read(data, data_len, &msg->local))
+  if (!hsk_netaddr_read(data, data_len, &msg->local))
     return false;
 
   if (!read_u64(data, data_len, &msg->nonce))
@@ -96,8 +55,8 @@ hsk_version_msg_write(hsk_version_msg_t *msg, uint8_t **data) {
   s += write_u32(data, msg->version);
   s += write_u64(data, msg->services);
   s += write_u64(data, msg->time);
-  s += hsk_addr_write(&msg->remote, data);
-  s += hsk_addr_write(&msg->local, data);
+  s += hsk_netaddr_write(&msg->remote, data);
+  s += hsk_netaddr_write(&msg->local, data);
   s += write_u64(data, msg->nonce);
   size_t size = strlen(msg->agent);
   s += write_u8(data, size);
@@ -166,7 +125,7 @@ hsk_addr_msg_read(uint8_t **data, size_t *data_len, hsk_addr_msg_t *msg) {
   int32_t i;
 
   for (i = 0; i < msg->addr_count; i++) {
-    if (!hsk_addr_read(data, data_len, &msg->addrs[i]))
+    if (!hsk_netaddr_read(data, data_len, &msg->addrs[i]))
       return false;
   }
 
@@ -182,7 +141,7 @@ hsk_addr_msg_write(hsk_addr_msg_t *msg, uint8_t **data) {
   int32_t i;
 
   for (i = 0; i < msg->addr_count; i++)
-    s += hsk_addr_write(&msg->addrs[i], data);
+    s += hsk_netaddr_write(&msg->addrs[i], data);
 
   return s;
 }
