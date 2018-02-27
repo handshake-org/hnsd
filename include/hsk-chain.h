@@ -56,12 +56,6 @@ hsk_chain_has_orphan(hsk_chain_t *chain, uint8_t *hash);
 hsk_header_t *
 hsk_chain_get_orphan(hsk_chain_t *chain, uint8_t *hash);
 
-bool
-hsk_chain_has_next(hsk_chain_t *chain, uint8_t *hash);
-
-hsk_header_t *
-hsk_chain_get_next(hsk_chain_t *chain, uint8_t *hash);
-
 hsk_header_t *
 hsk_chain_get_ancestor(hsk_chain_t *chain, hsk_header_t *hdr, int32_t height);
 

@@ -171,14 +171,17 @@ hsk_chain_get_orphan(hsk_chain_t *chain, uint8_t *hash) {
   return hsk_map_get(&chain->orphans, hash);
 }
 
-bool
-hsk_chain_has_next(hsk_chain_t *chain, uint8_t *hash) {
-  return hsk_map_has(&chain->prevs, hash);
-}
+static hsk_header_t *
+hsk_chain_resolve_orphan(hsk_chain_t *chain, uint8_t *hash) {
+  hsk_header_t *orphan = hsk_map_get(&chain->prevs, hash);
 
-hsk_header_t *
-hsk_chain_get_next(hsk_chain_t *chain, uint8_t *hash) {
-  return hsk_map_get(&chain->prevs, hash);
+  if (!orphan)
+    return NULL;
+
+  hsk_map_del(&chain->prevs, orphan->prev_block);
+  hsk_map_del(&chain->orphans, hsk_header_cache(orphan));
+
+  return orphan;
 }
 
 hsk_header_t *
@@ -441,6 +444,7 @@ hsk_chain_reorganize(hsk_chain_t *chain, hsk_header_t *competitor) {
   while (!hsk_header_equal(entry, fork)) {
     assert(!entry->next);
 
+    // Build the list backwards.
     if (connect)
       entry->next = connect;
 
@@ -514,11 +518,16 @@ hsk_chain_add(hsk_chain_t *chain, hsk_header_t *h) {
     goto fail;
   }
 
-  hsk_header_t *prev =
-    (hsk_header_t *)hsk_map_get(&chain->hashes, hdr->prev_block);
+  hsk_header_t *prev = hsk_chain_get(chain, hdr->prev_block);
 
   if (!prev) {
     hsk_chain_log(chain, "  stored as orphan\n");
+
+    if (chain->orphans.size > 10000) {
+      hsk_chain_log(chain, "clearing orphans: %d\n", chain->orphans.size);
+      hsk_map_clear(&chain->prevs);
+      hsk_map_clear(&chain->orphans);
+    }
 
     if (!hsk_map_set(&chain->orphans, hash, (void *)hdr)) {
       rc = HSK_ENOMEM;
@@ -531,12 +540,6 @@ hsk_chain_add(hsk_chain_t *chain, hsk_header_t *h) {
       goto fail;
     }
 
-    if (chain->orphans.size > 10000) {
-      hsk_chain_log(chain, "clearing orphans: %d\n", chain->orphans.size);
-      hsk_map_clear(&chain->prevs);
-      hsk_map_clear(&chain->orphans);
-    }
-
     return HSK_EORPHAN;
   }
 
@@ -547,15 +550,12 @@ hsk_chain_add(hsk_chain_t *chain, hsk_header_t *h) {
 
   for (;;) {
     prev = hdr;
-    hdr = hsk_chain_get_next(chain, hash);
+    hdr = hsk_chain_resolve_orphan(chain, hash);
 
     if (!hdr)
       break;
 
     hash = hsk_header_cache(hdr);
-
-    hsk_map_del(&chain->prevs, hdr->prev_block);
-    hsk_map_del(&chain->orphans, hash);
 
     rc = hsk_chain_insert(chain, hdr, prev);
 
