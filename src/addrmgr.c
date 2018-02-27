@@ -379,7 +379,6 @@ hsk_addrman_search(hsk_addrman_t *am) {
   if (am->size == 0)
     return NULL;
 
-  // randomly pick between fresh and used (track counts of each)
   int64_t now = hsk_timedata_now(am->td);
 
   double num = (double)(hsk_random() % (1 << 30));
