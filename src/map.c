@@ -436,7 +436,7 @@ hsk_map_put(hsk_map_t *map, void *key, int *ret) {
       *ret = 2;
   } else {
     // present and not deleted
-    // map->keys[x] = key;
+    map->keys[x] = key;
     if (ret)
       *ret = 0;
   }
