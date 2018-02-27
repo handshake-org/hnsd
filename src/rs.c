@@ -11,6 +11,7 @@
 #include "ldns/ldns.h"
 #include "unbound.h"
 
+#include "hsk-addr.h"
 #include "hsk-error.h"
 #include "hsk-constants.h"
 #include "rs.h"
@@ -122,12 +123,15 @@ hsk_rs_init_unbound(hsk_rs_t *ns, struct sockaddr *addr) {
   assert(ub_ctx_set_option(ns->ub, "root-hints:", "") == 0);
   assert(ub_ctx_set_option(ns->ub, "do-not-query-localhost:", "no") == 0);
 
-  char stub[56];
+  hsk_addr_t stub;
+  hsk_addr_from_sa(&stub, addr);
 
-  if (!hsk_inet2string(addr, stub, sizeof(stub) - 1, HSK_NS_PORT))
+  char host[HSK_MAX_HOST];
+
+  if (!hsk_addr_to_string(&stub, host, HSK_MAX_HOST, HSK_NS_PORT))
     return HSK_EFAILURE;
 
-  assert(ub_ctx_set_stub(ns->ub, ".", stub, 0) == 0);
+  assert(ub_ctx_set_stub(ns->ub, ".", host, 0) == 0);
   assert(ub_ctx_add_ta(ns->ub, HSK_TRUST_ANCHOR) == 0);
   assert(ub_ctx_zone_add(ns->ub, ".", "nodefault") == 0);
 

@@ -181,10 +181,12 @@ hsk_addrman_add_entry(hsk_addrman_t *am, hsk_addrentry_t *addr, bool src) {
     if (!hsk_map_set(&am->map, addr, addr))
       return false;
 
+    char host[HSK_MAX_HOST];
+    hsk_addr_to_string(&addr->addr, host, HSK_MAX_HOST, 0);
+    hsk_addrman_log(am, "added addr to addrman: %s\n", host);
+
     am->size += 1;
   }
-
-  hsk_addrman_log(am, "added addr to addrman\n");
 
   return true;
 }

@@ -11,6 +11,9 @@
 
 #include "hsk-msg.h"
 
+// INET6_ADDRSTRLEN + 11
+#define HSK_MAX_HOST 57
+
 typedef struct hsk_addr_s {
   uint8_t type;
   uint8_t ip[36];

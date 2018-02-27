@@ -131,6 +131,8 @@ hsk_pool_uninit(hsk_pool_t *pool) {
   if (!pool)
     return;
 
+  hsk_map_uninit(&pool->peers);
+
   hsk_peer_t *peer, *next;
   for (peer = pool->head; peer; peer = next) {
     next = peer->next;
@@ -147,9 +149,8 @@ hsk_pool_uninit(hsk_pool_t *pool) {
   pool->pending_count = 0;
 
   hsk_chain_uninit(&pool->chain);
-  hsk_timedata_uninit(&pool->td);
   hsk_addrman_uninit(&pool->am);
-  hsk_map_uninit(&pool->peers);
+  hsk_timedata_uninit(&pool->td);
 }
 
 hsk_pool_t *
@@ -723,7 +724,7 @@ hsk_peer_open(hsk_peer_t *peer, hsk_addr_t *addr) {
 
   hsk_addr_copy(&peer->addr, addr);
 
-  if (!hsk_addr_to_string(addr, peer->host, sizeof(peer->host) - 1, HSK_PORT))
+  if (!hsk_addr_to_string(addr, peer->host, HSK_MAX_HOST, HSK_PORT))
     return HSK_EBADARGS;
 
   uv_connect_t *conn = malloc(sizeof(uv_connect_t));
@@ -1168,8 +1169,17 @@ hsk_peer_handle_headers(hsk_peer_t *peer, hsk_headers_msg_t *msg) {
     }
   }
 
+  bool orphan = false;
+
   for (hdr = msg->headers; hdr; hdr = hdr->next) {
     int32_t rc = hsk_chain_add(peer->chain, hdr);
+
+    if (rc == HSK_EORPHAN || rc == HSK_EDUPLICATEORPHAN) {
+      if (!orphan)
+        hsk_peer_log(peer, "failed adding orphan\n");
+      orphan = true;
+      continue;
+    }
 
     if (rc != HSK_SUCCESS) {
       hsk_peer_log(peer, "failed adding block: %d\n", rc);
@@ -1177,6 +1187,15 @@ hsk_peer_handle_headers(hsk_peer_t *peer, hsk_headers_msg_t *msg) {
     }
 
     peer->headers += 1;
+  }
+
+  if (orphan) {
+    hsk_header_t *hdr = msg->headers;
+    uint8_t *hash = hsk_header_cache(hdr);
+    hsk_peer_log(peer, "peer sent orphan: %s\n", hsk_hex_encode32(hash));
+    hsk_peer_log(peer, "peer sending orphan locator\n");
+    hsk_peer_send_getheaders(peer, NULL);
+    return HSK_SUCCESS;
   }
 
   pool->block_time = hsk_now();

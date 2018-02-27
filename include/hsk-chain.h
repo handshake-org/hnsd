@@ -42,6 +42,30 @@ void
 hsk_chain_free(hsk_chain_t *chain);
 
 bool
+hsk_chain_has(hsk_chain_t *chain, uint8_t *hash);
+
+hsk_header_t *
+hsk_chain_get(hsk_chain_t *chain, uint8_t *hash);
+
+hsk_header_t *
+hsk_chain_get_by_height(hsk_chain_t *chain, int32_t height);
+
+bool
+hsk_chain_has_orphan(hsk_chain_t *chain, uint8_t *hash);
+
+hsk_header_t *
+hsk_chain_get_orphan(hsk_chain_t *chain, uint8_t *hash);
+
+bool
+hsk_chain_has_next(hsk_chain_t *chain, uint8_t *hash);
+
+hsk_header_t *
+hsk_chain_get_next(hsk_chain_t *chain, uint8_t *hash);
+
+hsk_header_t *
+hsk_chain_get_ancestor(hsk_chain_t *chain, hsk_header_t *hdr, int32_t height);
+
+bool
 hsk_chain_synced(hsk_chain_t *chain);
 
 int32_t

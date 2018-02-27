@@ -102,13 +102,13 @@ hsk_addr_is_mapped(hsk_addr_t *addr) {
 bool
 hsk_addr_is_ip4(hsk_addr_t *addr) {
   assert(addr);
-  return hsk_addr_get_af(addr) == AF_INET;
+  return hsk_addr_is_mapped(addr);
 }
 
 bool
 hsk_addr_is_ip6(hsk_addr_t *addr) {
   assert(addr);
-  return hsk_addr_get_af(addr) == AF_INET6;
+  return !hsk_addr_is_mapped(addr) && !hsk_addr_is_onion(addr);
 }
 
 bool
@@ -120,7 +120,7 @@ hsk_addr_is_onion(hsk_addr_t *addr) {
 uint16_t
 hsk_addr_get_af(hsk_addr_t *addr) {
   assert(addr);
-  return hsk_addr_is_mapped(addr) ? AF_INET : AF_INET;
+  return hsk_addr_is_mapped(addr) ? AF_INET : AF_INET6;
 }
 
 uint8_t

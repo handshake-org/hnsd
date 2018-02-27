@@ -8,6 +8,7 @@
 #include "hsk-msg.h"
 #include "hsk-proof.h"
 #include "bio.h"
+#include "utils.h"
 
 void
 hsk_netaddr_init(hsk_netaddr_t *addr) {

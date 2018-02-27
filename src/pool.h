@@ -54,7 +54,7 @@ typedef struct hsk_peer_s {
   uv_loop_t *loop;
   uv_tcp_t socket;
   uint64_t id;
-  char host[60];
+  char host[HSK_MAX_HOST];
   hsk_addr_t addr;
   uint16_t port;
   int32_t state;

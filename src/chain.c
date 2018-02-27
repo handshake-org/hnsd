@@ -21,7 +21,10 @@
  */
 
 static int32_t
-hsk_chain_init_genesis(hsk_chain_t *chain);
+hsk_chain_init_genesis(hsk_chain_t *);
+
+static int32_t
+hsk_chain_insert(hsk_chain_t *, hsk_header_t *, hsk_header_t *);
 
 /*
  * Helpers
@@ -141,6 +144,54 @@ hsk_chain_log(hsk_chain_t *chain, const char *fmt, ...) {
   va_start(args, fmt);
   vprintf(fmt, args);
   va_end(args);
+}
+
+bool
+hsk_chain_has(hsk_chain_t *chain, uint8_t *hash) {
+  return hsk_map_has(&chain->hashes, hash);
+}
+
+hsk_header_t *
+hsk_chain_get(hsk_chain_t *chain, uint8_t *hash) {
+  return hsk_map_get(&chain->hashes, hash);
+}
+
+hsk_header_t *
+hsk_chain_get_by_height(hsk_chain_t *chain, int32_t height) {
+  return hsk_map_get(&chain->heights, &height);
+}
+
+bool
+hsk_chain_has_orphan(hsk_chain_t *chain, uint8_t *hash) {
+  return hsk_map_has(&chain->orphans, hash);
+}
+
+hsk_header_t *
+hsk_chain_get_orphan(hsk_chain_t *chain, uint8_t *hash) {
+  return hsk_map_get(&chain->orphans, hash);
+}
+
+bool
+hsk_chain_has_next(hsk_chain_t *chain, uint8_t *hash) {
+  return hsk_map_has(&chain->prevs, hash);
+}
+
+hsk_header_t *
+hsk_chain_get_next(hsk_chain_t *chain, uint8_t *hash) {
+  return hsk_map_get(&chain->prevs, hash);
+}
+
+hsk_header_t *
+hsk_chain_get_ancestor(hsk_chain_t *chain, hsk_header_t *hdr, int32_t height) {
+  assert(height >= 0);
+  assert(height <= hdr->height);
+
+  while (hdr->height != height) {
+    hdr = (hsk_header_t *)hsk_map_get(&chain->heights, &height);
+    assert(hdr);
+  }
+
+  return hdr;
 }
 
 static bool
@@ -459,7 +510,7 @@ hsk_chain_add(hsk_chain_t *chain, hsk_header_t *h) {
   rc = hsk_header_verify_pow(hdr);
 
   if (rc != HSK_SUCCESS) {
-    hsk_chain_log(chain, "  rejected: cuckoo error %d\n", rc);
+    hsk_chain_log(chain, "  rejected: pow error %d\n", rc);
     goto fail;
   }
 
@@ -486,15 +537,53 @@ hsk_chain_add(hsk_chain_t *chain, hsk_header_t *h) {
       hsk_map_clear(&chain->orphans);
     }
 
-    return HSK_SUCCESS;
+    return HSK_EORPHAN;
   }
 
+  rc = hsk_chain_insert(chain, hdr, prev);
+
+  if (rc != HSK_SUCCESS)
+    goto fail;
+
+  for (;;) {
+    prev = hdr;
+    hdr = hsk_chain_get_next(chain, hash);
+
+    if (!hdr)
+      break;
+
+    hash = hsk_header_cache(hdr);
+
+    hsk_map_del(&chain->prevs, hdr->prev_block);
+    hsk_map_del(&chain->orphans, hash);
+
+    rc = hsk_chain_insert(chain, hdr, prev);
+
+    hsk_chain_log(chain, "resolved orphan: %s\n", hsk_hex_encode32(hash));
+
+    if (rc != HSK_SUCCESS) {
+      free(hdr);
+      return rc;
+    }
+  }
+
+  return rc;
+
+fail:
+  if (hdr)
+    free(hdr);
+
+  return rc;
+}
+
+static int32_t
+hsk_chain_insert(hsk_chain_t *chain, hsk_header_t *hdr, hsk_header_t *prev) {
+  uint8_t *hash = hsk_header_cache(hdr);
   int64_t mtp = hsk_chain_get_mtp(chain, prev);
 
   if ((int64_t)hdr->time <= mtp) {
     hsk_chain_log(chain, "  rejected: time-too-old\n");
-    rc = HSK_ETIMETOOOLD;
-    goto fail;
+    return HSK_ETIMETOOOLD;
   }
 
   uint32_t bits = hsk_chain_get_target(chain, hdr->time, prev);
@@ -503,8 +592,7 @@ hsk_chain_add(hsk_chain_t *chain, hsk_header_t *h) {
     hsk_chain_log(chain,
       "  rejected: bad-diffbits: %x != %x\n",
       hdr->bits, bits);
-    rc = HSK_EBADDIFFBITS;
-    goto fail;
+    return HSK_EBADDIFFBITS;
   }
 
   hdr->height = prev->height + 1;
@@ -513,8 +601,7 @@ hsk_chain_add(hsk_chain_t *chain, hsk_header_t *h) {
 
   if (memcmp(hdr->work, chain->tip->work, 32) <= 0) {
     if (!hsk_map_set(&chain->hashes, hash, (void *)hdr)) {
-      rc = HSK_ENOMEM;
-      goto fail;
+      return HSK_ENOMEM;
     }
     hsk_chain_log(chain, "  stored on alternate chain\n");
   } else {
@@ -524,14 +611,12 @@ hsk_chain_add(hsk_chain_t *chain, hsk_header_t *h) {
     }
 
     if (!hsk_map_set(&chain->hashes, hash, (void *)hdr)) {
-      rc = HSK_ENOMEM;
-      goto fail;
+      return HSK_ENOMEM;
     }
 
     if (!hsk_map_set(&chain->heights, &hdr->height, (void *)hdr)) {
       hsk_map_del(&chain->hashes, hash);
-      rc = HSK_ENOMEM;
-      goto fail;
+      return HSK_ENOMEM;
     }
 
     chain->height = hdr->height;
@@ -543,11 +628,5 @@ hsk_chain_add(hsk_chain_t *chain, hsk_header_t *h) {
     hsk_chain_maybe_sync(chain);
   }
 
-  return rc;
-
-fail:
-  if (hdr)
-    free(hdr);
-
-  return rc;
+  return HSK_SUCCESS;
 }
