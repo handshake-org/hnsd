@@ -110,8 +110,8 @@ hsk_pool_init(hsk_pool_t *pool, uv_loop_t *loop) {
     return HSK_EBADARGS;
 
   pool->loop = loop;
-  hsk_chain_init(&pool->chain);
   hsk_timedata_init(&pool->td);
+  hsk_chain_init(&pool->chain, &pool->td);
   hsk_addrman_init(&pool->am, &pool->td);
   pool->peer_id = 0;
   hsk_map_init_map(&pool->peers, hsk_addr_hash, hsk_addr_equal, NULL);
@@ -973,7 +973,7 @@ hsk_peer_send_version(hsk_peer_t *peer, hsk_version_msg_t *theirs) {
 
   msg.version = HSK_PROTO_VERSION;
   msg.services = HSK_SERVICES;
-  msg.time = hsk_now();
+  msg.time = hsk_timedata_now(&pool->td);
 
   if (theirs) {
     msg.remote.time = theirs->time;

@@ -12,6 +12,7 @@
 #include "hsk-header.h"
 #include "hsk-map.h"
 #include "hsk-msg.h"
+#include "hsk-timedata.h"
 #include "bn.h"
 #include "utils.h"
 
@@ -45,13 +46,15 @@ qsort_cmp(const void *a, const void *b) {
  */
 
 int32_t
-hsk_chain_init(hsk_chain_t *chain) {
-  if (!chain)
+hsk_chain_init(hsk_chain_t *chain, hsk_timedata_t *td) {
+  if (!chain || !td)
     return HSK_EBADARGS;
 
   chain->height = 0;
   chain->tip = NULL;
   chain->genesis = NULL;
+  chain->synced = false;
+  chain->td = td;
 
   hsk_map_init_hash_map(&chain->hashes, free);
   hsk_map_init_int_map(&chain->heights, NULL);
@@ -107,13 +110,13 @@ hsk_chain_uninit(hsk_chain_t *chain) {
 }
 
 hsk_chain_t *
-hsk_chain_alloc(void) {
+hsk_chain_alloc(hsk_timedata_t *td) {
   hsk_chain_t *chain = malloc(sizeof(hsk_chain_t));
 
   if (!chain)
     return NULL;
 
-  if (hsk_chain_init(chain) != HSK_SUCCESS) {
+  if (hsk_chain_init(chain, td) != HSK_SUCCESS) {
     free(chain);
     return NULL;
   }
@@ -155,7 +158,10 @@ hsk_chain_maybe_sync(hsk_chain_t *chain) {
       return;
   }
 
-  if (((int64_t)chain->tip->time) < hsk_now() - HSK_MAX_TIP_AGE)
+  // XXX no adjtime in bcoin?
+  int64_t now = hsk_timedata_now(chain->td);
+
+  if (((int64_t)chain->tip->time) < now - HSK_MAX_TIP_AGE)
     return;
 
   if (!hsk_chain_has_work(chain))
@@ -430,7 +436,9 @@ hsk_chain_add(hsk_chain_t *chain, hsk_header_t *h) {
 
   hsk_chain_log(chain, "adding block: %s\n", hsk_hex_encode32(hash));
 
-  if (hdr->time > hsk_now() + 2 * 60 * 60) {
+  int64_t now = hsk_timedata_now(chain->td);
+
+  if (hdr->time > now + 2 * 60 * 60) {
     hsk_chain_log(chain, "  rejected: time-too-new\n");
     rc = HSK_ETIMETOONEW;
     goto fail;
@@ -474,8 +482,8 @@ hsk_chain_add(hsk_chain_t *chain, hsk_header_t *h) {
 
     if (chain->orphans.size > 10000) {
       hsk_chain_log(chain, "clearing orphans: %d\n", chain->orphans.size);
-      hsk_map_clear(&chain->orphans);
       hsk_map_clear(&chain->prevs);
+      hsk_map_clear(&chain->orphans);
     }
 
     return HSK_SUCCESS;
