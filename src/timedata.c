@@ -2,7 +2,9 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <string.h>
+#include <stdarg.h>
 
+#include "hsk-addr.h"
 #include "hsk-error.h"
 #include "hsk-map.h"
 #include "hsk-timedata.h"
@@ -15,7 +17,7 @@ hsk_timedata_init(hsk_timedata_t *td) {
 
   td->sample_len = 0;
   memset(td->samples, 0, sizeof(int64_t) * HSK_TIMEDATA_LIMIT);
-  hsk_map_init_str_map(&td->known, free);
+  hsk_map_init_map(&td->known, hsk_addr_hash, hsk_addr_equal, free);
   td->offset = 0;
   td->checked = false;
 
@@ -44,6 +46,16 @@ hsk_timedata_free(hsk_timedata_t *td) {
 
   hsk_timedata_uninit(td);
   free(td);
+}
+
+static void
+hsk_timedata_log(hsk_timedata_t *td, const char *fmt, ...) {
+  printf("timedata: ");
+
+  va_list args;
+  va_start(args, fmt);
+  vprintf(fmt, args);
+  va_end(args);
 }
 
 static void
@@ -81,20 +93,20 @@ hsk_timedata_insert(hsk_timedata_t *td, int64_t sample) {
 }
 
 int32_t
-hsk_timedata_add(hsk_timedata_t *td, char *id, int64_t time) {
+hsk_timedata_add(hsk_timedata_t *td, hsk_addr_t *addr, int64_t time) {
   if (td->sample_len >= HSK_TIMEDATA_LIMIT)
     return HSK_SUCCESS;
 
-  if (hsk_map_has(&td->known, id))
+  if (hsk_map_has(&td->known, addr))
     return HSK_SUCCESS;
 
-  char *str = strdup(id);
+  hsk_addr_t *id = hsk_addr_clone(addr);
 
-  if (!str)
+  if (!id)
     return HSK_ENOMEM;
 
-  if (!hsk_map_set(&td->known, (void *)str, (void *)str)) {
-    free(str);
+  if (!hsk_map_set(&td->known, (void *)id, (void *)id)) {
+    free(id);
     return HSK_ENOMEM;
   }
 
@@ -127,7 +139,7 @@ hsk_timedata_add(hsk_timedata_t *td, char *id, int64_t time) {
 
         if (!match) {
           td->checked = true;
-          // MISMATCH
+          hsk_timedata_log(td, "WARNING: timing mismatch!");
         }
       }
 
@@ -135,7 +147,10 @@ hsk_timedata_add(hsk_timedata_t *td, char *id, int64_t time) {
     }
 
     td->offset = median;
-    // new offset
+
+    hsk_timedata_log(td, "added new time sample\n");
+    hsk_timedata_log(td, "  new adjusted time: %d\n", hsk_timedata_now(td));
+    hsk_timedata_log(td, "  offset: %d\n", td->offset);
   }
 
   return HSK_SUCCESS;

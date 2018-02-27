@@ -32,7 +32,7 @@ typedef struct hsk_banned_t {
 typedef struct hsk_addrman_s {
   hsk_timedata_t *td;
   size_t size;
-  hsk_addrentry_t **addrs;
+  hsk_addrentry_t *addrs;
   hsk_map_t map;
   hsk_map_t banned;
 } hsk_addrman_t;

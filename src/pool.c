@@ -9,6 +9,7 @@
 
 #include "uv.h"
 
+#include "hsk-addr.h"
 #include "hsk-chain.h"
 #include "hsk-hash.h"
 #include "hsk-header.h"
@@ -18,6 +19,8 @@
 #include "hsk-constants.h"
 #include "hsk-map.h"
 #include "hsk-msg.h"
+#include "hsk-timedata.h"
+#include "hsk-addrmgr.h"
 #include "utils.h"
 #include "bn.h"
 #include "pool.h"
@@ -50,7 +53,7 @@ static void
 hsk_peer_push(hsk_peer_t *);
 
 static int32_t
-hsk_peer_open(hsk_peer_t *, struct sockaddr *);
+hsk_peer_open(hsk_peer_t *, hsk_addr_t *addr);
 
 static int32_t
 hsk_peer_close(hsk_peer_t *);
@@ -108,7 +111,10 @@ hsk_pool_init(hsk_pool_t *pool, uv_loop_t *loop) {
 
   pool->loop = loop;
   hsk_chain_init(&pool->chain);
+  hsk_timedata_init(&pool->td);
+  hsk_addrman_init(&pool->am, &pool->td);
   pool->peer_id = 0;
+  hsk_map_init_map(&pool->peers, hsk_addr_hash, hsk_addr_equal, NULL);
   pool->head = NULL;
   pool->tail = NULL;
   pool->size = 0;
@@ -141,6 +147,9 @@ hsk_pool_uninit(hsk_pool_t *pool) {
   pool->pending_count = 0;
 
   hsk_chain_uninit(&pool->chain);
+  hsk_timedata_uninit(&pool->td);
+  hsk_addrman_uninit(&pool->am);
+  hsk_map_uninit(&pool->peers);
 }
 
 hsk_pool_t *
@@ -218,26 +227,33 @@ hsk_pool_log(hsk_pool_t *pool, const char *fmt, ...) {
   va_end(args);
 }
 
-static void
-hsk_pool_getaddr(hsk_pool_t *pool, struct sockaddr *addr) {
-  assert(hsk_string2inet("127.0.0.1", addr, HSK_PORT));
+static bool
+hsk_pool_getaddr(hsk_pool_t *pool, hsk_addr_t *addr) {
+  return hsk_addrman_pick_addr(&pool->am, &pool->peers, addr);
 }
 
 static int32_t
 hsk_pool_refill(hsk_pool_t *pool) {
   while (pool->size < HSK_POOL_SIZE) {
     hsk_peer_t *peer = hsk_peer_alloc(pool);
-    hsk_peer_push(peer);
 
-    struct sockaddr_storage addr;
-    hsk_pool_getaddr(pool, (struct sockaddr *)&addr);
+    hsk_addr_t addr;
 
-    int32_t rc = hsk_peer_open(peer, (struct sockaddr *)&addr);
+    if (!hsk_pool_getaddr(pool, &addr)) {
+      hsk_pool_log(pool, "could not find suitable addr\n");
+      break;
+    }
+
+    hsk_addrman_mark_attempt(&pool->am, &addr);
+
+    int32_t rc = hsk_peer_open(peer, &addr);
 
     if (rc != HSK_SUCCESS) {
       hsk_peer_destroy(peer);
       return rc;
     }
+
+    hsk_peer_push(peer);
   }
 
   return HSK_SUCCESS;
@@ -265,6 +281,9 @@ hsk_pool_pick_prover(hsk_pool_t *pool, uint8_t *name_hash) {
 
     total += 1;
   }
+
+  if (total == 0)
+    return NULL;
 
   int32_t i = name_hash[0] % total;
   int32_t r = hsk_random() % total;
@@ -613,9 +632,7 @@ hsk_peer_init(hsk_peer_t *peer, hsk_pool_t *pool) {
   peer->loop = pool->loop;
   peer->id = pool->peer_id++;
   memset(peer->host, 0, sizeof(peer->host));
-  peer->family = AF_INET;
-  memset(peer->ip, 0, 16);
-  peer->port = 0;
+  hsk_addr_init(&peer->addr);
   peer->state = HSK_STATE_DISCONNECTED;
   memset(peer->read_buffer, 0, HSK_BUFFER_SIZE);
   peer->headers = 0;
@@ -692,7 +709,8 @@ hsk_peer_free(hsk_peer_t *peer) {
 }
 
 static int32_t
-hsk_peer_open(hsk_peer_t *peer, struct sockaddr *addr) {
+hsk_peer_open(hsk_peer_t *peer, hsk_addr_t *addr) {
+  assert(peer && addr);
   assert(peer->pool && peer->loop && peer->state == HSK_STATE_DISCONNECTED);
 
   hsk_pool_t *pool = (hsk_pool_t *)peer->pool;
@@ -703,10 +721,9 @@ hsk_peer_open(hsk_peer_t *peer, struct sockaddr *addr) {
 
   peer->socket.data = (void *)peer;
 
-  if (!hsk_get_inet(addr, &peer->family, peer->ip, &peer->port))
-    return HSK_EBADARGS;
+  hsk_addr_copy(&peer->addr, addr);
 
-  if (!hsk_inet2string(addr, peer->host, sizeof(peer->host) - 1, HSK_PORT))
+  if (!hsk_addr_to_string(addr, peer->host, sizeof(peer->host) - 1, HSK_PORT))
     return HSK_EBADARGS;
 
   uv_connect_t *conn = malloc(sizeof(uv_connect_t));
@@ -714,7 +731,12 @@ hsk_peer_open(hsk_peer_t *peer, struct sockaddr *addr) {
   if (!conn)
     return HSK_ENOMEM;
 
-  if (uv_tcp_connect(conn, &peer->socket, addr, on_connect) != 0) {
+  struct sockaddr_storage ss;
+  struct sockaddr *sa = (struct sockaddr *)&ss;
+
+  assert(hsk_addr_to_sa(addr, sa));
+
+  if (uv_tcp_connect(conn, &peer->socket, sa, on_connect) != 0) {
     free(conn);
     return HSK_EFAILURE;
   }
@@ -737,7 +759,9 @@ hsk_peer_close(hsk_peer_t *peer) {
       hsk_peer_log(peer, "closing peer\n");
       break;
     case HSK_STATE_DISCONNECTED:
-      assert(false);
+      hsk_peer_log(peer, "closed peer\n");
+      hsk_peer_remove(peer);
+      hsk_peer_free(peer);
       break;
     default:
       assert(false);
@@ -784,6 +808,9 @@ hsk_peer_push(hsk_peer_t *peer) {
 
   pool->tail = peer;
   pool->size += 1;
+
+  assert(!hsk_map_has(&pool->peers, &peer->addr));
+  hsk_map_set(&pool->peers, &peer->addr, peer);
 }
 
 static void
@@ -802,6 +829,7 @@ hsk_peer_remove(hsk_peer_t *peer) {
     pool->head = peer->next;
     peer->next = NULL;
     pool->size -= 1;
+    assert(hsk_map_del(&pool->peers, &peer->addr));
     return;
   }
 
@@ -822,6 +850,8 @@ hsk_peer_remove(hsk_peer_t *peer) {
   prev->next = peer->next;
 
   pool->size -= 1;
+
+  assert(hsk_map_del(&pool->peers, &peer->addr));
 }
 
 static int32_t
@@ -951,8 +981,8 @@ hsk_peer_send_version(hsk_peer_t *peer, hsk_version_msg_t *theirs) {
   }
 
   msg.remote.type = 0;
-  memcpy(msg.remote.addr, peer->ip, 16);
-  msg.remote.port = peer->port;
+  memcpy(msg.remote.addr, peer->addr.ip, 16);
+  msg.remote.port = peer->addr.port;
   msg.nonce = hsk_nonce();
   strcpy(msg.agent, HSK_USER_AGENT);
   msg.height = pool->chain.height;
@@ -1021,22 +1051,29 @@ hsk_peer_send_getproof(hsk_peer_t *peer, uint8_t *name_hash, uint8_t *root) {
 
 static int32_t
 hsk_peer_handle_version(hsk_peer_t *peer, hsk_version_msg_t *msg) {
+  hsk_pool_t *pool = (hsk_pool_t *)peer->pool;
+
+  hsk_peer_log(peer, "received version: %s (%d)\n", msg->agent, msg->height);
+  peer->height = msg->height;
+
+  hsk_timedata_add(&pool->td, &peer->addr, msg->time);
+  hsk_addrman_mark_ack(&pool->am, &peer->addr, msg->services);
+
   int32_t rc = hsk_peer_send_verack(peer);
 
   if (rc != HSK_SUCCESS)
     return rc;
-
-  hsk_peer_log(peer, "received version: %s (%d)\n", msg->agent, msg->height);
-  peer->height = msg->height;
 
   return hsk_peer_send_version(peer, msg);
 }
 
 static int32_t
 hsk_peer_handle_verack(hsk_peer_t *peer, hsk_verack_msg_t *msg) {
-  int32_t rc = hsk_peer_send_sendheaders(peer);
+  hsk_pool_t *pool = (hsk_pool_t *)peer->pool;
 
   peer->version_time = 0;
+
+  int32_t rc = hsk_peer_send_sendheaders(peer);
 
   if (rc != HSK_SUCCESS)
     return rc;
@@ -1425,6 +1462,7 @@ on_connect(uv_connect_t *conn, int32_t status) {
     return;
   }
 
+  hsk_addrman_mark_success(&pool->am, &peer->addr);
   peer->state = HSK_STATE_READING;
   peer->conn_time = hsk_now();
 }

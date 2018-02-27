@@ -6,9 +6,12 @@
 #include <stdbool.h>
 #include "uv.h"
 
+#include "hsk-addr.h"
 #include "hsk-chain.h"
 #include "hsk-header.h"
 #include "hsk-map.h"
+#include "hsk-timedata.h"
+#include "hsk-addrmgr.h"
 
 /*
  * Defs
@@ -52,8 +55,7 @@ typedef struct hsk_peer_s {
   uv_tcp_t socket;
   uint64_t id;
   char host[60];
-  int32_t family;
-  uint8_t ip[16];
+  hsk_addr_t addr;
   uint16_t port;
   int32_t state;
   uint8_t read_buffer[HSK_BUFFER_SIZE];
@@ -83,8 +85,11 @@ typedef struct hsk_peer_s {
 typedef struct hsk_pool_s {
   uv_loop_t *loop;
   hsk_chain_t chain;
+  hsk_timedata_t td;
+  hsk_addrman_t am;
   uv_timer_t timer;
   uint64_t peer_id;
+  hsk_map_t peers;
   hsk_peer_t *head;
   hsk_peer_t *tail;
   int32_t size;
