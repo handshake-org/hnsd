@@ -5,10 +5,9 @@
 #include <stdint.h>
 #include <stdbool.h>
 
+#include "hsk-ec.h"
 #include "unbound.h"
 #include "uv.h"
-
-#include "ec.h"
 
 /*
  * Types

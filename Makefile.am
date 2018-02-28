@@ -20,9 +20,11 @@ include_HEADERS = include/hsk.h           \
                   include/hsk-chain.h     \
                   include/hsk-constants.h \
                   include/hsk-cuckoo.h    \
+                  include/hsk-ec.h        \
                   include/hsk-error.h     \
                   include/hsk-hash.h      \
                   include/hsk-header.h    \
+                  include/hsk-hsig.h      \
                   include/hsk-list.h      \
                   include/hsk-map.h       \
                   include/hsk-proof.h     \
@@ -33,7 +35,6 @@ CLEANFILES =
 
 lib_LTLIBRARIES = libhsk.la
 
-# libhsk_la_LIBADD = -luv -lldns -lssl -lcrypto -lunbound
 libhsk_la_LIBADD = -lssl                                           \
                    -lcrypto                                        \
                    $(top_builddir)/uv/.libs/libuv.la               \
@@ -53,6 +54,7 @@ libhsk_la_SOURCES = src/addr.c     \
                     src/ec.c       \
                     src/hash.c     \
                     src/header.c   \
+                    src/hsig.c     \
                     src/list.c     \
                     src/map.c      \
                     src/msg.c      \

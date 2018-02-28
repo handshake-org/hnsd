@@ -11,9 +11,9 @@
 #include "unbound.h"
 
 #include "hsk-addr.h"
+#include "hsk-ec.h"
 #include "hsk-error.h"
 #include "hsk-constants.h"
-#include "ec.h"
 #include "rs.h"
 #include "utils.h"
 #include "dns.h"

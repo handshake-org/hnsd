@@ -7,8 +7,8 @@
 #include "secp256k1.h"
 #include "secp256k1_recovery.h"
 
+#include "hsk-ec.h"
 #include "hsk-hash.h"
-#include "ec.h"
 
 hsk_ec_t *
 hsk_ec_alloc(void) {

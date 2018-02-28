@@ -12,9 +12,9 @@
 
 #include "hsk-addr.h"
 #include "hsk-constants.h"
+#include "hsk-ec.h"
 #include "hsk-error.h"
 #include "hsk-resource.h"
-#include "ec.h"
 #include "ns.h"
 #include "pool.h"
 
