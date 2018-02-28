@@ -31,8 +31,8 @@ typedef struct {
 typedef struct {
   hsk_rs_t *ns;
   ldns_pkt *req;
-  struct sockaddr addr;
-  char fqdn[256];
+  struct sockaddr_storage ss;
+  struct sockaddr *addr;
 } hsk_dns_req_t;
 
 /*
@@ -373,19 +373,20 @@ hsk_rs_onrecv(
 
   dr->ns = ns;
   dr->req = req;
-  memcpy((void *)&dr->addr, (void *)addr, sizeof(struct sockaddr));
-  strcpy(dr->fqdn, name);
-  free(name);
+  dr->addr = (struct sockaddr *)&dr->ss;
+  hsk_sa_copy(dr->addr, addr);
 
   int32_t r = ub_resolve_async(
     ns->ub,
-    dr->fqdn,
+    name,
     type,
     class,
     (void *)dr,
     after_resolve,
     NULL
   );
+
+  free(name);
 
   if (r != 0) {
     hsk_rs_log(ns, "resolve error: %s\n", ub_strerror(r));
@@ -606,7 +607,7 @@ after_resolve(void *data, int32_t status, struct ub_result *result) {
   if (!dr->ns)
     return;
 
-  hsk_rs_respond(dr->ns, dr->req, status, result, &dr->addr);
+  hsk_rs_respond(dr->ns, dr->req, status, result, dr->addr);
   ldns_pkt_free(dr->req);
   free(dr);
   ub_resolve_free(result);
