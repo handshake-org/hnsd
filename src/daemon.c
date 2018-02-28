@@ -226,6 +226,9 @@ main(int argc, char **argv) {
 
   hsk_ns_set_ip(ns, opt.ns_ip);
 
+  if (opt.identity_key)
+    hsk_ns_set_key(ns, opt.identity_key);
+
   rs = hsk_rs_alloc(loop, opt.ns_host);
 
   if (!rs) {
@@ -233,6 +236,9 @@ main(int argc, char **argv) {
     rc = HSK_ENOMEM;
     goto done;
   }
+
+  if (opt.identity_key)
+    hsk_rs_set_key(rs, opt.identity_key);
 
   rc = hsk_pool_open(pool);
 

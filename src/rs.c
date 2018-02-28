@@ -14,6 +14,7 @@
 #include "hsk-addr.h"
 #include "hsk-error.h"
 #include "hsk-constants.h"
+#include "ec.h"
 #include "rs.h"
 #include "utils.h"
 
@@ -95,11 +96,20 @@ hsk_rs_init(hsk_rs_t *ns, uv_loop_t *loop, struct sockaddr *addr) {
   if (!ns || !loop || !addr)
     return HSK_EBADARGS;
 
+  hsk_ec_t *ec = hsk_ec_alloc();
+
+  if (!ec)
+    return HSK_ENOMEM;
+
   ns->loop = loop;
   ns->ub = NULL;
   ns->socket.data = (void *)ns;
   ns->poll.data = (void *)ns;
-  memset(ns->read_buffer, 0, sizeof ns->read_buffer);
+  ns->ec = ec;
+  ns->key = NULL;
+  memset(ns->_key, 0, sizeof(ns->_key));
+  memset(ns->pubkey, 0, sizeof(ns->pubkey));
+  memset(ns->read_buffer, 0, sizeof(ns->read_buffer));
   ns->bound = false;
   ns->receiving = false;
   ns->polling = false;
@@ -152,6 +162,19 @@ hsk_rs_uninit(hsk_rs_t *ns) {
     ub_ctx_delete(ns->ub);
     ns->ub = NULL;
   }
+}
+
+bool
+hsk_rs_set_key(hsk_rs_t *ns, uint8_t *key) {
+  assert(ns && key);
+
+  if (!hsk_ec_create_pubkey(ns->ec, key, ns->pubkey))
+    return false;
+
+  memcpy(ns->_key, key, 32);
+  ns->key = ns->_key;
+
+  return true;
 }
 
 int32_t

@@ -50,5 +50,5 @@ AC_CHECK_HEADERS([ \
 ])
 
 AC_CONFIG_FILES([Makefile libhsk.pc])
-AC_CONFIG_SUBDIRS([uv ldns unbound])
+AC_CONFIG_SUBDIRS([uv ldns secp256k1 unbound])
 AC_OUTPUT

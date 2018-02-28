@@ -14,6 +14,7 @@
 #include "hsk-constants.h"
 #include "hsk-error.h"
 #include "hsk-resource.h"
+#include "ec.h"
 #include "ns.h"
 #include "pool.h"
 
@@ -88,11 +89,20 @@ hsk_ns_init(hsk_ns_t *ns, uv_loop_t *loop, hsk_pool_t *pool) {
   if (!ns || !pool)
     return HSK_EBADARGS;
 
+  hsk_ec_t *ec = hsk_ec_alloc();
+
+  if (!ec)
+    return HSK_ENOMEM;
+
   ns->loop = loop;
   ns->pool = pool;
   ns->ip = NULL;
   hsk_addr_init(&ns->_ip);
   ns->socket.data = (void *)ns;
+  ns->ec = ec;
+  ns->key = NULL;
+  memset(ns->_key, 0, sizeof(ns->_key));
+  memset(ns->pubkey, 0, sizeof(ns->pubkey));
   memset(ns->read_buffer, 0, sizeof(ns->read_buffer));
   ns->bound = false;
   ns->receiving = false;
@@ -111,6 +121,19 @@ void
 hsk_ns_set_ip(hsk_ns_t *ns, struct sockaddr *addr) {
   if (hsk_addr_from_sa(&ns->_ip, addr))
     ns->ip = &ns->_ip;
+}
+
+bool
+hsk_ns_set_key(hsk_ns_t *ns, uint8_t *key) {
+  assert(ns && key);
+
+  if (!hsk_ec_create_pubkey(ns->ec, key, ns->pubkey))
+    return false;
+
+  memcpy(ns->_key, key, 32);
+  ns->key = ns->_key;
+
+  return true;
 }
 
 int32_t
