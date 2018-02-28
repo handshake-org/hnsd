@@ -27,21 +27,19 @@
 #include "hsk-addr.h"
 
 // Records
-typedef struct _record {
+typedef struct hsk_record_s {
   uint8_t type;
-  struct _record *next;
 } hsk_record_t;
 
-typedef struct {
+typedef struct hsk_target_s {
   uint8_t type;
   uint8_t addr[33];
-  char *name;
+  char name[256];
 } hsk_target_t;
 
 // host(inet4,inet6,onion,onionng,name), canonical, delagate, ns
-typedef struct {
+typedef struct hsk_host_record_s {
   uint8_t type;
-  struct hsk_record_t *next;
   hsk_target_t target;
 } hsk_host_record_t;
 
@@ -54,11 +52,10 @@ typedef hsk_host_record_t hsk_canonical_record_t;
 typedef hsk_host_record_t hsk_delegate_record_t;
 typedef hsk_host_record_t hsk_ns_record_t;
 
-typedef struct {
+typedef struct hsk_service_record_s {
   uint8_t type;
-  struct hsk_record_t *next;
-  char *service;
-  char *protocol;
+  char service[33];
+  char protocol[33];
   uint8_t priority;
   uint8_t weight;
   hsk_target_t target;
@@ -66,19 +63,17 @@ typedef struct {
 } hsk_service_record_t;
 
 // url, email, text
-typedef struct {
+typedef struct hsk_txt_record_s {
   uint8_t type;
-  struct hsk_record_t *next;
-  char *text;
+  char text[256];
 } hsk_txt_record_t;
 
 typedef hsk_txt_record_t hsk_url_record_t;
 typedef hsk_txt_record_t hsk_email_record_t;
 typedef hsk_txt_record_t hsk_text_record_t;
 
-typedef struct {
+typedef struct hsk_location_record_s {
   uint8_t type;
-  struct hsk_record_t *next;
   uint8_t version;
   uint8_t size;
   uint8_t horiz_pre;
@@ -88,90 +83,81 @@ typedef struct {
   uint32_t altitude;
 } hsk_location_record_t;
 
-typedef struct {
+typedef struct hsk_magnet_record_s {
   uint8_t type;
-  struct hsk_record_t *next;
-  char *nid;
+  char nid[33];
   size_t nin_len;
-  uint8_t *nin;
+  uint8_t nin[64];
 } hsk_magnet_record_t;
 
-typedef struct {
+typedef struct hsk_ds_record_s {
   uint8_t type;
-  struct hsk_record_t *next;
   uint16_t key_tag;
   uint8_t algorithm;
   uint8_t digest_type;
   size_t digest_len;
-  uint8_t *digest;
+  uint8_t digest[64];
 } hsk_ds_record_t;
 
-typedef struct {
+typedef struct hsk_tls_record_s {
   uint8_t type;
-  struct hsk_record_t *next;
-  char *protocol;
+  char protocol[33];
   uint16_t port;
   uint8_t usage;
   uint8_t selector;
   uint8_t matching_type;
   size_t certificate_len;
-  uint8_t *certificate;
+  uint8_t certificate[64];
 } hsk_tls_record_t;
 
-typedef struct {
+typedef struct hsk_ssh_record_s {
   uint8_t type;
-  struct hsk_record_t *next;
   uint8_t algorithm;
   uint8_t key_type;
   size_t fingerprint_len;
-  uint8_t *fingerprint;
+  uint8_t fingerprint[64];
 } hsk_ssh_record_t;
 
 typedef hsk_ssh_record_t hsk_pgp_record_t;
 
-typedef struct {
+typedef struct hsk_addr_record_s {
   uint8_t type;
-  struct hsk_record_t *next;
-  char *currency;
-  char *address;
+  char currency[33];
+  char address[256];
   uint8_t ctype;
   bool testnet;
   uint8_t version;
   size_t hash_len;
-  uint8_t *hash;
+  uint8_t hash[64];
 } hsk_addr_record_t;
 
-typedef struct {
+typedef struct hsk_extra_record_s {
   uint8_t type;
-  struct hsk_record_t *next;
   uint8_t rtype;
   size_t data_len;
-  uint8_t *data;
+  uint8_t data[255];
 } hsk_extra_record_t;
 
 // Symbol Table
-typedef struct {
+typedef struct hsk_symbol_table_s {
   char *strings[255];
   uint8_t sizes[255];
   uint8_t size;
 } hsk_symbol_table_t;
 
 // Resource
-typedef struct {
+typedef struct hsk_resource_s {
   uint8_t version;
   uint32_t ttl;
-  hsk_record_t *records;
+  size_t record_count;
+  hsk_record_t *records[255];
 } hsk_resource_t;
 
 void
 hsk_resource_free(hsk_resource_t *res);
 
 bool
-hsk_resource_decode(
-  uint8_t *data,
-  size_t data_len,
-  hsk_resource_t **res
-);
+hsk_resource_decode(uint8_t *data, size_t data_len, hsk_resource_t **res);
 
 hsk_record_t *
 hsk_resource_get(hsk_resource_t *res, uint8_t type);
