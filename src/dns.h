@@ -5,14 +5,12 @@
 #include <stdbool.h>
 #include <stdlib.h>
 
-#define HSK_DNS_RR_HEADER        \
-  uint16_t type;                 \
-  char name[256];                \
-  uint16_t class;                \
-  uint32_t ttl;
-
 typedef struct hsk_dns_rr_s {
-  HSK_DNS_RR_HEADER
+  char name[256];
+  uint16_t type;
+  uint16_t class;
+  uint32_t ttl;
+  void *rd;
 } hsk_dns_rr_t;
 
 typedef hsk_dns_rr_t hsk_dns_qs_t;
@@ -54,13 +52,11 @@ typedef struct hsk_dns_txts_s {
 } hsk_dns_txts_t;
 
 typedef struct {
-  HSK_DNS_RR_HEADER
   size_t rd_len;
   uint8_t *rd;
-} hsk_dns_unknown_rr_t;
+} hsk_dns_unknown_rd_t;
 
 typedef struct {
-  HSK_DNS_RR_HEADER
   char ns[256];
   char mbox[256];
   uint32_t serial;
@@ -68,100 +64,85 @@ typedef struct {
   uint32_t retry;
   uint32_t expire;
   uint32_t minttl;
-} hsk_dns_soa_rr_t;
+} hsk_dns_soa_rd_t;
 
 typedef struct {
-  HSK_DNS_RR_HEADER
   uint8_t addr[4];
-} hsk_dns_a_rr_t;
+} hsk_dns_a_rd_t;
 
 typedef struct {
-  HSK_DNS_RR_HEADER
   uint8_t addr[16];
-} hsk_dns_aaaa_rr_t;
+} hsk_dns_aaaa_rd_t;
 
 typedef struct {
-  HSK_DNS_RR_HEADER
   char target[256];
-} hsk_dns_cname_rr_t;
+} hsk_dns_cname_rd_t;
 
 typedef struct {
-  HSK_DNS_RR_HEADER
   char target[256];
-} hsk_dns_dname_rr_t;
+} hsk_dns_dname_rd_t;
 
 typedef struct {
-  HSK_DNS_RR_HEADER
   char ns[256];
-} hsk_dns_ns_rr_t;
+} hsk_dns_ns_rd_t;
 
 typedef struct {
-  HSK_DNS_RR_HEADER
   uint16_t preference;
   char mx[256];
-} hsk_dns_mx_rr_t;
+} hsk_dns_mx_rd_t;
 
 typedef struct {
-  HSK_DNS_RR_HEADER
   char ptr[256];
-} hsk_dns_ptr_rr_t;
+} hsk_dns_ptr_rd_t;
 
 typedef struct {
-  HSK_DNS_RR_HEADER
   uint16_t priority;
   uint16_t weight;
   uint16_t port;
   char target[256];
-} hsk_dns_srv_rr_t;
+} hsk_dns_srv_rd_t;
 
 typedef struct {
-  HSK_DNS_RR_HEADER
   hsk_dns_txts_t txts;
-} hsk_dns_txt_rr_t;
+} hsk_dns_txt_rd_t;
 
 typedef struct {
-  HSK_DNS_RR_HEADER
   uint16_t key_tag;
   uint8_t algorithm;
   uint8_t digest_type;
   size_t digest_len;
   uint8_t *digest;
-} hsk_dns_ds_rr_t;
+} hsk_dns_ds_rd_t;
 
 typedef struct {
-  HSK_DNS_RR_HEADER
   uint8_t usage;
   uint8_t selector;
   uint8_t matching_type;
   size_t certificate_len;
   uint8_t *certificate;
-} hsk_dns_tlsa_rr_t;
+} hsk_dns_tlsa_rd_t;
 
 typedef struct {
-  HSK_DNS_RR_HEADER
   uint8_t algorithm;
   uint8_t key_type;
   size_t fingerprint_len;
   uint8_t *fingerprint;
-} hsk_dns_sshfp_rr_t;
+} hsk_dns_sshfp_rd_t;
 
 typedef struct {
-  HSK_DNS_RR_HEADER
   size_t rd_len;
   uint8_t *rd;
-} hsk_dns_opt_rr_t;
+} hsk_dns_opt_rd_t;
 
 typedef struct {
-  HSK_DNS_RR_HEADER
   uint16_t flags;
   uint8_t protocol;
   uint8_t algorithm;
   size_t public_key_len;
   uint8_t *public_key;
-} hsk_dns_dnskey_rr_t;
+} hsk_dns_dnskey_rd_t;
 
 typedef struct {
-  HSK_DNS_RR_HEADER
   uint16_t type_covered;
   uint8_t algorithm;
   uint8_t labels;
@@ -172,53 +153,25 @@ typedef struct {
   char signer_name[256];
   size_t signature_len;
   uint8_t *signature;
-} hsk_dns_rrsig_rr_t;
+} hsk_dns_rrsig_rd_t;
 
 typedef struct {
-  HSK_DNS_RR_HEADER
   uint16_t priority;
   uint16_t weight;
   uint8_t data_len;
   uint8_t data[255];
-} hsk_dns_uri_rr_t;
+} hsk_dns_uri_rd_t;
 
 typedef struct {
-  HSK_DNS_RR_HEADER
   char mbox[256];
   char txt[256];
-} hsk_dns_rp_rr_t;
+} hsk_dns_rp_rd_t;
 
 typedef struct {
-  HSK_DNS_RR_HEADER
   char next_domain[256];
   size_t type_map_len;
   uint8_t *type_map;
-} hsk_dns_nsec_rr_t;
-
-typedef struct {
-  union {
-    hsk_dns_unknown_rr_t unknown;
-    hsk_dns_soa_rr_t soa;
-    hsk_dns_a_rr_t a;
-    hsk_dns_aaaa_rr_t aaaa;
-    hsk_dns_cname_rr_t cname;
-    hsk_dns_dname_rr_t dname;
-    hsk_dns_ns_rr_t ns;
-    hsk_dns_mx_rr_t mx;
-    hsk_dns_ptr_rr_t ptr;
-    hsk_dns_srv_rr_t srv;
-    hsk_dns_txt_rr_t txt;
-    hsk_dns_ds_rr_t ds;
-    hsk_dns_tlsa_rr_t tlsa;
-    hsk_dns_sshfp_rr_t sshfp;
-    hsk_dns_opt_rr_t opt;
-    hsk_dns_dnskey_rr_t dnskey;
-    hsk_dns_rrsig_rr_t rrsig;
-    hsk_dns_uri_rr_t uri;
-    hsk_dns_rp_rr_t rp;
-    hsk_dns_nsec_rr_t nsec;
-  };
-} hsk_dns_any_rr_t;
+} hsk_dns_nsec_rd_t;
 
 typedef struct {
   hsk_dns_rrs_t *rrs;
@@ -468,16 +421,13 @@ hsk_dns_qs_read(
 );
 
 void
-hsk_dns_rr_init(hsk_dns_rr_t *rr, uint16_t type);
-
-void
-hsk_dns_rd_init(hsk_dns_rr_t *rr);
-
-hsk_dns_rr_t *
-hsk_dns_rr_alloc(uint16_t type);
+hsk_dns_rr_init(hsk_dns_rr_t *rr);
 
 void
 hsk_dns_rr_uninit(hsk_dns_rr_t *rr);
+
+hsk_dns_rr_t *
+hsk_dns_rr_alloc(void);
 
 void
 hsk_dns_rr_free(hsk_dns_rr_t *rr);
@@ -497,11 +447,23 @@ hsk_dns_rr_read(
   hsk_dns_rr_t *rr
 );
 
-int32_t
-hsk_dns_rd_write(hsk_dns_rr_t *rr, uint8_t **data);
+void
+hsk_dns_rd_init(void *rd, uint16_t type);
+
+void *
+hsk_dns_rd_alloc(uint16_t type);
+
+void
+hsk_dns_rd_uninit(void *rd, uint16_t type);
+
+void
+hsk_dns_rd_free(void *rd, uint16_t type);
 
 int32_t
-hsk_dns_rd_size(hsk_dns_rr_t *rr);
+hsk_dns_rd_write(void *rd, uint16_t type, uint8_t **data);
+
+int32_t
+hsk_dns_rd_size(void *rd, uint16_t type);
 
 bool
 hsk_dns_rd_read(
@@ -509,7 +471,8 @@ hsk_dns_rd_read(
   size_t *data_len,
   uint8_t *pd,
   size_t pd_len,
-  hsk_dns_rr_t *rr
+  void *rd,
+  uint16_t type
 );
 
 void
@@ -555,7 +518,12 @@ void
 hsk_dns_txt_free(hsk_dns_txt_t *txt);
 
 hsk_dns_rr_t *
-hsk_dns_get_rr2(hsk_dns_rrs_t *rrs, char *target, uint8_t type, int32_t *index);
+hsk_dns_get_rr2(
+  hsk_dns_rrs_t *rrs,
+  char *target,
+  uint8_t type,
+  int32_t *index
+);
 
 hsk_dns_rr_t *
 hsk_dns_get_rr(hsk_dns_rrs_t *rrs, char *target, uint8_t type);
