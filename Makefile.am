@@ -27,6 +27,7 @@ include_HEADERS = include/hsk.h           \
                   include/hsk-hsig.h      \
                   include/hsk-list.h      \
                   include/hsk-map.h       \
+                  include/hsk-msg.h       \
                   include/hsk-proof.h     \
                   include/hsk-resource.h  \
                   include/hsk-timedata.h
