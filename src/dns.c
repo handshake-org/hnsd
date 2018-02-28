@@ -33,10 +33,17 @@ hsk_dns_msg_init(hsk_dns_msg_t *msg) {
 void
 hsk_dns_msg_uninit(hsk_dns_msg_t *msg) {
   assert(msg);
+
   hsk_dns_rrs_uninit(&msg->qd);
   hsk_dns_rrs_uninit(&msg->an);
   hsk_dns_rrs_uninit(&msg->ns);
   hsk_dns_rrs_uninit(&msg->ar);
+
+  if (msg->edns.rd) {
+    free(msg->edns.rd);
+    msg->edns.rd_len = 0;
+    msg->edns.rd = NULL;
+  }
 }
 
 hsk_dns_msg_t *
@@ -610,6 +617,13 @@ hsk_dns_rd_init(hsk_dns_rr_t *rr) {
       memset(r->txt, 0, sizeof(r->txt));
       break;
     }
+    case HSK_DNS_NSEC: {
+      hsk_dns_nsec_rr_t *r = (hsk_dns_nsec_rr_t *)rr;
+      memset(r->next_domain, 0, sizeof(r->next_domain));
+      r->type_map_len = 0;
+      r->type_map = NULL;
+      break;
+    }
     default: {
       hsk_dns_unknown_rr_t *r = (hsk_dns_unknown_rr_t *)rr;
       r->rd_len = 0;
@@ -698,6 +712,10 @@ hsk_dns_rr_alloc(uint16_t type) {
     }
     case HSK_DNS_RP: {
       rr = (hsk_dns_rr_t *)malloc(sizeof(hsk_dns_rp_rr_t));
+      break;
+    }
+    case HSK_DNS_NSEC: {
+      rr = (hsk_dns_rr_t *)malloc(sizeof(hsk_dns_nsec_rr_t));
       break;
     }
     default: {
@@ -816,6 +834,14 @@ hsk_dns_rr_uninit(hsk_dns_rr_t *rr) {
     }
     case HSK_DNS_RP: {
       hsk_dns_rp_rr_t *r = (hsk_dns_rp_rr_t *)rr;
+      break;
+    }
+    case HSK_DNS_NSEC: {
+      hsk_dns_nsec_rr_t *r = (hsk_dns_nsec_rr_t *)rr;
+      if (r->type_map) {
+        free(r->type_map);
+        r->type_map = NULL;
+      }
       break;
     }
     default: {
@@ -1063,6 +1089,14 @@ hsk_dns_rd_write(hsk_dns_rr_t *rr, uint8_t **data) {
 
       size += hsk_dns_name_write(r->mbox, data);
       size += hsk_dns_name_write(r->txt, data);
+
+      break;
+    }
+    case HSK_DNS_NSEC: {
+      hsk_dns_nsec_rr_t *r = (hsk_dns_nsec_rr_t *)rr;
+
+      size += hsk_dns_name_write(r->next_domain, data);
+      size += write_bytes(data, r->type_map, r->type_map_len);
 
       break;
     }
@@ -1363,6 +1397,19 @@ fail_txt:
 
       break;
     }
+    case HSK_DNS_NSEC: {
+      hsk_dns_nsec_rr_t *r = (hsk_dns_nsec_rr_t *)rr;
+
+      if (!hsk_dns_name_read(data, data_len, pd, pd_len, r->next_domain))
+        return false;
+
+      r->type_map_len = *data_len;
+
+      if (!alloc_bytes(data, data_len, &r->type_map, *data_len))
+        return false;
+
+      break;
+    }
     default: {
       hsk_dns_unknown_rr_t *r = (hsk_dns_unknown_rr_t *)rr;
 
@@ -1631,11 +1678,11 @@ hsk_dns_name_parse(
         for (j = off; j < off + c; j++) {
           uint8_t b = data[j];
 
-          if (b == 0)
-            return -1;
+          if (b == 0x00)
+            b = 0xff;
 
-          if (b < 0x20 || b > 0x7e)
-            return -1;
+          // if (b < 0x20 || b > 0x7e)
+          //   return -1;
 
           if (noff + 1 > max)
             return -1;
@@ -1737,11 +1784,16 @@ hsk_dns_name_write(char *name, uint8_t **data) {
 
       int32_t j;
       for (j = begin; j < i; j++) {
+        char ch = name[j];
+
         if (off + 1 > 256)
           return off; // fail
 
+        if (ch == 0xff)
+          ch = 0x00;
+
         if (data)
-          (*data)[off] = name[j];
+          (*data)[off] = ch;
 
         off += 1;
       }

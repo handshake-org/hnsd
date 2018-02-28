@@ -388,7 +388,14 @@ hsk_sa_to_string(
 
 void
 hsk_sa_copy(struct sockaddr *sa, struct sockaddr *other) {
-  memcpy((void *)sa, (void *)other, sizeof(struct sockaddr_storage));
+  assert(sa && other);
+
+  size_t size = sizeof(struct sockaddr_in6);
+
+  if (other->sa_family == AF_INET)
+    size = sizeof(struct sockaddr_in);
+
+  memcpy((void *)sa, (void *)other, size);
 }
 
 static inline uint32_t

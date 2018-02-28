@@ -8,7 +8,6 @@
 #include <time.h>
 
 #include "uv.h"
-#include "ldns/ldns.h"
 #include "unbound.h"
 
 #include "hsk-addr.h"
@@ -31,9 +30,9 @@ typedef struct {
 
 typedef struct {
   hsk_rs_t *ns;
-  ldns_pkt *req;
-  struct sockaddr addr;
-  char fqdn[256];
+  hsk_dns_msg_t *msg;
+  struct sockaddr_storage ss;
+  struct sockaddr *addr;
 } hsk_dns_req_t;
 
 /*
@@ -49,7 +48,7 @@ hsk_rs_log(hsk_rs_t *ns, const char *fmt, ...);
 static void
 hsk_rs_respond(
   hsk_rs_t *,
-  ldns_pkt *,
+  hsk_dns_msg_t *,
   int32_t,
   struct ub_result *,
   struct sockaddr *
@@ -313,91 +312,70 @@ hsk_rs_onrecv(
   struct sockaddr *addr,
   uint32_t flags
 ) {
-  ldns_pkt *req;
-  ldns_status rc = ldns_wire2pkt(&req, data, data_len);
+  hsk_dns_msg_t *msg = NULL;
+  hsk_dns_req_t *dr = NULL;
 
-  if (rc != LDNS_STATUS_OK) {
-    hsk_rs_log(ns, "bad dns message: %s\n", ldns_get_errorstr_by_id(rc));
-    return;
+  if (!hsk_dns_msg_decode(data, data_len, &msg)) {
+    hsk_rs_log(ns, "bad dns request\n");
+    goto fail;
   }
 
-  ldns_pkt_opcode opcode = ldns_pkt_get_opcode(req);
-  ldns_pkt_rcode rcode = ldns_pkt_get_rcode(req);
-  ldns_rr_list *qd = ldns_pkt_question(req);
-  ldns_rr_list *an = ldns_pkt_answer(req);
-  ldns_rr_list *ns_ = ldns_pkt_authority(req);
-
-  if (opcode != LDNS_PACKET_QUERY
-      || rcode != LDNS_RCODE_NOERROR
-      || ldns_rr_list_rr_count(qd) != 1
-      || ldns_rr_list_rr_count(an) != 0
-      || ldns_rr_list_rr_count(ns_) != 0) {
-    ldns_pkt_free(req);
-    return;
+  if (msg->opcode != HSK_DNS_QUERY
+      || msg->code != HSK_DNS_NOERROR
+      || msg->qd.size != 1
+      || msg->an.size != 0
+      || msg->ns.size != 0) {
+    goto fail;
   }
 
   // Grab the first question.
-  ldns_rr *qs = ldns_rr_list_rr(qd, 0);
+  hsk_dns_qs_t *qs = hsk_dns_rrs_get(&msg->qd, 0);
 
-  hsk_rs_log(ns, "received recursive dns query:\n");
-  ldns_rr_print(stdout, qs);
+  hsk_rs_log(ns, "received recursive dns query: %s %d\n", qs->name, qs->type);
 
-  uint16_t id = ldns_pkt_id(req);
-  bool edns = ldns_pkt_edns_udp_size(req) == 4096;
-  bool dnssec = ldns_pkt_edns_do(req);
-  const ldns_rdf *rdf = ldns_rr_owner(qs);
-  const ldns_rr_type rrtype = ldns_rr_get_type(qs);
-  const ldns_rr_class rrclass = ldns_rr_get_class(qs);
+  if (qs->class != HSK_DNS_INET)
+    goto fail;
 
-  if (rrclass != LDNS_RR_CLASS_IN) {
-    ldns_pkt_free(req);
-    return;
-  }
+  dr = malloc(sizeof(hsk_dns_req_t));
 
-  char *name = ldns_rdf2str(rdf);
-
-  if (!name) {
-    ldns_pkt_free(req);
-    return;
-  }
-
-  uint16_t type = (uint16_t)rrtype;
-  uint16_t class = (uint16_t)rrclass;
-
-  hsk_dns_req_t *dr = malloc(sizeof(hsk_dns_req_t));
-
-  if (!dr) {
-    free(name);
-    ldns_pkt_free(req);
-    return;
-  }
+  if (!dr)
+    goto fail;
 
   dr->ns = ns;
-  dr->req = req;
-  memcpy((void *)&dr->addr, (void *)addr, sizeof(struct sockaddr));
-  strcpy(dr->fqdn, name);
-  free(name);
+  dr->msg = msg;
+  dr->addr = (struct sockaddr *)&dr->ss;
 
-  int32_t r = ub_resolve_async(
+  hsk_sa_copy(dr->addr, addr);
+
+  int32_t result = ub_resolve_async(
     ns->ub,
-    dr->fqdn,
-    type,
-    class,
+    qs->name,
+    qs->type,
+    qs->class,
     (void *)dr,
     after_resolve,
     NULL
   );
 
-  if (r != 0) {
-    hsk_rs_log(ns, "resolve error: %s\n", ub_strerror(r));
-    return;
+  if (result != 0) {
+    hsk_rs_log(ns, "resolve error: %s\n", ub_strerror(result));
+    goto fail;
   }
+
+  return;
+
+fail:
+  if (msg)
+    hsk_dns_msg_free(msg);
+
+  if (dr)
+    free(dr);
 }
 
 static void
 hsk_rs_respond(
   hsk_rs_t *ns,
-  ldns_pkt *req,
+  hsk_dns_msg_t *req,
   int32_t status,
   struct ub_result *result,
   struct sockaddr *addr
@@ -407,58 +385,47 @@ hsk_rs_respond(
     return;
   }
 
-  uint16_t id = ldns_pkt_id(req);
-  bool edns = ldns_pkt_edns_udp_size(req) == 4096;
-  bool dnssec = ldns_pkt_edns_do(req);
+  uint16_t id = req->id;
+  bool edns = req->edns.size == 4096;
+  bool dnssec = (req->edns.flags & HSK_DNS_DO) != 0;
 
   // result->havedata
   // result->nxdomain
   // result->secure
   // result->bogus
 
-  ldns_pkt *res;
-  ldns_status rc = ldns_wire2pkt(&res, result->answer_packet, result->answer_len);
+  hsk_dns_msg_t *msg;
 
-  if (rc != LDNS_STATUS_OK) {
-    hsk_rs_log(ns, "bad dns message: %s\n", ldns_get_errorstr_by_id(rc));
+  if (!hsk_dns_msg_decode(result->answer_packet, result->answer_len, &msg)) {
+    hsk_rs_log(ns, "bad dns message\n");
     return;
   }
 
-  ldns_pkt_set_id(res, id);
+  msg->id = id;
 
   if (edns) {
-    ldns_pkt_set_edns_udp_size(res, 4096);
+    msg->edns.enabled = true;
+    msg->edns.size = 4096;
     if (dnssec) {
-      ldns_pkt_set_edns_do(res, 1);
+      msg->edns.flags |= HSK_DNS_DO;
       if (result->secure && !result->bogus)
-        ldns_pkt_set_ad(res, 1);
+        msg->flags |= HSK_DNS_AD;
       else
-        ldns_pkt_set_ad(res, 0);
+        msg->flags &= ~HSK_DNS_AD;
     }
   }
 
   uint8_t *wire;
   size_t wire_len;
 
-  ldns_status r = ldns_pkt2wire(&wire, res, &wire_len);
+  if (!hsk_dns_msg_encode(msg, &wire, &wire_len)) {
+    hsk_dns_msg_free(msg);
+    hsk_rs_log(ns, "failed encoding dns message\n");
+    return;
+  }
 
-  ldns_pkt_free(res);
-
-  hsk_dns_msg_t *msg;
-
-  if (!hsk_dns_msg_decode(wire, wire_len, &msg))
-    printf("FAILED\n");
-  else if (!hsk_dns_msg_encode(msg, &wire, &wire_len))
-    printf("FAILED2\n");
-
-  // ldns_pkt_print();
-  if (r == LDNS_STATUS_OK)
-    hsk_rs_send(ns, wire, wire_len, addr, true);
-
-  // if (result->havedata) {
-  //   hsk_rs_log(ns, "The address is %s\n",
-  //     inet_ntoa(*(struct in_addr*)result->data[0]));
-  // }
+  hsk_dns_msg_free(msg);
+  hsk_rs_send(ns, wire, wire_len, addr, true);
 }
 
 static int32_t
@@ -614,8 +581,8 @@ after_resolve(void *data, int32_t status, struct ub_result *result) {
   if (!dr->ns)
     return;
 
-  hsk_rs_respond(dr->ns, dr->req, status, result, &dr->addr);
-  ldns_pkt_free(dr->req);
+  hsk_rs_respond(dr->ns, dr->msg, status, result, dr->addr);
+  hsk_dns_msg_free(dr->msg);
   free(dr);
   ub_resolve_free(result);
 }

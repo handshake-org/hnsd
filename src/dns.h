@@ -189,6 +189,13 @@ typedef struct {
 } hsk_dns_rp_rr_t;
 
 typedef struct {
+  HSK_DNS_RR_HEADER
+  char next_domain[256];
+  size_t type_map_len;
+  uint8_t *type_map;
+} hsk_dns_nsec_rr_t;
+
+typedef struct {
   union {
     hsk_dns_unknown_rr_t unknown;
     hsk_dns_soa_rr_t soa;
@@ -209,6 +216,7 @@ typedef struct {
     hsk_dns_rrsig_rr_t rrsig;
     hsk_dns_uri_rr_t uri;
     hsk_dns_rp_rr_t rp;
+    hsk_dns_nsec_rr_t nsec;
   };
 } hsk_dns_any_rr_t;
 
