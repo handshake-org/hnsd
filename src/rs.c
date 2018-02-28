@@ -17,6 +17,7 @@
 #include "ec.h"
 #include "rs.h"
 #include "utils.h"
+#include "dns.h"
 
 /*
  * Types
@@ -442,6 +443,13 @@ hsk_rs_respond(
   ldns_status r = ldns_pkt2wire(&wire, res, &wire_len);
 
   ldns_pkt_free(res);
+
+  hsk_dns_msg_t *msg;
+
+  if (!hsk_dns_msg_decode(wire, wire_len, &msg))
+    printf("FAILED\n");
+  else if (!hsk_dns_msg_encode(msg, &wire, &wire_len))
+    printf("FAILED2\n");
 
   // ldns_pkt_print();
   if (r == LDNS_STATUS_OK)

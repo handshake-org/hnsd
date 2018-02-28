@@ -3,7 +3,7 @@
 
 #include <stdint.h>
 #include <stdbool.h>
-#include "hsk-list.h"
+#include <stdlib.h>
 
 #define HSK_DNS_RR_HEADER        \
   uint16_t type;                 \
@@ -30,7 +30,7 @@ typedef struct hsk_dns_msg_s {
   hsk_dns_rrs_t qd;
   hsk_dns_rrs_t an;
   hsk_dns_rrs_t ns;
-  hsk_dns_rrs_t ad;
+  hsk_dns_rrs_t ar;
   struct {
     bool enabled;
     uint8_t version;
@@ -44,7 +44,7 @@ typedef struct hsk_dns_msg_s {
 } hsk_dns_msg_t;
 
 typedef struct hsk_dns_txt_s {
-  size_t data_len;
+  uint8_t data_len;
   uint8_t data[255];
 } hsk_dns_txt_t;
 
@@ -140,7 +140,7 @@ typedef struct {
 typedef struct {
   HSK_DNS_RR_HEADER
   uint8_t algorithm;
-  uint8_t type;
+  uint8_t key_type;
   size_t fingerprint_len;
   uint8_t *fingerprint;
 } hsk_dns_sshfp_rr_t;
@@ -178,7 +178,7 @@ typedef struct {
   HSK_DNS_RR_HEADER
   uint16_t priority;
   uint16_t weight;
-  size_t data_len;
+  uint8_t data_len;
   uint8_t data[255];
 } hsk_dns_uri_rr_t;
 
@@ -187,6 +187,30 @@ typedef struct {
   char mbox[256];
   char txt[256];
 } hsk_dns_rp_rr_t;
+
+typedef struct {
+  union {
+    hsk_dns_unknown_rr_t unknown;
+    hsk_dns_soa_rr_t soa;
+    hsk_dns_a_rr_t a;
+    hsk_dns_aaaa_rr_t aaaa;
+    hsk_dns_cname_rr_t cname;
+    hsk_dns_dname_rr_t dname;
+    hsk_dns_ns_rr_t ns;
+    hsk_dns_mx_rr_t mx;
+    hsk_dns_ptr_rr_t ptr;
+    hsk_dns_srv_rr_t srv;
+    hsk_dns_txt_rr_t txt;
+    hsk_dns_ds_rr_t ds;
+    hsk_dns_tlsa_rr_t tlsa;
+    hsk_dns_sshfp_rr_t sshfp;
+    hsk_dns_opt_rr_t opt;
+    hsk_dns_dnskey_rr_t dnskey;
+    hsk_dns_rrsig_rr_t rrsig;
+    hsk_dns_uri_rr_t uri;
+    hsk_dns_rp_rr_t rp;
+  };
+} hsk_dns_any_rr_t;
 
 typedef struct {
   hsk_dns_rrs_t *rrs;
@@ -350,4 +374,263 @@ typedef struct {
 #define HSK_DNS_PADDING 12 // Padding
 #define HSK_DNS_LOCALSTART 65001 // Beginning of range reserved for local/experimental use
 #define HSK_DNS_LOCALEND 65534 // End of range reserved for local/experimental use
+
+void
+hsk_dns_msg_init(hsk_dns_msg_t *msg);
+
+void
+hsk_dns_msg_uninit(hsk_dns_msg_t *msg);
+
+hsk_dns_msg_t *
+hsk_dns_msg_alloc(void);
+
+void
+hsk_dns_msg_free(hsk_dns_msg_t *msg);
+
+bool
+hsk_dns_msg_decode(uint8_t *data, size_t data_len, hsk_dns_msg_t **msg);
+
+int32_t
+hsk_dns_msg_write(hsk_dns_msg_t *msg, uint8_t **data);
+
+int32_t
+hsk_dns_msg_size(hsk_dns_msg_t *msg);
+
+bool
+hsk_dns_msg_encode(hsk_dns_msg_t *msg, uint8_t **data, size_t *data_len);
+
+bool
+hsk_dns_msg_read(uint8_t **data, size_t *data_len, hsk_dns_msg_t *msg);
+
+void
+hsk_dns_rrs_init(hsk_dns_rrs_t *rrs);
+
+void
+hsk_dns_rrs_uninit(hsk_dns_rrs_t *rrs);
+
+hsk_dns_rrs_t *
+hsk_dns_rrs_alloc(void);
+
+void
+hsk_dns_rrs_free(hsk_dns_rrs_t *rrs);
+
+size_t
+hsk_dns_rrs_unshift(hsk_dns_rrs_t *rrs, hsk_dns_rr_t *rr);
+
+hsk_dns_rr_t *
+hsk_dns_rrs_shift(hsk_dns_rrs_t *rrs);
+
+size_t
+hsk_dns_rrs_push(hsk_dns_rrs_t *rrs, hsk_dns_rr_t *rr);
+
+hsk_dns_rr_t *
+hsk_dns_rrs_pop(hsk_dns_rrs_t *rrs);
+
+hsk_dns_rr_t *
+hsk_dns_rrs_get(hsk_dns_rrs_t *rrs, int32_t index);
+
+size_t
+hsk_dns_rrs_set(hsk_dns_rrs_t *rrs, int32_t index, hsk_dns_rr_t *rr);
+
+void
+hsk_dns_qs_init(hsk_dns_qs_t *qs);
+
+void
+hsk_dns_qs_uninit(hsk_dns_qs_t *qs);
+
+hsk_dns_qs_t *
+hsk_dns_qs_alloc(void);
+
+void
+hsk_dns_qs_free(hsk_dns_qs_t *qs);
+
+void
+hsk_dns_qs_set(hsk_dns_qs_t *qs, char *name, uint16_t type);
+
+int32_t
+hsk_dns_qs_write(hsk_dns_qs_t *qs, uint8_t **data);
+
+bool
+hsk_dns_qs_read(
+  uint8_t **data,
+  size_t *data_len,
+  uint8_t *pd,
+  size_t pd_len,
+  hsk_dns_qs_t *qs
+);
+
+void
+hsk_dns_rr_init(hsk_dns_rr_t *rr, uint16_t type);
+
+void
+hsk_dns_rd_init(hsk_dns_rr_t *rr);
+
+hsk_dns_rr_t *
+hsk_dns_rr_alloc(uint16_t type);
+
+void
+hsk_dns_rr_uninit(hsk_dns_rr_t *rr);
+
+void
+hsk_dns_rr_free(hsk_dns_rr_t *rr);
+
+void
+hsk_dns_rr_set_name(hsk_dns_rr_t *rr, char *name);
+
+int32_t
+hsk_dns_rr_write(hsk_dns_rr_t *rr, uint8_t **data);
+
+bool
+hsk_dns_rr_read(
+  uint8_t **data,
+  size_t *data_len,
+  uint8_t *pd,
+  size_t pd_len,
+  hsk_dns_rr_t *rr
+);
+
+int32_t
+hsk_dns_rd_write(hsk_dns_rr_t *rr, uint8_t **data);
+
+int32_t
+hsk_dns_rd_size(hsk_dns_rr_t *rr);
+
+bool
+hsk_dns_rd_read(
+  uint8_t **data,
+  size_t *data_len,
+  uint8_t *pd,
+  size_t pd_len,
+  hsk_dns_rr_t *rr
+);
+
+void
+hsk_dns_txts_init(hsk_dns_txts_t *txts);
+
+void
+hsk_dns_txts_uninit(hsk_dns_txts_t *txts);
+
+hsk_dns_txts_t *
+hsk_dns_txts_alloc(void);
+
+void
+hsk_dns_txts_free(hsk_dns_txts_t *txts);
+
+size_t
+hsk_dns_txts_unshift(hsk_dns_txts_t *txts, hsk_dns_txt_t *txt);
+
+hsk_dns_txt_t *
+hsk_dns_txts_shift(hsk_dns_txts_t *txts);
+
+size_t
+hsk_dns_txts_push(hsk_dns_txts_t *txts, hsk_dns_txt_t *txt);
+
+hsk_dns_txt_t *
+hsk_dns_txts_pop(hsk_dns_txts_t *txts);
+
+hsk_dns_txt_t *
+hsk_dns_txts_get(hsk_dns_txts_t *txts, int32_t index);
+
+size_t
+hsk_dns_txts_set(hsk_dns_txts_t *txts, int32_t index, hsk_dns_txt_t *txt);
+
+void
+hsk_dns_txt_init(hsk_dns_txt_t *txt);
+
+void
+hsk_dns_txt_uninit(hsk_dns_txt_t *txt);
+
+hsk_dns_txt_t *
+hsk_dns_txt_alloc(void);
+
+void
+hsk_dns_txt_free(hsk_dns_txt_t *txt);
+
+hsk_dns_rr_t *
+hsk_dns_get_rr2(hsk_dns_rrs_t *rrs, char *target, uint8_t type, int32_t *index);
+
+hsk_dns_rr_t *
+hsk_dns_get_rr(hsk_dns_rrs_t *rrs, char *target, uint8_t type);
+
+int32_t
+hsk_dns_name_parse(
+  uint8_t **data_,
+  size_t *data_len_,
+  uint8_t *pd,
+  size_t pd_len,
+  char *name
+);
+
+int32_t
+hsk_dns_name_write(char *name, uint8_t **data);
+
+bool
+hsk_dns_name_read(
+  uint8_t **data,
+  size_t *data_len,
+  uint8_t *pd,
+  size_t pd_len,
+  char *name
+);
+
+int32_t
+hsk_dns_name_read_size(
+  uint8_t *data,
+  size_t data_len,
+  uint8_t *pd,
+  size_t pd_len
+);
+
+bool
+hsk_dns_name_alloc(
+  uint8_t **data,
+  size_t *data_len,
+  uint8_t *pd,
+  size_t pd_len,
+  char **name
+);
+
+int32_t
+hsk_dns_name_cmp(char *a, char *b);
+
+void
+hsk_dns_label_split(char *fqdn, uint8_t *labels, int32_t *count);
+
+int32_t
+hsk_dns_label_count(char *fqdn);
+
+void
+hsk_dns_label_from2(
+  char *fqdn,
+  uint8_t *labels,
+  int32_t count,
+  int32_t index,
+  char *ret
+);
+
+void
+hsk_dns_label_from(char *fqdn, int32_t index, char *ret);
+
+void
+hsk_dns_label_get2(
+  char *fqdn,
+  uint8_t *labels,
+  int32_t count,
+  int32_t index,
+  char *ret
+);
+
+void
+hsk_dns_label_get(char *fqdn, int32_t index, char *ret);
+
+void
+hsk_dns_iter_init(
+  hsk_dns_iter_t *it,
+  hsk_dns_rrs_t *rrs,
+  char *target,
+  uint8_t type
+);
+
+hsk_dns_rr_t *
+hsk_dns_iter_next(hsk_dns_iter_t *it);
 #endif
