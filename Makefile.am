@@ -23,6 +23,7 @@ include_HEADERS = include/hsk.h           \
                   include/hsk-error.h     \
                   include/hsk-hash.h      \
                   include/hsk-header.h    \
+                  include/hsk-list.h      \
                   include/hsk-map.h       \
                   include/hsk-proof.h     \
                   include/hsk-resource.h  \
@@ -52,6 +53,7 @@ libhsk_la_SOURCES = src/addr.c     \
                     src/ec.c       \
                     src/hash.c     \
                     src/header.c   \
+                    src/list.c     \
                     src/map.c      \
                     src/msg.c      \
                     src/pool.c     \
