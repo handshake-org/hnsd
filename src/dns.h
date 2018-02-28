@@ -5,24 +5,24 @@
 #include <stdbool.h>
 #include "hsk-list.h"
 
-typedef struct hsk_dns_rr_s {
-  struct hsk_dns_rr_s *prev;
-  struct hsk_dns_rr_s *next;
-  char name[256];
-  uint16_t type;
-  uint16_t class;
+#define HSK_DNS_RR_HEADER        \
+  uint16_t type;                 \
+  char name[256];                \
+  uint16_t class;                \
   uint32_t ttl;
+
+typedef struct hsk_dns_rr_s {
+  HSK_DNS_RR_HEADER
 } hsk_dns_rr_t;
 
 typedef hsk_dns_rr_t hsk_dns_qs_t;
 
 typedef struct hsk_dns_rrs_s {
-  hsk_dns_rr_t *head;
-  hsk_dns_rr_t *tail;
   size_t size;
+  hsk_dns_rr_t *items[255];
 } hsk_dns_rrs_t;
 
-typedef struct {
+typedef struct hsk_dns_msg_s {
   uint16_t id;
   uint8_t opcode;
   uint8_t code;
@@ -31,31 +31,27 @@ typedef struct {
   hsk_dns_rrs_t an;
   hsk_dns_rrs_t ns;
   hsk_dns_rrs_t ad;
-  bool edns;
-  uint16_t edns_usize;
-  uint8_t edns_rcode;
-  uint32_t edns_flags;
+  struct {
+    bool enabled;
+    uint8_t version;
+    uint16_t ttl;
+    uint16_t size;
+    uint8_t code;
+    uint32_t flags;
+    size_t rd_len;
+    uint8_t *rd;
+  } edns;
 } hsk_dns_msg_t;
 
 typedef struct hsk_dns_txt_s {
   size_t data_len;
   uint8_t data[255];
-  struct hsk_dns_txt_s *next;
 } hsk_dns_txt_t;
 
 typedef struct hsk_dns_txts_s {
-  hsk_dns_txt_t *head;
-  hsk_dns_txt_t *tail;
   size_t size;
+  hsk_dns_txt_t *items[255];
 } hsk_dns_txts_t;
-
-#define HSK_DNS_RR_HEADER        \
-  char name[256];                \
-  uint16_t type;                 \
-  uint16_t class;                \
-  uint32_t ttl;                  \
-  struct hsk_dns_rr_s *prev;     \
-  struct hsk_dns_rr_s *next;
 
 typedef struct {
   HSK_DNS_RR_HEADER
@@ -193,9 +189,10 @@ typedef struct {
 } hsk_dns_rp_rr_t;
 
 typedef struct {
+  hsk_dns_rrs_t *rrs;
   char *target;
   uint8_t type;
-  hsk_dns_rr_t *current;
+  int32_t index;
 } hsk_dns_iter_t;
 
 // Opcodes

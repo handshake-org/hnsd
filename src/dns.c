@@ -34,10 +34,14 @@ hsk_dns_msg_init(hsk_dns_msg_t *msg) {
   hsk_dns_rrs_init(&msg->an);
   hsk_dns_rrs_init(&msg->ns);
   hsk_dns_rrs_init(&msg->ar);
-  msg->edns = false;
-  msg->edns_usize = 0;
-  msg->edns_rcode = 0;
-  msg->edns_flags = 0;
+  msg->edns.enabled = false;
+  msg->edns.version = 0;
+  msg->edns.ttl = 0;
+  msg->edns.size = 0;
+  msg->edns.code = 0;
+  msg->edns.flags = 0;
+  msg->edns.rd_len = 0;
+  msg->edns.rd = NULL;
 }
 
 void
@@ -68,7 +72,7 @@ bool
 hsk_dns_msg_decode(uint8_t *data, size_t data_len, hsk_dns_msg_t **msg) {
   hsk_dns_msg_t *m = hsk_dns_msg_alloc();
 
-  if (m == NULL)
+  if (!m)
     return false;
 
   if (!hsk_dns_msg_read(&data, &data_len, m))
@@ -86,30 +90,40 @@ hsk_dns_msg_write(hsk_dns_msg_t *msg, uint8_t **data) {
 
   flags &= ~(0x0f << 11);
   flags &= ~0x0f;
-  flags |= (msg->opcode & 0x0f) << 11;
-  flags |= msg->code & 0x0f;
+  flags |= ((uint16_t)(msg->opcode & 0x0f)) << 11;
+  flags |= ((uint16_t)msg->code) & 0x0f;
 
   size += write_u16be(data, msg->id);
   size += write_u16be(data, flags);
   size += write_u16be(data, msg->qd.size);
   size += write_u16be(data, msg->an.size);
   size += write_u16be(data, msg->ns.size);
-  size += write_u16be(data, msg->ar.size);
+  size += write_u16be(data, msg->ar.size + (msg->edns.enabled ? 1 : 0));
 
-  hsk_dns_qs_t *qs;
-  hsk_dns_rr_t *rr;
+  for (i = 0; i < msg->qd.size; i++)
+    size += hsk_dns_qs_write(msg->qd.items[i], data);
 
-  for (qs = msg->qd.head; qs; qs = qs->next)
-    size += hsk_dns_qs_write(qs, data);
+  for (i = 0; i < msg->an.size; i++)
+    size += hsk_dns_rr_write(msg->an.items[i], data);
 
-  for (rr = msg->an.head; rr; rr = rr->next)
-    size += hsk_dns_rr_write(rr, data);
+  for (i = 0; i < msg->ns.size; i++)
+    size += hsk_dns_rr_write(msg->ns.items[i], data);
 
-  for (rr = msg->ns.head; rr; rr = rr->next)
-    size += hsk_dns_rr_write(rr, data);
+  for (i = 0; i < msg->ar.size; i++)
+    size += hsk_dns_rr_write(msg->ar.items[i], data);
 
-  for (rr = msg->ar.head; rr; rr = rr->next)
-    size += hsk_dns_rr_write(rr, data);
+  if (msg->edns.enabled) {
+    hsk_dns_opt_rr_t opt = { .type = HSK_DNS_OPT };
+    strcpy(opt.name, ".");
+    opt.ttl = 0;
+    opt.ttl |= ((uint32_t)msg->edns.code) << 24;
+    opt.ttl |= ((uint32_t)msg->edns.version) << 16;
+    opt.ttl |= (uint32_t)msg->edns.ttl;
+    opt.class = msg->edns.size;
+    opt.rd_len = msg->edns.rd_len;
+    opt.rd = msg->edns.rd;
+    size += hsk_dns_rr_write((hsk_dns_rr_t *)&opt, data);
+  }
 
   return size;
 }
@@ -178,7 +192,7 @@ hsk_dns_msg_read(uint8_t **data, size_t *data_len, hsk_dns_msg_t *msg) {
 
     hsk_dns_qs_t *qs = hsk_dns_qs_alloc();
 
-    if (qs == NULL)
+    if (!qs)
       goto fail;
 
     if (!hsk_dns_qs_read(data, data_len, pd, pd_len, qs))
@@ -195,7 +209,7 @@ hsk_dns_msg_read(uint8_t **data, size_t *data_len, hsk_dns_msg_t *msg) {
 
     hsk_dns_rr_t *rr = hsk_dns_rr_alloc();
 
-    if (rr == NULL)
+    if (!rr)
       goto fail;
 
     if (!hsk_dns_rr_read(data, data_len, pd, pd_len, rr))
@@ -212,7 +226,7 @@ hsk_dns_msg_read(uint8_t **data, size_t *data_len, hsk_dns_msg_t *msg) {
 
     hsk_dns_rr_t *rr = hsk_dns_rr_alloc();
 
-    if (rr == NULL)
+    if (!rr)
       goto fail;
 
     if (!hsk_dns_rr_read(data, data_len, pd, pd_len, rr))
@@ -227,11 +241,32 @@ hsk_dns_msg_read(uint8_t **data, size_t *data_len, hsk_dns_msg_t *msg) {
 
     hsk_dns_rr_t *rr = hsk_dns_rr_alloc();
 
-    if (rr == NULL)
+    if (!rr)
       goto fail;
 
     if (!hsk_dns_rr_read(data, data_len, pd, pd_len, rr))
       goto fail;
+
+    if (rr->type == HSK_DNS_OPT) {
+      hsk_dns_opt_record_t *opt = (hsk_dns_opt_record_t *)rr;
+
+      if (msg->edns.enabled) {
+        free(rr);
+        continue;
+      }
+
+      msg->edns.enabled = true;
+      msg->edns.code = (opt->ttl >> 24) & 0xff;
+      msg->edns.version = (opt->ttl >> 16) & 0xff;
+      msg->edns.ttl = opt->ttl & 0xffff;
+      msg->edns.size = opt->class;
+      msg->edns.rd_len = opt->rd_len;
+      msg->edns.rd = opt->rd;
+
+      free(rr);
+
+      continue;
+    }
 
     hsk_dns_rrs_push(&msg->ar, rr);
   }
@@ -249,28 +284,30 @@ fail:
 
 void
 hsk_dns_rrs_init(hsk_dns_rrs_t *rrs) {
-  hsk_list_init((hsk_list_t *)rrs);
+  memset(rrs->items, 0, sizeof(hsk_record_t *) * 255);
+  rrs->size = 0;
 }
 
 void
 hsk_dns_rrs_uninit(hsk_dns_rrs_t *rrs) {
   assert(rrs);
 
-  hsk_dns_rr_t *c, *n;
-
-  for (c = rrs->head; c; c = n) {
-    n = c->next;
-    dns_rr_free(c);
+  int32_t i;
+  for (i = 0; i < rrs->size; i++) {
+    assert(rrs->items[i]);
+    hsk_dns_rr_free(rrs->items[i]);
+    rrs->items[i] = NULL;
   }
 
-  rrs->head = NULL;
-  rrs->tail = NULL;
   rrs->size = 0;
 }
 
 hsk_dns_rrs_t *
 hsk_dns_rrs_alloc(void) {
-  return (hsk_dns_rrs_t *)hsk_list_alloc();
+  hsk_dns_rrs_t *rrs = malloc(sizeof(hsk_dns_rrs_t));
+  if (rrs)
+    hsk_dns_rrs_init(rrs);
+  return rrs;
 }
 
 void
@@ -282,51 +319,97 @@ hsk_dns_rrs_free(hsk_dns_rrs_t *rrs) {
 
 size_t
 hsk_dns_rrs_unshift(hsk_dns_rrs_t *rrs, hsk_dns_rr_t *rr) {
-  return hsk_list_unshift((hsk_list_t *)rrs, (hsk_item_t *)rr);
+  if (rrs->size == 255)
+    return 0;
+
+  assert(rrs->size < 255);
+
+  int32_t i;
+  for (i = 1; i < rrs->size + 1; i++) {
+    assert(rrs->items[i - 1]);
+    rrs->items[i] = rrs->items[i - 1];
+  }
+
+  rrs->items[i] = rr;
+  rrs->size += 1;
+
+  return rrs->size;
 }
 
 hsk_dns_rr_t *
 hsk_dns_rrs_shift(hsk_dns_rrs_t *rrs) {
-  return (hsk_dns_rr_t *)hsk_list_shift((hsk_list_t *)rrs);
+  if (rrs->size == 0)
+    return NULL;
+
+  hsk_dns_rr_t *rr = rrs->items[0];
+
+  int32_t i;
+  for (i = 0; i < rrs->size - 1; i++) {
+    assert(rrs->items[i]);
+    rrs->items[i] = rrs->items[i + 1];
+  }
+
+  rrs->items[rrs->size - 1] = NULL;
+
+  rrs->size -= 1;
+
+  return rr;
 }
 
 size_t
 hsk_dns_rrs_push(hsk_dns_rrs_t *rrs, hsk_dns_rr_t *rr) {
-  return hsk_list_push((hsk_list_t *)rrs, (hsk_item_t *)rr);
+  if (rrs->size == 255)
+    return 0;
+
+  assert(rrs->size < 255);
+
+  assert(!rr->items[rr->size]);
+  rrs->items[rrs->size] = rr;
+  rrs->size += 1;
+
+  return rrs->size;
 }
 
 hsk_dns_rr_t *
 hsk_dns_rrs_pop(hsk_dns_rrs_t *rrs) {
-  return (hsk_dns_rr_t *)hsk_list_pop((hsk_list_t *)rrs);
+  if (rrs->size == 0)
+    return NULL;
+
+  hsk_dns_rr_t *rr = rrs->items[rrs->size - 1];
+  assert(rr);
+
+  rrs->items[rrs->size - 1] = NULL;
+
+  rrs->size -= 1;
+
+  return rr;
 }
 
 hsk_dns_rr_t *
 hsk_dns_rrs_get(hsk_dns_rrs_t *rrs, int32_t index) {
-  return (hsk_dns_rr_t *)hsk_list_get((hsk_list_t *)rrs, index);
+  assert(rrs);
+
+  if (index < 0)
+    index += rrs->size;
+
+  if (index >= rrs->size)
+    return NULL;
+
+  return rrs->items[index];
 }
 
 size_t
-hsk_dns_rrs_set(hsk_dns_rrs_t *rrs, int32_t index, hsk_dns_rr_t *item) {
-  return hsk_list_set((hsk_list_t *)rrs, index, (hsk_item_t *)item);
-}
+hsk_dns_rrs_set(hsk_dns_rrs_t *rrs, int32_t index, hsk_dns_rr_t *rr) {
+  assert(rrs && rr);
 
-size_t
-hsk_dns_rrs_replace(hsk_dns_rrs_t *rrs, hsk_dns_rr_t *item, hsk_dns_rr_t *new) {
-  return hsk_list_replace(
-    (hsk_list_t *)rrs,
-    (hsk_item_t *)item,
-    (hsk_item_t *)new
-  );
-}
+  if (index < 0)
+    index += rrs->size;
 
-size_t
-hsk_dns_rrs_insert(hsk_dns_rrs_t *rrs, hsk_dns_rr_t *prev, hsk_dns_rr_t *rr) {
-  return hsk_list_push((hsk_list_t *)rrs, (hsk_item_t *)prev, (hsk_item_t *)rr);
-}
+  if (index >= rrs->size)
+    return 0;
 
-hsk_dns_rr_t *
-hsk_dns_rrs_remove(hsk_dns_rrs_t *rrs, hsk_dns_rr_t *rr) {
-  return (hsk_dns_rr_t *)hsk_list_remove((hsk_list_t *)rrs, (hsk_item_t *)rr);
+  rrs->items[index] = rr;
+  return rrs->size;
 }
 
 void
@@ -337,8 +420,6 @@ hsk_dns_qs_init(hsk_dns_qs_t *qs) {
   qs->type = 0;
   qs->class = 0;
   qs->ttl = 0;
-  qs->prev = NULL;
-  qs->next = NULL;
 }
 
 void
@@ -405,8 +486,6 @@ hsk_dns_rr_init(hsk_dns_rr_t *rr, uint16_t type) {
   rr->type = type;
   rr->class = 0;
   rr->ttl = 0;
-  rr->prev = NULL;
-  rr->next = NULL;
 
   hsk_dns_rd_init(rr);
 }
@@ -471,7 +550,7 @@ hsk_dns_rd_init(hsk_dns_rr_t *rr) {
     }
     case HSK_DNS_TXT: {
       hsk_dns_txt_rr_t *r = (hsk_dns_txt_rr_t *)rr;
-      r->text = NULL;
+      hsk_dns_txts_init(&r->txts);
       break;
     }
     case HSK_DNS_DS: {
@@ -684,44 +763,55 @@ hsk_dns_rr_uninit(hsk_dns_rr_t *rr) {
     }
     case HSK_DNS_TXT: {
       hsk_dns_txt_rr_t *r = (hsk_dns_txt_rr_t *)rr;
-      if (r->text)
-        hsk_dns_txt_free_list(r->text);
+      hsk_dns_txts_uninit(&r->txts);
       break;
     }
     case HSK_DNS_DS: {
       hsk_dns_ds_rr_t *r = (hsk_dns_ds_rr_t *)rr;
-      if (r->digest)
+      if (r->digest) {
         free(r->digest);
+        r->digest = NULL;
+      }
       break;
     }
     case HSK_DNS_TLSA: {
       hsk_dns_tlsa_rr_t *r = (hsk_dns_tlsa_rr_t *)rr;
-      if (r->certificate)
+      if (r->certificate) {
         free(r->certificate);
+        r->certificate = NULL;
+      }
       break;
     }
     case HSK_DNS_SSHFP: {
       hsk_dns_sshfp_rr_t *r = (hsk_dns_sshfp_rr_t *)rr;
-      if (r->fingerprint)
+      if (r->fingerprint) {
         free(r->fingerprint);
+        r->fingerprint = NULL;
+      }
       break;
     }
     case HSK_DNS_OPT: {
       hsk_dns_opt_rr_t *r = (hsk_dns_opt_rr_t *)rr;
-      if (r->rd)
+      if (r->rd) {
         free(r->rd);
+        r->rd = NULL;
+      }
       break;
     }
     case HSK_DNS_DNSKEY: {
       hsk_dns_dnskey_rr_t *r = (hsk_dns_dnskey_rr_t *)rr;
-      if (r->public_key)
+      if (r->public_key) {
         free(r->public_key);
+        r->public_key = NULL;
+      }
       break;
     }
     case HSK_DNS_RRSIG: {
       hsk_dns_rrsig_rr_t *r = (hsk_dns_rrsig_rr_t *)rr;
-      if (r->signature)
+      if (r->signature) {
         free(r->signature);
+        r->signature = NULL;
+      }
       break;
     }
     case HSK_DNS_URI: {
@@ -734,8 +824,10 @@ hsk_dns_rr_uninit(hsk_dns_rr_t *rr) {
     }
     default: {
       hsk_dns_unknown_rr_t *r = (hsk_dns_unknown_rr_t *)rr;
-      if (r->rd)
+      if (r->rd) {
         free(r->rd);
+        r->rd = NULL;
+      }
       break;
     }
   }
@@ -743,8 +835,7 @@ hsk_dns_rr_uninit(hsk_dns_rr_t *rr) {
 
 void
 hsk_dns_rr_free(hsk_dns_rr_t *rr) {
-  if (rr == NULL)
-    return;
+  assert(rr);
   hsk_dns_rr_uninit(rr);
   free(rr);
 }
@@ -1112,7 +1203,7 @@ hsk_dns_rd_read(
       while (*data_len > 0) {
         hsk_dns_txt_t *txt = hsk_dns_txt_alloc();
 
-        if (txt == NULL)
+        if (!txt)
           goto fail_txt;
 
         if (!read_u8(data, data_len, &txt->data_len))
@@ -1292,28 +1383,30 @@ fail_txt:
 
 void
 hsk_dns_txts_init(hsk_dns_txts_t *txts) {
-  hsk_list_init((hsk_list_t *)txts);
+  memset(txts->items, 0, sizeof(hsk_record_t *) * 255);
+  txts->size = 0;
 }
 
 void
 hsk_dns_txts_uninit(hsk_dns_txts_t *txts) {
   assert(txts);
 
-  hsk_dns_txt_t *c, *n;
-
-  for (c = txts->head; c; c = n) {
-    n = c->next;
-    dns_txt_free(c);
+  int32_t i;
+  for (i = 0; i < txts->size; i++) {
+    assert(txts->items[i]);
+    hsk_dns_txt_free(txts->items[i]);
+    txts->items[i] = NULL;
   }
 
-  txts->head = NULL;
-  txts->tail = NULL;
   txts->size = 0;
 }
 
 hsk_dns_txts_t *
 hsk_dns_txts_alloc(void) {
-  return (hsk_dns_txts_t *)hsk_list_alloc();
+  hsk_dns_txts_t *txts = malloc(sizeof(hsk_dns_txts_t));
+  if (txts)
+    hsk_dns_txts_init(txts);
+  return txts;
 }
 
 void
@@ -1325,66 +1418,98 @@ hsk_dns_txts_free(hsk_dns_txts_t *txts) {
 
 size_t
 hsk_dns_txts_unshift(hsk_dns_txts_t *txts, hsk_dns_txt_t *txt) {
-  return hsk_list_unshift((hsk_list_t *)txts, (hsk_item_t *)txt);
+  if (txts->size == 255)
+    return 0;
+
+  assert(txts->size < 255);
+
+  int32_t i;
+  for (i = 1; i < txts->size + 1; i++) {
+    assert(txts->items[i - 1]);
+    txts->items[i] = txts->items[i - 1];
+  }
+
+  txts->items[i] = txt;
+  txts->size += 1;
+
+  return txts->size;
 }
 
 hsk_dns_txt_t *
 hsk_dns_txts_shift(hsk_dns_txts_t *txts) {
-  return (hsk_dns_txt_t *)hsk_list_shift((hsk_list_t *)txts);
+  if (txts->size == 0)
+    return NULL;
+
+  hsk_dns_txt_t *txt = txts->items[0];
+
+  int32_t i;
+  for (i = 0; i < txts->size - 1; i++) {
+    assert(txts->items[i]);
+    txts->items[i] = txts->items[i + 1];
+  }
+
+  txts->items[txts->size - 1] = NULL;
+
+  txts->size -= 1;
+
+  return txt;
 }
 
 size_t
 hsk_dns_txts_push(hsk_dns_txts_t *txts, hsk_dns_txt_t *txt) {
-  return hsk_list_push((hsk_list_t *)txts, (hsk_item_t *)txt);
+  if (txts->size == 255)
+    return 0;
+
+  assert(txts->size < 255);
+
+  assert(!txt->items[txt->size]);
+  txts->items[txts->size] = txt;
+  txts->size += 1;
+
+  return txts->size;
 }
 
 hsk_dns_txt_t *
 hsk_dns_txts_pop(hsk_dns_txts_t *txts) {
-  return (hsk_dns_txt_t *)hsk_list_pop((hsk_list_t *)txts);
+  if (txts->size == 0)
+    return NULL;
+
+  hsk_dns_txt_t *txt = txts->items[txts->size - 1];
+  assert(txt);
+
+  txts->items[txts->size - 1] = NULL;
+
+  txts->size -= 1;
+
+  return txt;
 }
 
 hsk_dns_txt_t *
-hsk_dns_txts_get(hsk_dns_txts_t *rrs, int32_t index) {
-  return (hsk_dns_txt_t *)hsk_list_get((hsk_list_t *)rrs, index);
+hsk_dns_txts_get(hsk_dns_txts_t *txts, int32_t index) {
+  assert(txts);
+
+  if (index < 0)
+    index += txts->size;
+
+  if (index >= txts->size)
+    return NULL;
+
+  return txts->items[index];
 }
 
 size_t
-hsk_dns_txts_set(hsk_dns_txts_t *rrs, int32_t index, hsk_dns_txt_t *item) {
-  return hsk_list_set((hsk_list_t *)rrs, index, (hsk_item_t *)item);
-}
+hsk_dns_txts_set(hsk_dns_txts_t *txts, int32_t index, hsk_dns_txt_t *txt) {
+  assert(txts && txt);
 
-size_t
-hsk_dns_txts_replace(
-  hsk_dns_txts_t *rrs,
-  hsk_dns_txt_t *item,
-  hsk_dns_txt_t *new
-) {
-  return hsk_list_replace(
-    (hsk_list_t *)rrs,
-    (hsk_item_t *)item,
-    (hsk_item_t *)new
-  );
-}
+  if (index < 0)
+    index += txts->size;
 
-size_t
-hsk_dns_txts_insert(
-  hsk_dns_txts_t *txts,
-  hsk_dns_txt_t *prev,
-  hsk_dns_txt_t *txt
-) {
-  return hsk_list_push(
-    (hsk_list_t *)txts,
-    (hsk_item_t *)prev,
-    (hsk_item_t *)txt
-  );
-}
+  if (index >= txts->size)
+    return 0;
 
-hsk_dns_txt_t *
-hsk_dns_txts_remove(hsk_dns_txts_t *txts, hsk_dns_txt_t *txt) {
-  return (hsk_dns_txt_t *)hsk_list_remove(
-    (hsk_list_t *)txts,
-    (hsk_item_t *)txt
-  );
+  txts->items[index] = txt;
+
+  return txts->size;
 }
 
 void
@@ -1392,8 +1517,6 @@ hsk_dns_txt_init(hsk_dns_txt_t *txt) {
   assert(txt);
   txt->data_len = 0;
   txt->data = NULL;
-  txt->next = NULL;
-  txt->prev = NULL;
 }
 
 void
@@ -1421,36 +1544,63 @@ hsk_dns_txt_free(hsk_dns_txt_t *txt) {
 }
 
 hsk_dns_rr_t *
-hsk_dns_get_record(hsk_dns_rr_t *rr, char *target, uint8_t type) {
-  hsk_dns_rr_t *c;
-
+hsk_dns_get_record2(
+  hsk_dns_rrs_t *rrs,
+  char *target,
+  uint8_t type,
+  int32_t *index
+) {
   char *glue = target;
 
-  for (c = rr; c; c = c->next) {
+  int32_t i = 0;
+
+  if (index)
+    i = *index;
+
+  for (; i < rrs->size; i++) {
+    hsk_dns_rr_t *rr = rrs->items[i];
+
     if (!target) {
-      if (c->type == type || type == HSK_DNS_ANY)
-        return c;
-      continue;
-    }
-
-    if (c->type == HSK_DNS_CNAME) {
-      if (hsk_dns_name_cmp(c->name, glue) == 0) {
-        if (type == HSK_DNS_CNAME || type == HSK_DNS_ANY)
-          return c;
-
-        glue = ((hsk_dns_cname_rr_t *)c)->target;
+      if (rr->type == type || type == HSK_DNS_ANY) {
+        if (index)
+          *index = i;
+        return rr;
       }
       continue;
     }
 
-    if (c->type == type || type == HSK_DNS_ANY) {
-      if (hsk_dns_name_cmp(c->name, glue) == 0)
-        return c;
+    if (rr->type == HSK_DNS_CNAME) {
+      if (hsk_dns_name_cmp(rr->name, glue) == 0) {
+        if (type == HSK_DNS_CNAME || type == HSK_DNS_ANY) {
+          if (index)
+            *index = i;
+          return rr;
+        }
+
+        glue = ((hsk_dns_cname_rr_t *)rr)->target;
+      }
+      continue;
+    }
+
+    if (rr->type == type || type == HSK_DNS_ANY) {
+      if (hsk_dns_name_cmp(rr->name, glue) == 0) {
+        if (index)
+          *index = i;
+        return rr;
+      }
       continue;
     }
   }
 
+  if (index)
+    *index = -1;
+
   return NULL;
+}
+
+hsk_dns_rr_t *
+hsk_dns_get_record(hsk_dns_rrs_t *rrs, char *target, uint8_t type) {
+  return hsk_dns_get_record2(rrs, target, type, NULL);
 }
 
 int32_t
@@ -1636,7 +1786,12 @@ hsk_dns_name_read(
 }
 
 int32_t
-hsk_dns_name_read_size(uint8_t *data, size_t data_len, uint8_t *pd, size_t pd_len) {
+hsk_dns_name_read_size(
+  uint8_t *data,
+  size_t data_len,
+  uint8_t *pd,
+  size_t pd_len
+) {
   return hsk_dns_name_parse(&data, &data_len, pd, pd_len, NULL);
 }
 
@@ -1653,25 +1808,27 @@ hsk_dns_name_alloc(
   if (size == -1)
     return false;
 
-  *name = malloc(size + 1);
+  char *n = malloc(size + 1);
 
-  if (*name == NULL)
+  if (!n)
     return false;
 
-  assert(hsk_dns_name_read(data, data_len, pd, pd_len, *name));
+  assert(hsk_dns_name_read(data, data_len, pd, pd_len, n));
+
+  *name = n;
 
   return true;
 }
 
 int32_t
 hsk_dns_name_cmp(char *a, char *b) {
-  if (a == NULL && b == NULL)
+  if (!a && !b)
     return 0;
 
-  if (a == NULL)
+  if (!a)
     return -1;
 
-  if (b == NULL)
+  if (!b)
     return 1;
 
   size_t alen = strlen(a);
@@ -1752,18 +1909,18 @@ hsk_dns_label_from2(
   char *fqdn,
   uint8_t *labels,
   int32_t count,
-  int32_t idx,
+  int32_t index,
   char *ret
 ) {
-  if (idx < 0)
-    idx += count;
+  if (index < 0)
+    index += count;
 
-  if (idx >= count) {
+  if (index >= count) {
     ret[0] = '\0';
     return;
   }
 
-  size_t start = (size_t)labels[idx];
+  size_t start = (size_t)labels[index];
   size_t end = strlen(fqdn);
   size_t len = end - start;
 
@@ -1773,11 +1930,11 @@ hsk_dns_label_from2(
 }
 
 void
-hsk_dns_label_from(char *fqdn, int32_t idx, char *ret) {
+hsk_dns_label_from(char *fqdn, int32_t index, char *ret) {
   uint8_t labels[255];
   int32_t count;
   hsk_dns_label_split(fqdn, labels, &count);
-  hsk_dns_label_from2(fqdn, labels, count, idx, ret);
+  hsk_dns_label_from2(fqdn, labels, count, index, ret);
 }
 
 void
@@ -1785,24 +1942,24 @@ hsk_dns_label_get2(
   char *fqdn,
   uint8_t *labels,
   int32_t count,
-  int32_t idx,
+  int32_t index,
   char *ret
 ) {
-  if (idx < 0)
-    idx += count;
+  if (index < 0)
+    index += count;
 
-  if (idx >= count) {
+  if (index >= count) {
     ret[0] = '\0';
     return;
   }
 
-  size_t start = (size_t)labels[idx];
+  size_t start = (size_t)labels[index];
   size_t end;
 
-  if (idx + 1 >= count)
+  if (index + 1 >= count)
     end = strlen(fqdn);
   else
-    end = ((size_t)labels[idx + 1]) - 1;
+    end = ((size_t)labels[index + 1]) - 1;
 
   size_t len = end - start;
 
@@ -1812,41 +1969,47 @@ hsk_dns_label_get2(
 }
 
 void
-hsk_dns_label_get(char *fqdn, int32_t idx, char *ret) {
+hsk_dns_label_get(char *fqdn, int32_t index, char *ret) {
   uint8_t labels[255];
   int32_t count;
   hsk_dns_label_split(fqdn, labels, &count);
-  hsk_dns_label_get2(fqdn, labels, count, idx, ret);
+  hsk_dns_label_get2(fqdn, labels, count, index, ret);
 }
 
 void
-hsk_dns_iterator_init(
-  hsk_dns_iterator_t *it,
-  hsk_dns_rr_t *section,
+hsk_dns_iter_init(
+  hsk_dns_iter_t *it,
+  hsk_dns_rrs_t *rrs,
   char *target,
   uint8_t type
 ) {
+  it->rrs = rrs;
   it->target = target;
   it->type = type;
-  it->current = section;
+  it->index = 0;
 }
 
 hsk_dns_rr_t *
-hsk_dns_iterator_next(hsk_dns_iterator_t *it) {
-  if (it->current == NULL)
+hsk_dns_iter_next(hsk_dns_iter_t *it) {
+  if (it->index == -1)
     return NULL;
 
-  hsk_dns_rr_t *c = hsk_dns_get_record(it->current, it->target, it->type);
+  hsk_dns_rr_t *rr = hsk_dns_get_record2(
+    it->rrs,
+    it->target,
+    it->type,
+    &it->index
+  );
 
-  if (c == NULL) {
-    it->current = NULL;
+  if (!rr) {
+    it->index = -1;
     return NULL;
   }
 
   if (it->target)
-    it->target = c->name;
+    it->target = rr->name;
 
-  it->current = c->next;
+  it->index += 1;
 
-  return c;
+  return rr;
 }

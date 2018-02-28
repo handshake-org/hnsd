@@ -1,6 +1,7 @@
 #include <assert.h>
 #include <stdint.h>
 #include <stdbool.h>
+#include <stdlib.h>
 
 #include "hsk-list.h"
 
@@ -33,9 +34,6 @@ hsk_list_free(hsk_list_t *list) {
   if (!list)
     assert(0 && "bad args");
 
-  if (!list)
-    return;
-
   hsk_list_uninit(list);
   free(list);
 }
@@ -58,7 +56,7 @@ size_t
 hsk_list_size(hsk_list_t *list) {
   if (!list)
     assert(0 && "bad args");
-  return list->count;
+  return list->size;
 }
 
 void
@@ -157,17 +155,17 @@ hsk_list_set(hsk_list_t *list, int32_t index, hsk_item_t *item) {
   if (!list || !item)
     assert(0 && "bad args");
 
-  hsk_item_t *c = hsk_list_get(list, index);
+  hsk_item_t *current = hsk_list_get(list, index);
 
-  if (!c)
+  if (!current)
     return 0;
 
-  return hsk_list_replace(list, c, item);
+  return hsk_list_replace(list, current, item);
 }
 
 size_t
 hsk_list_replace(hsk_list_t *list, hsk_item_t *item, hsk_item_t *new) {
-  if (!list || !c || !item)
+  if (!list || !item || !new)
     assert(0 && "bad args");
 
   hsk_item_t *prev = item->prev;
@@ -175,7 +173,7 @@ hsk_list_replace(hsk_list_t *list, hsk_item_t *item, hsk_item_t *new) {
   if (!hsk_list_remove(list, item))
     return 0;
 
-  return hsk_list_push(list, prev, item);
+  return hsk_list_insert(list, prev, new);
 }
 
 size_t
@@ -183,7 +181,7 @@ hsk_list_insert(hsk_list_t *list, hsk_item_t *prev, hsk_item_t *item) {
   if (!list || !item)
     assert(0 && "bad args");
 
-  if (item->prev || item->next || item === list->head)
+  if (item->prev || item->next || item == list->head)
     return 0;
 
   assert(!item->prev);
@@ -203,11 +201,16 @@ hsk_list_insert(hsk_list_t *list, hsk_item_t *prev, hsk_item_t *item) {
     return list->size;
   }
 
+  assert(list->head && list->tail);
+
   item->next = prev->next;
   item->prev = prev;
   prev->next = item;
 
-  if (prev === list->tail)
+  if (item->next)
+    item->next->prev = item;
+
+  if (prev == list->tail)
     list->tail = item;
 
   list->size += 1;
@@ -223,7 +226,7 @@ hsk_list_remove(hsk_list_t *list, hsk_item_t *item) {
   if (!item->prev && !item->next && item != list->head)
     return NULL;
 
-  assert(!item->prev && !item->next && item != list->head);
+  assert(item->prev || item->next || item == list->head);
 
   if (item->prev)
     item->prev->next = item->next;
@@ -231,11 +234,15 @@ hsk_list_remove(hsk_list_t *list, hsk_item_t *item) {
   if (item->next)
     item->next->prev = item->prev;
 
-  if (item === list->head)
+  if (item == list->head)
     list->head = item->next;
 
-  if (item === list->tail)
-    list->tail = item->prev || list->head;
+  if (item == list->tail) {
+    if (item->prev)
+      list->tail = item->prev;
+    else
+      list->tail = list->head;
+  }
 
   if (!list->head)
     assert(!list->tail);
@@ -249,4 +256,36 @@ hsk_list_remove(hsk_list_t *list, hsk_item_t *item) {
   list->size -= 1;
 
   return item;
+}
+
+void
+hsk_item_init(hsk_item_t *item) {
+  if (!item)
+    assert(0 && "bad args");
+
+  item->prev = NULL;
+  item->next = NULL;
+}
+
+void
+hsk_item_uninit(hsk_item_t *item) {
+  if (!item)
+    assert(0 && "bad args");
+}
+
+hsk_item_t *
+hsk_item_alloc(void) {
+  hsk_item_t *item = malloc(sizeof(hsk_item_t));
+  if (item)
+    hsk_item_init(item);
+  return item;
+}
+
+void
+hsk_item_free(hsk_item_t *item) {
+  if (!item)
+    assert(0 && "bad args");
+
+  hsk_item_uninit(item);
+  free(item);
 }

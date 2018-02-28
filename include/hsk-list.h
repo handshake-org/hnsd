@@ -3,14 +3,15 @@
 
 #include <stdint.h>
 #include <stdbool.h>
+#include <stdlib.h>
 
-typedef hsk_item_s {
+typedef struct hsk_item_s {
   struct hsk_item_s *prev;
   struct hsk_item_s *next;
   void *data;
 } hsk_item_t;
 
-typedef hsk_list_s {
+typedef struct hsk_list_s {
   hsk_item_t *head;
   hsk_item_t *tail;
   size_t size;
@@ -66,4 +67,16 @@ hsk_list_insert(hsk_list_t *list, hsk_item_t *prev, hsk_item_t *item);
 
 hsk_item_t *
 hsk_list_remove(hsk_list_t *list, hsk_item_t *item);
+
+void
+hsk_item_init(hsk_item_t *item);
+
+void
+hsk_item_uninit(hsk_item_t *item);
+
+hsk_item_t *
+hsk_item_alloc(void);
+
+void
+hsk_item_free(hsk_item_t *item);
 #endif
