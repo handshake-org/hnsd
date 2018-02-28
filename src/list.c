@@ -34,9 +34,6 @@ hsk_list_free(hsk_list_t *list) {
   if (!list)
     assert(0 && "bad args");
 
-  if (!list)
-    return;
-
   hsk_list_uninit(list);
   free(list);
 }
@@ -204,9 +201,14 @@ hsk_list_insert(hsk_list_t *list, hsk_item_t *prev, hsk_item_t *item) {
     return list->size;
   }
 
+  assert(list->head && list->tail);
+
   item->next = prev->next;
   item->prev = prev;
   prev->next = item;
+
+  if (item->next)
+    item->next->prev = item;
 
   if (prev == list->tail)
     list->tail = item;
@@ -254,4 +256,36 @@ hsk_list_remove(hsk_list_t *list, hsk_item_t *item) {
   list->size -= 1;
 
   return item;
+}
+
+void
+hsk_item_init(hsk_item_t *item) {
+  if (!item)
+    assert(0 && "bad args");
+
+  item->prev = NULL;
+  item->next = NULL;
+}
+
+void
+hsk_item_uninit(hsk_item_t *item) {
+  if (!item)
+    assert(0 && "bad args");
+}
+
+hsk_item_t *
+hsk_item_alloc(void) {
+  hsk_item_t *item = malloc(sizeof(hsk_item_t));
+  if (item)
+    hsk_item_init(item);
+  return item;
+}
+
+void
+hsk_item_free(hsk_item_t *item) {
+  if (!item)
+    assert(0 && "bad args");
+
+  hsk_item_uninit(item);
+  free(item);
 }

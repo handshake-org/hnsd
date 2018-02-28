@@ -67,4 +67,16 @@ hsk_list_insert(hsk_list_t *list, hsk_item_t *prev, hsk_item_t *item);
 
 hsk_item_t *
 hsk_list_remove(hsk_list_t *list, hsk_item_t *item);
+
+void
+hsk_item_init(hsk_item_t *item);
+
+void
+hsk_item_uninit(hsk_item_t *item);
+
+hsk_item_t *
+hsk_item_alloc(void);
+
+void
+hsk_item_free(hsk_item_t *item);
 #endif
