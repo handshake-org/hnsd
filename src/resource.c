@@ -896,8 +896,6 @@ hsk_resource_decode(
   bool result = true;
 
   hsk_symbol_table_t st;
-  st.strings = NULL;
-  st.sizes = NULL;
   st.size = 0;
 
   hsk_resource_t *res = malloc(sizeof(hsk_resource_t));
@@ -925,29 +923,18 @@ hsk_resource_decode(
   if (!read_u8(&data, &data_len, &st_size))
     goto fail;
 
-  if (st_size != 0) {
-    st.strings = (char **)malloc(st_size * sizeof(char *) + 1);
-    st.sizes = (uint8_t *)malloc(st_size * sizeof(uint8_t) + 1);
+  int32_t i;
+  for (i = 0; i < st_size; i++) {
+    uint8_t size;
 
-    if (st.strings == NULL || st.sizes == NULL)
+    if (!read_u8(&data, &data_len, &size))
       goto fail;
 
-    int32_t i;
-    for (i = 0; i < st_size; i++) {
-      uint8_t size;
+    if (!slice_ascii(&data, &data_len, &st.strings[i], size))
+      goto fail;
 
-      if (!read_u8(&data, &data_len, &size))
-        goto fail;
-
-      if (!alloc_ascii(&data, &data_len, &st.strings[i], size))
-        goto fail;
-
-      st.sizes[i] = size;
-      st.size += 1;
-    }
-
-    st.strings[st_size] = NULL;
-    st.sizes[st_size] = 0;
+    st.sizes[i] = size;
+    st.size += 1;
   }
 
   hsk_record_t *parent = NULL;
@@ -979,18 +966,6 @@ fail:
   result = false;
 
 done:
-  if (st.size > 0) {
-    int32_t i;
-    for (i = 0; i < st.size; i++)
-      free(st.strings[i]);
-  }
-
-  if (st.strings != NULL)
-    free(st.strings);
-
-  if (st.sizes != NULL)
-    free(st.sizes);
-
   return result;
 }
 

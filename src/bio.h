@@ -203,15 +203,13 @@ alloc_bytes(uint8_t **data, size_t *len, uint8_t **out, size_t size) {
 }
 
 static inline bool
-read_ascii(uint8_t **data, size_t *len, char *out, size_t size) {
-  uint8_t *chunk;
-
-  if (!slice_bytes(data, len, &chunk, size))
+slice_ascii(uint8_t **data, size_t *len, char **out, size_t size) {
+  if (!slice_bytes(data, len, (uint8_t **)out, size))
     return false;
 
   uint8_t i;
   for (i = 0; i < size; i++) {
-    uint8_t ch = chunk[i];
+    uint8_t ch = (*out)[i];
 
     // No unicode.
     if (ch & 0x80)
@@ -230,6 +228,16 @@ read_ascii(uint8_t **data, size_t *len, char *out, size_t size) {
       return false;
     }
   }
+
+  return true;
+}
+
+static inline bool
+read_ascii(uint8_t **data, size_t *len, char *out, size_t size) {
+  char *chunk;
+
+  if (!slice_ascii(data, len, &chunk, size))
+    return false;
 
   memcpy((void *)out, chunk, size);
   out[size] = '\0';

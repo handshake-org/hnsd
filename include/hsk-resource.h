@@ -151,8 +151,8 @@ typedef struct {
 
 // Symbol Table
 typedef struct {
-  char **strings;
-  uint8_t *sizes;
+  char *strings[255];
+  uint8_t sizes[255];
   uint8_t size;
 } hsk_symbol_table_t;
 
