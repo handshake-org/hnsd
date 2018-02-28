@@ -1789,7 +1789,7 @@ hsk_dns_name_write(char *name, uint8_t **data) {
         if (off + 1 > 256)
           return off; // fail
 
-        if (ch == 0xff)
+        if (ch == -1)
           ch = 0x00;
 
         if (data)
