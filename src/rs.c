@@ -132,9 +132,7 @@ hsk_rs_init_unbound(hsk_rs_t *ns, struct sockaddr *addr) {
   assert(ub_ctx_set_option(ns->ub, "do-tcp:", "no") == 0);
   assert(ub_ctx_set_option(ns->ub, "logfile:", "") == 0);
   assert(ub_ctx_set_option(ns->ub, "use-syslog:", "no") == 0);
-  assert(ub_ctx_set_option(ns->ub, "domain-insecure:", ".") == 0);
   assert(ub_ctx_set_option(ns->ub, "root-hints:", "") == 0);
-  assert(ub_ctx_set_option(ns->ub, "do-not-query-localhost:", "no") == 0);
 
   char stub[HSK_MAX_HOST];
 

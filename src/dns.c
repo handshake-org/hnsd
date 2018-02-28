@@ -421,6 +421,7 @@ hsk_dns_qs_init(hsk_dns_qs_t *qs) {
   qs->type = 0;
   qs->class = 0;
   qs->ttl = 0;
+  qs->rd = NULL;
 }
 
 void
@@ -508,6 +509,27 @@ hsk_dns_rr_alloc(void) {
   return rr;
 }
 
+hsk_dns_rr_t *
+hsk_dns_rr_create(uint16_t type) {
+  hsk_dns_rr_t *rr = hsk_dns_rr_alloc();
+
+  if (!rr)
+    return NULL;
+
+  void *rd = hsk_dns_rd_alloc(type);
+
+  if (!rd) {
+    free(rr);
+    return NULL;
+  }
+
+  rr->type = type;
+  rr->class = HSK_DNS_INET;
+  rr->rd = rd;
+
+  return rr;
+}
+
 void
 hsk_dns_rr_free(hsk_dns_rr_t *rr) {
   assert(rr);
@@ -562,22 +584,18 @@ hsk_dns_rr_read(
   if (!read_u32be(data, data_len, &rr->ttl))
     return false;
 
+  uint16_t len;
+
+  if (!read_u16be(data, data_len, &len))
+    return false;
+
+  if (*data_len < len)
+    return false;
+
   void *rd = hsk_dns_rd_alloc(rr->type);
 
   if (!rd)
     return false;
-
-  uint16_t len;
-
-  if (!read_u16be(data, data_len, &len)) {
-    free(rd);
-    return false;
-  }
-
-  if (*data_len < len) {
-    free(rd);
-    return false;
-  }
 
   uint8_t *rdata = *data;
   size_t rdlen = (size_t)len;
