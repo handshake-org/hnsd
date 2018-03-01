@@ -87,4 +87,7 @@ hsk_header_hash_sol(hsk_header_t *hdr, uint8_t *hash);
 
 int32_t
 hsk_header_verify_pow(hsk_header_t *hdr);
+
+void
+hsk_header_print(hsk_header_t *hdr, char *prefix);
 #endif

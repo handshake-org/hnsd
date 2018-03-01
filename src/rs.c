@@ -318,6 +318,8 @@ hsk_rs_onrecv(
     return;
   }
 
+  hsk_dns_req_print(req, "rs: ");
+
   req->ns = (void *)ns;
 
   rc = ub_resolve_async(

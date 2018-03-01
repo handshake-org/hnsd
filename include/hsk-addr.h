@@ -171,6 +171,9 @@ bool
 hsk_addr_is_routable(hsk_addr_t *addr);
 
 void
+hsk_addr_print(hsk_addr_t *addr, char *prefix);
+
+void
 hsk_netaddr_init(hsk_netaddr_t *addr);
 
 bool

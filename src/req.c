@@ -3,6 +3,7 @@
 #include <stdbool.h>
 #include <string.h>
 #include <stdlib.h>
+#include <stdio.h>
 
 #include "ldns/ldns.h"
 
@@ -11,6 +12,7 @@
 #include "hsk-error.h"
 #include "hsk-hsig.h"
 #include "req.h"
+#include "utils.h"
 
 void
 hsk_dns_req_init(hsk_dns_req_t *req) {
@@ -169,16 +171,6 @@ hsk_dns_req_create(uint8_t *data, size_t data_len, struct sockaddr *addr) {
   // Sender address.
   hsk_sa_copy(req->addr, addr);
 
-  printf("DNS REQ\n");
-  printf("id: %d\n", req->id);
-  printf("labels: %d\n", req->labels);
-  printf("name: %s\n", req->name);
-  printf("type: %d\n", req->type);
-  printf("class: %d\n", req->class);
-  printf("edns: %d\n", (int32_t)req->edns);
-  printf("dnssec: %d\n", (int32_t)req->dnssec);
-  printf("tld: %s\n", req->tld);
-
   // Free stuff up.
   ldns_pkt_free(pkt);
 
@@ -207,5 +199,31 @@ fail:
   if (tld)
     free(tld);
 
-  return false;
+  return NULL;
+}
+
+void
+hsk_dns_req_print(hsk_dns_req_t *req, char *prefix) {
+  assert(req);
+
+  if (!prefix)
+    prefix = "";
+
+  char nonce[65];
+  char addr[HSK_MAX_HOST];
+
+  assert(hsk_hex_encode(req->nonce, 32, nonce));
+  assert(hsk_sa_to_string(req->addr, addr, HSK_MAX_HOST, 1));
+
+  printf("%squery\n", prefix);
+  printf("%s  id=%d\n", prefix, req->id);
+  printf("%s  labels=%d\n", prefix, req->labels);
+  printf("%s  name=%s\n", prefix, req->name);
+  printf("%s  type=%d\n", prefix, req->type);
+  printf("%s  class=%d\n", prefix, req->class);
+  printf("%s  edns=%d\n", prefix, (int32_t)req->edns);
+  printf("%s  dnssec=%d\n", prefix, (int32_t)req->dnssec);
+  printf("%s  tld=%s\n", prefix, req->tld);
+  printf("%s  nonce=%s\n", prefix, nonce);
+  printf("%s  addr=%s\n", prefix, addr);
 }

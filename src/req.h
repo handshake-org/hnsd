@@ -44,4 +44,7 @@ hsk_dns_req_free(hsk_dns_req_t *req);
 
 hsk_dns_req_t *
 hsk_dns_req_create(uint8_t *data, size_t data_len, struct sockaddr *addr);
+
+void
+hsk_dns_req_print(hsk_dns_req_t *req, char *prefix);
 #endif

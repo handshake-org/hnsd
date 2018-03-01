@@ -408,3 +408,41 @@ hsk_header_verify_pow(hsk_header_t *hdr) {
 
   return hsk_cuckoo_verify_header(&ctx, pre, psize, hdr->sol, hdr->sol_size);
 }
+
+void
+hsk_header_print(hsk_header_t *hdr, char *prefix) {
+  assert(hdr);
+
+  if (!prefix)
+    prefix = "";
+
+  char hash[65];
+  char work[65];
+  char prev_block[65];
+  char merkle_root[65];
+  char witness_root[65];
+  char trie_root[65];
+  char nonce[33];
+
+  assert(hsk_hex_encode(hsk_header_cache(hdr), 32, hash));
+  assert(hsk_hex_encode(hdr->work, 32, work));
+  assert(hsk_hex_encode(hdr->prev_block, 32, prev_block));
+  assert(hsk_hex_encode(hdr->merkle_root, 32, merkle_root));
+  assert(hsk_hex_encode(hdr->witness_root, 32, witness_root));
+  assert(hsk_hex_encode(hdr->trie_root, 32, trie_root));
+  assert(hsk_hex_encode(hdr->nonce, 16, nonce));
+
+  printf("%sheader\n", prefix);
+  printf("%s  hash=%s\n", prefix, hash);
+  printf("%s  height=%d\n", prefix, hdr->height);
+  printf("%s  work=%s\n", prefix, work);
+  printf("%s  version=%d\n", prefix, hdr->version);
+  printf("%s  prev_block=%s\n", prefix, prev_block);
+  printf("%s  merkle_root=%s\n", prefix, merkle_root);
+  printf("%s  witness_root=%s\n", prefix, witness_root);
+  printf("%s  trie_root=%s\n", prefix, trie_root);
+  printf("%s  time=%d\n", prefix, hdr->time);
+  printf("%s  bits=%d\n", prefix, hdr->bits);
+  printf("%s  nonce=%s\n", prefix, nonce);
+  printf("%s  sol_size=%d\n", prefix, hdr->sol_size);
+}

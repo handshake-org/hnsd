@@ -10,6 +10,7 @@
 #include "uv.h"
 
 #include "hsk-addr.h"
+#include "hsk-constants.h"
 #include "hsk-map.h"
 #include "bio.h"
 
@@ -687,6 +688,21 @@ hsk_addr_is_routable(hsk_addr_t *addr) {
     return false;
 
   return true;
+}
+
+void
+hsk_addr_print(hsk_addr_t *addr, char *prefix) {
+  assert(addr);
+
+  if (!prefix)
+    prefix = "";
+
+  char host[HSK_MAX_HOST];
+  assert(hsk_addr_to_string(addr, host, HSK_MAX_HOST, HSK_PORT));
+
+  printf("%saddr\n", prefix);
+  printf("%s  type=%d\n", prefix, addr->type);
+  printf("%s  host=%s\n", prefix, host);
 }
 
 void

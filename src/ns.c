@@ -263,6 +263,8 @@ hsk_ns_onrecv(
     return;
   }
 
+  hsk_dns_req_print(req, "ns: ");
+
   bool result;
   uint8_t *wire;
   size_t wire_len;
@@ -329,13 +331,6 @@ fail:
     goto done;
   }
 
-  if (ns->key) {
-    if (!hsk_hsig_sign_msg(ns->ec, ns->key, &wire, &wire_len, req->nonce)) {
-      hsk_ns_log(ns, "could not sign response\n");
-      goto done;
-    }
-  }
-
   hsk_ns_send(ns, wire, wire_len, addr, true);
 
 done:
@@ -389,6 +384,13 @@ hsk_ns_respond(
       hsk_ns_log(ns, "could not create dns response\n");
   }
 
+  if (result && ns->key) {
+    if (!hsk_hsig_sign_msg(ns->ec, ns->key, &wire, &wire_len, req->nonce)) {
+      hsk_ns_log(ns, "could not sign response\n");
+      result = false;
+    }
+  }
+
   if (!result) {
     // Send SERVFAIL in case of error.
     result = hsk_resource_to_servfail(
@@ -403,13 +405,6 @@ hsk_ns_respond(
 
     if (!result) {
       hsk_ns_log(ns, "could not create servfail response\n");
-      return;
-    }
-  }
-
-  if (ns->key) {
-    if (!hsk_hsig_sign_msg(ns->ec, ns->key, &wire, &wire_len, req->nonce)) {
-      hsk_ns_log(ns, "could not sign response\n");
       return;
     }
   }
