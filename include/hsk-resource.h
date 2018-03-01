@@ -20,6 +20,7 @@
 #define HSK_SSH 17
 #define HSK_PGP 18
 #define HSK_ADDR 19
+#define HSK_GLUE 20
 #define HSK_EXTRA 255
 
 #include <stdint.h>
@@ -130,6 +131,13 @@ typedef struct hsk_addr_record_s {
   size_t hash_len;
   uint8_t hash[64];
 } hsk_addr_record_t;
+
+// TODO: IMPLEMENT
+typedef struct hsk_glue_record_s {
+  uint8_t type;
+  char name[256];
+  hsk_target_t target;
+} hsk_glue_record_t;
 
 typedef struct hsk_extra_record_s {
   uint8_t type;

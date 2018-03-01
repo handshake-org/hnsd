@@ -527,16 +527,12 @@ hsk_map_del(hsk_map_t *map, void *key) {
 
 uint32_t
 hsk_map_hash_str(void *key) {
-  const char *s = (const char *)key;
-  uint32_t hash = (uint32_t)*s;
+  char *s = (char *)key;
 
-  if (hash == 0)
-    return 0;
-
-  s += 1;
+  uint32_t hash = 5381;
 
   for (; *s; s++)
-    hash = (hash << 5) - hash + ((uint32_t)*s);
+    hash = ((hash << 5) + hash) + ((uint32_t)*s);
 
   return hash;
 }
@@ -574,8 +570,6 @@ hsk_map_equal_hash(void *a, void *b) {
   return memcmp(a, b, 32) == 0;
 }
 
-#define __h_rotl32(w, b) ((w << b) | (w >> (32 - b)))
-
 uint32_t
 hsk_map_murmur3(uint8_t *data, size_t data_len, uint32_t seed) {
   const uint32_t c1 = 0xcc9e2d51;
@@ -586,6 +580,8 @@ hsk_map_murmur3(uint8_t *data, size_t data_len, uint32_t seed) {
 
   uint32_t h1 = seed;
   uint32_t k1;
+
+#define __h_rotl32(w, b) ((w << b) | (w >> (32 - b)))
 
   for (i = 0; i < tail; i += 4) {
     k1 = (data[i + 3] << 24)
@@ -615,6 +611,8 @@ hsk_map_murmur3(uint8_t *data, size_t data_len, uint32_t seed) {
       h1 ^= k1;
   }
 
+#undef __h_rotl32
+
   h1 ^= data_len;
   h1 ^= h1 >> 16;
   h1 = h1 * 0x85ebca6b;
@@ -624,8 +622,6 @@ hsk_map_murmur3(uint8_t *data, size_t data_len, uint32_t seed) {
 
   return h1;
 }
-
-#undef __h_rotl32
 
 uint32_t
 hsk_map_tweak3(uint8_t *data, size_t data_len, uint32_t n, uint32_t tweak) {

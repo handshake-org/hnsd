@@ -321,7 +321,6 @@ hsk_addr_from_string(hsk_addr_t *addr, char *src, uint16_t port) {
 
   addr->type = 0;
   assert(hsk_addr_set_ip(addr, af, sin_addr));
-
   addr->port = sin_port;
 
   if (at)
@@ -394,6 +393,7 @@ hsk_sa_copy(struct sockaddr *sa, struct sockaddr *other) {
 
   size_t size = sizeof(struct sockaddr_in6);
 
+  // Note: sockaddr is the worst thing ever created.
   if (other->sa_family == AF_INET)
     size = sizeof(struct sockaddr_in);
 
@@ -711,6 +711,11 @@ hsk_netaddr_read(uint8_t **data, size_t *data_len, hsk_netaddr_t *na) {
 
   if (!read_bytes(data, data_len, na->addr.ip, 36))
     return false;
+
+  // Make sure we ignore trailing bytes
+  // if the address is an IP address.
+  if (na->addr.type == 0)
+    memset(na->addr.ip + 16, 0x00, 20);
 
   if (!read_u16(data, data_len, &na->addr.port))
     return false;
