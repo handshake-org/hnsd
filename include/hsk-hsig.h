@@ -11,14 +11,13 @@
 #define HSK_DNS_HSIG 599
 
 bool
-hsk_hsig_get_nonce(
-  uint8_t *wire,
-  size_t wire_len,
-  uint8_t *nonce
-);
+hsk_hsig_get_nonce(uint8_t *wire, size_t wire_len, uint8_t *nonce);
 
 bool
-hsk_hsig_add_nonce(
+hsk_hsig_has_nonce(uint8_t *wire, size_t wire_len);
+
+bool
+hsk_hsig_set_nonce(
   uint8_t *wire,
   size_t wire_len,
   uint8_t *nonce,
@@ -27,12 +26,10 @@ hsk_hsig_add_nonce(
 );
 
 bool
-hsk_hsig_get_sig(
-  uint8_t *wire,
-  size_t wire_len,
-  uint8_t *sig,
-  int32_t *rec
-);
+hsk_hsig_get_sig(uint8_t *wire, size_t wire_len, uint8_t *sig, int32_t *rec);
+
+bool
+hsk_hsig_has_sig(uint8_t *wire, size_t wire_len);
 
 bool
 hsk_hsig_sighash(
@@ -63,14 +60,11 @@ hsk_hsig_verify(
 );
 
 bool
-hsk_hsig_sign_response(
+hsk_hsig_sign_msg(
   hsk_ec_t *ctx,
   uint8_t *key,
-  uint8_t *wire,
-  size_t wire_len,
-  uint8_t *req,
-  size_t req_len,
-  uint8_t **out,
-  size_t *out_len
+  uint8_t **wire,
+  size_t *wire_len,
+  uint8_t *nonce
 );
 #endif

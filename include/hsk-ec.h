@@ -15,6 +15,12 @@ typedef secp256k1_context hsk_ec_t;
 hsk_ec_t *
 hsk_ec_alloc(void);
 
+hsk_ec_t *
+hsk_ec_clone(hsk_ec_t *ec);
+
+void
+hsk_ec_free(hsk_ec_t *ec);
+
 bool
 hsk_ec_randomize(hsk_ec_t *ctx, uint8_t *seed);
 

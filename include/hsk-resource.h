@@ -206,4 +206,15 @@ hsk_resource_to_nx(
   uint8_t **wire,
   size_t *wire_len
 );
+
+bool
+hsk_resource_to_servfail(
+  uint16_t id,
+  char *fqdn,
+  uint16_t type,
+  bool edns,
+  bool dnssec,
+  uint8_t **wire,
+  size_t *wire_len
+);
 #endif

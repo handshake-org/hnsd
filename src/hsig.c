@@ -9,11 +9,7 @@
 #include "hsk-hsig.h"
 
 bool
-hsk_hsig_get_nonce(
-  uint8_t *wire,
-  size_t wire_len,
-  uint8_t *nonce
-) {
+hsk_hsig_get_nonce(uint8_t *wire, size_t wire_len, uint8_t *nonce) {
   if (wire_len < 43 + 12)
     return false;
 
@@ -54,13 +50,19 @@ hsk_hsig_get_nonce(
     return false;
 
   // Copy nonce.
-  memcpy(nonce, rr + 11, 32);
+  if (nonce)
+    memcpy(nonce, rr + 11, 32);
 
   return true;
 }
 
 bool
-hsk_hsig_add_nonce(
+hsk_hsig_has_nonce(uint8_t *wire, size_t wire_len) {
+  return hsk_hsig_get_nonce(wire, wire_len, NULL);
+}
+
+bool
+hsk_hsig_set_nonce(
   uint8_t *wire,
   size_t wire_len,
   uint8_t *nonce,
@@ -71,8 +73,17 @@ hsk_hsig_add_nonce(
     return false;
 
   uint16_t arcount = (((uint16_t)wire[10]) << 8) | wire[11];
+  arcount += 1;
 
   size_t o_len = wire_len + 43;
+
+  // Overwrite nonces. Do not append.
+  if (hsk_hsig_has_nonce(wire, wire_len)) {
+    o_len -= 43;
+    wire_len -= 43;
+    arcount -= 1;
+  }
+
   uint8_t *o = malloc(o_len);
 
   if (!o)
@@ -107,7 +118,6 @@ hsk_hsig_add_nonce(
   memcpy(rr + 11, nonce, 32);
 
   // arcount + 1
-  arcount += 1;
   o[10] = arcount >> 8;
   o[11] = arcount & 0xff;
 
@@ -118,12 +128,7 @@ hsk_hsig_add_nonce(
 }
 
 bool
-hsk_hsig_get_sig(
-  uint8_t *wire,
-  size_t wire_len,
-  uint8_t *sig,
-  int32_t *rec
-) {
+hsk_hsig_get_sig(uint8_t *wire, size_t wire_len, uint8_t *sig, int32_t *rec) {
   if (wire_len < 76 + 12)
     return false;
 
@@ -163,11 +168,19 @@ hsk_hsig_get_sig(
   if (size != 65)
     return false;
 
-  // Copy to temporary buffer while we append the nonce.
-  memcpy(sig, rr + 11, 64);
-  *rec = (rr + 11)[64];
+  // Copy sig.
+  if (sig)
+    memcpy(sig, rr + 11, 64);
+
+  if (rec)
+    *rec = (rr + 11)[64];
 
   return true;
+}
+
+bool
+hsk_hsig_has_sig(uint8_t *wire, size_t wire_len) {
+  return hsk_hsig_get_sig(wire, wire_len, NULL, NULL);
 }
 
 bool
@@ -218,8 +231,17 @@ hsk_hsig_sign(
     return false;
 
   uint16_t arcount = (((uint16_t)wire[10]) << 8) | wire[11];
+  arcount += 1;
 
   size_t o_len = wire_len + 76;
+
+  // Overwrite sigs. Do not append.
+  if (hsk_hsig_has_sig(wire, wire_len)) {
+    o_len -= 76;
+    wire_len -= 76;
+    arcount -= 1;
+  }
+
   uint8_t *o = malloc(o_len);
 
   if (!o)
@@ -271,7 +293,6 @@ hsk_hsig_sign(
   sig[64] = (uint8_t)rec;
 
   // arcount + 1
-  arcount += 1;
   o[10] = arcount >> 8;
   o[11] = arcount & 0xff;
 
@@ -302,28 +323,36 @@ hsk_hsig_verify(
 }
 
 bool
-hsk_hsig_sign_response(
+hsk_hsig_sign_msg(
   hsk_ec_t *ctx,
   uint8_t *key,
-  uint8_t *wire,
-  size_t wire_len,
-  uint8_t *req,
-  size_t req_len,
-  uint8_t **out,
-  size_t *out_len
+  uint8_t **msg,
+  size_t *msg_len,
+  uint8_t *nonce
 ) {
-  uint8_t nonce[32];
+  uint8_t *res;
+  size_t res_len;
 
-  if (!hsk_hsig_get_nonce(req, req_len, nonce))
-    return false;
-
-  return hsk_hsig_sign(
+  bool result = hsk_hsig_sign(
     ctx,
     key,
-    wire,
-    wire_len,
+    *msg,
+    *msg_len,
     nonce,
-    out,
-    out_len
+    &res,
+    &res_len
   );
+
+  free(*msg);
+
+  *msg = NULL;
+  *msg_len = 0;
+
+  if (!result)
+    return false;
+
+  *msg = res;
+  *msg_len = res_len;
+
+  return true;
 }

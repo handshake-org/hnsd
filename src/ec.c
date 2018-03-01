@@ -16,6 +16,16 @@ hsk_ec_alloc(void) {
     SECP256K1_CONTEXT_SIGN | SECP256K1_CONTEXT_VERIFY);
 }
 
+hsk_ec_t *
+hsk_ec_clone(hsk_ec_t *ec) {
+  return secp256k1_context_clone(ec);
+}
+
+void
+hsk_ec_free(hsk_ec_t *ec) {
+  secp256k1_context_destroy(ec);
+}
+
 bool
 hsk_ec_randomize(hsk_ec_t *ctx, uint8_t *seed) {
   return secp256k1_context_randomize(ctx, seed) != 0;

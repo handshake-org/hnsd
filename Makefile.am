@@ -62,6 +62,7 @@ libhsk_la_SOURCES = src/addr.c     \
                     src/msg.c      \
                     src/pool.c     \
                     src/proof.c    \
+                    src/req.c      \
                     src/resource.c \
                     src/sha256.c   \
                     src/siphash.c  \

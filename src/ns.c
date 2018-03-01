@@ -6,6 +6,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
+#include <arpa/inet.h>
+#include <netinet/in.h>
 
 #include "uv.h"
 #include "ldns/ldns.h"
@@ -14,9 +16,11 @@
 #include "hsk-constants.h"
 #include "hsk-ec.h"
 #include "hsk-error.h"
+#include "hsk-hsig.h"
 #include "hsk-resource.h"
 #include "ns.h"
 #include "pool.h"
+#include "req.h"
 
 /*
  * Types
@@ -28,13 +32,6 @@ typedef struct {
   bool should_free;
 } hsk_send_data_t;
 
-typedef struct {
-  hsk_ns_t *ns;
-  ldns_pkt *req;
-  struct sockaddr addr;
-  char fqdn[256];
-} hsk_dns_req_t;
-
 /*
  * Templates
  */
@@ -43,7 +40,7 @@ static void
 hsk_ns_log(hsk_ns_t *, const char *, ...);
 
 static void
-hsk_ns_respond(
+after_resolve(
   char *,
   int32_t,
   bool,
@@ -114,7 +111,13 @@ void
 hsk_ns_uninit(hsk_ns_t *ns) {
   if (!ns)
     return;
+
   ns->socket.data = NULL;
+
+  if (ns->ec) {
+    hsk_ec_free(ns->ec);
+    ns->ec = NULL;
+  }
 }
 
 void
@@ -253,186 +256,165 @@ hsk_ns_onrecv(
   struct sockaddr *addr,
   uint32_t flags
 ) {
-  ldns_pkt *req;
-  ldns_status rc = ldns_wire2pkt(&req, data, data_len);
+  hsk_dns_req_t *req = hsk_dns_req_create(data, data_len, addr);
 
-  if (rc != LDNS_STATUS_OK) {
-    hsk_ns_log(ns, "bad dns message: %s\n", ldns_get_errorstr_by_id(rc));
+  if (!req) {
+    hsk_ns_log(ns, "failed processing dns request\n");
     return;
   }
 
-  ldns_pkt_opcode opcode = ldns_pkt_get_opcode(req);
-  ldns_pkt_rcode rcode = ldns_pkt_get_rcode(req);
-  ldns_rr_list *qd = ldns_pkt_question(req);
-  ldns_rr_list *an = ldns_pkt_answer(req);
-  ldns_rr_list *ns_ = ldns_pkt_authority(req);
+  bool result;
+  uint8_t *wire;
+  size_t wire_len;
 
-  if (opcode != LDNS_PACKET_QUERY
-      || rcode != LDNS_RCODE_NOERROR
-      || ldns_rr_list_rr_count(qd) != 1
-      || ldns_rr_list_rr_count(an) != 0
-      || ldns_rr_list_rr_count(ns_) != 0) {
-    ldns_pkt_free(req);
+  // Requesting a lookup.
+  if (req->labels > 0) {
+    req->ns = (void *)ns;
+
+    int32_t rc = hsk_pool_resolve(
+      ns->pool,
+      req->tld,
+      after_resolve,
+      (void *)req
+    );
+
+    if (rc != HSK_SUCCESS) {
+      hsk_ns_log(ns, "pool resolve error: %d\n", rc);
+      goto fail;
+    }
+
     return;
   }
 
-  // Grab the first question.
-  ldns_rr *qs = ldns_rr_list_rr(qd, 0);
+  // Querying the root zone.
+  result = hsk_resource_root(
+    req->id,
+    req->type,
+    req->edns,
+    req->dnssec,
+    ns->ip,
+    &wire,
+    &wire_len
+  );
 
-  hsk_ns_log(ns, "received dns query:\n");
-  ldns_rr_print(stdout, qs);
-
-  uint16_t id = ldns_pkt_id(req);
-  const ldns_rdf *rdf = ldns_rr_owner(qs);
-  const ldns_rr_type type = ldns_rr_get_type(qs);
-  const ldns_rr_class class = ldns_rr_get_class(qs);
-
-  if (class != LDNS_RR_CLASS_IN) {
-    ldns_pkt_free(req);
-    return;
+  if (!result) {
+    hsk_ns_log(ns, "could not create root soa\n");
+    goto fail;
   }
 
-  char *fqdn = ldns_rdf2str(rdf);
-
-  if (!fqdn) {
-    ldns_pkt_free(req);
-    return;
+  if (ns->key) {
+    if (!hsk_hsig_sign_msg(ns->ec, ns->key, &wire, &wire_len, req->nonce)) {
+      hsk_ns_log(ns, "could not sign response\n");
+      goto fail;
+    }
   }
 
-  size_t size = strlen(fqdn);
+  hsk_ns_send(ns, wire, wire_len, addr, true);
 
-  if (size == 0 || size > 255 || fqdn[size - 1] != '.') {
-    free(fqdn);
-    ldns_pkt_free(req);
-    return;
+  goto done;
+
+fail:
+  result = hsk_resource_to_servfail(
+    req->id,
+    req->name,
+    req->type,
+    req->edns,
+    req->dnssec,
+    &wire,
+    &wire_len
+  );
+
+  if (!result) {
+    hsk_ns_log(ns, "failed creating servfail\n");
+    goto done;
   }
 
-  // Authoritative.
-  if (size == 1) {
-    bool edns = ldns_pkt_edns_udp_size(req) == 4096;
-    bool dnssec = ldns_pkt_edns_do(req);
+  if (ns->key) {
+    if (!hsk_hsig_sign_msg(ns->ec, ns->key, &wire, &wire_len, req->nonce)) {
+      hsk_ns_log(ns, "could not sign response\n");
+      goto done;
+    }
+  }
 
-    free(fqdn);
-    ldns_pkt_free(req);
+  hsk_ns_send(ns, wire, wire_len, addr, true);
 
-    uint8_t *wire;
-    size_t wire_len;
+done:
+  if (req)
+    hsk_dns_req_free(req);
+}
 
-    bool result = hsk_resource_root(
-      id,
-      type,
-      edns,
-      dnssec,
-      ns->ip,
+static void
+hsk_ns_respond(
+  hsk_ns_t *ns,
+  hsk_dns_req_t *req,
+  int32_t status,
+  hsk_resource_t *res
+) {
+  bool result;
+  uint8_t *wire;
+  size_t wire_len;
+
+  if (status != HSK_SUCCESS) {
+    // Pool resolve error.
+    result = false;
+    hsk_ns_log(ns, "resolve response error: %d\n", status);
+  } else if (!res) {
+    // Doesn't exist.
+    result = hsk_resource_to_nx(
+      req->id,
+      req->name,
+      req->type,
+      req->edns,
+      req->dnssec,
       &wire,
       &wire_len
     );
 
     if (!result)
-      return;
+      hsk_ns_log(ns, "could not create nx response\n");
+  } else {
+    // Exists!
+    result = hsk_resource_to_dns(
+      res,
+      req->id,
+      req->name,
+      req->type,
+      req->edns,
+      req->dnssec,
+      &wire,
+      &wire_len
+    );
 
-    hsk_ns_send(ns, wire, wire_len, addr, true);
-
-    return;
+    if (!result)
+      hsk_ns_log(ns, "could not create dns response\n");
   }
 
-  int32_t i = size - 2;
+  if (!result) {
+    // Send SERVFAIL in case of error.
+    result = hsk_resource_to_servfail(
+      req->id,
+      req->name,
+      req->type,
+      req->edns,
+      req->dnssec,
+      &wire,
+      &wire_len
+    );
 
-  for (; i >= 0; i--) {
-    if (fqdn[i] == '.')
-      break;
-  }
-
-  i += 1;
-  size_t nsize = (size - 1) - i;
-  char name[256];
-  memcpy(name, fqdn + i, nsize);
-  name[nsize] = '\0';
-
-  hsk_dns_req_t *dr = malloc(sizeof(hsk_dns_req_t));
-
-  if (!dr) {
-    free(fqdn);
-    ldns_pkt_free(req);
-    return;
-  }
-
-  dr->ns = ns;
-  dr->req = req;
-  memcpy((void *)&dr->addr, (void *)addr, sizeof(struct sockaddr));
-  memcpy(dr->fqdn, fqdn, size + 1);
-  free(fqdn);
-
-  int32_t r = hsk_pool_resolve(ns->pool, name, hsk_ns_respond, (void *)dr);
-
-  if (r != HSK_SUCCESS)
-    hsk_ns_log(ns, "resolve error: %d\n", r);
-}
-
-static void
-hsk_ns_respond(
-  char *name,
-  int32_t status,
-  bool exists,
-  uint8_t *data,
-  size_t data_len,
-  void *arg
-) {
-  hsk_dns_req_t *dr = (hsk_dns_req_t *)arg;
-  hsk_ns_t *ns = dr->ns;
-  ldns_pkt *req = dr->req;
-  struct sockaddr *addr = &dr->addr;
-  char *fqdn = dr->fqdn;
-
-  if (status != HSK_SUCCESS) {
-    hsk_ns_log(ns, "resolve response error: %d\n", status);
-    ldns_pkt_free(req);
-    free(dr);
-    return;
-  }
-
-  uint8_t *wire;
-  size_t wire_len;
-
-  ldns_rr *qs = ldns_rr_list_rr(ldns_pkt_question(req), 0);
-
-  bool edns = ldns_pkt_edns_udp_size(req) == 4096;
-  bool dnssec = ldns_pkt_edns_do(req);
-  uint16_t id = ldns_pkt_id(req);
-  uint16_t type = (uint16_t)ldns_rr_get_type(qs);
-
-  ldns_pkt_free(req);
-
-  // Doesn't exist.
-  if (!exists) {
-    if (!hsk_resource_to_nx(id, fqdn, type, edns, dnssec, &wire, &wire_len)) {
-      free(dr);
+    if (!result) {
+      hsk_ns_log(ns, "could not create servfail response\n");
       return;
     }
-    hsk_ns_send(ns, wire, wire_len, addr, true);
-    free(dr);
-    return;
   }
 
-  hsk_resource_t *rs;
-
-  if (!hsk_resource_decode(data, data_len, &rs)) {
-    ldns_pkt_free(req);
-    free(dr);
-    return;
+  if (ns->key) {
+    if (!hsk_hsig_sign_msg(ns->ec, ns->key, &wire, &wire_len, req->nonce)) {
+      hsk_ns_log(ns, "could not sign response\n");
+      return;
+    }
   }
 
-  if (!hsk_resource_to_dns(rs, id, fqdn, type, edns, dnssec, &wire, &wire_len)) {
-    hsk_resource_free(rs);
-    free(dr);
-    return;
-  }
-
-  hsk_resource_free(rs);
-
-  hsk_ns_send(ns, wire, wire_len, addr, true);
-
-  free(dr);
+  hsk_ns_send(ns, wire, wire_len, req->addr, true);
 }
 
 int32_t
@@ -577,4 +559,33 @@ after_close(uv_handle_t *handle) {
   // handle->data = NULL;
   // ns->bound = false;
   // hsk_ns_free(peer);
+}
+
+static void
+after_resolve(
+  char *name,
+  int32_t status,
+  bool exists,
+  uint8_t *data,
+  size_t data_len,
+  void *arg
+) {
+  hsk_dns_req_t *req = (hsk_dns_req_t *)arg;
+  hsk_ns_t *ns = (hsk_ns_t *)req->ns;
+  hsk_resource_t *res = NULL;
+
+  if (status == HSK_SUCCESS && exists) {
+    if (!hsk_resource_decode(data, data_len, &res)) {
+      hsk_ns_log(ns, "could not decode resource for: %s\n", name);
+      status = HSK_EFAILURE;
+      res = NULL;
+    }
+  }
+
+  hsk_ns_respond(ns, req, status, res);
+
+  if (res)
+    hsk_resource_free(res);
+
+  hsk_dns_req_free(req);
 }

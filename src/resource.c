@@ -2011,6 +2011,83 @@ hsk_resource_to_nx(
   return rc == LDNS_STATUS_OK;
 }
 
+bool
+hsk_resource_to_servfail(
+  uint16_t id,
+  char *fqdn,
+  uint16_t type,
+  bool edns,
+  bool dnssec,
+  uint8_t **wire,
+  size_t *wire_len
+) {
+  ldns_rdf *rdf = ldns_dname_new_frm_str(fqdn);
+
+  if (!rdf)
+    return false;
+
+  ldns_pkt *res = ldns_pkt_new();
+  ldns_rr_list *qd = ldns_rr_list_new();
+  ldns_rr_list *an = ldns_rr_list_new();
+  ldns_rr_list *ns = ldns_rr_list_new();
+  ldns_rr_list *ad = ldns_rr_list_new();
+  ldns_rr *qs = ldns_rr_new();
+
+  if (!res || !qd || !an || !ns || !ad || !qs) {
+    ldns_rdf_deep_free(rdf);
+
+    if (res)
+      ldns_pkt_free(res);
+
+    if (qd)
+      ldns_rr_list_free(qd);
+
+    if (an)
+      ldns_rr_list_free(an);
+
+    if (ns)
+      ldns_rr_list_free(ns);
+
+    if (ad)
+      ldns_rr_list_free(ad);
+
+    return false;
+  }
+
+  ldns_pkt_set_id(res, id);
+  ldns_pkt_set_rcode(res, LDNS_RCODE_SERVFAIL);
+  ldns_pkt_set_qr(res, 1);
+  ldns_pkt_set_aa(res, 1);
+
+  if (edns) {
+    ldns_pkt_set_edns_udp_size(res, 4096);
+    if (dnssec)
+      ldns_pkt_set_edns_do(res, 1);
+  }
+
+  ldns_rr_set_question(qs, 1);
+  ldns_rr_set_type(qs, (ldns_rr_type)type);
+  ldns_rr_set_class(qs, LDNS_RR_CLASS_IN);
+  ldns_rr_set_owner(qs, rdf);
+
+  ldns_rr_list_push_rr(qd, qs);
+
+  ldns_pkt_push_rr_list(res, LDNS_SECTION_QUESTION, qd);
+  ldns_pkt_push_rr_list(res, LDNS_SECTION_ANSWER, an);
+  ldns_pkt_push_rr_list(res, LDNS_SECTION_AUTHORITY, ns);
+  ldns_pkt_push_rr_list(res, LDNS_SECTION_ADDITIONAL, ad);
+
+  ldns_status rc = ldns_pkt2wire(wire, res, wire_len);
+
+  ldns_pkt_free(res);
+  ldns_rr_list_free(qd);
+  ldns_rr_list_free(an);
+  ldns_rr_list_free(ns);
+  ldns_rr_list_free(ad);
+
+  return rc == LDNS_STATUS_OK;
+}
+
 /*
  * Helpers
  */
