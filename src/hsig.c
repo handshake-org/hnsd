@@ -72,7 +72,8 @@ hsk_hsig_add_nonce(
 
   uint16_t arcount = (((uint16_t)wire[10]) << 8) | wire[11];
 
-  uint8_t *o = malloc(wire_len + 43);
+  size_t o_len = wire_len + 43;
+  uint8_t *o = malloc(o_len);
 
   if (!o)
     return false;
@@ -111,7 +112,7 @@ hsk_hsig_add_nonce(
   o[11] = arcount & 0xff;
 
   *out = o;
-  *out_len = wire_len + 43;
+  *out_len = o_len;
 
   return true;
 }
@@ -218,7 +219,8 @@ hsk_hsig_sign(
 
   uint16_t arcount = (((uint16_t)wire[10]) << 8) | wire[11];
 
-  uint8_t *o = malloc(wire_len + 76);
+  size_t o_len = wire_len + 76;
+  uint8_t *o = malloc(o_len);
 
   if (!o)
     return false;
@@ -253,7 +255,7 @@ hsk_hsig_sign(
 
   uint8_t hash[32];
 
-  if (!hsk_hsig_sighash(wire, wire_len, nonce, hash)) {
+  if (!hsk_hsig_sighash(o, o_len, nonce, hash)) {
     free(o);
     return false;
   }
@@ -274,7 +276,7 @@ hsk_hsig_sign(
   o[11] = arcount & 0xff;
 
   *out = o;
-  *out_len = wire_len + 76;
+  *out_len = o_len;
 
   return true;
 }

@@ -12,9 +12,10 @@
 #include "unbound.h"
 
 #include "hsk-addr.h"
+#include "hsk-constants.h"
 #include "hsk-error.h"
 #include "hsk-ec.h"
-#include "hsk-constants.h"
+#include "hsk-hsig.h"
 #include "rs.h"
 #include "utils.h"
 
@@ -31,6 +32,7 @@ typedef struct {
 typedef struct {
   hsk_rs_t *ns;
   ldns_pkt *req;
+  uint8_t nonce[32];
   struct sockaddr_storage ss;
   struct sockaddr *addr;
 } hsk_dns_req_t;
@@ -44,15 +46,6 @@ hsk_rs_init_unbound(hsk_rs_t *ns, struct sockaddr *addr);
 
 static void
 hsk_rs_log(hsk_rs_t *ns, const char *fmt, ...);
-
-static void
-hsk_rs_respond(
-  hsk_rs_t *,
-  ldns_pkt *,
-  int32_t,
-  struct ub_result *,
-  struct sockaddr *
-);
 
 static int32_t
 hsk_rs_send(
@@ -363,7 +356,7 @@ hsk_rs_onrecv(
   uint16_t type = (uint16_t)rrtype;
   uint16_t class = (uint16_t)rrclass;
 
-  hsk_dns_req_t *dr = malloc(sizeof(hsk_dns_req_t));
+  hsk_dns_req_t *dr = (hsk_dns_req_t *)calloc(1, sizeof(hsk_dns_req_t));
 
   if (!dr) {
     free(name);
@@ -375,6 +368,9 @@ hsk_rs_onrecv(
   dr->req = req;
   dr->addr = (struct sockaddr *)&dr->ss;
   hsk_sa_copy(dr->addr, addr);
+
+  if (!hsk_hsig_get_nonce(data, data_len, dr->nonce))
+    hsk_rs_log(ns, "no nonce in dns request\n");
 
   int32_t r = ub_resolve_async(
     ns->ub,
@@ -398,6 +394,7 @@ static void
 hsk_rs_respond(
   hsk_rs_t *ns,
   ldns_pkt *req,
+  uint8_t *nonce,
   int32_t status,
   struct ub_result *result,
   struct sockaddr *addr
@@ -444,14 +441,36 @@ hsk_rs_respond(
 
   ldns_pkt_free(res);
 
-  // ldns_pkt_print();
-  if (r == LDNS_STATUS_OK)
-    hsk_rs_send(ns, wire, wire_len, addr, true);
+  if (r != LDNS_STATUS_OK) {
+    hsk_rs_log(ns, "could not serialize response\n");
+    return;
+  }
 
-  // if (result->havedata) {
-  //   hsk_rs_log(ns, "The address is %s\n",
-  //     inet_ntoa(*(struct in_addr*)result->data[0]));
-  // }
+  if (ns->key) {
+    uint8_t *data;
+    size_t data_len;
+
+    bool result = hsk_hsig_sign(
+      ns->ec,
+      ns->key,
+      wire,
+      wire_len,
+      nonce,
+      &data,
+      &data_len
+    );
+
+    if (!result) {
+      free(wire);
+      hsk_rs_log(ns, "could not sign response\n");
+      return;
+    }
+
+    hsk_rs_send(ns, data, data_len, addr, true);
+    return;
+  }
+
+  hsk_rs_send(ns, wire, wire_len, addr, true);
 }
 
 static int32_t
@@ -607,7 +626,7 @@ after_resolve(void *data, int32_t status, struct ub_result *result) {
   if (!dr->ns)
     return;
 
-  hsk_rs_respond(dr->ns, dr->req, status, result, dr->addr);
+  hsk_rs_respond(dr->ns, dr->req, dr->nonce, status, result, dr->addr);
   ldns_pkt_free(dr->req);
   free(dr);
   ub_resolve_free(result);
