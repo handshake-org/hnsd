@@ -20,4 +20,10 @@ hsk_dnssec_sign_rr_list(ldns_rr_list *an);
 
 bool
 hsk_dnssec_sign(ldns_rr_list *an, ldns_rr_type type, bool dnssec);
+
+ldns_rr_list *
+hsk_dnssec_filter(ldns_rr_list *list, ldns_rr_type type);
+
+bool
+hsk_dnssec_clean(ldns_pkt *pkt, ldns_rr_type type);
 #endif

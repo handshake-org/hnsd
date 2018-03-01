@@ -319,3 +319,109 @@ hsk_dnssec_sign(ldns_rr_list *an, ldns_rr_type type, bool dnssec) {
 
   return true;
 }
+
+ldns_rr_list *
+hsk_dnssec_filter(ldns_rr_list *list, ldns_rr_type type) {
+  ldns_rr_list *set = ldns_rr_list_new();
+
+  if (!set)
+    return NULL;
+
+  ldns_rr_list *dead = ldns_rr_list_new();
+
+  if (!dead) {
+    ldns_rr_list_free(set);
+    return NULL;
+  }
+
+  int32_t count = ldns_rr_list_rr_count(list);
+  int32_t i;
+
+  for (i = 0; i < count; i++) {
+    ldns_rr *rr = ldns_rr_list_rr(list, i);
+
+    if (type != LDNS_RR_TYPE_RRSIG) {
+      if (ldns_rr_get_type(rr) == LDNS_RR_TYPE_RRSIG) {
+        if (!ldns_rr_list_push_rr(dead, rr)) {
+          ldns_rr_list_free(dead);
+          ldns_rr_list_free(set);
+          return NULL;
+        }
+        continue;
+      }
+    }
+
+    if (type != LDNS_RR_TYPE_NSEC3) {
+      if (ldns_rr_get_type(rr) == LDNS_RR_TYPE_NSEC3) {
+        if (!ldns_rr_list_push_rr(dead, rr)) {
+          ldns_rr_list_free(dead);
+          ldns_rr_list_free(set);
+          return NULL;
+        }
+        continue;
+      }
+    }
+
+    if (type != LDNS_RR_TYPE_NSEC) {
+      if (ldns_rr_get_type(rr) == LDNS_RR_TYPE_NSEC) {
+        if (!ldns_rr_list_push_rr(dead, rr)) {
+          ldns_rr_list_free(dead);
+          ldns_rr_list_free(set);
+          return NULL;
+        }
+        continue;
+      }
+    }
+
+    if (type != LDNS_RR_TYPE_DS) {
+      if (ldns_rr_get_type(rr) == LDNS_RR_TYPE_DS) {
+        if (!ldns_rr_list_push_rr(dead, rr)) {
+          ldns_rr_list_free(dead);
+          ldns_rr_list_free(set);
+          return NULL;
+        }
+        continue;
+      }
+    }
+
+    if (!ldns_rr_list_push_rr(set, rr)) {
+      ldns_rr_list_free(dead);
+      ldns_rr_list_free(set);
+      return NULL;
+    }
+  }
+
+  ldns_rr_list_deep_free(dead);
+  ldns_rr_list_free(list);
+
+  return set;
+}
+
+bool
+hsk_dnssec_clean(ldns_pkt *pkt, ldns_rr_type type) {
+  ldns_rr_list *an = hsk_dnssec_filter(ldns_pkt_answer(pkt), type);
+
+  if (!an)
+    return false;
+
+  ldns_pkt_set_ancount(pkt, ldns_rr_list_rr_count(an));
+  ldns_pkt_set_answer(pkt, an);
+
+  ldns_rr_list *ns = hsk_dnssec_filter(ldns_pkt_authority(pkt), type);
+
+  if (!ns)
+    return false;
+
+  ldns_pkt_set_nscount(pkt, ldns_rr_list_rr_count(ns));
+  ldns_pkt_set_authority(pkt, ns);
+
+  ldns_rr_list *ar = hsk_dnssec_filter(ldns_pkt_additional(pkt), type);
+
+  if (!ar)
+    return false;
+
+  ldns_pkt_set_arcount(pkt, ldns_rr_list_rr_count(ar));
+  ldns_pkt_set_additional(pkt, ar);
+
+  return true;
+}

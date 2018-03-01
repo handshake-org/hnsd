@@ -19,6 +19,7 @@
 #include "hsk-error.h"
 #include "hsk-ec.h"
 #include "hsk-hsig.h"
+#include "dnssec.h"
 #include "req.h"
 #include "rs.h"
 #include "utils.h"
@@ -402,6 +403,9 @@ hsk_rs_respond(
         ldns_pkt_set_ad(pkt, 1);
       else
         ldns_pkt_set_ad(pkt, 0);
+
+      if (!hsk_dnssec_clean(pkt, (ldns_rr_type)req->type))
+        goto fail;
     }
   }
 
