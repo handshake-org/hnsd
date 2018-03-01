@@ -566,16 +566,69 @@ hsk_map_equal_int(void *a, void *b) {
 uint32_t
 hsk_map_hash_hash(void *key) {
   uint8_t *data = (uint8_t *)key;
-  uint32_t hash = (uint32_t)*data;
-  int i;
-
-  for (i = 1; i < 32; i++)
-    hash = (hash << 5) - hash + ((uint32_t)data[i]);
-
-  return hash;
+  return hsk_map_murmur3(data, 32, 0xfba4c795);
 }
 
 bool
 hsk_map_equal_hash(void *a, void *b) {
   return memcmp(a, b, 32) == 0;
+}
+
+#define __h_rotl32(w, b) ((w << b) | (w >> (32 - b)))
+
+uint32_t
+hsk_map_murmur3(uint8_t *data, size_t data_len, uint32_t seed) {
+  const uint32_t c1 = 0xcc9e2d51;
+  const uint32_t c2 = 0x1b873593;
+
+  int32_t tail = data_len - (data_len % 4);
+  int32_t i;
+
+  uint32_t h1 = seed;
+  uint32_t k1;
+
+  for (i = 0; i < tail; i += 4) {
+    k1 = (data[i + 3] << 24)
+      | (data[i + 2] << 16)
+      | (data[i + 1] << 8)
+      | data[i];
+    k1 = k1 * c1;
+    k1 = __h_rotl32(k1, 15);
+    k1 = k1 * c2;
+    h1 ^= k1;
+    h1 = __h_rotl32(h1, 13);
+    h1 = (h1 * 5) + 0xe6546b64;
+  }
+
+  k1 = 0;
+
+  switch (data_len & 3) {
+    case 3:
+      k1 ^= data[tail + 2] << 16;
+    case 2:
+      k1 ^= data[tail + 1] << 8;
+    case 1:
+      k1 ^= data[tail + 0];
+      k1 = k1 * c1;
+      k1 = __h_rotl32(k1, 15);
+      k1 = k1 * c2;
+      h1 ^= k1;
+  }
+
+  h1 ^= data_len;
+  h1 ^= h1 >> 16;
+  h1 = h1 * 0x85ebca6b;
+  h1 ^= h1 >> 13;
+  h1 = h1 * 0xc2b2ae35;
+  h1 ^= h1 >> 16;
+
+  return h1;
+}
+
+#undef __h_rotl32
+
+uint32_t
+hsk_map_tweak3(uint8_t *data, size_t data_len, uint32_t n, uint32_t tweak) {
+  uint32_t seed = (n * 0xfba4c795) + tweak;
+  return hsk_map_murmur3(data, data_len, seed);
 }

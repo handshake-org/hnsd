@@ -333,7 +333,7 @@ bool
 hsk_addrman_add_ban(hsk_addrman_t *am, hsk_addr_t *addr) {
   hsk_banned_t *entry = hsk_map_get(&am->banned, addr);
 
-  int64_t now = hsk_timedata_now(am->td);
+  int64_t now = hsk_now();
 
   if (entry) {
     entry->time = now;
@@ -348,7 +348,7 @@ hsk_addrman_add_ban(hsk_addrman_t *am, hsk_addr_t *addr) {
   hsk_addr_copy(&ban->addr, addr);
   ban->time = now;
 
-  if (!hsk_map_set(&am->banned, ban, ban)) {
+  if (!hsk_map_set(&am->banned, &ban->addr, ban)) {
     free(ban);
     return false;
   }
@@ -363,10 +363,10 @@ hsk_addrman_is_banned(hsk_addrman_t *am, hsk_addr_t *addr) {
   if (!entry)
     return false;
 
-  int64_t now = hsk_timedata_now(am->td);
+  int64_t now = hsk_now();
 
   if (now > entry->time + HSK_BAN_TIME) {
-    hsk_map_del(&am->banned, entry);
+    hsk_map_del(&am->banned, &entry->addr);
     free(entry);
     return false;
   }

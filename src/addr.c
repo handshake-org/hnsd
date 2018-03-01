@@ -8,7 +8,9 @@
 #include <string.h>
 
 #include "uv.h"
+
 #include "hsk-addr.h"
+#include "hsk-map.h"
 #include "bio.h"
 
 static const uint8_t hsk_ip4_mapped[12] = {
@@ -398,26 +400,11 @@ hsk_sa_copy(struct sockaddr *sa, struct sockaddr *other) {
   memcpy((void *)sa, (void *)other, size);
 }
 
-static inline uint32_t
-hsk_hash_data(uint32_t hash, uint8_t *data, size_t size) {
-  assert(data);
-
-  int32_t i;
-
-  for (i = 0; i < size; i++)
-    hash = (hash << 5) - hash + ((uint32_t)data[i]);
-
-  return hash;
-}
-
 uint32_t
 hsk_addr_hash(void *key) {
-  assert(key);
   hsk_addr_t *addr = (hsk_addr_t *)key;
-  uint32_t hash = (uint32_t)addr->type;
-  hash = hsk_hash_data(hash, addr->ip, 36);
-  hash = hsk_hash_data(hash, (uint8_t *)&addr->port, 2);
-  return hash;
+  assert(addr);
+  return hsk_map_tweak3(addr->ip, 36, addr->type + 1, addr->port);
 }
 
 bool

@@ -243,4 +243,10 @@ hsk_map_hash_hash(void *key);
 
 bool
 hsk_map_equal_hash(void *a, void *b);
+
+uint32_t
+hsk_map_murmur3(uint8_t *data, size_t data_len, uint32_t seed);
+
+uint32_t
+hsk_map_tweak3(uint8_t *data, size_t data_len, uint32_t n, uint32_t tweak);
 #endif
