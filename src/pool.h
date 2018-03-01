@@ -113,6 +113,9 @@ hsk_pool_uninit(hsk_pool_t *pool);
 bool
 hsk_pool_set_size(hsk_pool_t *pool, int32_t max_size);
 
+bool
+hsk_pool_set_seeds(hsk_pool_t *pool, char *seeds);
+
 hsk_pool_t *
 hsk_pool_alloc(uv_loop_t *loop);
 

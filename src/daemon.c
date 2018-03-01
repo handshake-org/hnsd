@@ -250,6 +250,12 @@ main(int argc, char **argv) {
     goto done;
   }
 
+  if (!hsk_pool_set_seeds(pool, opt.seeds)) {
+    fprintf(stderr, "failed adding seeds\n");
+    rc = HSK_EFAILURE;
+    goto done;
+  }
+
   ns = hsk_ns_alloc(loop, pool);
 
   if (!ns) {

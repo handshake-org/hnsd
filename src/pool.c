@@ -160,10 +160,54 @@ hsk_pool_uninit(hsk_pool_t *pool) {
 
 bool
 hsk_pool_set_size(hsk_pool_t *pool, int32_t max_size) {
+  assert(pool);
+
   if (max_size <= 0 || max_size > 1000)
     return false;
 
   pool->max_size = max_size;
+
+  return true;
+}
+
+bool
+hsk_pool_set_seeds(hsk_pool_t *pool, char *seeds) {
+  assert(pool);
+
+  if (!seeds)
+    return true;
+
+  size_t len = strlen(seeds);
+  int32_t start = 0;
+  int32_t i;
+
+  char seed[HSK_MAX_HOST];
+  hsk_addr_t addr;
+
+  for (i = 0; i < len + 1; i++) {
+    if (seeds[i] == ',' || seeds[i] == '\0') {
+      size_t size = i - start;
+
+      if (size == 0) {
+        start = i + 1;
+        continue;
+      }
+
+      if (size >= HSK_MAX_HOST)
+        return false;
+
+      memcpy(seed, seeds + start, size);
+      seed[size] = '\0';
+
+      if (!hsk_addr_from_string(&addr, seed, HSK_PORT))
+        return false;
+
+      if (!hsk_addrman_add_addr(&pool->am, &addr))
+        return false;
+
+      start = i + 1;
+    }
+  }
 
   return true;
 }
