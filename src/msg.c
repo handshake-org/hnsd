@@ -66,6 +66,31 @@ hsk_version_msg_write(hsk_version_msg_t *msg, uint8_t **data) {
   return s;
 }
 
+void
+hsk_version_msg_print(hsk_version_msg_t *msg, char *prefix) {
+  assert(msg);
+
+  if (!prefix)
+    prefix = "";
+
+  char local[HSK_MAX_HOST];
+  char remote[HSK_MAX_HOST];
+
+  assert(hsk_addr_to_string(&msg->remote.addr, remote, HSK_MAX_HOST, 1));
+  assert(hsk_addr_to_string(&msg->local.addr, local, HSK_MAX_HOST, 1));
+
+  printf("%sversion msg\n", prefix);
+  printf("%s  version=%d\n", prefix, msg->version);
+  printf("%s  services=%d\n", prefix, msg->services);
+  printf("%s  time=%d\n", prefix, msg->time);
+  printf("%s  remote=%s\n", prefix, remote);
+  printf("%s  local=%s\n", prefix, local);
+  printf("%s  nonce=%d\n", prefix, msg->nonce);
+  printf("%s  agent=%s\n", prefix, msg->agent);
+  printf("%s  height=%d\n", prefix, msg->height);
+  printf("%s  no_relay=%d\n", prefix, (int32_t)msg->no_relay);
+}
+
 bool
 hsk_verack_msg_read(uint8_t **data, size_t *data_len, hsk_verack_msg_t *msg) {
   return true;

@@ -22,7 +22,7 @@ extern int optind, opterr, optopt;
 
 typedef struct hsk_options_s {
   char *config;
-  char _config[256];
+  char config_[256];
   struct sockaddr *ns_host;
   struct sockaddr_storage _ns_host;
   struct sockaddr *rs_host;
@@ -30,8 +30,8 @@ typedef struct hsk_options_s {
   struct sockaddr *ns_ip;
   struct sockaddr_storage _ns_ip;
   char *rs_config;
-  char _rs_config[256];
-  uint8_t _identity_key[32];
+  char rs_config_[256];
+  uint8_t identity_key_[32];
   uint8_t *identity_key;
   char *seeds;
   int32_t pool_size;
@@ -40,7 +40,7 @@ typedef struct hsk_options_s {
 static void
 hsk_options_init(hsk_options_t *opt) {
   opt->config = NULL;
-  memset(opt->_config, 0, sizeof(opt->_config));
+  memset(opt->config_, 0, sizeof(opt->config_));
   opt->ns_host = (struct sockaddr *)&opt->_ns_host;
   opt->rs_host = (struct sockaddr *)&opt->_rs_host;
   opt->ns_ip = (struct sockaddr *)&opt->_ns_ip;
@@ -48,8 +48,8 @@ hsk_options_init(hsk_options_t *opt) {
   assert(hsk_sa_from_string(opt->rs_host, HSK_RS_IP, HSK_RS_PORT));
   assert(hsk_sa_from_string(opt->ns_ip, HSK_RS_A, 0));
   opt->rs_config = NULL;
-  memset(opt->_rs_config, 0, sizeof(opt->_config));
-  memset(opt->_identity_key, 0, sizeof(opt->_identity_key));
+  memset(opt->rs_config_, 0, sizeof(opt->config_));
+  memset(opt->identity_key_, 0, sizeof(opt->identity_key_));
   opt->identity_key = NULL;
   opt->seeds = NULL;
   opt->pool_size = HSK_POOL_SIZE;
@@ -83,7 +83,7 @@ help(int32_t r) {
     "    Size of peer pool.\n"
     "\n"
     "  -k, --identity-key <hex-string>\n"
-    "    Identity key to use on the P2P network.\n"
+    "    Identity key for signing DNS responses.\n"
     "\n"
     "  -s, --seeds <seed1,seed2,...>\n"
     "    Seeds to connect to on P2P network.\n"
@@ -92,6 +92,7 @@ help(int32_t r) {
     "    This help message.\n"
     "\n"
   );
+
   exit(r);
 }
 
@@ -123,59 +124,88 @@ parse_arg(int argc, char **argv, hsk_options_t *opt) {
       break;
 
     switch (o) {
-      case 'h':
-        help(0);
-        break;
-      case 'c':
-        strcpy(opt->_config, optarg);
-        opt->config = opt->_config;
-        break;
-      case 'n':
-        if (!hsk_sa_from_string(opt->ns_host, optarg, HSK_NS_PORT))
-          help(1);
-        break;
-      case 'r':
-        if (!hsk_sa_from_string(opt->rs_host, optarg, HSK_RS_PORT))
-          help(1);
-        break;
-      case 'i':
-        if (!hsk_sa_from_string(opt->ns_ip, optarg, 0))
-          help(1);
-        has_ip = true;
-        break;
-      case 'u':
-        strcpy(opt->_rs_config, optarg);
-        opt->config = opt->_rs_config;
-        break;
-      case 'p': {
-        int32_t size = atoi(optarg);
-        if (size <= 0 || size > 1000)
-          help(1);
-        opt->pool_size = size;
+      case 'h': {
+        return help(0);
+      }
+
+      case 'c': {
+        if (strlen(optarg) > 255)
+          return help(1);
+        strcpy(opt->config_, optarg);
+        opt->config = opt->config_;
         break;
       }
-      case 'k':
-        if (hsk_hex_decode_size(optarg) != 32)
-          help(1);
-        if (!hsk_hex_decode(optarg, opt->_identity_key))
-          help(1);
-        opt->identity_key = opt->_identity_key;
+
+      case 'n': {
+        if (!hsk_sa_from_string(opt->ns_host, optarg, HSK_NS_PORT))
+          return help(1);
         break;
-      case 's':
+      }
+
+      case 'r': {
+        if (!hsk_sa_from_string(opt->rs_host, optarg, HSK_RS_PORT))
+          return help(1);
+        break;
+      }
+
+      case 'i': {
+        if (!hsk_sa_from_string(opt->ns_ip, optarg, 0))
+          return help(1);
+        has_ip = true;
+        break;
+      }
+
+      case 'u': {
+        if (strlen(optarg) > 255)
+          return help(1);
+        strcpy(opt->rs_config_, optarg);
+        opt->rs_config = opt->rs_config_;
+        break;
+      }
+
+      case 'p': {
+        int32_t size = atoi(optarg);
+
+        if (size <= 0 || size > 1000)
+          return help(1);
+
+        opt->pool_size = size;
+
+        break;
+      }
+
+      case 'k': {
+        if (hsk_hex_decode_size(optarg) != 32)
+          return help(1);
+
+        if (!hsk_hex_decode(optarg, opt->identity_key_))
+          return help(1);
+
+        opt->identity_key = opt->identity_key_;
+
+        break;
+      }
+
+      case 's': {
         opt->seeds = strdup(optarg);
+
         if (!opt->seeds) {
           printf("ENOMEM\n");
           exit(1);
+          return;
         }
+
         break;
-      case '?':
-        help(1);
-        break;
+      }
+
+      case '?': {
+        return help(1);
+      }
     }
   }
 
   if (optind < argc)
-    help(1);
+    return help(1);
 
   if (!has_ip)
     hsk_sa_copy(opt->ns_ip, opt->ns_host);
@@ -214,7 +244,11 @@ main(int argc, char **argv) {
     goto done;
   }
 
-  hsk_pool_set_size(pool, opt.pool_size);
+  if (!hsk_pool_set_size(pool, opt.pool_size)) {
+    fprintf(stderr, "failed setting pool size\n");
+    rc = HSK_EFAILURE;
+    goto done;
+  }
 
   ns = hsk_ns_alloc(loop, pool);
 
@@ -224,10 +258,19 @@ main(int argc, char **argv) {
     goto done;
   }
 
-  hsk_ns_set_ip(ns, opt.ns_ip);
+  if (!hsk_ns_set_ip(ns, opt.ns_ip)) {
+    fprintf(stderr, "failed setting ip\n");
+    rc = HSK_EFAILURE;
+    goto done;
+  }
 
-  if (opt.identity_key)
-    hsk_ns_set_key(ns, opt.identity_key);
+  if (opt.identity_key) {
+    if (!hsk_ns_set_key(ns, opt.identity_key)) {
+      fprintf(stderr, "failed setting identity key\n");
+      rc = HSK_EFAILURE;
+      goto done;
+    }
+  }
 
   rs = hsk_rs_alloc(loop, opt.ns_host);
 
@@ -237,8 +280,21 @@ main(int argc, char **argv) {
     goto done;
   }
 
-  if (opt.identity_key)
-    hsk_rs_set_key(rs, opt.identity_key);
+  if (opt.rs_config) {
+    if (!hsk_rs_set_config(rs, opt.rs_config)) {
+      fprintf(stderr, "failed setting rs config\n");
+      rc = HSK_EFAILURE;
+      goto done;
+    }
+  }
+
+  if (opt.identity_key) {
+    if (!hsk_rs_set_key(rs, opt.identity_key)) {
+      fprintf(stderr, "failed setting identity key\n");
+      rc = HSK_EFAILURE;
+      goto done;
+    }
+  }
 
   rc = hsk_pool_open(pool);
 

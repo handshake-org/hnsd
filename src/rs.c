@@ -38,9 +38,6 @@ typedef struct {
  * Templates
  */
 
-static int32_t
-hsk_rs_init_unbound(hsk_rs_t *ns, struct sockaddr *addr);
-
 static void
 hsk_rs_log(hsk_rs_t *ns, const char *fmt, ...);
 
@@ -82,62 +79,56 @@ after_close(uv_handle_t *);
  */
 
 int32_t
-hsk_rs_init(hsk_rs_t *ns, uv_loop_t *loop, struct sockaddr *addr) {
-  if (!ns || !loop || !addr)
+hsk_rs_init(hsk_rs_t *ns, uv_loop_t *loop, struct sockaddr *stub) {
+  if (!ns || !loop)
     return HSK_EBADARGS;
 
-  hsk_ec_t *ec = hsk_ec_alloc();
+  struct ub_ctx *ub = NULL;
+  hsk_ec_t *ec = NULL;
+
+  ub = ub_ctx_create();
+
+  if (!ub)
+    goto fail;
+
+  if (ub_ctx_async(ub, 1) != 0)
+    goto fail;
+
+  ec = hsk_ec_alloc();
 
   if (!ec)
-    return HSK_ENOMEM;
+    goto fail;
 
   ns->loop = loop;
-  ns->ub = NULL;
+  ns->ub = ub;
   ns->socket.data = (void *)ns;
   ns->poll.data = (void *)ns;
   ns->ec = ec;
+  memset(ns->config_, 0x00, sizeof(ns->config_));
+  ns->config = NULL;
+  ns->stub = (struct sockaddr *)&ns->stub_ss;
+  assert(hsk_sa_from_string(ns->stub, "127.0.0.1", HSK_NS_PORT));
+  memset(ns->key_, 0x00, sizeof(ns->key_));
   ns->key = NULL;
-  memset(ns->_key, 0, sizeof(ns->_key));
-  memset(ns->pubkey, 0, sizeof(ns->pubkey));
-  memset(ns->read_buffer, 0, sizeof(ns->read_buffer));
+  memset(ns->pubkey, 0x00, sizeof(ns->pubkey));
+  memset(ns->read_buffer, 0x00, sizeof(ns->read_buffer));
   ns->bound = false;
   ns->receiving = false;
   ns->polling = false;
 
-  return hsk_rs_init_unbound(ns, addr);
-}
-
-static int32_t
-hsk_rs_init_unbound(hsk_rs_t *ns, struct sockaddr *addr) {
-  if (!ns || !addr)
-    return HSK_EBADARGS;
-
-  ns->ub = ub_ctx_create();
-
-  if (!ns->ub)
-    return HSK_ENOMEM;
-
-  assert(ub_ctx_async(ns->ub, 1) == 0);
-
-  assert(ub_ctx_set_option(ns->ub, "do-tcp:", "no") == 0);
-  assert(ub_ctx_set_option(ns->ub, "logfile:", "") == 0);
-  assert(ub_ctx_set_option(ns->ub, "use-syslog:", "no") == 0);
-  assert(ub_ctx_set_option(ns->ub, "domain-insecure:", ".") == 0);
-  assert(ub_ctx_set_option(ns->ub, "root-hints:", "") == 0);
-  assert(ub_ctx_set_option(ns->ub, "do-not-query-localhost:", "no") == 0);
-
-  char stub[HSK_MAX_HOST];
-
-  if (!hsk_sa_to_string(addr, stub, HSK_MAX_HOST, HSK_NS_PORT))
+  if (stub && !hsk_sa_copy(ns->stub, stub))
     return HSK_EFAILURE;
 
-  assert(ub_ctx_set_stub(ns->ub, ".", stub, 0) == 0);
-  assert(ub_ctx_add_ta(ns->ub, HSK_TRUST_ANCHOR) == 0);
-  assert(ub_ctx_zone_add(ns->ub, ".", "nodefault") == 0);
-
-  hsk_rs_log(ns, "recursive nameserver pointing to: %s\n", stub);
-
   return HSK_SUCCESS;
+
+fail:
+  if (ub)
+    ub_ctx_delete(ub);
+
+  if (ec)
+    hsk_ec_free(ec);
+
+  return HSK_ENOMEM;
 }
 
 void
@@ -160,14 +151,85 @@ hsk_rs_uninit(hsk_rs_t *ns) {
 }
 
 bool
+hsk_rs_set_config(hsk_rs_t *ns, char *config) {
+  assert(ns);
+
+  if (!config) {
+    memset(ns->config_, 0x00, sizeof(ns->config_));
+    ns->config = NULL;
+    return true;
+  }
+
+  size_t size = strlen(config);
+
+  if (size > 255)
+    return false;
+
+  memcpy(ns->config_, config, size + 1);
+  ns->config = ns->config_;
+
+  return true;
+}
+
+bool
 hsk_rs_set_key(hsk_rs_t *ns, uint8_t *key) {
-  assert(ns && key);
+  assert(ns);
+
+  if (!key) {
+    memset(ns->key_, 0x00, sizeof(ns->key_));
+    ns->key = NULL;
+    return true;
+  }
 
   if (!hsk_ec_create_pubkey(ns->ec, key, ns->pubkey))
     return false;
 
-  memcpy(ns->_key, key, 32);
-  ns->key = ns->_key;
+  memcpy(ns->key_, key, 32);
+  ns->key = ns->key_;
+
+  return true;
+}
+
+static bool
+hsk_rs_inject_options(hsk_rs_t *ns) {
+  if (ns->config) {
+    if (ub_ctx_config(ns->ub, ns->config) != 0)
+      return false;
+  }
+
+  if (ub_ctx_set_option(ns->ub, "do-tcp:", "no") != 0)
+    return false;
+
+  if (ub_ctx_set_option(ns->ub, "logfile:", "") != 0)
+    return false;
+
+  if (ub_ctx_set_option(ns->ub, "use-syslog:", "no") != 0)
+    return false;
+
+  if (ub_ctx_set_option(ns->ub, "domain-insecure:", ".") != 0)
+    return false;
+
+  if (ub_ctx_set_option(ns->ub, "root-hints:", "") != 0)
+    return false;
+
+  if (ub_ctx_set_option(ns->ub, "do-not-query-localhost:", "no") != 0)
+    return false;
+
+  char stub[HSK_MAX_HOST];
+
+  if (!hsk_sa_to_string(ns->stub, stub, HSK_MAX_HOST, HSK_NS_PORT))
+    return false;
+
+  if (ub_ctx_set_stub(ns->ub, ".", stub, 0) != 0)
+    return false;
+
+  if (ub_ctx_add_ta(ns->ub, HSK_TRUST_ANCHOR) != 0)
+    return false;
+
+  if (ub_ctx_zone_add(ns->ub, ".", "nodefault") != 0)
+    return false;
+
+  hsk_rs_log(ns, "recursive nameserver pointing to: %s\n", stub);
 
   return true;
 }
@@ -176,6 +238,9 @@ int32_t
 hsk_rs_open(hsk_rs_t *ns, struct sockaddr *addr) {
   if (!ns || !addr)
     return HSK_EBADARGS;
+
+  if (!hsk_rs_inject_options(ns))
+    return HSK_EFAILURE;
 
   if (uv_udp_init(ns->loop, &ns->socket) != 0)
     return HSK_EFAILURE;
@@ -242,22 +307,20 @@ hsk_rs_close(hsk_rs_t *ns) {
   ns->socket.data = NULL;
   ns->poll.data = NULL;
 
-  if (ns->ub) {
-    ub_ctx_delete(ns->ub);
-    ns->ub = NULL;
-  }
+  ub_ctx_delete(ns->ub);
+  ns->ub = NULL;
 
   return HSK_SUCCESS;
 }
 
 hsk_rs_t *
-hsk_rs_alloc(uv_loop_t *loop, struct sockaddr *addr) {
+hsk_rs_alloc(uv_loop_t *loop, struct sockaddr *stub) {
   hsk_rs_t *ns = malloc(sizeof(hsk_rs_t));
 
   if (!ns)
     return NULL;
 
-  if (hsk_rs_init(ns, loop, addr) != HSK_SUCCESS) {
+  if (hsk_rs_init(ns, loop, stub) != HSK_SUCCESS) {
     free(ns);
     return NULL;
   }
@@ -377,6 +440,15 @@ hsk_rs_respond(
     goto fail;
   }
 
+  hsk_rs_log(ns, "received answer for: %s\n", req->name);
+  hsk_rs_log(ns, "  canonname: %s\n", result->canonname);
+  hsk_rs_log(ns, "  rcode: %d\n", result->rcode);
+  hsk_rs_log(ns, "  havedata: %d\n", result->havedata);
+  hsk_rs_log(ns, "  nxdomain: %d\n", result->nxdomain);
+  hsk_rs_log(ns, "  secure: %d\n", result->secure);
+  hsk_rs_log(ns, "  bogus: %d\n", result->bogus);
+  hsk_rs_log(ns, "  why_bogus: %s\n", result->why_bogus);
+
   uint8_t *data = result->answer_packet;
   size_t data_len = result->answer_len;
 
@@ -398,7 +470,6 @@ hsk_rs_respond(
     if (req->dnssec) {
       ldns_pkt_set_edns_do(pkt, 1);
 
-      // Perhaps check nxdomain and havedata?
       if (result->secure && !result->bogus)
         ldns_pkt_set_ad(pkt, 1);
       else
@@ -411,9 +482,6 @@ hsk_rs_respond(
 
   // Reserialize once we're done.
   rc = ldns_pkt2wire(&wire, pkt, &wire_len);
-
-  ldns_pkt_free(pkt);
-  pkt = NULL;
 
   if (rc != LDNS_STATUS_OK) {
     hsk_rs_log(ns,
@@ -429,9 +497,14 @@ hsk_rs_respond(
     }
   }
 
+  ldns_pkt_free(pkt);
+
   goto done;
 
 fail:
+  if (pkt)
+    ldns_pkt_free(pkt);
+
   ok = hsk_resource_to_servfail(
     req->id,
     req->name,
@@ -562,7 +635,7 @@ after_recv(
     return;
 
   if (nread < 0) {
-    hsk_rs_log(ns, "udp read error: %d\n", nread);
+    hsk_rs_log(ns, "udp read error: %s\n", uv_strerror(nread));
     return;
   }
 

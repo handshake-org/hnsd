@@ -388,17 +388,24 @@ hsk_sa_to_string(
   return true;
 }
 
-void
+bool
 hsk_sa_copy(struct sockaddr *sa, struct sockaddr *other) {
   assert(sa && other);
 
-  size_t size = sizeof(struct sockaddr_in6);
+  if (other->sa_family != AF_INET && other->sa_family != AF_INET6)
+    return false;
+
+  size_t size = 0;
 
   // Note: sockaddr is the worst thing ever created.
   if (other->sa_family == AF_INET)
     size = sizeof(struct sockaddr_in);
+  else
+    size = sizeof(struct sockaddr_in6);
 
   memcpy((void *)sa, (void *)other, size);
+
+  return true;
 }
 
 uint32_t

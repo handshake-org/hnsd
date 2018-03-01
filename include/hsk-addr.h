@@ -104,7 +104,7 @@ hsk_sa_to_string(
   uint16_t fb
 );
 
-void
+bool
 hsk_sa_copy(struct sockaddr *sa, struct sockaddr *other);
 
 uint32_t

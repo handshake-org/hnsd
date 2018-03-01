@@ -93,14 +93,14 @@ hsk_ns_init(hsk_ns_t *ns, uv_loop_t *loop, hsk_pool_t *pool) {
 
   ns->loop = loop;
   ns->pool = pool;
+  hsk_addr_init(&ns->ip_);
   ns->ip = NULL;
-  hsk_addr_init(&ns->_ip);
   ns->socket.data = (void *)ns;
   ns->ec = ec;
+  memset(ns->key_, 0x00, sizeof(ns->key_));
   ns->key = NULL;
-  memset(ns->_key, 0, sizeof(ns->_key));
-  memset(ns->pubkey, 0, sizeof(ns->pubkey));
-  memset(ns->read_buffer, 0, sizeof(ns->read_buffer));
+  memset(ns->pubkey, 0x00, sizeof(ns->pubkey));
+  memset(ns->read_buffer, 0x00, sizeof(ns->read_buffer));
   ns->bound = false;
   ns->receiving = false;
 
@@ -120,21 +120,39 @@ hsk_ns_uninit(hsk_ns_t *ns) {
   }
 }
 
-void
+bool
 hsk_ns_set_ip(hsk_ns_t *ns, struct sockaddr *addr) {
-  if (hsk_addr_from_sa(&ns->_ip, addr))
-    ns->ip = &ns->_ip;
+  assert(ns);
+
+  if (!addr) {
+    hsk_addr_init(&ns->ip_);
+    ns->ip = NULL;
+    return true;
+  }
+
+  if (!hsk_addr_from_sa(&ns->ip_, addr))
+    return false;
+
+  ns->ip = &ns->ip_;
+
+  return true;
 }
 
 bool
 hsk_ns_set_key(hsk_ns_t *ns, uint8_t *key) {
-  assert(ns && key);
+  assert(ns);
+
+  if (!key) {
+    memset(ns->key_, 0x00, 32);
+    ns->key = NULL;
+    return true;
+  }
 
   if (!hsk_ec_create_pubkey(ns->ec, key, ns->pubkey))
     return false;
 
-  memcpy(ns->_key, key, 32);
-  ns->key = ns->_key;
+  memcpy(ns->key_, key, 32);
+  ns->key = ns->key_;
 
   return true;
 }
@@ -504,7 +522,7 @@ after_send(uv_udp_send_t *req, int status) {
     return;
 
   if (status != 0) {
-    hsk_ns_log(ns, "send error: %d\n", status);
+    hsk_ns_log(ns, "send error: %s\n", uv_strerror(status));
     return;
   }
 }
@@ -523,7 +541,7 @@ after_recv(
     return;
 
   if (nread < 0) {
-    hsk_ns_log(ns, "udp read error: %d\n", nread);
+    hsk_ns_log(ns, "udp read error: %s\n", uv_strerror(nread));
     return;
   }
 

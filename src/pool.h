@@ -110,7 +110,7 @@ hsk_pool_init(hsk_pool_t *pool, uv_loop_t *loop);
 void
 hsk_pool_uninit(hsk_pool_t *pool);
 
-void
+bool
 hsk_pool_set_size(hsk_pool_t *pool, int32_t max_size);
 
 hsk_pool_t *

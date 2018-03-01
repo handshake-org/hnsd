@@ -158,11 +158,14 @@ hsk_pool_uninit(hsk_pool_t *pool) {
   hsk_timedata_uninit(&pool->td);
 }
 
-void
+bool
 hsk_pool_set_size(hsk_pool_t *pool, int32_t max_size) {
-  if (max_size <= 0)
-    return;
+  if (max_size <= 0 || max_size > 1000)
+    return false;
+
   pool->max_size = max_size;
+
+  return true;
 }
 
 hsk_pool_t *
