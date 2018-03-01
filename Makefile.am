@@ -46,6 +46,7 @@ libhsk_la_CFLAGS = @CFLAGS@
 libhsk_la_LDFLAGS = -no-undefined -version-info 0:0:0
 libhsk_la_SOURCES = src/addr.c     \
                     src/addrmgr.c  \
+                    src/base32.c   \
                     src/blake2b.c  \
                     src/bn.c       \
                     src/chain.c    \

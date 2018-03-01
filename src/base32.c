@@ -7,7 +7,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-#include "hsk-base32.h"
+#include "base32.h"
 
 static const char CHARSET[] = "abcdefghijklmnopqrstuvwxyz234567";
 
@@ -37,29 +37,9 @@ static const int8_t TABLE_HEX[] = {
 
 static const uint8_t PADDING[] = { 0, 6, 4, 3, 1 };
 
-int32_t
-hsk_base32_encode(uint8_t *data, size_t data_len, char *out, bool pad) {
-  return hsk_base32_encode2(CHARSET, data, data_len, out, pad);
-}
-
-int32_t
-hsk_base32_encode_hex(uint8_t *data, size_t data_len, char *out, bool pad) {
-  return hsk_base32_encode2(CHARSET_HEX, data, data_len, out, pad);
-}
-
-int32_t
-hsk_base32_encode_size(uint8_t *data, size_t data_len, bool pad) {
-  return hsk_base32_encode2(CHARSET, data, data_len, NULL, pad);
-}
-
-int32_t
-hsk_base32_encode_hex_size(uint8_t *data, size_t data_len, bool pad) {
-  return hsk_base32_encode2(CHARSET_HEX, data, data_len, NULL, pad);
-}
-
-int32_t
+static int32_t
 hsk_base32_encode2(
-  char *charset,
+  const char *charset,
   uint8_t *data,
   size_t data_len,
   char *out,
@@ -142,38 +122,8 @@ hsk_base32_encode2(
   return off;
 }
 
-int32_t
-hsk_base32_decode(char *str, uint8_t *out, bool unpad) {
-  return hsk_base32_decode2(TABLE, str, out, unpad);
-}
-
-int32_t
-hsk_base32_decode_hex(char *str, uint8_t *out, bool unpad) {
-  return hsk_base32_decode2(TABLE_HEX, str, out, unpad);
-}
-
-int32_t
-hsk_base32_decode_size(char *str) {
-  int32_t size hsk_base32_decode2(TABLE, str, NULL, false);
-
-  if (size == -1)
-    return strlen(str) * 5 / 8;
-
-  return size;
-}
-
-int32_t
-hsk_base32_decode_hex_size(char *str, uint8_t *out) {
-  int32_t size = hsk_base32_decode2(TABLE_HEX, str, NULL, false);
-
-  if (size == -1)
-    return strlen(str) * 5 / 8;
-
-  return size;
-}
-
-int32_t
-hsk_base32_decode2(uint8_t *table, char *str, uint8_t *out, bool unpad) {
+static int32_t
+hsk_base32_decode2(const int8_t *table, char *str, uint8_t *out, bool unpad) {
   assert(table);
   assert(str);
 
@@ -199,8 +149,8 @@ hsk_base32_decode2(uint8_t *table, char *str, uint8_t *out, bool unpad) {
         mode = 1;
         break;
       case 1:
-        if (data)
-          data[j] = (left << 3) | (v >> 2);
+        if (out)
+          out[j] = (left << 3) | (v >> 2);
         j += 1;
         left = v & 3;
         mode = 2;
@@ -210,15 +160,15 @@ hsk_base32_decode2(uint8_t *table, char *str, uint8_t *out, bool unpad) {
         mode = 3;
         break;
       case 3:
-        if (data)
-          data[j] = (left << 1) | (v >> 4);
+        if (out)
+          out[j] = (left << 1) | (v >> 4);
         j += 1;
         left = v & 15;
         mode = 4;
         break;
       case 4:
-        if (data)
-          data[j] = (left << 4) | (v >> 1);
+        if (out)
+          out[j] = (left << 4) | (v >> 1);
         j += 1;
         left = v & 1;
         mode = 5;
@@ -228,15 +178,15 @@ hsk_base32_decode2(uint8_t *table, char *str, uint8_t *out, bool unpad) {
         mode = 6;
         break;
       case 6:
-        if (data)
-          data[j] = (left << 2) | (v >> 3);
+        if (out)
+          out[j] = (left << 2) | (v >> 3);
         j += 1;
         left = v & 7;
         mode = 7;
         break;
       case 7:
-        if (data)
-          data[j] = (left << 5) | v;
+        if (out)
+          out[j] = (left << 5) | v;
         j += 1;
         mode = 0;
         break;
@@ -299,7 +249,57 @@ hsk_base32_decode2(uint8_t *table, char *str, uint8_t *out, bool unpad) {
   }
 
   return j;
-};
+}
+
+int32_t
+hsk_base32_encode(uint8_t *data, size_t data_len, char *out, bool pad) {
+  return hsk_base32_encode2(CHARSET, data, data_len, out, pad);
+}
+
+int32_t
+hsk_base32_encode_hex(uint8_t *data, size_t data_len, char *out, bool pad) {
+  return hsk_base32_encode2(CHARSET_HEX, data, data_len, out, pad);
+}
+
+int32_t
+hsk_base32_encode_size(uint8_t *data, size_t data_len, bool pad) {
+  return hsk_base32_encode2(CHARSET, data, data_len, NULL, pad);
+}
+
+int32_t
+hsk_base32_encode_hex_size(uint8_t *data, size_t data_len, bool pad) {
+  return hsk_base32_encode2(CHARSET_HEX, data, data_len, NULL, pad);
+}
+
+int32_t
+hsk_base32_decode(char *str, uint8_t *out, bool unpad) {
+  return hsk_base32_decode2(TABLE, str, out, unpad);
+}
+
+int32_t
+hsk_base32_decode_hex(char *str, uint8_t *out, bool unpad) {
+  return hsk_base32_decode2(TABLE_HEX, str, out, unpad);
+}
+
+int32_t
+hsk_base32_decode_size(char *str) {
+  int32_t size = hsk_base32_decode2(TABLE, str, NULL, false);
+
+  if (size == -1)
+    return strlen(str) * 5 / 8;
+
+  return size;
+}
+
+int32_t
+hsk_base32_decode_hex_size(char *str, uint8_t *out) {
+  int32_t size = hsk_base32_decode2(TABLE_HEX, str, NULL, false);
+
+  if (size == -1)
+    return strlen(str) * 5 / 8;
+
+  return size;
+}
 
 bool
 hsk_base32_test(char *str, uint8_t *out, bool unpad) {
@@ -307,6 +307,6 @@ hsk_base32_test(char *str, uint8_t *out, bool unpad) {
 }
 
 bool
-hsk_base32_decode_hex(char *str, bool unpad) {
+hsk_base32_test_hex(char *str, bool unpad) {
   return hsk_base32_decode(str, NULL, unpad) != -1;
 }
