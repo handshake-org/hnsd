@@ -460,8 +460,9 @@ hsk_rs_respond(
       &data_len
     );
 
+    free(wire);
+
     if (!result) {
-      free(wire);
       hsk_rs_log(ns, "could not sign response\n");
       return;
     }

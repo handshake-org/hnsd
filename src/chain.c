@@ -85,11 +85,16 @@ hsk_chain_init_genesis(hsk_chain_t *chain) {
   assert(hsk_header_decode(raw, size, tip));
   assert(hsk_header_calc_work(tip, NULL));
 
-  if (!hsk_map_set(&chain->hashes, hsk_header_cache(tip), (void *)tip))
+  if (!hsk_map_set(&chain->hashes, hsk_header_cache(tip), (void *)tip)) {
+    free(tip);
     return HSK_ENOMEM;
+  }
 
-  if (!hsk_map_set(&chain->heights, &tip->height, (void *)tip))
+  if (!hsk_map_set(&chain->heights, &tip->height, (void *)tip)) {
+    hsk_map_del(&chain->hashes, hsk_header_cache(tip));
+    free(tip);
     return HSK_ENOMEM;
+  }
 
   chain->height = tip->height;
   chain->tip = tip;
