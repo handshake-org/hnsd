@@ -14,6 +14,7 @@
 #include "hsk-error.h"
 #include "utils.h"
 #include "dnssec.h"
+#include "base32.h"
 
 static void
 ip_size(uint8_t *ip, size_t *s, size_t *l);
@@ -2079,19 +2080,12 @@ ip_to_b32(hsk_target_t *target, char *dst) {
   }
 
   uint8_t data[17];
+
   size_t size = ip_write(ip, data);
+  assert(size <= 17);
 
-  char b32[65];
+  size_t b32_size = hsk_base32_encode_hex_size(data, size, false);
+  assert(b32_size <= 29);
 
-  ldns_b32_ntop_extended_hex(target->addr, size, b32, 65);
-
-  int32_t i;
-  for (i = 0; i < 64; i++) {
-    if (b32[i] == '=' || b32[i] == '\0')
-      break;
-  }
-
-  b32[i] = '\0';
-
-  strcpy(dst, b32);
+  hsk_base32_encode_hex(data, size, dst, false);
 }
