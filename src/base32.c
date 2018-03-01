@@ -308,5 +308,5 @@ hsk_base32_test(char *str, uint8_t *out, bool unpad) {
 
 bool
 hsk_base32_test_hex(char *str, bool unpad) {
-  return hsk_base32_decode(str, NULL, unpad) != -1;
+  return hsk_base32_decode_hex(str, NULL, unpad) != -1;
 }
