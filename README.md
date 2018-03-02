@@ -64,6 +64,9 @@ name_servers="127.0.0.1"
 - lcrypto >= 1.1.0
 - lgmp >= 6.1.2 (optional)
 
+hskd will recursively build and statically link to `uv`, `ldns`, `secp256k1`,
+and `unbound` which are included in the source repo.
+
 ## Building
 
 ``` sh
