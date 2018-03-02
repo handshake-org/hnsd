@@ -467,20 +467,37 @@ hsk_rs_respond(
     goto fail;
   }
 
+  // Set to stub's request ID.
   ldns_pkt_set_id(pkt, req->id);
 
-  ldns_rr_list *ar = ldns_pkt_additional(pkt);
-  int32_t count = ldns_rr_list_rr_count(ar);
+  // "Clean" the packet.
+  ldns_pkt_set_opcode(pkt, LDNS_PACKET_QUERY);
+  ldns_pkt_set_flags(pkt, 0);
+  ldns_pkt_set_qr(pkt, 1);
+  ldns_pkt_set_aa(pkt, 0);
+  ldns_pkt_set_tc(pkt, 0);
+  ldns_pkt_set_rd(pkt, 1); // XXX
+  ldns_pkt_set_ra(pkt, 1);
+  ldns_pkt_set_ad(pkt, 0);
+  ldns_pkt_set_cd(pkt, 0); // XXX
 
-  if (count > 0) {
-    ldns_rr *rr = ldns_rr_list_rr(ar, count - 1);
-    if (ldns_rr_get_type(rr) == HSK_DNS_HSIG) {
-      ldns_rr_list_pop_rr(ar);
-      ldns_rr_free(rr);
-      ldns_pkt_set_arcount(pkt, count - 1);
-    }
-  }
+  // Remove EDNS stuff.
+  ldns_rdf *ed = ldns_pkt_edns_data(pkt);
 
+  if (ed)
+    ldns_rdf_deep_free(ed);
+
+  ldns_pkt_set_edns_version(pkt, 0);
+  ldns_pkt_set_edns_extended_rcode(pkt, 0);
+  ldns_pkt_set_edns_udp_size(pkt, 0);
+  ldns_pkt_set_edns_data(pkt, NULL);
+  ldns_pkt_set_edns_do(pkt, 0);
+  ldns_pkt_set_edns_z(pkt, 0);
+
+  // Hack.
+  pkt->_edns_present = false;
+
+  // Handle EDNS and DNSSEC flags.
   if (req->edns) {
     ldns_pkt_set_edns_udp_size(pkt, 4096);
 
@@ -489,11 +506,26 @@ hsk_rs_respond(
 
       if (result->secure && !result->bogus)
         ldns_pkt_set_ad(pkt, 1);
-      else
-        ldns_pkt_set_ad(pkt, 0);
+    }
+  }
 
-      if (!hsk_dnssec_clean(pkt, (ldns_rr_type)req->type))
-        goto fail;
+  // Remove all RRSIGs: stub resolvers don't
+  // need them and they take up space.
+  if (!hsk_dnssec_clean(pkt, (ldns_rr_type)req->type))
+    goto fail;
+
+  // Remove HSIG from our authoritative server.
+  if (req->labels <= 1) {
+    ldns_rr_list *ar = ldns_pkt_additional(pkt);
+    int32_t count = ldns_rr_list_rr_count(ar);
+
+    if (count > 0) {
+      ldns_rr *rr = ldns_rr_list_rr(ar, count - 1);
+      if (ldns_rr_get_type(rr) == HSK_DNS_HSIG) {
+        ldns_rr_list_pop_rr(ar);
+        ldns_rr_free(rr);
+        ldns_pkt_set_arcount(pkt, count - 1);
+      }
     }
   }
 

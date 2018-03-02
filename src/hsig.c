@@ -91,6 +91,10 @@ hsk_hsig_set_nonce(
 
   memcpy(o, wire, wire_len);
 
+  // arcount + 1
+  o[10] = arcount >> 8;
+  o[11] = arcount & 0xff;
+
   uint8_t *rr = o + wire_len;
 
   // name = .
@@ -116,10 +120,6 @@ hsk_hsig_set_nonce(
 
   // rd = nonce
   memcpy(rr + 11, nonce, 32);
-
-  // arcount + 1
-  o[10] = arcount >> 8;
-  o[11] = arcount & 0xff;
 
   *out = o;
   *out_len = o_len;
@@ -249,6 +249,10 @@ hsk_hsig_sign(
 
   memcpy(o, wire, wire_len);
 
+  // arcount + 1
+  o[10] = arcount >> 8;
+  o[11] = arcount & 0xff;
+
   uint8_t *rr = o + wire_len;
 
   // name = .
@@ -291,10 +295,6 @@ hsk_hsig_sign(
   }
 
   sig[64] = (uint8_t)rec;
-
-  // arcount + 1
-  o[10] = arcount >> 8;
-  o[11] = arcount & 0xff;
 
   *out = o;
   *out_len = o_len;
