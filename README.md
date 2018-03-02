@@ -13,7 +13,8 @@ hskd exists as a 3-layer architecture:
 3. A recursive name server pointed at the authoritative server, which serves
    `.` as a stub zone
 
-A standard stub resolver can hit the recursive server with a request. The flow looks something like this.
+A standard stub resolver can hit the recursive server with a request. The flow
+looks something like this.
 
 ```
 stub resolver
