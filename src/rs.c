@@ -116,8 +116,13 @@ hsk_rs_init(hsk_rs_t *ns, uv_loop_t *loop, struct sockaddr *stub) {
   ns->receiving = false;
   ns->polling = false;
 
-  if (stub && !hsk_sa_copy(ns->stub, stub))
-    return HSK_EFAILURE;
+  if (stub) {
+    if (!hsk_sa_copy(ns->stub, stub))
+      return HSK_EFAILURE;
+
+    if (!hsk_sa_localize(ns->stub))
+      return HSK_EFAILURE;
+  }
 
   return HSK_SUCCESS;
 

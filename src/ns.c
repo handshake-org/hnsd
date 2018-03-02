@@ -133,6 +133,9 @@ hsk_ns_set_ip(hsk_ns_t *ns, struct sockaddr *addr) {
   if (!hsk_addr_from_sa(&ns->ip_, addr))
     return false;
 
+  if (!hsk_addr_localize(&ns->ip_))
+    return false;
+
   ns->ip = &ns->ip_;
 
   return true;

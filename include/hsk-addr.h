@@ -94,6 +94,9 @@ bool
 hsk_addr_to_string(hsk_addr_t *addr, char *dst, size_t dst_len, uint16_t fb);
 
 bool
+hsk_addr_localize(hsk_addr_t *addr);
+
+bool
 hsk_sa_from_string(struct sockaddr *sa, char *src, uint16_t port);
 
 bool
@@ -106,6 +109,9 @@ hsk_sa_to_string(
 
 bool
 hsk_sa_copy(struct sockaddr *sa, struct sockaddr *other);
+
+bool
+hsk_sa_localize(struct sockaddr *sa);
 
 uint32_t
 hsk_addr_hash(void *key);

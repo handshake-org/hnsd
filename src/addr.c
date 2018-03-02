@@ -357,6 +357,25 @@ hsk_addr_to_string(hsk_addr_t *addr, char *dst, size_t dst_len, uint16_t fb) {
 }
 
 bool
+hsk_addr_localize(hsk_addr_t *addr) {
+  assert(addr);
+
+  if (addr->type != 0)
+    return false;
+
+  if (hsk_addr_is_null(addr)) {
+    if (hsk_addr_is_ip4(addr)) {
+      addr->ip[12] = 127;
+      addr->ip[15] = 1;
+    } else {
+      addr->ip[15] = 1;
+    }
+  }
+
+  return true;
+}
+
+bool
 hsk_sa_from_string(struct sockaddr *sa, char *src, uint16_t port) {
   assert(sa && src);
 
@@ -404,6 +423,22 @@ hsk_sa_copy(struct sockaddr *sa, struct sockaddr *other) {
     size = sizeof(struct sockaddr_in6);
 
   memcpy((void *)sa, (void *)other, size);
+
+  return true;
+}
+
+bool
+hsk_sa_localize(struct sockaddr *sa) {
+  hsk_addr_t addr;
+
+  if (!hsk_addr_from_sa(&addr, sa))
+    return false;
+
+  if (!hsk_addr_localize(&addr))
+    return false;
+
+  if (!hsk_addr_to_sa(&addr, sa))
+    return false;
 
   return true;
 }
