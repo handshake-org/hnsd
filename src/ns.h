@@ -29,6 +29,7 @@ typedef struct {
   uint8_t key_[32];
   uint8_t *key;
   uint8_t pubkey[33];
+  uint8_t pkh[32];
   uint8_t read_buffer[HSK_UDP_BUFFER];
   bool bound;
   bool receiving;

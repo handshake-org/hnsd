@@ -100,6 +100,7 @@ hsk_ns_init(hsk_ns_t *ns, uv_loop_t *loop, hsk_pool_t *pool) {
   memset(ns->key_, 0x00, sizeof(ns->key_));
   ns->key = NULL;
   memset(ns->pubkey, 0x00, sizeof(ns->pubkey));
+  memset(ns->pkh, 0x00, sizeof(ns->pkh));
   memset(ns->read_buffer, 0x00, sizeof(ns->read_buffer));
   ns->bound = false;
   ns->receiving = false;
@@ -148,6 +149,8 @@ hsk_ns_set_key(hsk_ns_t *ns, uint8_t *key) {
   if (!key) {
     memset(ns->key_, 0x00, 32);
     ns->key = NULL;
+    memset(ns->pubkey, 0x00, sizeof(ns->pubkey));
+    memset(ns->pkh, 0x00, sizeof(ns->pkh));
     return true;
   }
 
@@ -156,6 +159,8 @@ hsk_ns_set_key(hsk_ns_t *ns, uint8_t *key) {
 
   memcpy(ns->key_, key, 32);
   ns->key = ns->key_;
+
+  hsk_hash_blake2b(ns->key, 33, ns->pkh);
 
   return true;
 }

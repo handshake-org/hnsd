@@ -111,6 +111,7 @@ hsk_rs_init(hsk_rs_t *ns, uv_loop_t *loop, struct sockaddr *stub) {
   memset(ns->key_, 0x00, sizeof(ns->key_));
   ns->key = NULL;
   memset(ns->pubkey, 0x00, sizeof(ns->pubkey));
+  memset(ns->pkh, 0x00, sizeof(ns->pkh));
   memset(ns->read_buffer, 0x00, sizeof(ns->read_buffer));
   ns->bound = false;
   ns->receiving = false;
@@ -183,6 +184,8 @@ hsk_rs_set_key(hsk_rs_t *ns, uint8_t *key) {
   if (!key) {
     memset(ns->key_, 0x00, sizeof(ns->key_));
     ns->key = NULL;
+    memset(ns->pubkey, 0x00, sizeof(ns->pubkey));
+    memset(ns->pkh, 0x00, sizeof(ns->pkh));
     return true;
   }
 
@@ -191,6 +194,8 @@ hsk_rs_set_key(hsk_rs_t *ns, uint8_t *key) {
 
   memcpy(ns->key_, key, 32);
   ns->key = ns->key_;
+
+  hsk_hash_blake2b(ns->key, 33, ns->pkh);
 
   return true;
 }
@@ -218,6 +223,9 @@ hsk_rs_inject_options(hsk_rs_t *ns) {
     return false;
 
   if (ub_ctx_set_option(ns->ub, "do-not-query-localhost:", "no") != 0)
+    return false;
+
+  if (ub_ctx_set_option(ns->ub, "trust-anchor-signaling:", "no") != 0)
     return false;
 
   char stub[HSK_MAX_HOST];
@@ -477,10 +485,10 @@ hsk_rs_respond(
   ldns_pkt_set_qr(pkt, 1);
   ldns_pkt_set_aa(pkt, 0);
   ldns_pkt_set_tc(pkt, 0);
-  ldns_pkt_set_rd(pkt, 1); // XXX
+  ldns_pkt_set_rd(pkt, 1);
   ldns_pkt_set_ra(pkt, 1);
   ldns_pkt_set_ad(pkt, 0);
-  ldns_pkt_set_cd(pkt, 0); // XXX
+  ldns_pkt_set_cd(pkt, 0);
 
   // Remove EDNS stuff.
   ldns_rdf *ed = ldns_pkt_edns_data(pkt);
@@ -498,24 +506,13 @@ hsk_rs_respond(
   // Hack.
   pkt->_edns_present = false;
 
-  // Handle EDNS and DNSSEC flags.
-  if (req->edns) {
-    ldns_pkt_set_edns_udp_size(pkt, 4096);
-
-    if (req->dnssec) {
-      ldns_pkt_set_edns_do(pkt, 1);
-
-      if (result->secure && !result->bogus)
-        ldns_pkt_set_ad(pkt, 1);
-    }
-  }
-
   // Remove all RRSIGs: stub resolvers don't
   // need them and they take up space.
   if (!hsk_dnssec_clean(pkt, (ldns_rr_type)req->type))
     goto fail;
 
-  // Remove HSIG from our authoritative server.
+  // Verify and remove HSIG from
+  // our authoritative server.
   if (req->labels <= 1) {
     ldns_rr_list *ar = ldns_pkt_additional(pkt);
     int32_t count = ldns_rr_list_rr_count(ar);
@@ -527,6 +524,18 @@ hsk_rs_respond(
         ldns_rr_free(rr);
         ldns_pkt_set_arcount(pkt, count - 1);
       }
+    }
+  }
+
+  // Handle EDNS and DNSSEC flags.
+  if (req->edns) {
+    ldns_pkt_set_edns_udp_size(pkt, 4096);
+
+    if (req->dnssec) {
+      ldns_pkt_set_edns_do(pkt, 1);
+
+      if (result->secure && !result->bogus)
+        ldns_pkt_set_ad(pkt, 1);
     }
   }
 
