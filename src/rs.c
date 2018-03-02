@@ -469,6 +469,18 @@ hsk_rs_respond(
 
   ldns_pkt_set_id(pkt, req->id);
 
+  ldns_rr_list *ar = ldns_pkt_additional(pkt);
+  int32_t count = ldns_rr_list_rr_count(ar);
+
+  if (count > 0) {
+    ldns_rr *rr = ldns_rr_list_rr(ar, count - 1);
+    if (ldns_rr_get_type(rr) == HSK_DNS_HSIG) {
+      ldns_rr_list_pop_rr(ar);
+      ldns_rr_free(rr);
+      ldns_pkt_set_arcount(pkt, count - 1);
+    }
+  }
+
   if (req->edns) {
     ldns_pkt_set_edns_udp_size(pkt, 4096);
 
@@ -582,7 +594,7 @@ fail:
   if (req)
     free(req);
 
-  if (should_free)
+  if (data && should_free)
     free(data);
 
   return rc;
@@ -611,7 +623,7 @@ after_send(uv_udp_send_t *req, int status) {
   hsk_send_data_t *sd = (hsk_send_data_t *)req->data;
   hsk_rs_t *ns = sd->ns;
 
-  if (sd->should_free && sd->data)
+  if (sd->data && sd->should_free)
     free(sd->data);
 
   free(sd);

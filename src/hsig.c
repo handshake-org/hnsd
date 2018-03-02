@@ -343,7 +343,8 @@ hsk_hsig_sign_msg(
     &res_len
   );
 
-  free(*msg);
+  if (*msg)
+    free(*msg);
 
   *msg = NULL;
   *msg_len = 0;

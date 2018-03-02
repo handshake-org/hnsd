@@ -486,7 +486,7 @@ fail:
   if (req)
     free(req);
 
-  if (should_free)
+  if (data && should_free)
     free(data);
 
   return rc;
@@ -515,7 +515,7 @@ after_send(uv_udp_send_t *req, int status) {
   hsk_send_data_t *sd = (hsk_send_data_t *)req->data;
   hsk_ns_t *ns = sd->ns;
 
-  if (sd->should_free && sd->data)
+  if (sd->data && sd->should_free)
     free(sd->data);
 
   free(sd);

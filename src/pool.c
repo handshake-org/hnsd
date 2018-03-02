@@ -979,7 +979,7 @@ fail:
   if (req)
     free(req);
 
-  if (should_free)
+  if (data && should_free)
     free(data);
 
   return rc;
@@ -1567,7 +1567,7 @@ after_write(uv_write_t *req, int32_t status) {
   hsk_peer_t *peer = wd->peer;
   hsk_pool_t *pool = (hsk_pool_t *)peer->pool;
 
-  if (wd->should_free) {
+  if (wd->data && wd->should_free) {
     free(wd->data);
     wd->data = NULL;
   }
