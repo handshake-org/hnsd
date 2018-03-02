@@ -471,8 +471,9 @@ hsk_rs_respond(
   ldns_pkt_set_id(pkt, req->id);
 
   // "Clean" the packet.
-  ldns_pkt_set_opcode(pkt, LDNS_PACKET_QUERY);
   ldns_pkt_set_flags(pkt, 0);
+  ldns_pkt_set_opcode(pkt, LDNS_PACKET_QUERY);
+  ldns_pkt_set_rcode(pkt, result->rcode);
   ldns_pkt_set_qr(pkt, 1);
   ldns_pkt_set_aa(pkt, 0);
   ldns_pkt_set_tc(pkt, 0);
