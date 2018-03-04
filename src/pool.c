@@ -1241,6 +1241,22 @@ hsk_peer_handle_headers(hsk_peer_t *peer, hsk_headers_msg_t *msg) {
   for (hdr = msg->headers; hdr; hdr = hdr->next) {
     int32_t rc = hsk_chain_add(peer->chain, hdr);
 
+    if (rc == HSK_ETIMETOOOLD || rc == HSK_EBADDIFFBITS) {
+      hsk_peer_log(peer, "failed adding block: %d\n", rc);
+
+      if (!hsk_addrman_add_ban(&pool->am, &peer->addr))
+        return HSK_ENOMEM;
+
+      hsk_peer_destroy(peer);
+      return rc;
+    }
+
+    if (rc == HSK_ETIMETOONEW) {
+      hsk_peer_log(peer, "failed adding block: %d\n", rc);
+      hsk_peer_destroy(peer);
+      return rc;
+    }
+
     if (rc == HSK_EORPHAN || rc == HSK_EDUPLICATEORPHAN) {
       if (!orphan)
         hsk_peer_log(peer, "failed adding orphan\n");

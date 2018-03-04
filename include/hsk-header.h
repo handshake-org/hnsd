@@ -13,7 +13,7 @@ typedef struct hsk_header_s {
   uint8_t trie_root[32];
   uint64_t time;
   uint32_t bits;
-  uint8_t nonce[16];
+  uint8_t nonce[20];
   uint8_t sol_size;
   uint32_t sol[42];
 

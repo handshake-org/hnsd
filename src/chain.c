@@ -72,17 +72,15 @@ hsk_chain_init_genesis(hsk_chain_t *chain) {
   if (!chain)
     return HSK_EBADARGS;
 
-  size_t size = hsk_hex_decode_size((char *)HSK_GENESIS);
-  uint8_t raw[size];
-
-  assert(hsk_hex_decode((char *)HSK_GENESIS, raw));
-
   hsk_header_t *tip = hsk_header_alloc();
 
   if (!tip)
     return HSK_ENOMEM;
 
-  assert(hsk_header_decode(raw, size, tip));
+  uint8_t *data = (uint8_t *)HSK_GENESIS;
+  size_t size = sizeof(HSK_GENESIS) - 1;
+
+  assert(hsk_header_decode(data, size, tip));
   assert(hsk_header_calc_work(tip, NULL));
 
   if (!hsk_map_set(&chain->hashes, hsk_header_cache(tip), (void *)tip)) {
@@ -333,7 +331,7 @@ hsk_chain_retarget(hsk_chain_t *chain, hsk_header_t *prev) {
   int64_t start = hsk_chain_get_mtp(chain, first);
   int64_t end = hsk_chain_get_mtp(chain, last);
   int64_t diff = end - start;
-  int64_t actual = timespan + ((diff - timespan) / 4);
+  int64_t actual = timespan + ((diff - timespan) >> 2);
 
   if (actual < min)
     actual = min;
