@@ -380,11 +380,8 @@ hsk_proof_verify(
   uint8_t **data,
   size_t *data_len
 ) {
-  if (root == NULL
-      || key == NULL
-      || nodes == NULL) {
+  if (root == NULL || key == NULL)
     return HSK_EBADARGS;
-  }
 
   // Nibble key & key length
   uint8_t k[65];
