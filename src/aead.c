@@ -23,7 +23,7 @@ hsk_aead_init(hsk_aead_t *aead) {
 }
 
 void
-hsk_aead_start(hsk_aead_t *aead, uint8_t *key, uint8_t *iv) {
+hsk_aead_setup(hsk_aead_t *aead, uint8_t *key, uint8_t *iv) {
   memset(aead->poly_key, 0, 32);
 
   if (key)
@@ -52,16 +52,14 @@ hsk_aead_start(hsk_aead_t *aead, uint8_t *key, uint8_t *iv) {
 
 void
 hsk_aead_aad(hsk_aead_t *aead, uint8_t *aad, size_t len) {
-  // assert(!aead->has_cipher);
-  assert(aead->cipher_len == 0);
+  assert(!aead->has_cipher);
   poly1305_update(&aead->poly, aad, len);
   aead->aad_len += len;
 }
 
 void
 hsk_aead_encrypt(hsk_aead_t *aead, uint8_t *in, uint8_t *out, size_t len) {
-  // if (!aead->has_cipher)
-  if (aead->cipher_len == 0)
+  if (!aead->has_cipher)
     hsk_aead_pad16(aead, aead->aad_len);
 
   chacha20_encrypt(&aead->chacha, in, out, len);
@@ -73,8 +71,7 @@ hsk_aead_encrypt(hsk_aead_t *aead, uint8_t *in, uint8_t *out, size_t len) {
 
 void
 hsk_aead_decrypt(hsk_aead_t *aead, uint8_t *in, uint8_t *out, size_t len) {
-  // if (!aead->has_cipher)
-  if (aead->cipher_len == 0)
+  if (!aead->has_cipher)
     hsk_aead_pad16(aead, aead->aad_len);
 
   aead->cipher_len += len;
@@ -86,8 +83,7 @@ hsk_aead_decrypt(hsk_aead_t *aead, uint8_t *in, uint8_t *out, size_t len) {
 
 void
 hsk_aead_auth(hsk_aead_t *aead, uint8_t *in, size_t len) {
-  // if (!aead->has_cipher)
-  if (aead->cipher_len == 0)
+  if (!aead->has_cipher)
     hsk_aead_pad16(aead, aead->aad_len);
 
   aead->cipher_len += len;
@@ -104,8 +100,7 @@ hsk_aead_final(hsk_aead_t *aead, uint8_t *tag) {
   write_u64(&buf, aead->aad_len);
   write_u64(&buf, aead->cipher_len);
 
-  // if (!aead->has_cipher)
-  if (aead->cipher_len == 0)
+  if (!aead->has_cipher)
     hsk_aead_pad16(aead, aead->aad_len);
 
   hsk_aead_pad16(aead, aead->cipher_len);

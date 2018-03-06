@@ -23,7 +23,7 @@ void
 hsk_aead_init(hsk_aead_t *aead);
 
 void
-hsk_aead_start(hsk_aead_t *aead, uint8_t *key, uint8_t *iv);
+hsk_aead_setup(hsk_aead_t *aead, uint8_t *key, uint8_t *iv);
 
 void
 hsk_aead_aad(hsk_aead_t *aead, uint8_t *aad, size_t len);

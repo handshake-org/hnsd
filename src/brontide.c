@@ -17,7 +17,7 @@
 static const char brontide_protocol_name[] =
   "Noise_XK_secp256k1_ChaChaPoly_SHA256";
 
-static const char brontide_prologue[] = "lightning";
+static const char brontide_prologue[] = "hsk";
 
 #define BRONTIDE_ROTATION_INTERVAL 1000
 #define BRONTIDE_VERSION 0
@@ -43,8 +43,8 @@ static const char brontide_prologue[] = "lightning";
 void
 hsk_cs_init(hsk_cs_t *cs) {
   cs->nonce = 0;
-  memset(cs->secret_key, 0, 32);
   memset(cs->iv, 0, 12);
+  memset(cs->secret_key, 0, 32);
   memset(cs->salt, 0, 32);
   memset(cs->tag, 0, 16);
   hsk_aead_init(&cs->cipher);
@@ -61,7 +61,6 @@ hsk_cs_init_key(hsk_cs_t *cs, uint8_t *key) {
   memcpy(cs->secret_key, key, 32);
   cs->nonce = 0;
   hsk_cs_update(cs);
-  hsk_aead_start(&cs->cipher, cs->secret_key, cs->iv);
 }
 
 void
@@ -90,7 +89,7 @@ hsk_cs_encrypt(
   uint8_t *out,
   size_t len
 ) {
-  hsk_aead_start(&cs->cipher, NULL, cs->iv);
+  hsk_aead_setup(&cs->cipher, cs->secret_key, cs->iv);
 
   if (ad)
     hsk_aead_aad(&cs->cipher, ad, 32);
@@ -113,7 +112,7 @@ hsk_cs_decrypt(
   uint8_t *out,
   size_t len
 ) {
-  hsk_aead_start(&cs->cipher, NULL, cs->iv);
+  hsk_aead_setup(&cs->cipher, cs->secret_key, cs->iv);
 
   if (ad)
     hsk_aead_aad(&cs->cipher, ad, 32);
@@ -601,6 +600,9 @@ hsk_brontide_on_read(hsk_brontide_t *b, uint8_t *data, size_t data_len) {
       hsk_brontide_destroy(b);
       return r;
     }
+
+    if (b->state == BRONTIDE_ACT_NONE)
+      return HSK_SUCCESS;
 
     assert(s > 0);
 
