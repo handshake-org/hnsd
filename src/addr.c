@@ -754,6 +754,7 @@ hsk_netaddr_init(hsk_netaddr_t *na) {
   na->time = 0;
   na->services = 0;
   hsk_addr_init(&na->addr);
+  memset(na->pubkey, 0, 33);
 }
 
 bool
@@ -778,6 +779,9 @@ hsk_netaddr_read(uint8_t **data, size_t *data_len, hsk_netaddr_t *na) {
   if (!read_u16(data, data_len, &na->addr.port))
     return false;
 
+  if (!read_bytes(data, data_len, na->pubkey, 33))
+    return false;
+
   return true;
 }
 
@@ -789,5 +793,6 @@ hsk_netaddr_write(hsk_netaddr_t *na, uint8_t **data) {
   s += write_u8(data, na->addr.type);
   s += write_bytes(data, na->addr.ip, 36);
   s += write_u16(data, na->addr.port);
+  s += write_bytes(data, na->pubkey, 33);
   return s;
 }

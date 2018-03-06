@@ -41,10 +41,11 @@ hsk_version_msg_read(uint8_t **data, size_t *data_len, hsk_version_msg_t *msg) {
   if (!read_u32(data, data_len, &msg->height))
     return false;
 
-  if (!read_u8(data, data_len, &msg->no_relay))
+  uint8_t no_relay;
+  if (!read_u8(data, data_len, &no_relay))
     return false;
 
-  msg->no_relay = !msg->no_relay;
+  msg->no_relay = no_relay == 1;
 
   return true;
 }
@@ -62,7 +63,7 @@ hsk_version_msg_write(hsk_version_msg_t *msg, uint8_t **data) {
   s += write_u8(data, size);
   s += write_bytes(data, msg->agent, size);
   s += write_u32(data, msg->height);
-  s += write_u8(data, msg->no_relay ? 0 : 1);
+  s += write_u8(data, msg->no_relay ? 1 : 0);
   return s;
 }
 

@@ -22,6 +22,7 @@ typedef struct {
   uint64_t time;
   uint64_t services;
   hsk_addr_t addr;
+  uint8_t pubkey[33];
 } hsk_netaddr_t;
 
 void

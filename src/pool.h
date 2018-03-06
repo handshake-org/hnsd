@@ -7,11 +7,13 @@
 #include "uv.h"
 
 #include "hsk-addr.h"
+#include "hsk-addrmgr.h"
+#include "hsk-brontide.h"
 #include "hsk-chain.h"
+#include "hsk-ec.h"
 #include "hsk-header.h"
 #include "hsk-map.h"
 #include "hsk-timedata.h"
-#include "hsk-addrmgr.h"
 
 /*
  * Defs
@@ -53,6 +55,7 @@ typedef struct hsk_peer_s {
   hsk_chain_t *chain;
   uv_loop_t *loop;
   uv_tcp_t socket;
+  hsk_brontide_t brontide;
   uint64_t id;
   char host[HSK_MAX_HOST];
   hsk_addr_t addr;
@@ -84,6 +87,7 @@ typedef struct hsk_peer_s {
 
 typedef struct hsk_pool_s {
   uv_loop_t *loop;
+  hsk_ec_t *ec;
   hsk_timedata_t td;
   hsk_chain_t chain;
   hsk_addrman_t am;

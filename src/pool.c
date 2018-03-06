@@ -10,21 +10,23 @@
 #include "uv.h"
 
 #include "hsk-addr.h"
+#include "hsk-addrmgr.h"
+#include "hsk-brontide.h"
 #include "hsk-chain.h"
+#include "hsk-constants.h"
+#include "hsk-ec.h"
+#include "hsk-error.h"
 #include "hsk-hash.h"
 #include "hsk-header.h"
-#include "hsk-resource.h"
-#include "hsk-proof.h"
-#include "hsk-error.h"
-#include "hsk-constants.h"
 #include "hsk-map.h"
 #include "hsk-msg.h"
+#include "hsk-proof.h"
+#include "hsk-resource.h"
 #include "hsk-timedata.h"
-#include "hsk-addrmgr.h"
-#include "utils.h"
+#include "bio.h"
 #include "bn.h"
 #include "pool.h"
-#include "bio.h"
+#include "utils.h"
 
 /*
  * Types
@@ -112,7 +114,13 @@ hsk_pool_init(hsk_pool_t *pool, uv_loop_t *loop) {
   if (!pool || !loop)
     return HSK_EBADARGS;
 
+  hsk_ec_t *ec = hsk_ec_alloc();
+
+  if (!ec)
+    return HSK_ENOMEM;
+
   pool->loop = loop;
+  pool->ec = ec;
   hsk_timedata_init(&pool->td);
   hsk_chain_init(&pool->chain, &pool->td);
   hsk_addrman_init(&pool->am, &pool->td);
@@ -134,6 +142,11 @@ void
 hsk_pool_uninit(hsk_pool_t *pool) {
   if (!pool)
     return;
+
+  if (pool->ec) {
+    hsk_ec_free(pool->ec);
+    pool->ec = NULL;
+  }
 
   // segfaulting?
   // hsk_map_uninit(&pool->peers);
@@ -692,6 +705,8 @@ hsk_peer_init(hsk_peer_t *peer, hsk_pool_t *pool) {
   peer->pool = (void *)pool;
   peer->chain = &pool->chain;
   peer->loop = pool->loop;
+  peer->socket;
+  hsk_brontide_init(&peer->brontide, pool->ec);
   peer->id = pool->peer_id++;
   memset(peer->host, 0, sizeof(peer->host));
   hsk_addr_init(&peer->addr);
