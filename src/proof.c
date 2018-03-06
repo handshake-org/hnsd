@@ -376,18 +376,15 @@ hsk_proof_verify(
   uint8_t *root,
   uint8_t *key,
   hsk_raw_node_t *nodes,
-  uint8_t *data,
-  size_t data_len,
-  bool *exists
+  bool *exists,
+  uint8_t **data,
+  size_t *data_len
 ) {
   if (root == NULL
       || key == NULL
       || nodes == NULL) {
     return HSK_EBADARGS;
   }
-
-  if (data_len > HSK_MAX_DATA_SIZE)
-    return HSK_EHASHMISMATCH;
 
   // Nibble key & key length
   uint8_t k[65];
@@ -434,11 +431,14 @@ hsk_proof_verify(
       if (c->next)
         return HSK_EEARLYEND;
 
-      if (data_len != 0)
-        return HSK_EHASHMISMATCH;
-
       if (exists)
         *exists = false;
+
+      if (data)
+        *data = NULL;
+
+      if (data_len)
+        *data_len = 0;
 
       return HSK_EPROOFOK;
     }
@@ -458,14 +458,7 @@ hsk_proof_verify(
 
         hsk_valuenode_t *n = (hsk_valuenode_t *)node;
 
-        if (n->data_len != 32) {
-          rc = HSK_EHASHMISMATCH;
-          goto done;
-        }
-
-        hsk_hash_blake2b(data, data_len, hash);
-
-        if (memcmp(hash, n->data, 32) != 0) {
+        if (n->data_len > HSK_MAX_DATA_SIZE) {
           rc = HSK_EHASHMISMATCH;
           goto done;
         }
@@ -473,8 +466,15 @@ hsk_proof_verify(
         if (exists)
           *exists = true;
 
-        rc = HSK_EPROOFOK;
-        goto done;
+        if (data)
+          *data = n->data;
+
+        if (data_len)
+          *data_len = n->data_len;
+
+        free(node);
+
+        return HSK_EPROOFOK;
       }
       default: {
         rc = HSK_EINVALIDNODE;

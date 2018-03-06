@@ -93,19 +93,17 @@ typedef struct {
 // us
 typedef struct {
   uint8_t cmd; // 31
-  uint8_t name_hash[32];
   uint8_t root[32];
+  uint8_t key[32];
 } hsk_getproof_msg_t;
 
 // them
 typedef struct {
   uint8_t cmd; // 32
-  uint8_t name_hash[32];
   uint8_t root[32];
+  uint8_t key[32];
   size_t node_count;
   hsk_raw_node_t *nodes;
-  size_t data_len;
-  uint8_t data[512];
 } hsk_proof_msg_t;
 
 uint8_t

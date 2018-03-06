@@ -52,9 +52,9 @@ hsk_proof_verify(
   uint8_t *root,
   uint8_t *key,
   hsk_raw_node_t *nodes,
-  uint8_t *data,
-  size_t data_len,
-  bool *exists
+  bool *exists,
+  uint8_t **data,
+  size_t *data_len
 );
 
 void

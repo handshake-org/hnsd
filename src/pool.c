@@ -1108,7 +1108,7 @@ hsk_peer_send_getproof(hsk_peer_t *peer, uint8_t *name_hash, uint8_t *root) {
   hsk_getproof_msg_t msg = { .cmd = HSK_MSG_GETPROOF };
   hsk_msg_init((hsk_msg_t *)&msg);
 
-  memcpy(msg.name_hash, name_hash, 32);
+  memcpy(msg.key, name_hash, 32);
   memcpy(msg.root, root, 32);
 
   return hsk_peer_send(peer, (hsk_msg_t *)&msg);
@@ -1296,14 +1296,14 @@ static int32_t
 hsk_peer_handle_proof(hsk_peer_t *peer, hsk_proof_msg_t *msg) {
   hsk_pool_t *pool = (hsk_pool_t *)peer->pool;
 
-  hsk_peer_log(peer, "received proof: %s\n", hsk_hex_encode32(msg->name_hash));
+  hsk_peer_log(peer, "received proof: %s\n", hsk_hex_encode32(msg->key));
 
-  hsk_name_req_t *reqs = hsk_map_get(&peer->names, msg->name_hash);
+  hsk_name_req_t *reqs = hsk_map_get(&peer->names, msg->key);
 
   if (!reqs) {
     hsk_peer_log(peer,
       "received unsolicited proof: %s\n",
-      hsk_hex_encode32(msg->name_hash));
+      hsk_hex_encode32(msg->key));
     return HSK_EBADARGS;
   }
 
@@ -1314,14 +1314,17 @@ hsk_peer_handle_proof(hsk_peer_t *peer, hsk_proof_msg_t *msg) {
     return HSK_EHASHMISMATCH;
   }
 
-  bool exists = false;
+  bool exists;
+  uint8_t *data;
+  size_t data_len;
+
   int32_t rc = hsk_proof_verify(
     msg->root,
-    msg->name_hash,
+    msg->key,
     msg->nodes,
-    msg->data,
-    msg->data_len,
-    &exists
+    &exists,
+    &data,
+    &data_len
   );
 
   if (rc != HSK_SUCCESS) {
@@ -1329,7 +1332,7 @@ hsk_peer_handle_proof(hsk_peer_t *peer, hsk_proof_msg_t *msg) {
     return rc;
   }
 
-  hsk_map_del(&peer->names, msg->name_hash);
+  hsk_map_del(&peer->names, msg->key);
 
   hsk_name_req_t *req, *next;
 
@@ -1340,13 +1343,15 @@ hsk_peer_handle_proof(hsk_peer_t *peer, hsk_proof_msg_t *msg) {
       req->name,
       HSK_SUCCESS,
       exists,
-      msg->data,
-      msg->data_len,
+      data,
+      data_len,
       req->arg
     );
 
     free(req);
   }
+
+  free(data);
 
   peer->proofs += 1;
 

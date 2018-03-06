@@ -274,10 +274,10 @@ hsk_sendheaders_msg_write(hsk_sendheaders_msg_t *msg, uint8_t **data) {
 
 bool
 hsk_getproof_msg_read(uint8_t **data, size_t *data_len, hsk_getproof_msg_t *msg) {
-  if (!read_bytes(data, data_len, msg->name_hash, 32))
+  if (!read_bytes(data, data_len, msg->root, 32))
     return false;
 
-  if (!read_bytes(data, data_len, msg->root, 32))
+  if (!read_bytes(data, data_len, msg->key, 32))
     return false;
 
   return true;
@@ -286,17 +286,17 @@ hsk_getproof_msg_read(uint8_t **data, size_t *data_len, hsk_getproof_msg_t *msg)
 int32_t
 hsk_getproof_msg_write(hsk_getproof_msg_t *msg, uint8_t **data) {
   int32_t s = 0;
-  s += write_bytes(data, msg->name_hash, 32);
   s += write_bytes(data, msg->root, 32);
+  s += write_bytes(data, msg->key, 32);
   return s;
 }
 
 bool
 hsk_proof_msg_read(uint8_t **data, size_t *data_len, hsk_proof_msg_t *msg) {
-  if (!read_bytes(data, data_len, msg->name_hash, 32))
+  if (!read_bytes(data, data_len, msg->root, 32))
     return false;
 
-  if (!read_bytes(data, data_len, msg->root, 32))
+  if (!read_bytes(data, data_len, msg->key, 32))
     return false;
 
   if (!read_varsize(data, data_len, &msg->node_count))
@@ -323,15 +323,6 @@ hsk_proof_msg_read(uint8_t **data, size_t *data_len, hsk_proof_msg_t *msg) {
     tail = n;
   }
 
-  if (!read_varsize(data, data_len, &msg->data_len))
-    goto fail;
-
-  if (msg->data_len > 512)
-    goto fail;
-
-  if (!read_bytes(data, data_len, msg->data, msg->data_len))
-    goto fail;
-
   return true;
 
 fail:
@@ -343,15 +334,13 @@ int32_t
 hsk_proof_msg_write(hsk_proof_msg_t *msg, uint8_t **data) {
   int32_t s = 0;
 
-  s += write_bytes(data, msg->name_hash, 32);
   s += write_bytes(data, msg->root, 32);
+  s += write_bytes(data, msg->key, 32);
   s += write_varsize(data, msg->node_count);
 
   hsk_raw_node_t *c;
   for (c = msg->nodes; c; c = c->next)
     s += write_varbytes(data, c->data, c->data_len);
-
-  s += write_varbytes(data, msg->data, msg->data_len);
 
   return s;
 }
@@ -511,18 +500,16 @@ hsk_msg_init(hsk_msg_t *msg) {
     case HSK_MSG_GETPROOF: {
       hsk_getproof_msg_t *m = (hsk_getproof_msg_t *)msg;
       m->cmd = HSK_MSG_GETPROOF;
-      memset(m->name_hash, 0, 32);
       memset(m->root, 0, 32);
+      memset(m->key, 0, 32);
       break;
     }
     case HSK_MSG_PROOF: {
       hsk_proof_msg_t *m = (hsk_proof_msg_t *)msg;
       m->cmd = HSK_MSG_PROOF;
-      memset(m->name_hash, 0, 32);
       memset(m->root, 0, 32);
+      memset(m->key, 0, 32);
       m->nodes = NULL;
-      m->data_len = 0;
-      memset(m->data, 0, 512);
       break;
     }
   }
