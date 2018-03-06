@@ -12,6 +12,7 @@
 #include "hsk-addr.h"
 #include "hsk-constants.h"
 #include "hsk-map.h"
+#include "base32.h"
 #include "bio.h"
 
 static const uint8_t hsk_ip4_mapped[12] = {
@@ -277,22 +278,52 @@ bool
 hsk_addr_from_string(hsk_addr_t *addr, char *src, uint16_t port) {
   assert(addr && src);
 
-  uint16_t sin_port = port;
+  size_t sz = strlen(src);
+
+  if (sz > HSK_MAX_HOST + 33)
+    return false;
+
+  char ss[sz];
+  memcpy(ss, src, sz + 1);
+  src = &ss[0];
+
+  bool ret = false;
+  char *comma = strstr(src, ",");
   char *at = strstr(src, "@");
+
+  if (at && comma) {
+    if (at > comma)
+      goto done;
+  }
+
+  if (comma) {
+    char *b32 = &comma[1];
+    size_t s = hsk_base32_decode_size(b32);
+
+    if (s != 33)
+      goto done;
+
+    if (!hsk_base32_decode(b32, addr->key, false))
+      goto done;
+
+    *comma = '\0';
+  }
+
+  uint16_t sin_port = port;
 
   if (port && at) {
     int32_t i = 0;
     uint32_t word = 0;
-    char *s = at + 1;
+    char *s = &at[1];
 
     for (; *s; s++) {
       int32_t ch = ((int32_t)*s) - 0x30;
 
       if (ch < 0 || ch > 9)
-        return false;
+        goto done;
 
       if (i == 5)
-        return false;
+        goto done;
 
       word *= 10;
       word += ch;
@@ -303,10 +334,9 @@ hsk_addr_from_string(hsk_addr_t *addr, char *src, uint16_t port) {
     sin_port = (uint16_t)word;
     *at = '\0';
   } else if (!port && at) {
-    return false;
+    goto done;
   }
 
-  bool ret = true;
   uint8_t sin_addr[16];
   uint16_t af;
 
@@ -315,19 +345,22 @@ hsk_addr_from_string(hsk_addr_t *addr, char *src, uint16_t port) {
   } else if (uv_inet_pton(AF_INET6, src, sin_addr) == 0) {
     af = AF_INET6;
   } else {
-    if (at)
-      *at = '@';
-    return false;
+    goto done;
   }
 
   addr->type = 0;
   assert(hsk_addr_set_ip(addr, af, sin_addr));
   addr->port = sin_port;
+  ret = true;
+
+done:
+  if (comma)
+    *comma = ',';
 
   if (at)
     *at = '@';
 
-  return true;
+  return ret;
 }
 
 bool
@@ -754,7 +787,6 @@ hsk_netaddr_init(hsk_netaddr_t *na) {
   na->time = 0;
   na->services = 0;
   hsk_addr_init(&na->addr);
-  memset(na->pubkey, 0, 33);
 }
 
 bool
@@ -779,7 +811,7 @@ hsk_netaddr_read(uint8_t **data, size_t *data_len, hsk_netaddr_t *na) {
   if (!read_u16(data, data_len, &na->addr.port))
     return false;
 
-  if (!read_bytes(data, data_len, na->pubkey, 33))
+  if (!read_bytes(data, data_len, na->addr.key, 33))
     return false;
 
   return true;
@@ -793,6 +825,6 @@ hsk_netaddr_write(hsk_netaddr_t *na, uint8_t **data) {
   s += write_u8(data, na->addr.type);
   s += write_bytes(data, na->addr.ip, 36);
   s += write_u16(data, na->addr.port);
-  s += write_bytes(data, na->pubkey, 33);
+  s += write_bytes(data, na->addr.key, 33);
   return s;
 }

@@ -32,7 +32,7 @@ int32_t
 hsk_base32_decode_hex_size(char *str, uint8_t *out);
 
 bool
-hsk_base32_test(char *str, uint8_t *out, bool unpad);
+hsk_base32_test(char *str, bool unpad);
 
 bool
 hsk_base32_test_hex(char *str, bool unpad);

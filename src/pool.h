@@ -25,7 +25,8 @@
 #define HSK_STATE_CONNECTING 2
 #define HSK_STATE_CONNECTED 3
 #define HSK_STATE_READING 4
-#define HSK_STATE_DISCONNECTING 5
+#define HSK_STATE_HANDSHAKE 5
+#define HSK_STATE_DISCONNECTING 6
 
 /*
  * Types
@@ -88,6 +89,8 @@ typedef struct hsk_peer_s {
 typedef struct hsk_pool_s {
   uv_loop_t *loop;
   hsk_ec_t *ec;
+  uint8_t key_[32];
+  uint8_t *key;
   hsk_timedata_t td;
   hsk_chain_t chain;
   hsk_addrman_t am;

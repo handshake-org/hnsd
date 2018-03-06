@@ -16,13 +16,13 @@ typedef struct hsk_addr_s {
   uint8_t type;
   uint8_t ip[36];
   uint16_t port;
+  uint8_t key[33];
 } hsk_addr_t;
 
 typedef struct {
   uint64_t time;
   uint64_t services;
   hsk_addr_t addr;
-  uint8_t pubkey[33];
 } hsk_netaddr_t;
 
 void

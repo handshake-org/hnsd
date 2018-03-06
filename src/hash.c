@@ -8,6 +8,9 @@
 #include "blake2b.h"
 #include "sha256.h"
 
+#include <stdio.h>
+#include "utils.h"
+
 int32_t
 hsk_hash_blake2b(uint8_t *data, size_t data_len, uint8_t *hash) {
   assert(hash != NULL);
@@ -48,15 +51,12 @@ hsk_hash_sha256_hmac(
 ) {
   // Initializing.
   sha256_ctx inner;
-  sha256_init(&inner);
-
   sha256_ctx outer;
-  sha256_init(&outer);
 
   uint8_t k[32];
-  uint8_t pad[32];
+  uint8_t pad[64];
 
-  if (key_len > 32) {
+  if (key_len > 64) {
     hsk_hash_sha256(key, key_len, k);
     key = &k[0];
     key_len = 32;
@@ -67,18 +67,20 @@ hsk_hash_sha256_hmac(
   for (i = 0; i < key_len; i++)
     pad[i] = key[i] ^ 0x36;
 
-  for (i = key_len; i < 32; i++)
+  for (i = key_len; i < 64; i++)
     pad[i] = 0x36;
 
-  sha256_update(&inner, pad, 32);
+  sha256_init(&inner);
+  sha256_update(&inner, pad, 64);
 
   for (i = 0; i < key_len; i++)
     pad[i] = key[i] ^ 0x5c;
 
-  for (i = key_len; i < 32; i++)
+  for (i = key_len; i < 64; i++)
     pad[i] = 0x5c;
 
-  sha256_update(&outer, pad, 32);
+  sha256_init(&outer);
+  sha256_update(&outer, pad, 64);
 
   // Updating
   sha256_update(&inner, data, data_len);

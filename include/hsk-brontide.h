@@ -12,7 +12,7 @@
 #include "hsk-ec.h"
 
 typedef struct hsk_cs_s {
-  uint64_t nonce;
+  uint32_t nonce;
   uint8_t secret_key[32];
   uint8_t iv[12];
   uint8_t salt[32];
@@ -24,10 +24,11 @@ typedef void (*hsk_brontide_connect_cb)(
   void *arg
 );
 
-typedef void (*hsk_brontide_write_cb)(
+typedef int32_t (*hsk_brontide_write_cb)(
   void *arg,
   uint8_t *data,
-  size_t data_len
+  size_t data_len,
+  bool is_heap
 );
 
 typedef void (*hsk_brontide_read_cb)(
@@ -82,7 +83,7 @@ void
 hsk_cs_init_key(hsk_cs_t *cs, uint8_t *key);
 
 void
-hsk_cs_init_keysalt(hsk_cs_t *cs, uint8_t *key, uint8_t *salt);
+hsk_cs_init_saltkey(hsk_cs_t *cs, uint8_t *salt, uint8_t *key);
 
 void
 hsk_cs_rotate_key(hsk_cs_t *cs);
@@ -157,6 +158,9 @@ hsk_brontide_init_brontide(
 );
 
 void
+hsk_brontide_destroy(hsk_brontide_t *b);
+
+void
 hsk_brontide_gen_act_one(hsk_brontide_t *b, uint8_t *act1);
 
 bool
@@ -177,21 +181,26 @@ hsk_brontide_recv_act_three(hsk_brontide_t *b, uint8_t *act3);
 void
 hsk_brontide_split(hsk_brontide_t *b);
 
-void
+int32_t
 hsk_brontide_accept(hsk_brontide_t *b, uint8_t *our_key);
 
-void
+int32_t
 hsk_brontide_connect(hsk_brontide_t *b, uint8_t *our_key, uint8_t *their_key);
 
-bool
+int32_t
 hsk_brontide_on_connect(hsk_brontide_t *b);
 
-void
+int32_t
 hsk_brontide_write(hsk_brontide_t *b, uint8_t *data, size_t data_len);
 
-void
+int32_t
 hsk_brontide_on_read(hsk_brontide_t *b, uint8_t *data, size_t data_len);
 
 int32_t
-hsk_brontide_parse(hsk_brontide_t *b, uint8_t *data, size_t data_len);
+hsk_brontide_parse(
+  hsk_brontide_t *b,
+  uint8_t *data,
+  size_t data_len,
+  size_t *msg_len
+);
 #endif
