@@ -219,7 +219,7 @@ hsk_pool_set_seeds(hsk_pool_t *pool, char *seeds) {
         continue;
       }
 
-      if (size >= HSK_MAX_HOST + 33)
+      if (size >= HSK_MAX_HOST)
         return false;
 
       memcpy(seed, seeds + start, size);

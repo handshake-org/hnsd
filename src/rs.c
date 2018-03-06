@@ -230,7 +230,7 @@ hsk_rs_inject_options(hsk_rs_t *ns) {
 
   char stub[HSK_MAX_HOST];
 
-  if (!hsk_sa_to_string(ns->stub, stub, HSK_MAX_HOST, HSK_NS_PORT))
+  if (!hsk_sa_to_at(ns->stub, stub, HSK_MAX_HOST, HSK_NS_PORT))
     return false;
 
   if (ub_ctx_set_stub(ns->ub, ".", stub, 0) != 0)

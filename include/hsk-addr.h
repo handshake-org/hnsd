@@ -9,8 +9,10 @@
 #include <arpa/inet.h>
 #include <netinet/in.h>
 
-// INET6_ADDRSTRLEN + 11
-#define HSK_MAX_HOST 57
+// INET6_ADDRSTRLEN = 46
+// 46 + 5 + 1 + 2 = 54 - long enough for [ipv6]:port
+// 54 + 53  + 1 = 108 - long enough for pubkey@[ipv6]:port
+#define HSK_MAX_HOST 109
 
 typedef struct hsk_addr_s {
   uint8_t type;
@@ -95,6 +97,12 @@ bool
 hsk_addr_to_string(hsk_addr_t *addr, char *dst, size_t dst_len, uint16_t fb);
 
 bool
+hsk_addr_to_full(hsk_addr_t *addr, char *dst, size_t dst_len, uint16_t fb);
+
+bool
+hsk_addr_to_at(hsk_addr_t *addr, char *dst, size_t dst_len, uint16_t fb);
+
+bool
 hsk_addr_localize(hsk_addr_t *addr);
 
 bool
@@ -102,6 +110,14 @@ hsk_sa_from_string(struct sockaddr *sa, char *src, uint16_t port);
 
 bool
 hsk_sa_to_string(
+  struct sockaddr *sa,
+  char *dst,
+  size_t dst_len,
+  uint16_t fb
+);
+
+bool
+hsk_sa_to_at(
   struct sockaddr *sa,
   char *dst,
   size_t dst_len,

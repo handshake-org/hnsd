@@ -13,8 +13,8 @@
 
 typedef struct hsk_cs_s {
   uint32_t nonce;
-  uint8_t secret_key[32];
   uint8_t iv[12];
+  uint8_t secret_key[32];
   uint8_t salt[32];
   uint8_t tag[16];
   hsk_aead_t cipher;

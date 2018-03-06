@@ -63,6 +63,14 @@ static const uint8_t hsk_tor_onion[6] = {
   0xeb, 0x43
 };
 
+static const uint8_t hsk_zero_pub[33] = {
+  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+  0x00
+};
+
 void
 hsk_addr_init(hsk_addr_t *addr) {
   assert(addr);
@@ -278,52 +286,86 @@ bool
 hsk_addr_from_string(hsk_addr_t *addr, char *src, uint16_t port) {
   assert(addr && src);
 
-  size_t sz = strlen(src);
-
-  if (sz > HSK_MAX_HOST + 33)
-    return false;
-
-  char ss[sz];
-  memcpy(ss, src, sz + 1);
-  src = &ss[0];
-
-  bool ret = false;
-  char *comma = strstr(src, ",");
   char *at = strstr(src, "@");
 
-  if (at && comma) {
-    if (at > comma)
-      goto done;
+  if (at) {
+    char pubkey[54];
+    size_t pubkey_len = at - src;
+
+    if (pubkey_len > 53)
+      return false;
+
+    memcpy(pubkey, src, pubkey_len);
+    pubkey[pubkey_len] = '\0';
+
+    if (hsk_base32_decode_size(pubkey) != 33)
+      return false;
+
+    if (!hsk_base32_decode(pubkey, addr->key, false))
+      return false;
+
+    src = &at[1];
   }
 
-  if (comma) {
-    char *b32 = &comma[1];
-    size_t s = hsk_base32_decode_size(b32);
+  char host[INET6_ADDRSTRLEN + 1];
+  char *host_start;
+  size_t host_len;
+  char *port_s = NULL;
 
-    if (s != 33)
-      goto done;
+  if (src[0] == '[') {
+    char *bracket = strstr(src, "]");
 
-    if (!hsk_base32_decode(b32, addr->key, false))
-      goto done;
+    if (!bracket)
+      return false;
 
-    *comma = '\0';
+    host_start = &src[1];
+    host_len = bracket - host_start;
+
+    if (bracket[1] == ':')
+      port_s = &bracket[2];
+    else if (bracket[1] == '\0')
+      port_s = NULL;
+    else
+      return false;
+  } else {
+    char *colon = strstr(src, ":");
+
+    // ipv6 with no port.
+    if (colon && strstr(&colon[1], ":"))
+      colon = NULL;
+
+    host_start = src;
+
+    if (colon) {
+      host_len = colon - src;
+      port_s = &colon[1];
+    } else {
+      host_len = strlen(src);
+      port_s = NULL;
+    }
   }
+
+  if (host_len > INET6_ADDRSTRLEN)
+    return false;
+
+  memcpy(host, host_start, host_len);
+  host[host_len] = '\0';
 
   uint16_t sin_port = port;
 
-  if (port && at) {
+  if (port && port_s) {
     int32_t i = 0;
     uint32_t word = 0;
-    char *s = &at[1];
+    char *s = port_s;
 
     for (; *s; s++) {
       int32_t ch = ((int32_t)*s) - 0x30;
 
       if (ch < 0 || ch > 9)
-        goto done;
+        return false;
 
       if (i == 5)
-        goto done;
+        return false;
 
       word *= 10;
       word += ch;
@@ -332,39 +374,91 @@ hsk_addr_from_string(hsk_addr_t *addr, char *src, uint16_t port) {
     }
 
     sin_port = (uint16_t)word;
-    *at = '\0';
-  } else if (!port && at) {
-    goto done;
+  } else if (!port && port_s) {
+    return false;
   }
 
   uint8_t sin_addr[16];
   uint16_t af;
 
-  if (uv_inet_pton(AF_INET, src, sin_addr) == 0) {
+  if (uv_inet_pton(AF_INET, host, sin_addr) == 0) {
     af = AF_INET;
-  } else if (uv_inet_pton(AF_INET6, src, sin_addr) == 0) {
+  } else if (uv_inet_pton(AF_INET6, host, sin_addr) == 0) {
     af = AF_INET6;
   } else {
-    goto done;
+    return false;
   }
 
   addr->type = 0;
   assert(hsk_addr_set_ip(addr, af, sin_addr));
   addr->port = sin_port;
-  ret = true;
 
-done:
-  if (comma)
-    *comma = ',';
-
-  if (at)
-    *at = '@';
-
-  return ret;
+  return true;
 }
 
 bool
 hsk_addr_to_string(hsk_addr_t *addr, char *dst, size_t dst_len, uint16_t fb) {
+  assert(addr && dst);
+
+  uint16_t af = hsk_addr_get_af(addr);
+  uint8_t *ip = hsk_addr_get_ip(addr);
+  uint16_t port = addr->port;
+
+  if (uv_inet_ntop(af, ip, dst, dst_len) != 0)
+    return false;
+
+  if (fb) {
+    size_t len = strlen(dst);
+    size_t need = af == AF_INET6 ? 9 : 7;
+
+    if (dst_len - len < need)
+      return false;
+
+    if (!port)
+      port = fb;
+
+    if (af == AF_INET6) {
+      assert(len + need < HSK_MAX_HOST);
+      char tmp[HSK_MAX_HOST];
+      sprintf(tmp, "[%s]:%d", dst, port);
+      strcpy(dst, tmp);
+    } else {
+      sprintf(dst, "%s:%d", dst, port);
+    }
+  }
+
+  return true;
+}
+
+bool
+hsk_addr_to_full(hsk_addr_t *addr, char *dst, size_t dst_len, uint16_t fb) {
+  if (!hsk_addr_to_string(addr, dst, dst_len, fb))
+    return false;
+
+  if (memcmp(addr->key, (void *)hsk_zero_pub, 33) == 0)
+    return true;
+
+  size_t len = strlen(dst);
+  size_t size = hsk_base32_encode_size(addr->key, 33, false);
+
+  if (dst_len - len < size + 1)
+    return false;
+
+  assert(size <= 54);
+  assert(len + (size - 1) + 1 < HSK_MAX_HOST);
+
+  char b32[54];
+  hsk_base32_encode(addr->key, 33, b32, false);
+
+  char tmp[HSK_MAX_HOST];
+  sprintf(tmp, "%s@%s", b32, dst);
+  strcpy(dst, tmp);
+
+  return true;
+}
+
+bool
+hsk_addr_to_at(hsk_addr_t *addr, char *dst, size_t dst_len, uint16_t fb) {
   assert(addr && dst);
 
   uint16_t af = hsk_addr_get_af(addr);
@@ -435,6 +529,26 @@ hsk_sa_to_string(
     return false;
 
   if (!hsk_addr_to_string(&addr, dst, dst_len, fb))
+    return false;
+
+  return true;
+}
+
+bool
+hsk_sa_to_at(
+  struct sockaddr *sa,
+  char *dst,
+  size_t dst_len,
+  uint16_t fb
+) {
+  assert(sa && dst);
+
+  hsk_addr_t addr;
+
+  if (!hsk_addr_from_sa(&addr, sa))
+    return false;
+
+  if (!hsk_addr_to_at(&addr, dst, dst_len, fb))
     return false;
 
   return true;
