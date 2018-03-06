@@ -17,6 +17,8 @@ AM_CPPFLAGS = -I$(top_builddir)                  \
 include_HEADERS = include/hsk.h           \
                   include/hsk-addr.h      \
                   include/hsk-addrmgr.h   \
+                  include/hsk-aead.h      \
+                  include/hsk-brontide.h  \
                   include/hsk-chain.h     \
                   include/hsk-constants.h \
                   include/hsk-cuckoo.h    \
@@ -29,6 +31,7 @@ include_HEADERS = include/hsk.h           \
                   include/hsk-map.h       \
                   include/hsk-msg.h       \
                   include/hsk-proof.h     \
+                  include/hsk-random.h    \
                   include/hsk-resource.h  \
                   include/hsk-timedata.h
 
@@ -46,9 +49,12 @@ libhsk_la_CFLAGS = @CFLAGS@
 libhsk_la_LDFLAGS = -no-undefined -version-info 0:0:0
 libhsk_la_SOURCES = src/addr.c     \
                     src/addrmgr.c  \
+                    src/aead.c     \
                     src/base32.c   \
                     src/blake2b.c  \
                     src/bn.c       \
+                    src/brontide.c \
+                    src/chacha20/chacha20.c \
                     src/chain.c    \
                     src/cuckoo.c   \
                     src/dns.c      \
@@ -60,8 +66,10 @@ libhsk_la_SOURCES = src/addr.c     \
                     src/list.c     \
                     src/map.c      \
                     src/msg.c      \
+                    src/poly1305/poly1305-donna.c \
                     src/pool.c     \
                     src/proof.c    \
+                    src/random.c   \
                     src/req.c      \
                     src/resource.c \
                     src/sha256.c   \
