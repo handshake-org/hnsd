@@ -36,6 +36,8 @@ static const char brontide_prologue[] = "hsk";
 #define BRONTIDE_ACT_THREE 3
 #define BRONTIDE_ACT_DONE 4
 
+#define BRONTIDE_MAX_MESSAGE (4 * 1000 * 1000)
+
 /*
  * Cipher State
  */
@@ -75,9 +77,13 @@ hsk_cs_rotate_key(hsk_cs_t *cs) {
   uint8_t *old_key = cs->secret_key;
   uint8_t h1[32];
   uint8_t h2[32];
+
   hsk_hash_hkdf(old_key, 32, cs->salt, 32, info, 0, h1, h2);
+
   memcpy(cs->salt, h1, 32);
+
   uint8_t *next_key = h2;
+
   hsk_cs_init_key(cs, next_key);
 }
 
@@ -505,19 +511,23 @@ hsk_brontide_connect(hsk_brontide_t *b, uint8_t *our_key, uint8_t *their_key) {
 int32_t
 hsk_brontide_on_connect(hsk_brontide_t *b) {
   size_t size;
-  int32_t r;
 
   assert(b->write_cb);
 
   if (b->initiator) {
     b->state = BRONTIDE_ACT_TWO;
+
     uint8_t act1[BRONTIDE_ACT_ONE_SIZE];
+
     hsk_brontide_gen_act_one(b, act1);
-    r = b->write_cb(b->write_arg, act1, BRONTIDE_ACT_ONE_SIZE, false);
+
+    int32_t r = b->write_cb(b->write_arg, act1, BRONTIDE_ACT_ONE_SIZE, false);
+
     if (r != HSK_SUCCESS) {
       hsk_brontide_destroy(b);
       return r;
     }
+
     size = BRONTIDE_ACT_TWO_SIZE;
   } else {
     b->state = BRONTIDE_ACT_ONE;
@@ -593,8 +603,8 @@ hsk_brontide_on_read(hsk_brontide_t *b, uint8_t *data, size_t data_len) {
     data += need;
     data_len -= need;
 
-    size_t s;
-    int32_t r = hsk_brontide_parse(b, b->msg, b->msg_len, &s);
+    size_t msg_len;
+    int32_t r = hsk_brontide_parse(b, b->msg, b->msg_len, &msg_len);
 
     if (r != HSK_SUCCESS) {
       hsk_brontide_destroy(b);
@@ -604,18 +614,16 @@ hsk_brontide_on_read(hsk_brontide_t *b, uint8_t *data, size_t data_len) {
     if (b->state == BRONTIDE_ACT_NONE)
       return HSK_SUCCESS;
 
-    assert(s > 0);
+    uint8_t *msg = realloc(b->msg, msg_len);
 
-    uint8_t *msg = realloc(b->msg, s);
-
-    if (!msg) {
+    if (!msg && msg_len != 0) {
       hsk_brontide_destroy(b);
       return HSK_ENOMEM;
     }
 
     b->msg = msg;
     b->msg_pos = 0;
-    b->msg_len = s;
+    b->msg_len = msg_len;
   }
 
   memcpy(&b->msg[b->msg_pos], data, data_len);
@@ -711,19 +719,19 @@ hsk_brontide_parse(
     assert(b->msg_len == BRONTIDE_HEADER_SIZE);
     assert(data_len == BRONTIDE_HEADER_SIZE);
 
-    uint8_t *s = &data[0];
-    uint8_t *p = &data[4];
+    uint8_t *len = &data[0];
+    uint8_t *tag = &data[4];
 
-    hsk_cs_decrypt(&b->recv_cipher, NULL, s, s, 4);
+    hsk_cs_decrypt(&b->recv_cipher, NULL, len, len, 4);
 
-    if (!hsk_cs_verify(&b->recv_cipher, p))
+    if (!hsk_cs_verify(&b->recv_cipher, tag))
       return HSK_EBADTAG;
 
     int32_t size;
     size_t s_len = 4;
-    assert(read_i32(&s, &s_len, &size));
+    assert(read_i32(&len, &s_len, &size));
 
-    if (size <= 0 || size > (8 << 20))
+    if (size < 0 || size > BRONTIDE_MAX_MESSAGE)
       return HSK_EBADSIZE;
 
     b->has_size = true;
@@ -735,11 +743,11 @@ hsk_brontide_parse(
 
   uint8_t *payload = &data[0];
   size_t payload_len = data_len - 16;
-  uint8_t *p = &data[payload_len];
+  uint8_t *tag = &data[payload_len];
 
   hsk_cs_decrypt(&b->recv_cipher, NULL, payload, payload, payload_len);
 
-  if (!hsk_cs_verify(&b->recv_cipher, p))
+  if (!hsk_cs_verify(&b->recv_cipher, tag))
     return HSK_EBADTAG;
 
   b->has_size = false;
