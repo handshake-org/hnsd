@@ -27,79 +27,67 @@ typedef struct {
   uint8_t cmd;
 } hsk_msg_t;
 
-// bidirectional
 typedef struct {
-  uint8_t cmd; // 0
+  uint8_t cmd;
   uint32_t version;
   uint64_t services;
   uint64_t time;
   hsk_netaddr_t remote;
-  hsk_netaddr_t local;
   uint64_t nonce;
   char agent[256];
   uint32_t height;
   uint8_t no_relay;
 } hsk_version_msg_t;
 
-// bidirectional
 typedef struct {
-  uint8_t cmd; // 1
+  uint8_t cmd;
 } hsk_verack_msg_t;
 
-// bidirectional
 typedef struct {
-  uint8_t cmd; // 2
+  uint8_t cmd;
   uint64_t nonce;
 } hsk_ping_msg_t;
 
-// bidirectional
 typedef struct {
-  uint8_t cmd; // 3
+  uint8_t cmd;
   uint64_t nonce;
 } hsk_pong_msg_t;
 
-// us
 typedef struct {
-  uint8_t cmd; // 4
+  uint8_t cmd;
 } hsk_getaddr_msg_t;
 
-// them
 typedef struct {
-  uint8_t cmd; // 5
+  uint8_t cmd;
   size_t addr_count;
   hsk_netaddr_t addrs[1000];
 } hsk_addr_msg_t;
 
-// us
 typedef struct {
-  uint8_t cmd; // 10
+  uint8_t cmd;
   size_t hash_count;
   uint8_t hashes[64][32];
   uint8_t stop[32];
 } hsk_getheaders_msg_t;
 
-// them
 typedef struct {
-  uint8_t cmd; // 11
+  uint8_t cmd;
   size_t header_count;
   hsk_header_t *headers;
 } hsk_headers_msg_t;
 
-// us
 typedef struct {
-  uint8_t cmd; // 12
+  uint8_t cmd;
 } hsk_sendheaders_msg_t;
 
-// us
 typedef struct {
-  uint8_t cmd; // 31
+  uint8_t cmd;
   uint8_t root[32];
   uint8_t key[32];
 } hsk_getproof_msg_t;
 
-// them
 typedef struct {
-  uint8_t cmd; // 32
+  uint8_t cmd;
   uint8_t root[32];
   uint8_t key[32];
   size_t node_count;

@@ -25,9 +25,6 @@ hsk_version_msg_read(uint8_t **data, size_t *data_len, hsk_version_msg_t *msg) {
   if (!hsk_netaddr_read(data, data_len, &msg->remote))
     return false;
 
-  if (!hsk_netaddr_read(data, data_len, &msg->local))
-    return false;
-
   if (!read_u64(data, data_len, &msg->nonce))
     return false;
 
@@ -57,7 +54,6 @@ hsk_version_msg_write(hsk_version_msg_t *msg, uint8_t **data) {
   s += write_u64(data, msg->services);
   s += write_u64(data, msg->time);
   s += hsk_netaddr_write(&msg->remote, data);
-  s += hsk_netaddr_write(&msg->local, data);
   s += write_u64(data, msg->nonce);
   size_t size = strlen(msg->agent);
   s += write_u8(data, size);
@@ -74,18 +70,15 @@ hsk_version_msg_print(hsk_version_msg_t *msg, char *prefix) {
   if (!prefix)
     prefix = "";
 
-  char local[HSK_MAX_HOST];
   char remote[HSK_MAX_HOST];
 
   assert(hsk_addr_to_string(&msg->remote.addr, remote, HSK_MAX_HOST, 1));
-  assert(hsk_addr_to_string(&msg->local.addr, local, HSK_MAX_HOST, 1));
 
   printf("%sversion msg\n", prefix);
   printf("%s  version=%d\n", prefix, msg->version);
   printf("%s  services=%d\n", prefix, msg->services);
   printf("%s  time=%d\n", prefix, msg->time);
   printf("%s  remote=%s\n", prefix, remote);
-  printf("%s  local=%s\n", prefix, local);
   printf("%s  nonce=%d\n", prefix, msg->nonce);
   printf("%s  agent=%s\n", prefix, msg->agent);
   printf("%s  height=%d\n", prefix, msg->height);
@@ -439,7 +432,6 @@ hsk_msg_init(hsk_msg_t *msg) {
       m->services = 0;
       m->time = 0;
       hsk_netaddr_init(&m->remote);
-      hsk_netaddr_init(&m->local);
       m->nonce = 0;
       memset(m->agent, 0, 256);
       m->height = 0;

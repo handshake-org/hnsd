@@ -16,6 +16,17 @@
 #include "dnssec.h"
 #include "base32.h"
 
+static const uint8_t hsk_zero_inet4[4] = {
+  0x00, 0x00, 0x00, 0x00
+};
+
+static const uint8_t hsk_zero_inet6[16] = {
+  0x00, 0x00, 0x00, 0x00,
+  0x00, 0x00, 0x00, 0x00,
+  0x00, 0x00, 0x00, 0x00,
+  0x00, 0x00, 0x00, 0x00
+};
+
 static void
 ip_size(uint8_t *ip, size_t *s, size_t *l);
 
@@ -112,7 +123,7 @@ hsk_resource_target_read(
 
   switch (type) {
     case HSK_INET4: {
-      return read_bytes(data, data_len, target->addr, 4);
+      return read_bytes(data, data_len, target->inet4, 4);
     }
     case HSK_INET6: {
       uint8_t field;
@@ -125,22 +136,22 @@ hsk_resource_target_read(
       uint8_t left = 16 - (start + len);
 
       // Front half.
-      if (!read_bytes(data, data_len, target->addr, start))
+      if (!read_bytes(data, data_len, target->inet6, start))
         return false;
 
       // Fill in the missing section.
-      memset(target->addr + start, 0x00, len);
+      memset(&target->inet6[start], 0x00, len);
 
       // Back half.
-      uint8_t *back = target->addr + start + len;
+      uint8_t *back = &target->inet6[start + len];
 
       return read_bytes(data, data_len, back, left);
     }
     case HSK_ONION: {
-      return read_bytes(data, data_len, target->addr, 10);
+      return read_bytes(data, data_len, target->onion, 10);
     }
     case HSK_ONIONNG: {
-      return read_bytes(data, data_len, target->addr, 33);
+      return read_bytes(data, data_len, target->onion, 33);
     }
     case HSK_NAME: {
       return hsk_resource_str_read(data, data_len, st, target->name, 255);
@@ -162,6 +173,24 @@ hsk_resource_host_read(
 
   if (!read_u8(data, data_len, &type))
     return false;
+
+  if (type == HSK_GLUE) {
+    if (!hsk_resource_target_read(data, data_len, HSK_NAME, st, target))
+      return false;
+
+    if (!hsk_resource_target_read(data, data_len, HSK_INET4, st, target))
+      return false;
+
+    if (!hsk_resource_target_read(data, data_len, HSK_INET6, st, target))
+      return false;
+
+    if (memcmp(target->inet4, hsk_zero_inet4, 4) == 0
+        && memcmp(target->inet6, hsk_zero_inet6, 16) == 0) {
+      return false;
+    }
+
+    return true;
+  }
 
   return hsk_resource_target_read(data, data_len, type, st, target);
 }
@@ -463,8 +492,10 @@ hsk_record_init(hsk_record_t *r) {
     case HSK_NS: {
       hsk_host_record_t *rec = (hsk_host_record_t *)r;
       rec->target.type = 0;
-      memset(rec->target.addr, 0, sizeof(rec->target.addr));
       memset(rec->target.name, 0, sizeof(rec->target.name));
+      memset(rec->target.inet4, 0, sizeof(rec->target.inet4));
+      memset(rec->target.inet6, 0, sizeof(rec->target.inet6));
+      memset(rec->target.onion, 0, sizeof(rec->target.onion));
       break;
     }
     case HSK_SERVICE: {
@@ -474,8 +505,10 @@ hsk_record_init(hsk_record_t *r) {
       rec->priority = 0;
       rec->weight = 0;
       rec->target.type = 0;
-      memset(rec->target.addr, 0, sizeof(rec->target.addr));
       memset(rec->target.name, 0, sizeof(rec->target.name));
+      memset(rec->target.inet4, 0, sizeof(rec->target.inet4));
+      memset(rec->target.inet6, 0, sizeof(rec->target.inet6));
+      memset(rec->target.onion, 0, sizeof(rec->target.onion));
       rec->port = 0;
       break;
     }
@@ -906,7 +939,7 @@ hsk_resource_to_a(hsk_resource_t *res, char *name, ldns_rr_list *an) {
     ldns_rr_set_owner(rr, ldns_dname_new_frm_str(name));
 
     ldns_rr_push_rdf(rr,
-      ldns_rdf_new_frm_data(LDNS_RDF_TYPE_NONE, 4, target->addr));
+      ldns_rdf_new_frm_data(LDNS_RDF_TYPE_NONE, 4, target->inet4));
 
     ldns_rr_list_push_rr(an, rr);
   }
@@ -934,7 +967,7 @@ hsk_resource_to_aaaa(hsk_resource_t *res, char *name, ldns_rr_list *an) {
     ldns_rr_set_owner(rr, ldns_dname_new_frm_str(name));
 
     ldns_rr_push_rdf(rr,
-      ldns_rdf_new_frm_data(LDNS_RDF_TYPE_NONE, 16, target->addr));
+      ldns_rdf_new_frm_data(LDNS_RDF_TYPE_NONE, 16, target->inet6));
 
     ldns_rr_list_push_rr(an, rr);
   }
@@ -1023,7 +1056,7 @@ hsk_resource_to_ns(hsk_resource_t *res, char *name, ldns_rr_list *an) {
 
     char nsname[286];
 
-    if (target->type == HSK_NAME) {
+    if (target->type == HSK_NAME || target->type == HSK_GLUE) {
       if (strlen(target->name) > 253)
         continue;
       sprintf(nsname, "%s.", target->name);
@@ -1077,6 +1110,10 @@ hsk_resource_to_nsip(hsk_resource_t *res, char *name, ldns_rr_list *ad) {
 
     size_t size = target->type == HSK_INET4 ? 4 : 16;
 
+    uint8_t *addr = target->type == HSK_INET4
+      ? &target->inet4[0]
+      : &target->inet6[0];
+
     char b32[29];
     ip_to_b32(target, b32);
     sprintf(ptr, "_%s.%s", b32, name);
@@ -1087,7 +1124,7 @@ hsk_resource_to_nsip(hsk_resource_t *res, char *name, ldns_rr_list *ad) {
     ldns_rr_set_class(rr, LDNS_RR_CLASS_IN);
     ldns_rr_set_owner(rr, ldns_dname_new_frm_str(ptr));
 
-    ldns_rr_push_rdf(rr, ldns_rdf_new_frm_data(rdftype, size, target->addr));
+    ldns_rr_push_rdf(rr, ldns_rdf_new_frm_data(rdftype, size, addr));
 
     ldns_rr_list_push_rr(ad, rr);
   }
@@ -1135,6 +1172,10 @@ hsk__resource_to_srvip(
 
     size_t size = target->type == HSK_INET4 ? 4 : 16;
 
+    uint8_t *addr = target->type == HSK_INET4
+      ? &target->inet4[0]
+      : &target->inet6[0];
+
     char b32[29];
     ip_to_b32(target, b32);
     sprintf(ptr, "_%s.%s", b32, name);
@@ -1145,7 +1186,7 @@ hsk__resource_to_srvip(
     ldns_rr_set_class(rr, LDNS_RR_CLASS_IN);
     ldns_rr_set_owner(rr, ldns_dname_new_frm_str(ptr));
 
-    ldns_rr_push_rdf(rr, ldns_rdf_new_frm_data(rdftype, size, target->addr));
+    ldns_rr_push_rdf(rr, ldns_rdf_new_frm_data(rdftype, size, addr));
 
     ldns_rr_list_push_rr(ad, rr);
   }
@@ -1173,7 +1214,7 @@ hsk_resource_to_mx(hsk_resource_t *res, char *name, ldns_rr_list *an) {
 
     char targ[286];
 
-    if (target->type == HSK_NAME) {
+    if (target->type == HSK_NAME || target->type == HSK_GLUE) {
       if (strlen(target->name) > 253)
         continue;
       sprintf(targ, "%s.", target->name);
@@ -1221,7 +1262,7 @@ hsk_resource_to_srv(hsk_resource_t *res, char *name, ldns_rr_list *an) {
 
     char targ[286];
 
-    if (target->type == HSK_NAME) {
+    if (target->type == HSK_NAME || target->type == HSK_GLUE) {
       if (strlen(target->name) > 253)
         continue;
       sprintf(targ, "%s.", target->name);
@@ -1512,6 +1553,65 @@ hsk_resource_to_rp(hsk_resource_t *res, char *name, ldns_rr_list *an) {
   return true;
 }
 
+static bool
+hsk_resource_to_glue(hsk_resource_t *res, ldns_rr_list *an) {
+  int32_t i;
+
+  for (i = 0; i < res->record_count; i++) {
+    hsk_record_t *c = res->records[i];
+    hsk_target_t *target;
+
+    switch (c->type) {
+      case HSK_CANONICAL:
+      case HSK_DELEGATE:
+      case HSK_NS: {
+        hsk_host_record_t *rec = (hsk_host_record_t *)c;
+        target = &rec->target;
+        break;
+      }
+      case HSK_SERVICE: {
+        hsk_service_record_t *rec = (hsk_service_record_t *)c;
+        target = &rec->target;
+        break;
+      }
+      default: {
+        continue;
+      }
+    }
+
+    if (target->type != HSK_GLUE)
+      continue;
+
+    if (memcmp(target->inet4, hsk_zero_inet4, 4) != 0) {
+      ldns_rr *rr = ldns_rr_new();
+      ldns_rr_set_ttl(rr, res->ttl);
+      ldns_rr_set_type(rr, LDNS_RR_TYPE_A);
+      ldns_rr_set_class(rr, LDNS_RR_CLASS_IN);
+      ldns_rr_set_owner(rr, ldns_dname_new_frm_str(target->name));
+
+      ldns_rr_push_rdf(rr,
+        ldns_rdf_new_frm_data(LDNS_RDF_TYPE_NONE, 4, target->inet4));
+
+      ldns_rr_list_push_rr(an, rr);
+    }
+
+    if (memcmp(target->inet6, hsk_zero_inet6, 16) != 0) {
+      ldns_rr *rr = ldns_rr_new();
+      ldns_rr_set_ttl(rr, res->ttl);
+      ldns_rr_set_type(rr, LDNS_RR_TYPE_AAAA);
+      ldns_rr_set_class(rr, LDNS_RR_CLASS_IN);
+      ldns_rr_set_owner(rr, ldns_dname_new_frm_str(target->name));
+
+      ldns_rr_push_rdf(rr,
+        ldns_rdf_new_frm_data(LDNS_RDF_TYPE_NONE, 16, target->inet6));
+
+      ldns_rr_list_push_rr(an, rr);
+    }
+  }
+
+  return true;
+}
+
 bool
 hsk_resource_to_dns(
   hsk_resource_t *rs,
@@ -1607,6 +1707,8 @@ hsk_resource_to_dns(
       hsk_dnssec_sign(an, LDNS_RR_TYPE_DNAME, dnssec);
     }
 
+    hsk_resource_to_glue(rs, ad);
+
     goto done;
   }
 
@@ -1685,6 +1787,7 @@ hsk_resource_to_dns(
       ldns_pkt_set_aa(res, 1);
       hsk_resource_to_cname(rs, name, an);
       hsk_dnssec_sign(an, LDNS_RR_TYPE_CNAME, dnssec);
+      hsk_resource_to_glue(rs, ad);
       goto done;
     }
 
@@ -1695,6 +1798,7 @@ hsk_resource_to_dns(
       if (dnssec)
         hsk_resource_to_ds(rs, name, ns);
       hsk_dnssec_sign(ns, LDNS_RR_TYPE_DS, dnssec);
+      hsk_resource_to_glue(rs, ad);
     }
   }
 
@@ -2151,9 +2255,9 @@ ip_to_b32(hsk_target_t *target, char *dst) {
   if (target->type == HSK_INET4) {
     memset(ip + 0, 0x00, 10);
     memset(ip + 10, 0xff, 2);
-    memcpy(ip + 12, target->addr, 4);
+    memcpy(ip + 12, target->inet4, 4);
   } else {
-    memcpy(ip, target->addr, 16);
+    memcpy(ip, target->inet6, 16);
   }
 
   uint8_t data[17];

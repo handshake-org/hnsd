@@ -6,21 +6,21 @@
 #define HSK_ONION 3
 #define HSK_ONIONNG 4
 #define HSK_NAME 5
-#define HSK_CANONICAL 6
-#define HSK_DELEGATE 7
-#define HSK_NS 8
-#define HSK_SERVICE 9
-#define HSK_URL 10
-#define HSK_EMAIL 11
-#define HSK_TEXT 12
-#define HSK_LOCATION 13
-#define HSK_MAGNET 14
-#define HSK_DS 15
-#define HSK_TLS 16
-#define HSK_SSH 17
-#define HSK_PGP 18
-#define HSK_ADDR 19
-#define HSK_GLUE 20
+#define HSK_GLUE 6
+#define HSK_CANONICAL 7
+#define HSK_DELEGATE 8
+#define HSK_NS 9
+#define HSK_SERVICE 10
+#define HSK_URL 11
+#define HSK_EMAIL 12
+#define HSK_TEXT 13
+#define HSK_LOCATION 14
+#define HSK_MAGNET 15
+#define HSK_DS 16
+#define HSK_TLS 17
+#define HSK_SSH 18
+#define HSK_PGP 19
+#define HSK_ADDR 20
 #define HSK_EXTRA 255
 
 #include <stdint.h>
@@ -34,11 +34,12 @@ typedef struct hsk_record_s {
 
 typedef struct hsk_target_s {
   uint8_t type;
-  uint8_t addr[33];
   char name[256];
+  uint8_t inet4[4];
+  uint8_t inet6[16];
+  uint8_t onion[33];
 } hsk_target_t;
 
-// host(inet4,inet6,onion,onionng,name), canonical, delagate, ns
 typedef struct hsk_host_record_s {
   uint8_t type;
   hsk_target_t target;
@@ -131,13 +132,6 @@ typedef struct hsk_addr_record_s {
   size_t hash_len;
   uint8_t hash[64];
 } hsk_addr_record_t;
-
-// TODO: IMPLEMENT
-typedef struct hsk_glue_record_s {
-  uint8_t type;
-  char name[256];
-  hsk_target_t target;
-} hsk_glue_record_t;
 
 typedef struct hsk_extra_record_s {
   uint8_t type;
