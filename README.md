@@ -87,11 +87,11 @@ $ hskd [options]
 -c, --config <config>
   Path to config file.
 
--n, --ns-host <ip[@port]>
-  IP address and port for root nameserver, e.g. 127.0.0.1@5369.
+-n, --ns-host <ip[:port]>
+  IP address and port for root nameserver, e.g. 127.0.0.1:5369.
 
--r, --rs-host <ip[@port>
-  IP address and port for recursive nameserver, e.g. 127.0.0.1@53.
+-r, --rs-host <ip[:port]>
+  IP address and port for recursive nameserver, e.g. 127.0.0.1:53.
 
 -i, --ns-ip <ip>
   Public IP for NS records in the root zone.
@@ -103,10 +103,12 @@ $ hskd [options]
   Size of peer pool.
 
 -k, --identity-key <hex-string>
-  Identity key for signing DNS responses.
+  Identity key for signing DNS responses as well as P2P messages.
 
 -s, --seeds <seed1,seed2,...>
-  Seeds to connect to on P2P network.
+  Extra seeds to connect to on P2P network.
+  Example:
+    -s aorsxa4ylaacshipyjkfbvzfkh3jhh4yowtoqdt64nzemqtiw2whk@127.0.0.1
 
 -h, --help
   Help message.

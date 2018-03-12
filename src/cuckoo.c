@@ -43,7 +43,7 @@ hsk_cuckoo_init(
   ctx->size = size;
 
   // Maximum nonce size (easipct->easiness).
-  ctx->easiness = (ease * ctx->nodes) / 100;
+  ctx->easiness = ((uint64_t)ease * ctx->nodes) / 100;
 
   // Which style of hashing to use (SIPHASH_COMPAT).
   ctx->legacy = legacy;

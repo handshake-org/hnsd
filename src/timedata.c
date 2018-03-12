@@ -66,7 +66,7 @@ hsk_timedata_insert(hsk_timedata_t *td, int64_t sample) {
 
   while (start <= end) {
     int32_t pos = (start + end) >> 1;
-    int32_t cmp = td->samples[pos] - sample;
+    int64_t cmp = td->samples[pos] - sample;
 
     if (cmp == 0) {
       i = pos;
