@@ -748,11 +748,10 @@ hsk_peer_init(hsk_peer_t *peer, hsk_pool_t *pool) {
   peer->last_send = 0;
   peer->last_recv = 0;
   peer->msg_hdr = false;
-  peer->msg = (uint8_t *)malloc(24);
+  peer->msg = (uint8_t *)malloc(9);
   peer->msg_pos = 0;
-  peer->msg_len = 24;
-  memset(peer->msg_cmd, 0, sizeof peer->msg_cmd);
-  memset(peer->msg_sum, 0, sizeof peer->msg_sum);
+  peer->msg_len = 9;
+  peer->msg_cmd = 0;
   peer->next = NULL;
 
   if (!peer->msg)
@@ -1047,7 +1046,7 @@ hsk_peer_send(hsk_peer_t *peer, hsk_msg_t *msg) {
   int32_t msg_size = hsk_msg_size(msg);
   assert(msg_size != -1);
 
-  size_t size = 24 + msg_size;
+  size_t size = 9 + msg_size;
   uint8_t *data = malloc(size);
 
   if (!data)
@@ -1059,28 +1058,13 @@ hsk_peer_send(hsk_peer_t *peer, hsk_msg_t *msg) {
   write_u32(&buf, HSK_MAGIC);
 
   // Command
-  const char *cmd = hsk_msg_str(msg->cmd);
-  size_t len = strlen(cmd);
-  write_bytes(&buf, (uint8_t *)cmd, len);
-
-  // Padding
-  int32_t i;
-  for (i = len; i < 12; i++)
-    write_u8(&buf, 0);
+  write_u8(&buf, msg->cmd);
 
   // Msg Size
   write_u32(&buf, msg_size);
 
-  // Checksum
-  write_u32(&buf, 0);
-
   // Msg
   hsk_msg_write(msg, &buf);
-
-  // Compute Checksum
-  uint8_t hash[32];
-  hsk_hash_hash256(data + 24, size - 24, hash);
-  memcpy(data + 20, hash, 4);
 
   return hsk_peer_write(peer, data, size, true);
 }
@@ -1499,33 +1483,24 @@ hsk_peer_parse_hdr(hsk_peer_t *peer, uint8_t *msg, size_t msg_len) {
     return HSK_EENCODING;
   }
 
-  int32_t i = 0;
-  for (; msg[i] != 0 && i < 12; i++);
+  uint8_t cmd;
 
-  if (i == 12) {
+  if (!read_u8(&msg, &msg_len, &cmd)) {
     hsk_peer_log(peer, "invalid command\n");
     return HSK_EENCODING;
   }
 
-  memcpy(peer->msg_cmd, msg, i + 1);
-
-  msg += 12;
-  msg_len -= 12;
+  const char *str = hsk_msg_str(cmd);
 
   uint32_t size;
 
   if (!read_u32(&msg, &msg_len, &size)) {
-    hsk_peer_log(peer, "invalid header: %s\n", peer->msg_cmd);
+    hsk_peer_log(peer, "invalid header: %s\n", str);
     return HSK_EENCODING;
   }
 
   if (size > HSK_MAX_MESSAGE) {
-    hsk_peer_log(peer, "invalid msg size: %s - %d\n", peer->msg_cmd, size);
-    return HSK_EENCODING;
-  }
-
-  if (!read_bytes(&msg, &msg_len, peer->msg_sum, 4)) {
-    hsk_peer_log(peer, "invalid header: %s\n", peer->msg_cmd);
+    hsk_peer_log(peer, "invalid msg size: %s - %d\n", str, size);
     return HSK_EENCODING;
   }
 
@@ -1538,8 +1513,9 @@ hsk_peer_parse_hdr(hsk_peer_t *peer, uint8_t *msg, size_t msg_len) {
   peer->msg = msg;
   peer->msg_pos = 0;
   peer->msg_len = size;
+  peer->msg_cmd = cmd;
 
-  hsk_peer_log(peer, "received header: %s\n", peer->msg_cmd);
+  hsk_peer_log(peer, "received header: %s\n", str);
   hsk_peer_log(peer, "  msg size: %d\n", peer->msg_len);
 
   return HSK_SUCCESS;
@@ -1551,23 +1527,14 @@ hsk_peer_parse(hsk_peer_t *peer, uint8_t *msg, size_t msg_len) {
     return hsk_peer_parse_hdr(peer, msg, msg_len);
 
   int32_t rc = HSK_SUCCESS;
-  uint8_t hash[32];
-  hsk_hash_hash256(msg, msg_len, hash);
+  const char *str = hsk_msg_str(peer->msg_cmd);
 
-  if (memcmp(hash, peer->msg_sum, 4) != 0) {
-    hsk_peer_log(peer, "invalid checksum: %s\n", peer->msg_cmd);
-    rc = HSK_EENCODING;
+  if (strcmp(str, "unknown") == 0) {
+    hsk_peer_log(peer, "unknown command: %d\n", peer->msg_cmd);
     goto done;
   }
 
-  uint8_t cmd = hsk_msg_cmd(peer->msg_cmd);
-
-  if (cmd == HSK_MSG_UNKNOWN) {
-    hsk_peer_log(peer, "unknown command: %s\n", peer->msg_cmd);
-    goto done;
-  }
-
-  hsk_msg_t *m = hsk_msg_alloc(cmd);
+  hsk_msg_t *m = hsk_msg_alloc(peer->msg_cmd);
 
   if (!m) {
     rc = HSK_ENOMEM;
@@ -1575,7 +1542,7 @@ hsk_peer_parse(hsk_peer_t *peer, uint8_t *msg, size_t msg_len) {
   }
 
   if (!hsk_msg_decode(msg, msg_len, m)) {
-    hsk_peer_log(peer, "error parsing msg: %s\n", peer->msg_cmd);
+    hsk_peer_log(peer, "error parsing msg: %s\n", str);
     free(m);
     rc = HSK_EENCODING;
     goto done;
@@ -1585,7 +1552,7 @@ hsk_peer_parse(hsk_peer_t *peer, uint8_t *msg, size_t msg_len) {
   hsk_msg_free(m);
 
 done:
-  msg = realloc(peer->msg, 24);
+  msg = realloc(peer->msg, 9);
 
   if (!msg)
     return HSK_ENOMEM;
@@ -1593,9 +1560,8 @@ done:
   peer->msg_hdr = false;
   peer->msg = msg;
   peer->msg_pos = 0;
-  peer->msg_len = 24;
-  memset(peer->msg_cmd, 0, sizeof peer->msg_cmd);
-  memset(peer->msg_sum, 0, sizeof peer->msg_sum);
+  peer->msg_len = 9;
+  peer->msg_cmd = 0;
 
   return rc;
 }

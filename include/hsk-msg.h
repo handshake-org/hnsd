@@ -19,8 +19,8 @@
 #define HSK_MSG_GETHEADERS 10
 #define HSK_MSG_HEADERS 11
 #define HSK_MSG_SENDHEADERS 12
-#define HSK_MSG_GETPROOF 31
-#define HSK_MSG_PROOF 32
+#define HSK_MSG_GETPROOF 26
+#define HSK_MSG_PROOF 27
 #define HSK_MSG_UNKNOWN 255
 
 typedef struct {

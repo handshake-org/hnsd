@@ -81,8 +81,7 @@ typedef struct hsk_peer_s {
   uint8_t *msg;
   size_t msg_pos;
   size_t msg_len;
-  char msg_cmd[12];
-  uint8_t msg_sum[4];
+  uint8_t msg_cmd;
   struct hsk_peer_s *next;
 } hsk_peer_t;
 
