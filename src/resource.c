@@ -189,6 +189,8 @@ hsk_resource_host_read(
       return false;
     }
 
+    target->type = HSK_GLUE;
+
     return true;
   }
 
