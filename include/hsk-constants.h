@@ -9,7 +9,7 @@
 #define HSK_SIMNET 3
 
 #ifndef HSK_NETWORK
-#define HSK_NETWORK HSK_TESTNET
+#define HSK_NETWORK HSK_SIMNET
 #endif
 
 #define HSK_MAX_MESSAGE (4 * 1000 * 1000)
