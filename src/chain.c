@@ -26,6 +26,9 @@ hsk_chain_init_genesis(hsk_chain_t *);
 static int32_t
 hsk_chain_insert(hsk_chain_t *, hsk_header_t *, hsk_header_t *);
 
+static void
+hsk_chain_maybe_sync(hsk_chain_t *);
+
 /*
  * Helpers
  */
@@ -97,6 +100,8 @@ hsk_chain_init_genesis(hsk_chain_t *chain) {
   chain->height = tip->height;
   chain->tip = tip;
   chain->genesis = tip;
+
+  hsk_chain_maybe_sync(chain);
 
   return HSK_SUCCESS;
 }
