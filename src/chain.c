@@ -210,13 +210,18 @@ hsk_chain_maybe_sync(hsk_chain_t *chain) {
   if (chain->synced)
     return;
 
+  int64_t now = hsk_timedata_now(chain->td);
+
+  if (now < HSK_LAUNCH_DATE) {
+    hsk_chain_log(chain, "chain is fully synced\n");
+    chain->synced = true;
+    return;
+  }
+
   if (HSK_USE_CHECKPOINTS) {
     if (chain->height < HSK_LAST_CHECKPOINT)
       return;
   }
-
-  // XXX no adjtime in bcoin?
-  int64_t now = hsk_timedata_now(chain->td);
 
   if (((int64_t)chain->tip->time) < now - HSK_MAX_TIP_AGE)
     return;

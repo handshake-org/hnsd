@@ -51,6 +51,9 @@ hsk_addr_is_ip6(hsk_addr_t *addr);
 bool
 hsk_addr_is_onion(hsk_addr_t *addr);
 
+bool
+hsk_addr_has_key(hsk_addr_t *addr);
+
 uint16_t
 hsk_addr_get_af(hsk_addr_t *addr);
 

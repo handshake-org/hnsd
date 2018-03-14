@@ -129,6 +129,12 @@ hsk_addr_is_onion(hsk_addr_t *addr) {
   return memcmp(addr->ip, hsk_tor_onion, sizeof(hsk_tor_onion)) == 0;
 }
 
+bool
+hsk_addr_has_key(hsk_addr_t *addr) {
+  assert(addr);
+  return memcmp(addr->key, (void *)hsk_zero_pub, sizeof(hsk_zero_pub)) != 0;
+}
+
 uint16_t
 hsk_addr_get_af(hsk_addr_t *addr) {
   assert(addr);
@@ -435,7 +441,7 @@ hsk_addr_to_full(hsk_addr_t *addr, char *dst, size_t dst_len, uint16_t fb) {
   if (!hsk_addr_to_string(addr, dst, dst_len, fb))
     return false;
 
-  if (memcmp(addr->key, (void *)hsk_zero_pub, 33) == 0)
+  if (!hsk_addr_has_key(addr))
     return true;
 
   size_t len = strlen(dst);

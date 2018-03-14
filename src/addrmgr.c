@@ -221,6 +221,7 @@ hsk_addrman_add_entry(hsk_addrman_t *am, hsk_netaddr_t *na, bool src) {
   entry->last_attempt = 0;
   entry->ref_count = 1;
   entry->used = false;
+  entry->removed = false;
 
   if (!hsk_map_set(&am->map, &entry->addr, entry)) {
     if (alloc)
@@ -273,6 +274,18 @@ hsk_addrman_add_ip(hsk_addrman_t *am, int32_t af, uint8_t *ip, uint16_t port) {
   na.services = 1;
 
   return hsk_addrman_add_entry(am, &na, false);
+}
+
+bool
+hsk_addrman_remove_addr(hsk_addrman_t *am, hsk_addr_t *addr) {
+  hsk_addrentry_t *entry = hsk_map_get(&am->map, addr);
+
+  if (!entry)
+    return false;
+
+  entry->removed = true;
+
+  return true;
 }
 
 bool
@@ -407,6 +420,9 @@ hsk_addrman_pick(hsk_addrman_t *am, hsk_map_t *map) {
 
     if (!entry)
       break;
+
+    if (entry->removed)
+      continue;
 
     if (hsk_map_has(map, &entry->addr))
       continue;

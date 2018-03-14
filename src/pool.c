@@ -228,6 +228,9 @@ hsk_pool_set_seeds(hsk_pool_t *pool, char *seeds) {
       if (!hsk_addr_from_string(&addr, seed, HSK_PORT))
         return false;
 
+      if (!hsk_addr_has_key(&addr))
+        return false;
+
       if (!hsk_addrman_add_addr(&pool->am, &addr))
         return false;
 
@@ -330,6 +333,11 @@ hsk_pool_refill(hsk_pool_t *pool) {
     if (!hsk_pool_getaddr(pool, &addr)) {
       hsk_pool_log(pool, "could not find suitable addr\n");
       break;
+    }
+
+    if (!hsk_ec_verify_pubkey(pool->ec, addr.key)) {
+      hsk_addrman_remove_addr(&pool->am, &addr);
+      continue;
     }
 
     hsk_addrman_mark_attempt(&pool->am, &addr);
@@ -1236,10 +1244,27 @@ hsk_peer_handle_addr(hsk_peer_t *peer, hsk_addr_msg_t *msg) {
 
   hsk_peer_log(peer, "received %d addrs\n", msg->addr_count);
 
-  int32_t i;
+  int64_t now = hsk_timedata_now(&pool->td);
 
+  int32_t i;
   for (i = 0; i < msg->addr_count; i++) {
     hsk_netaddr_t *addr = &msg->addrs[i];
+
+    if (!hsk_addr_is_routable(&addr->addr))
+      continue;
+
+    if (!(addr->services & 1))
+      continue;
+
+    if (addr->time <= 100000000 || addr->time > now + 10 * 60)
+      addr->time = now - 5 * 24 * 60 * 60;
+
+    if (addr->addr.port == 0)
+      continue;
+
+    if (!hsk_addr_has_key(&addr->addr))
+      continue;
+
     hsk_addrman_add_na(&pool->am, addr);
   }
 

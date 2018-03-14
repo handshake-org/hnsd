@@ -20,6 +20,7 @@ typedef struct hsk_addrentry_s {
   int64_t last_attempt;
   int32_t ref_count;
   bool used;
+  bool removed;
 } hsk_addrentry_t;
 
 typedef struct hsk_banned_t {
@@ -68,6 +69,9 @@ hsk_addrman_add_sa(hsk_addrman_t *am, struct sockaddr *sa);
 
 bool
 hsk_addrman_add_ip(hsk_addrman_t *am, int32_t af, uint8_t *ip, uint16_t port);
+
+bool
+hsk_addrman_remove_addr(hsk_addrman_t *am, hsk_addr_t *addr);
 
 bool
 hsk_addrman_mark_attempt(hsk_addrman_t *am, hsk_addr_t *addr);
