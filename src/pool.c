@@ -207,7 +207,7 @@ hsk_pool_set_seeds(hsk_pool_t *pool, char *seeds) {
   int32_t start = 0;
   int32_t i;
 
-  char seed[HSK_MAX_HOST + 33];
+  char seed[HSK_MAX_HOST + 1];
   hsk_addr_t addr;
 
   for (i = 0; i < len + 1; i++) {
