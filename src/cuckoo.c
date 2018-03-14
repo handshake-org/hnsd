@@ -22,10 +22,10 @@ hsk_cuckoo_init(
   if (bits < 1 || bits > 32)
     return HSK_EBADARGS;
 
-  if (size < 2 || size > 254)
+  if (size < 4 || size > 254)
     return HSK_EBADARGS;
 
-  if ((size & 1) != 0)
+  if (size & 1)
     return HSK_EBADARGS;
 
   if (ease < 1 || ease > 100)
@@ -44,6 +44,9 @@ hsk_cuckoo_init(
 
   // Maximum nonce size (easipct->easiness).
   ctx->easiness = ((uint64_t)ease * ctx->nodes) / 100;
+
+  // Sanity check.
+  assert(ease != 50 || ctx->easiness == (ctx->mask + 1));
 
   // Which style of hashing to use (SIPHASH_COMPAT).
   ctx->legacy = legacy;
@@ -173,7 +176,7 @@ hsk_cuckoo_verify_header(
   uint8_t key[32];
 
   if (hsk_cuckoo_sipkey(ctx, hdr, hdr_len, key) != 0)
-    return HSK_ENOMEM;
+    return HSK_EBADARGS;
 
   return hsk_cuckoo_verify(ctx, key, sol);
 }
