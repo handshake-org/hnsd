@@ -193,7 +193,7 @@ hsk_chain_get_ancestor(hsk_chain_t *chain, hsk_header_t *hdr, int32_t height) {
   assert(height <= hdr->height);
 
   while (hdr->height != height) {
-    hdr = (hsk_header_t *)hsk_map_get(&chain->heights, &height);
+    hdr = (hsk_header_t *)hsk_map_get(&chain->hashes, hdr->prev_block);
     assert(hdr);
   }
 
@@ -603,9 +603,9 @@ hsk_chain_insert(hsk_chain_t *chain, hsk_header_t *hdr, hsk_header_t *prev) {
   assert(hsk_header_calc_work(hdr, prev));
 
   if (memcmp(hdr->work, chain->tip->work, 32) <= 0) {
-    if (!hsk_map_set(&chain->hashes, hash, (void *)hdr)) {
+    if (!hsk_map_set(&chain->hashes, hash, (void *)hdr))
       return HSK_ENOMEM;
-    }
+
     hsk_chain_log(chain, "  stored on alternate chain\n");
   } else {
     if (memcmp(hdr->prev_block, hsk_header_cache(chain->tip), 32) != 0) {
@@ -613,9 +613,8 @@ hsk_chain_insert(hsk_chain_t *chain, hsk_header_t *hdr, hsk_header_t *prev) {
       hsk_chain_reorganize(chain, hdr);
     }
 
-    if (!hsk_map_set(&chain->hashes, hash, (void *)hdr)) {
+    if (!hsk_map_set(&chain->hashes, hash, (void *)hdr))
       return HSK_ENOMEM;
-    }
 
     if (!hsk_map_set(&chain->heights, &hdr->height, (void *)hdr)) {
       hsk_map_del(&chain->hashes, hash);
