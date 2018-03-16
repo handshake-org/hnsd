@@ -107,7 +107,7 @@ AC_ARG_ENABLE(openssl_tests,
 AC_ARG_ENABLE(experimental,
     AS_HELP_STRING([--enable-experimental],[allow experimental configure options (default is no)]),
     [use_experimental=$enableval],
-    [use_experimental=yes])
+    [use_experimental=no])
 
 AC_ARG_ENABLE(exhaustive_tests,
     AS_HELP_STRING([--enable-exhaustive-tests],[compile exhaustive tests (default is yes)]),
@@ -127,12 +127,12 @@ AC_ARG_ENABLE(ecmult_static_precomputation,
 AC_ARG_ENABLE(module_ecdh,
     AS_HELP_STRING([--enable-module-ecdh],[enable ECDH shared secret computation (experimental)]),
     [enable_module_ecdh=$enableval],
-    [enable_module_ecdh=yes])
+    [enable_module_ecdh=no])
 
 AC_ARG_ENABLE(module_recovery,
     AS_HELP_STRING([--enable-module-recovery],[enable ECDSA pubkey recovery module (default is no)]),
     [enable_module_recovery=$enableval],
-    [enable_module_recovery=yes])
+    [enable_module_recovery=no])
 
 AC_ARG_ENABLE(jni,
     AS_HELP_STRING([--enable-jni],[enable libsecp256k1_jni (default is no)]),
@@ -460,9 +460,9 @@ if test x"$enable_experimental" = x"yes"; then
   AC_MSG_NOTICE([Building ECDH module: $enable_module_ecdh])
   AC_MSG_NOTICE([******])
 else
-  # if test x"$enable_module_ecdh" = x"yes"; then
-  #   AC_MSG_ERROR([ECDH module is experimental. Use --enable-experimental to allow.])
-  # fi
+  if test x"$enable_module_ecdh" = x"yes"; then
+    AC_MSG_ERROR([ECDH module is experimental. Use --enable-experimental to allow.])
+  fi
   if test x"$set_asm" = x"arm"; then
     AC_MSG_ERROR([ARM assembly optimization is experimental. Use --enable-experimental to allow.])
   fi
