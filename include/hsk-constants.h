@@ -27,7 +27,6 @@ static const uint8_t HSK_ZERO_HASH[32] = {
 
 #define HSK_NS_IP "127.0.0.1"
 #define HSK_RS_IP "127.0.0.1"
-#define HSK_RS_PORT 53
 #define HSK_RS_A "127.0.0.1"
 
 static const char HSK_TRUST_ANCHOR[] = ". DS 40564 8 2 "
@@ -44,7 +43,8 @@ static const char HSK_TRUST_ANCHOR[] = ". DS 40564 8 2 "
 #define HSK_NETWORK_NAME "main"
 #define HSK_MAGIC 0xebf10ad8
 #define HSK_PORT 12038
-#define HSK_NS_PORT 5369
+#define HSK_NS_PORT 5359
+#define HSK_RS_PORT 5360
 
 #define HSK_BITS 0x1f07ffff
 
@@ -88,7 +88,8 @@ static const uint8_t HSK_CHAINWORK[32] = {
 #define HSK_NETWORK_NAME "testnet"
 #define HSK_MAGIC 0x8efa1fbe
 #define HSK_PORT 13038
-#define HSK_NS_PORT 15369
+#define HSK_NS_PORT 15359
+#define HSK_RS_PORT 15360
 
 #define HSK_BITS 0x2007ffff
 
@@ -132,7 +133,8 @@ static const uint8_t HSK_CHAINWORK[32] = {
 #define HSK_NETWORK_NAME "regtest"
 #define HSK_MAGIC 0xbcf173aa
 #define HSK_PORT 14038
-#define HSK_NS_PORT 25369
+#define HSK_NS_PORT 25359
+#define HSK_RS_PORT 25360
 
 #define HSK_BITS 0x207fffff
 
@@ -176,7 +178,8 @@ static const uint8_t HSK_CHAINWORK[32] = {
 #define HSK_NETWORK_NAME "simnet"
 #define HSK_MAGIC 0x473bd012
 #define HSK_PORT 15038
-#define HSK_NS_PORT 35369
+#define HSK_NS_PORT 35359
+#define HSK_RS_PORT 35360
 
 #define HSK_BITS 0x207fffff
 

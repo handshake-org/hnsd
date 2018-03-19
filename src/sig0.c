@@ -51,7 +51,7 @@ hsk_sig0_has_sig(uint8_t *wire, size_t wire_len) {
   uint16_t type_covered = get_u16be(&rd[0]);
 
   // Must be SIG(0).
-  if (type_covered != 0)
+  if (type_covered != HSK_SIG0_ZERO)
     return false;
 
   return true;
@@ -75,7 +75,7 @@ hsk_sig0_get_sig(uint8_t *wire, size_t wire_len, uint8_t *sig, uint16_t *tag) {
   uint16_t signer_name = get_u8(&rd[18]);
 
   // Must be SIG(0).
-  if (type_covered != 0)
+  if (type_covered != HSK_SIG0_ZERO)
     return false;
 
   // Must be PRIVATEDNS.
@@ -194,7 +194,7 @@ hsk_sig0_sign(
   set_u16be(&rr[9], HSK_SIG0_RD_SIZE);
 
   // type_covered = 0
-  set_u16be(&rd[0], 0);
+  set_u16be(&rd[0], HSK_SIG0_ZERO);
 
   // algorithm = PRIVATEDNS
   set_u8(&rd[2], HSK_SIG0_ALG);

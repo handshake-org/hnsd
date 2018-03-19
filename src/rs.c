@@ -18,10 +18,10 @@
 #include "hsk-resource.h"
 #include "hsk-error.h"
 #include "hsk-ec.h"
-#include "hsk-hsig.h"
 #include "dnssec.h"
 #include "req.h"
 #include "rs.h"
+#include "sig0.h"
 #include "utils.h"
 
 /*
@@ -511,7 +511,7 @@ hsk_rs_respond(
   if (!hsk_dnssec_clean(pkt, (ldns_rr_type)req->type))
     goto fail;
 
-  // Verify and remove HSIG from
+  // Verify and remove SIG0 from
   // our authoritative server.
   if (req->labels <= 1) {
     ldns_rr_list *ar = ldns_pkt_additional(pkt);
@@ -519,7 +519,7 @@ hsk_rs_respond(
 
     if (count > 0) {
       ldns_rr *rr = ldns_rr_list_rr(ar, count - 1);
-      if (ldns_rr_get_type(rr) == HSK_DNS_HSIG) {
+      if (ldns_rr_get_type(rr) == HSK_SIG0_TYPE) {
         ldns_rr_list_pop_rr(ar);
         ldns_rr_free(rr);
         ldns_pkt_set_arcount(pkt, count - 1);
@@ -550,7 +550,7 @@ hsk_rs_respond(
   }
 
   if (ns->key) {
-    if (!hsk_hsig_sign_msg(ns->ec, ns->key, &wire, &wire_len, req->nonce)) {
+    if (!hsk_sig0_sign_msg(ns->ec, ns->key, &wire, &wire_len)) {
       hsk_rs_log(ns, "could not sign response\n");
       goto fail;
     }

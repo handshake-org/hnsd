@@ -10,7 +10,6 @@
 #include "hsk-addr.h"
 #include "hsk-constants.h"
 #include "hsk-error.h"
-#include "hsk-hsig.h"
 #include "req.h"
 #include "utils.h"
 
@@ -26,7 +25,6 @@ hsk_dns_req_init(hsk_dns_req_t *req) {
   req->edns = false;
   req->dnssec = false;
   memset(req->tld, 0x00, sizeof(req->tld));
-  memset(req->nonce, 0x00, sizeof(req->nonce));
   memset(&req->ss, 0x00, sizeof(struct sockaddr_storage));
   req->addr = (struct sockaddr *)&req->ss;
 }
@@ -144,12 +142,6 @@ hsk_dns_req_create(uint8_t *data, size_t data_len, struct sockaddr *addr) {
     }
   }
 
-  // Check for an HSIG nonce.
-  uint8_t nonce[32];
-
-  if (!hsk_hsig_get_nonce(data, data_len, nonce))
-    memset(nonce, 0x00, 32);
-
   // Reference.
   req->ns = NULL;
 
@@ -165,8 +157,6 @@ hsk_dns_req_create(uint8_t *data, size_t data_len, struct sockaddr *addr) {
   // HSK stuff.
   if (tld)
     memcpy(req->tld, tld, tld_size + 1);
-
-  memcpy(req->nonce, nonce, 32);
 
   // Sender address.
   hsk_sa_copy(req->addr, addr);
@@ -209,10 +199,8 @@ hsk_dns_req_print(hsk_dns_req_t *req, char *prefix) {
   if (!prefix)
     prefix = "";
 
-  char nonce[65];
   char addr[HSK_MAX_HOST];
 
-  assert(hsk_hex_encode(req->nonce, 32, nonce));
   assert(hsk_sa_to_string(req->addr, addr, HSK_MAX_HOST, 1));
 
   printf("%squery\n", prefix);
@@ -224,6 +212,5 @@ hsk_dns_req_print(hsk_dns_req_t *req, char *prefix) {
   printf("%s  edns=%d\n", prefix, (int32_t)req->edns);
   printf("%s  dnssec=%d\n", prefix, (int32_t)req->dnssec);
   printf("%s  tld=%s\n", prefix, req->tld);
-  printf("%s  nonce=%s\n", prefix, nonce);
   printf("%s  addr=%s\n", prefix, addr);
 }

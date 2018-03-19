@@ -2043,13 +2043,11 @@ hsk_resource_root(
       if (dnssec)
         hsk_dnssec_sign(an, LDNS_RR_TYPE_DS);
       break;
-  }
-
-  if (ldns_rr_list_rr_count(an) == 0
-      && ldns_rr_list_rr_count(ns) == 0) {
-    hsk_resource_root_to_soa(ns);
-    if (dnssec)
-      hsk_dnssec_sign(ns, LDNS_RR_TYPE_SOA);
+    default:
+      hsk_resource_root_to_soa(ns);
+      if (dnssec)
+        hsk_dnssec_sign(ns, LDNS_RR_TYPE_SOA);
+      break;
   }
 
   ldns_pkt_push_rr_list(res, LDNS_SECTION_QUESTION, qd);

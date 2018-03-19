@@ -7,11 +7,13 @@
 
 #include "hsk-ec.h"
 
+#define HSK_SIG0_RR_SIZE 94
+#define HSK_SIG0_RD_SIZE 83
+
 #define HSK_SIG0_TYPE 24
 #define HSK_SIG0_CLASS 255
+#define HSK_SIG0_ZERO 0
 #define HSK_SIG0_ALG 253
-#define HSK_SIG0_RD_SIZE 83
-#define HSK_SIG0_RR_SIZE 94
 
 bool
 hsk_sig0_has_sig(uint8_t *wire, size_t wire_len);

@@ -23,7 +23,6 @@ typedef struct {
 
   // HSK stuff
   char tld[256];
-  uint8_t nonce[32];
 
   // Who it's from.
   struct sockaddr_storage ss;

@@ -348,19 +348,8 @@ hsk_dnssec_filter(ldns_rr_list *list, ldns_rr_type type) {
       }
     }
 
-    if (type != LDNS_RR_TYPE_NSEC3) {
-      if (ldns_rr_get_type(rr) == LDNS_RR_TYPE_NSEC3) {
-        if (!ldns_rr_list_push_rr(dead, rr)) {
-          ldns_rr_list_free(dead);
-          ldns_rr_list_free(set);
-          return NULL;
-        }
-        continue;
-      }
-    }
-
-    if (type != LDNS_RR_TYPE_NSEC) {
-      if (ldns_rr_get_type(rr) == LDNS_RR_TYPE_NSEC) {
+    if (type != LDNS_RR_TYPE_DNSKEY) {
+      if (ldns_rr_get_type(rr) == LDNS_RR_TYPE_DNSKEY) {
         if (!ldns_rr_list_push_rr(dead, rr)) {
           ldns_rr_list_free(dead);
           ldns_rr_list_free(set);
@@ -372,6 +361,39 @@ hsk_dnssec_filter(ldns_rr_list *list, ldns_rr_type type) {
 
     if (type != LDNS_RR_TYPE_DS) {
       if (ldns_rr_get_type(rr) == LDNS_RR_TYPE_DS) {
+        if (!ldns_rr_list_push_rr(dead, rr)) {
+          ldns_rr_list_free(dead);
+          ldns_rr_list_free(set);
+          return NULL;
+        }
+        continue;
+      }
+    }
+
+    if (type != LDNS_RR_TYPE_NSEC3) {
+      if (ldns_rr_get_type(rr) == LDNS_RR_TYPE_NSEC3) {
+        if (!ldns_rr_list_push_rr(dead, rr)) {
+          ldns_rr_list_free(dead);
+          ldns_rr_list_free(set);
+          return NULL;
+        }
+        continue;
+      }
+    }
+
+    if (type != LDNS_RR_TYPE_NSEC3PARAM) {
+      if (ldns_rr_get_type(rr) == LDNS_RR_TYPE_NSEC3PARAM) {
+        if (!ldns_rr_list_push_rr(dead, rr)) {
+          ldns_rr_list_free(dead);
+          ldns_rr_list_free(set);
+          return NULL;
+        }
+        continue;
+      }
+    }
+
+    if (type != LDNS_RR_TYPE_NSEC) {
+      if (ldns_rr_get_type(rr) == LDNS_RR_TYPE_NSEC) {
         if (!ldns_rr_list_push_rr(dead, rr)) {
           ldns_rr_list_free(dead);
           ldns_rr_list_free(set);

@@ -16,11 +16,11 @@
 #include "hsk-constants.h"
 #include "hsk-ec.h"
 #include "hsk-error.h"
-#include "hsk-hsig.h"
 #include "hsk-resource.h"
 #include "ns.h"
 #include "pool.h"
 #include "req.h"
+#include "sig0.h"
 
 /*
  * Types
@@ -331,7 +331,7 @@ hsk_ns_onrecv(
   }
 
   if (ns->key) {
-    if (!hsk_hsig_sign_msg(ns->ec, ns->key, &wire, &wire_len, req->nonce)) {
+    if (!hsk_sig0_sign_msg(ns->ec, ns->key, &wire, &wire_len)) {
       hsk_ns_log(ns, "could not sign response\n");
       goto fail;
     }
@@ -411,7 +411,7 @@ hsk_ns_respond(
   }
 
   if (result && ns->key) {
-    if (!hsk_hsig_sign_msg(ns->ec, ns->key, &wire, &wire_len, req->nonce)) {
+    if (!hsk_sig0_sign_msg(ns->ec, ns->key, &wire, &wire_len)) {
       hsk_ns_log(ns, "could not sign response\n");
       result = false;
     }
