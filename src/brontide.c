@@ -558,9 +558,8 @@ hsk_brontide_write(hsk_brontide_t *b, uint8_t *data, size_t data_len) {
     goto done;
 
   uint8_t len[4];
-  uint8_t *buf = &len[0];
 
-  write_u32(&buf, (uint32_t)data_len);
+  set_u32(&len[0], (uint32_t)data_len);
 
   hsk_cs_encrypt(&b->send_cipher, NULL, len, len, 4);
 
@@ -731,7 +730,7 @@ hsk_brontide_parse(
     if (!hsk_cs_verify(&b->recv_cipher, tag))
       return HSK_EBADTAG;
 
-    int32_t size = read_int(len);
+    int32_t size = get_i32(len);
 
     if (size < 0 || size > BRONTIDE_MAX_MESSAGE)
       return HSK_EBADSIZE;

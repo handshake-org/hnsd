@@ -5,7 +5,7 @@
 #include <stdbool.h>
 #include <stdlib.h>
 
-int32_t
+void
 hsk_hash_blake2b(uint8_t *data, size_t data_len, uint8_t *hash);
 
 void
