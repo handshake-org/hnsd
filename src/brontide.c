@@ -595,6 +595,8 @@ hsk_brontide_on_read(hsk_brontide_t *b, uint8_t *data, size_t data_len) {
   if (b->state == BRONTIDE_ACT_NONE)
     return HSK_SUCCESS;
 
+  assert(b->msg);
+
   while (b->msg_pos + data_len >= b->msg_len) {
     size_t need = b->msg_len - b->msg_pos;
 
@@ -614,9 +616,11 @@ hsk_brontide_on_read(hsk_brontide_t *b, uint8_t *data, size_t data_len) {
     if (b->state == BRONTIDE_ACT_NONE)
       return HSK_SUCCESS;
 
+    assert(msg_len != 0);
+
     uint8_t *msg = realloc(b->msg, msg_len);
 
-    if (!msg && msg_len != 0) {
+    if (!msg) {
       hsk_brontide_destroy(b);
       return HSK_ENOMEM;
     }
@@ -727,9 +731,7 @@ hsk_brontide_parse(
     if (!hsk_cs_verify(&b->recv_cipher, tag))
       return HSK_EBADTAG;
 
-    int32_t size;
-    size_t s_len = 4;
-    assert(read_i32(&len, &s_len, &size));
+    int32_t size = read_int(len);
 
     if (size < 0 || size > BRONTIDE_MAX_MESSAGE)
       return HSK_EBADSIZE;

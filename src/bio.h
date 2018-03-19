@@ -22,7 +22,7 @@ read_u16(uint8_t **data, size_t *len, uint16_t *out) {
   if (*len < 2)
     return false;
 #ifdef HSK_LITTLE_ENDIAN
-  memcpy(out, data, 2);
+  memcpy(out, *data, 2);
 #else
   *out = 0;
   *out |= ((uint16_t)(*data)[1]) << 8;
@@ -38,7 +38,7 @@ read_u32(uint8_t **data, size_t *len, uint32_t *out) {
   if (*len < 4)
     return false;
 #ifdef HSK_LITTLE_ENDIAN
-  memcpy(out, data, 4);
+  memcpy(out, *data, 4);
 #else
   *out = 0;
   *out |= ((uint32_t)(*data)[3]) << 24;
@@ -56,7 +56,7 @@ read_u64(uint8_t **data, size_t *len, uint64_t *out) {
   if (*len < 8)
     return false;
 #ifdef HSK_LITTLE_ENDIAN
-  memcpy(out, data, 8);
+  memcpy(out, *data, 8);
 #else
   *out = 0;
   *out |= ((uint64_t)(*data)[7]) << 56;
@@ -98,7 +98,7 @@ read_u16be(uint8_t **data, size_t *len, uint16_t *out) {
   if (*len < 2)
     return false;
 #ifdef HSK_BIG_ENDIAN
-  memcpy(out, data, 2);
+  memcpy(out, *data, 2);
 #else
   *out = 0;
   *out |= ((uint16_t)(*data)[0]) << 8;
@@ -114,7 +114,7 @@ read_u32be(uint8_t **data, size_t *len, uint32_t *out) {
   if (*len < 4)
     return false;
 #ifdef HSK_BIG_ENDIAN
-  memcpy(out, data, 4);
+  memcpy(out, *data, 4);
 #else
   *out = 0;
   *out |= ((uint16_t)(*data)[0]) << 24;
@@ -132,7 +132,7 @@ read_u64be(uint8_t **data, size_t *len, uint64_t *out) {
   if (*len < 8)
     return false;
 #ifdef HSK_BIG_ENDIAN
-  memcpy(out, data, 8);
+  memcpy(out, *data, 8);
 #else
   *out = 0;
   *out |= ((uint64_t)(*data)[0]) << 56;
@@ -617,5 +617,25 @@ write_varbytes(uint8_t **data, uint8_t *bytes, size_t size) {
   s += write_varsize(data, size);
   s += write_bytes(data, bytes, size);
   return s;
+}
+
+static inline uint32_t
+read_uint(uint8_t *data) {
+  uint32_t out;
+#ifdef HSK_LITTLE_ENDIAN
+  memcpy(&out, data, 4);
+#else
+  out = 0;
+  out |= ((uint32_t)data[3]) << 24;
+  out |= ((uint32_t)data[2]) << 16;
+  out |= ((uint32_t)data[1]) << 8;
+  out |= (uint32_t)data[0];
+#endif
+  return out;
+}
+
+static inline int32_t
+read_int(uint8_t *data) {
+  return (int32_t)read_uint(data);
 }
 #endif

@@ -19,7 +19,7 @@ bool
 hsk_dnssec_sign_rr_list(ldns_rr_list *an);
 
 bool
-hsk_dnssec_sign(ldns_rr_list *an, ldns_rr_type type, bool dnssec);
+hsk_dnssec_sign(ldns_rr_list *an, ldns_rr_type type);
 
 ldns_rr_list *
 hsk_dnssec_filter(ldns_rr_list *list, ldns_rr_type type);

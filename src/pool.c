@@ -1173,12 +1173,7 @@ hsk_peer_handle_version(hsk_peer_t *peer, hsk_version_msg_t *msg) {
   hsk_timedata_add(&pool->td, &peer->addr, msg->time);
   hsk_addrman_mark_ack(&pool->am, &peer->addr, msg->services);
 
-  int32_t rc = hsk_peer_send_verack(peer);
-
-  if (rc != HSK_SUCCESS)
-    return rc;
-
-  return hsk_peer_send_version(peer);
+  return hsk_peer_send_verack(peer);
 }
 
 static int32_t
@@ -1730,6 +1725,8 @@ after_brontide_connect(void *arg) {
   hsk_addrman_mark_success(&pool->am, &peer->addr);
 
   peer->state = HSK_STATE_HANDSHAKE;
+
+  hsk_peer_send_version(peer);
 }
 
 static void

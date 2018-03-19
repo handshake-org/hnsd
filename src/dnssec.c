@@ -273,10 +273,7 @@ hsk_dnssec_get_ds(void) {
 }
 
 bool
-hsk_dnssec_sign(ldns_rr_list *an, ldns_rr_type type, bool dnssec) {
-  if (!dnssec)
-    return true;
-
+hsk_dnssec_sign(ldns_rr_list *an, ldns_rr_type type) {
   ldns_key_list *keys = hsk_dnssec_get_list();
 
   if (!keys)
