@@ -22,10 +22,9 @@ hsk_dns_msg_init(hsk_dns_msg_t *msg) {
   hsk_dns_rrs_init(&msg->ar);
   msg->edns.enabled = false;
   msg->edns.version = 0;
-  msg->edns.ttl = 0;
+  msg->edns.flags = 0;
   msg->edns.size = 0;
   msg->edns.code = 0;
-  msg->edns.flags = 0;
   msg->edns.rd_len = 0;
   msg->edns.rd = NULL;
 }
@@ -86,7 +85,7 @@ hsk_dns_msg_write(hsk_dns_msg_t *msg, uint8_t **data) {
   flags &= ~(0x0f << 11);
   flags &= ~0x0f;
   flags |= ((uint16_t)(msg->opcode & 0x0f)) << 11;
-  flags |= ((uint16_t)msg->code) & 0x0f;
+  flags |= msg->code & 0x0f;
 
   size += write_u16be(data, msg->id);
   size += write_u16be(data, flags);
@@ -109,6 +108,11 @@ hsk_dns_msg_write(hsk_dns_msg_t *msg, uint8_t **data) {
   for (i = 0; i < msg->ar.size; i++)
     size += hsk_dns_rr_write(msg->ar.items[i], data);
 
+  if (msg->code > 0x0f) {
+    msg->edns.enabled = true;
+    msg->edns.code = msg->code >> 4;
+  }
+
   if (msg->edns.enabled) {
     hsk_dns_rr_t rr = { .type = HSK_DNS_OPT };
     hsk_dns_opt_rd_t rd;
@@ -116,7 +120,7 @@ hsk_dns_msg_write(hsk_dns_msg_t *msg, uint8_t **data) {
     rr.ttl = 0;
     rr.ttl |= ((uint32_t)msg->edns.code) << 24;
     rr.ttl |= ((uint32_t)msg->edns.version) << 16;
-    rr.ttl |= (uint32_t)msg->edns.ttl;
+    rr.ttl |= (uint32_t)msg->edns.flags;
     rr.class = msg->edns.size;
     rr.rd = (void *)&rd;
     rd.rd_len = msg->edns.rd_len;
@@ -258,10 +262,11 @@ hsk_dns_msg_read(uint8_t **data, size_t *data_len, hsk_dns_msg_t *msg) {
       msg->edns.enabled = true;
       msg->edns.code = (rr->ttl >> 24) & 0xff;
       msg->edns.version = (rr->ttl >> 16) & 0xff;
-      msg->edns.ttl = rr->ttl & 0xffff;
+      msg->edns.flags = rr->ttl & 0xffff;
       msg->edns.size = rr->class;
       msg->edns.rd_len = opt->rd_len;
       msg->edns.rd = opt->rd;
+      msg->code |= msg->edns.code << 4;
 
       free(rr->rd);
       free(rr);
@@ -524,7 +529,7 @@ hsk_dns_rr_create(uint16_t type) {
   }
 
   rr->type = type;
-  rr->class = HSK_DNS_INET;
+  rr->class = HSK_DNS_IN;
   rr->rd = rd;
 
   return rr;
@@ -697,7 +702,7 @@ hsk_dns_rd_init(void *rd, uint16_t type) {
     case HSK_DNS_SSHFP: {
       hsk_dns_sshfp_rd_t *r = (hsk_dns_sshfp_rd_t *)rd;
       r->algorithm = 0;
-      r->key_type = 0;
+      r->digest_type = 0;
       r->fingerprint_len = 0;
       r->fingerprint = NULL;
       break;
@@ -1097,7 +1102,7 @@ hsk_dns_rd_write(void *rd, uint16_t type, uint8_t **data) {
       hsk_dns_sshfp_rd_t *r = (hsk_dns_sshfp_rd_t *)rd;
 
       size += write_u8(data, r->algorithm);
-      size += write_u8(data, r->key_type);
+      size += write_u8(data, r->digest_type);
       size += write_bytes(data, r->fingerprint, r->fingerprint_len);
 
       break;
@@ -1358,7 +1363,7 @@ fail_txt:
       if (!read_u8(data, data_len, &r->algorithm))
         return false;
 
-      if (!read_u8(data, data_len, &r->key_type))
+      if (!read_u8(data, data_len, &r->digest_type))
         return false;
 
       r->fingerprint_len = *data_len;

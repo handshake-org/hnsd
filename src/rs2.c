@@ -331,7 +331,7 @@ hsk_rs_onrecv(
 
   hsk_rs_log(ns, "received recursive dns query: %s %d\n", qs->name, qs->type);
 
-  if (qs->class != HSK_DNS_INET)
+  if (qs->class != HSK_DNS_IN)
     goto fail;
 
   dr = malloc(sizeof(hsk_dns_req_t));

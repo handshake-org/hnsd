@@ -23,7 +23,7 @@ typedef struct hsk_dns_rrs_s {
 typedef struct hsk_dns_msg_s {
   uint16_t id;
   uint8_t opcode;
-  uint8_t code;
+  uint16_t code;
   uint16_t flags;
   hsk_dns_rrs_t qd;
   hsk_dns_rrs_t an;
@@ -32,10 +32,9 @@ typedef struct hsk_dns_msg_s {
   struct {
     bool enabled;
     uint8_t version;
-    uint16_t ttl;
+    uint16_t flags;
     uint16_t size;
     uint8_t code;
-    uint32_t flags;
     size_t rd_len;
     uint8_t *rd;
   } edns;
@@ -124,7 +123,7 @@ typedef struct {
 
 typedef struct {
   uint8_t algorithm;
-  uint8_t key_type;
+  uint8_t digest_type;
   size_t fingerprint_len;
   uint8_t *fingerprint;
 } hsk_dns_sshfp_rd_t;
@@ -200,10 +199,10 @@ typedef struct {
 // Errors
 #define HSK_DNS_NOERROR 0 // No Error
 #define HSK_DNS_SUCCESS 0 // No Error
-#define HSK_DNS_FORMATERROR 1 // Format Error
-#define HSK_DNS_SERVERFAILURE 2 // Server Failure
+#define HSK_DNS_FORMERR 1 // Format Error
+#define HSK_DNS_SERVFAIL 2 // Server Failure
 #define HSK_DNS_NXDOMAIN 3 // Non-Existent Domain
-#define HSK_DNS_NOTIMPLEMENTED 4 // Not Implemented
+#define HSK_DNS_NOTIMP 4 // Not Implemented
 #define HSK_DNS_REFUSED 5 // Query Refused
 #define HSK_DNS_YXDOMAIN 6 // Name Exists when it should not
 #define HSK_DNS_YXRRSET 7 // RR Set Exists when it should not
@@ -221,7 +220,7 @@ typedef struct {
 #define HSK_DNS_BADCOOKIE 23 // Bad/missing Server Cookie
 
 // Records
-// #define HSK_DNS_NONE 0
+#define HSK_DNS_UNKNOWN 0
 #define HSK_DNS_A 1
 #define HSK_DNS_NS 2
 #define HSK_DNS_MD 3 // obsolete
@@ -296,9 +295,6 @@ typedef struct {
 #define HSK_DNS_LP 107
 #define HSK_DNS_EUI48 108
 #define HSK_DNS_EUI64 109
-#define HSK_DNS_URI 256
-#define HSK_DNS_CAA 257
-#define HSK_DNS_AVC 258 // proposed
 #define HSK_DNS_TKEY 249
 #define HSK_DNS_TSIG 250
 #define HSK_DNS_IXFR 251 // unimpl (pseudo-record)
@@ -306,15 +302,18 @@ typedef struct {
 #define HSK_DNS_MAILB 253 // experimental unimpl (qtype)
 #define HSK_DNS_MAILA 254 // obsolete unimpl (qtype)
 #define HSK_DNS_ANY 255 // impl (qtype)
+#define HSK_DNS_URI 256
+#define HSK_DNS_CAA 257
+#define HSK_DNS_AVC 258 // proposed
+#define HSK_DNS_DOA 259 // proposed
 #define HSK_DNS_TA 32768
 #define HSK_DNS_DLV 32769
 #define HSK_DNS_RESERVED 65535 // unimpl
 
 // Classes
-#define HSK_DNS_INET 1
-#define HSK_DNS_CSNET 2
-#define HSK_DNS_CHAOS 3
-#define HSK_DNS_HESIOD 4
+#define HSK_DNS_IN 1
+#define HSK_DNS_CH 3
+#define HSK_DNS_HS 4
 #define HSK_DNS_NONE 254
 #define HSK_DNS_ANY 255
 
@@ -322,19 +321,24 @@ typedef struct {
 #define HSK_DNS_DO (1 << 15) // DNSSEC OK
 
 // EDNS Options
-#define HSK_DNS_LLQ 1 // Long Lived Queries
-#define HSK_DNS_UL 2 // Update Lease Draft
-#define HSK_DNS_NSID 3 // Nameserver Identifier
-#define HSK_DNS_DAU 5 // DNSSEC Algorithm Understood
-#define HSK_DNS_DHU 6 // DS Hash Understood
-#define HSK_DNS_N3U 7 // NSEC3 Hash Understood
-#define HSK_DNS_SUBNET 8 // Client Subnet
-#define HSK_DNS_EXPIRE 9 // Expire
-#define HSK_DNS_COOKIE 10 // Cookie
-#define HSK_DNS_TCPKEEPALIVE 11 // TCP Keep-Alive
-#define HSK_DNS_PADDING 12 // Padding
-#define HSK_DNS_LOCALSTART 65001 // Beginning of range reserved for local/experimental use
-#define HSK_DNS_LOCALEND 65534 // End of range reserved for local/experimental use
+#define HSK_DNS_OPT_RESERVED 0 // Reserved
+#define HSK_DNS_OPT_LLQ 1 // Long Lived Queries
+#define HSK_DNS_OPT_UL 2 // Update Lease Draft
+#define HSK_DNS_OPT_NSID 3 // Nameserver Identifier
+#define HSK_DNS_OPT_DAU 5 // DNSSEC Algorithm Understood
+#define HSK_DNS_OPT_DHU 6 // DS Hash Understood
+#define HSK_DNS_OPT_N3U 7 // NSEC3 Hash Understood
+#define HSK_DNS_OPT_SUBNET 8 // Client Subnet
+#define HSK_DNS_OPT_EXPIRE 9 // Expire
+#define HSK_DNS_OPT_COOKIE 10 // Cookie
+#define HSK_DNS_OPT_TCPKEEPALIVE 11 // TCP Keep-Alive
+#define HSK_DNS_OPT_PADDING 12 // Padding
+#define HSK_DNS_OPT_CHAIN 13 // Chain
+#define HSK_DNS_OPT_KEYTAG 14 // Key Tag
+#define HSK_DNS_OPT_DEVICEID 26946 // Device ID
+#define HSK_DNS_OPT_LOCAL 65001 // Beginning of range reserved for local/experimental use
+#define HSK_DNS_OPT_LOCALSTART 65001 // Beginning of range reserved for local/experimental use
+#define HSK_DNS_OPT_LOCALEND 65534 // End of range reserved for local/experimental use
 
 void
 hsk_dns_msg_init(hsk_dns_msg_t *msg);
