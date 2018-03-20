@@ -216,16 +216,16 @@ hsk_rs_inject_options(hsk_rs_t *ns) {
   if (ub_ctx_set_option(ns->ub, "use-syslog:", "no") != 0)
     return false;
 
-  if (ub_ctx_set_option(ns->ub, "domain-insecure:", ".") != 0)
-    return false;
-
   if (ub_ctx_set_option(ns->ub, "root-hints:", "") != 0)
     return false;
 
-  if (ub_ctx_set_option(ns->ub, "do-not-query-localhost:", "no") != 0)
-    return false;
+  // if (ub_ctx_set_option(ns->ub, "do-not-query-localhost:", "no") != 0)
+  //   return false;
 
   if (ub_ctx_set_option(ns->ub, "trust-anchor-signaling:", "no") != 0)
+    return false;
+
+  if (ub_ctx_set_option(ns->ub, "do-tcp:", "no") != 0)
     return false;
 
   char stub[HSK_MAX_HOST];
