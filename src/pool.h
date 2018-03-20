@@ -90,6 +90,7 @@ typedef struct hsk_pool_s {
   hsk_ec_t *ec;
   uint8_t key_[32];
   uint8_t *key;
+  uint8_t pubkey[33];
   hsk_timedata_t td;
   hsk_chain_t chain;
   hsk_addrman_t am;
@@ -115,6 +116,9 @@ hsk_pool_init(hsk_pool_t *pool, uv_loop_t *loop);
 
 void
 hsk_pool_uninit(hsk_pool_t *pool);
+
+bool
+hsk_pool_set_key(hsk_pool_t *pool, uint8_t *key);
 
 bool
 hsk_pool_set_size(hsk_pool_t *pool, int32_t max_size);

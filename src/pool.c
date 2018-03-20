@@ -131,6 +131,9 @@ hsk_pool_init(hsk_pool_t *pool, uv_loop_t *loop) {
   if (!hsk_ec_create_privkey(ec, pool->key_))
     return HSK_EFAILURE;
 
+  if (!hsk_ec_create_pubkey(ec, pool->key_, pool->pubkey))
+    return HSK_EFAILURE;
+
   pool->loop = loop;
   pool->ec = ec;
   pool->key = &pool->key_[0];
@@ -161,9 +164,6 @@ hsk_pool_uninit(hsk_pool_t *pool) {
     pool->ec = NULL;
   }
 
-  // segfaulting?
-  // hsk_map_uninit(&pool->peers);
-
   hsk_peer_t *peer, *next;
   for (peer = pool->head; peer; peer = next) {
     next = peer->next;
@@ -179,9 +179,30 @@ hsk_pool_uninit(hsk_pool_t *pool) {
   pool->pending = NULL;
   pool->pending_count = 0;
 
+  hsk_map_uninit(&pool->peers);
   hsk_chain_uninit(&pool->chain);
   hsk_addrman_uninit(&pool->am);
   hsk_timedata_uninit(&pool->td);
+}
+
+bool
+hsk_pool_set_key(hsk_pool_t *pool, uint8_t *key) {
+  assert(pool);
+
+  if (!key) {
+    memset(pool->key_, 0x00, 32);
+    pool->key = NULL;
+    memset(pool->pubkey, 0x00, sizeof(pool->pubkey));
+    return true;
+  }
+
+  if (!hsk_ec_create_pubkey(pool->ec, key, pool->pubkey))
+    return false;
+
+  memcpy(pool->key_, key, 32);
+  pool->key = &pool->key_[0];
+
+  return true;
 }
 
 bool

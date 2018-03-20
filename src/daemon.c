@@ -246,6 +246,14 @@ main(int argc, char **argv) {
     goto done;
   }
 
+  if (opt.identity_key) {
+    if (!hsk_pool_set_key(pool, opt.identity_key)) {
+      fprintf(stderr, "failed setting identity key\n");
+      rc = HSK_EFAILURE;
+      goto done;
+    }
+  }
+
   if (!hsk_pool_set_size(pool, opt.pool_size)) {
     fprintf(stderr, "failed setting pool size\n");
     rc = HSK_EFAILURE;

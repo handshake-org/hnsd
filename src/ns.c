@@ -100,7 +100,6 @@ hsk_ns_init(hsk_ns_t *ns, uv_loop_t *loop, hsk_pool_t *pool) {
   memset(ns->key_, 0x00, sizeof(ns->key_));
   ns->key = NULL;
   memset(ns->pubkey, 0x00, sizeof(ns->pubkey));
-  memset(ns->pkh, 0x00, sizeof(ns->pkh));
   memset(ns->read_buffer, 0x00, sizeof(ns->read_buffer));
   ns->bound = false;
   ns->receiving = false;
@@ -150,7 +149,6 @@ hsk_ns_set_key(hsk_ns_t *ns, uint8_t *key) {
     memset(ns->key_, 0x00, 32);
     ns->key = NULL;
     memset(ns->pubkey, 0x00, sizeof(ns->pubkey));
-    memset(ns->pkh, 0x00, sizeof(ns->pkh));
     return true;
   }
 
@@ -159,8 +157,6 @@ hsk_ns_set_key(hsk_ns_t *ns, uint8_t *key) {
 
   memcpy(ns->key_, key, 32);
   ns->key = ns->key_;
-
-  hsk_hash_blake2b(ns->key, 33, ns->pkh);
 
   return true;
 }
@@ -337,6 +333,8 @@ hsk_ns_onrecv(
     }
   }
 
+  hsk_ns_log(ns, "sending root soa (%d): %d\n", req->id, wire_len);
+
   hsk_ns_send(ns, wire, wire_len, addr, true);
 
   goto done;
@@ -356,6 +354,8 @@ fail:
     hsk_ns_log(ns, "failed creating servfail\n");
     goto done;
   }
+
+  hsk_ns_log(ns, "sending servfail (%d): %d\n", req->id, wire_len);
 
   hsk_ns_send(ns, wire, wire_len, addr, true);
 
@@ -393,6 +393,8 @@ hsk_ns_respond(
 
     if (!result)
       hsk_ns_log(ns, "could not create nx response\n");
+    else
+      hsk_ns_log(ns, "sending nxdomain (%d): %d\n", req->id, wire_len);
   } else {
     // Exists!
     result = hsk_resource_to_dns(
@@ -408,6 +410,8 @@ hsk_ns_respond(
 
     if (!result)
       hsk_ns_log(ns, "could not create dns response\n");
+    else
+      hsk_ns_log(ns, "sending msg (%d): %d\n", req->id, wire_len);
   }
 
   if (result && ns->key) {
@@ -433,6 +437,8 @@ hsk_ns_respond(
       hsk_ns_log(ns, "could not create servfail response\n");
       return;
     }
+
+    hsk_ns_log(ns, "sending servfail (%d): %d\n", req->id, wire_len);
   }
 
   hsk_ns_send(ns, wire, wire_len, req->addr, true);

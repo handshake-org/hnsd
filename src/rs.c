@@ -111,7 +111,6 @@ hsk_rs_init(hsk_rs_t *ns, uv_loop_t *loop, struct sockaddr *stub) {
   memset(ns->key_, 0x00, sizeof(ns->key_));
   ns->key = NULL;
   memset(ns->pubkey, 0x00, sizeof(ns->pubkey));
-  memset(ns->pkh, 0x00, sizeof(ns->pkh));
   memset(ns->read_buffer, 0x00, sizeof(ns->read_buffer));
   ns->bound = false;
   ns->receiving = false;
@@ -185,7 +184,6 @@ hsk_rs_set_key(hsk_rs_t *ns, uint8_t *key) {
     memset(ns->key_, 0x00, sizeof(ns->key_));
     ns->key = NULL;
     memset(ns->pubkey, 0x00, sizeof(ns->pubkey));
-    memset(ns->pkh, 0x00, sizeof(ns->pkh));
     return true;
   }
 
@@ -194,8 +192,6 @@ hsk_rs_set_key(hsk_rs_t *ns, uint8_t *key) {
 
   memcpy(ns->key_, key, 32);
   ns->key = ns->key_;
-
-  hsk_hash_blake2b(ns->key, 33, ns->pkh);
 
   return true;
 }
@@ -226,6 +222,9 @@ hsk_rs_inject_options(hsk_rs_t *ns) {
     return false;
 
   if (ub_ctx_set_option(ns->ub, "do-tcp:", "no") != 0)
+    return false;
+
+  if (ub_ctx_set_option(ns->ub, "edns-buffer-size:", "4096") != 0)
     return false;
 
   char stub[HSK_MAX_HOST];
