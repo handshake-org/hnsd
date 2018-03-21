@@ -10,11 +10,13 @@
 #include <netinet/in.h>
 #include <getopt.h>
 
+#include "uv.h"
+
+#include "base32.h"
 #include "hsk.h"
 #include "pool.h"
 #include "ns.h"
 #include "rs.h"
-#include "uv.h"
 #include "utils.h"
 
 extern char *optarg;
@@ -213,6 +215,33 @@ parse_arg(int argc, char **argv, hsk_options_t *opt) {
     hsk_sa_copy(opt->ns_ip, opt->ns_host);
 }
 
+static bool
+print_identity(uint8_t *key) {
+  hsk_ec_t *ec = hsk_ec_alloc();
+
+  if (!ec)
+    return false;
+
+  uint8_t pub[33];
+
+  if (!hsk_ec_create_pubkey(ec, key, pub)) {
+    hsk_ec_free(ec);
+    return false;
+  }
+
+  hsk_ec_free(ec);
+
+  size_t size = hsk_base32_encode_size(pub, 33, false);
+  assert(size <= 54);
+
+  char b32[54];
+  hsk_base32_encode(pub, 33, b32, false);
+
+  printf("starting with identity key of: %s\n", b32);
+
+  return true;
+}
+
 /*
  * Main
  */
@@ -229,6 +258,14 @@ main(int argc, char **argv) {
   hsk_pool_t *pool = NULL;
   hsk_ns_t *ns = NULL;
   hsk_rs_t *rs = NULL;
+
+  if (opt.identity_key) {
+    if (!print_identity(opt.identity_key)) {
+      fprintf(stderr, "invalid identity key\n");
+      rc = HSK_EFAILURE;
+      goto done;
+    }
+  }
 
   loop = uv_default_loop();
 
