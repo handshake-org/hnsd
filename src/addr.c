@@ -307,7 +307,7 @@ hsk_addr_from_string(hsk_addr_t *addr, char *src, uint16_t port) {
     if (hsk_base32_decode_size(pubkey) != 33)
       return false;
 
-    if (!hsk_base32_decode(pubkey, addr->key, false))
+    if (hsk_base32_decode(pubkey, addr->key, false) == -1)
       return false;
 
     src = &at[1];

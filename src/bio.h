@@ -117,10 +117,10 @@ read_u32be(uint8_t **data, size_t *len, uint32_t *out) {
   memcpy(out, *data, 4);
 #else
   *out = 0;
-  *out |= ((uint16_t)(*data)[0]) << 24;
-  *out |= ((uint16_t)(*data)[1]) << 16;
-  *out |= ((uint16_t)(*data)[2]) << 8;
-  *out |= (uint16_t)(*data)[3];
+  *out |= ((uint32_t)(*data)[0]) << 24;
+  *out |= ((uint32_t)(*data)[1]) << 16;
+  *out |= ((uint32_t)(*data)[2]) << 8;
+  *out |= (uint32_t)(*data)[3];
 #endif
   *data += 4;
   *len -= 4;
@@ -711,10 +711,10 @@ get_u32be(uint8_t *data) {
   memcpy(&out, data, 4);
 #else
   out = 0;
-  out |= ((uint16_t)data[0]) << 24;
-  out |= ((uint16_t)data[1]) << 16;
-  out |= ((uint16_t)data[2]) << 8;
-  out |= (uint16_t)data[3];
+  out |= ((uint32_t)data[0]) << 24;
+  out |= ((uint32_t)data[1]) << 16;
+  out |= ((uint32_t)data[2]) << 8;
+  out |= (uint32_t)data[3];
 #endif
   return out;
 }

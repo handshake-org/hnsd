@@ -23,7 +23,7 @@ static inline uint32_t bswap_32(uint32_t x) {
 	return (x >> 16) | (x << 16);
 }
 
-void swap_copy_str_to_u32(void* to, int index, const void* from, size_t length)
+static void swap_copy_str_to_u32(void* to, int index, const void* from, size_t length)
 {
 	/* if all pointers and length are 32-bits aligned */
 	if ( 0 == (( (int)((char*)to - (char*)0) | ((char*)from - (char*)0) | index | length ) & 3) ) {
