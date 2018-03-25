@@ -184,6 +184,12 @@ typedef struct {
   int32_t index;
 } hsk_dns_iter_t;
 
+// Constants
+#define HSK_DNS_MAX_NAME 255
+#define HSK_DNS_MAX_LABEL 63
+#define HSK_DNS_MAX_SANITIZED 1009
+#define HSK_DNS_MAX_LABELS 128
+
 // Opcodes
 #define HSK_DNS_QUERY 0
 #define HSK_DNS_IQUERY 1
@@ -550,6 +556,9 @@ hsk_dns_name_parse(
 );
 
 int32_t
+hsk_dns_name_pack(char *name, uint8_t *data);
+
+int32_t
 hsk_dns_name_write(char *name, uint8_t **data);
 
 bool
@@ -577,6 +586,15 @@ hsk_dns_name_alloc(
   size_t pd_len,
   char **name
 );
+
+void
+hsk_dns_name_sanitize(char *name, char *out);
+
+bool
+hsk_dns_name_verify(char *name);
+
+bool
+hsk_dns_name_is_fqdn(char *name);
 
 int32_t
 hsk_dns_name_cmp(char *a, char *b);

@@ -1100,7 +1100,7 @@ hsk_resource_to_cname(hsk_resource_t *res, char *name, ldns_rr_list *an) {
     ldns_rr_set_class(rr, LDNS_RR_CLASS_IN);
     ldns_rr_set_owner(rr, ldns_dname_new_frm_str(name));
 
-    char cname[256];
+    char cname[HSK_DNS_MAX_NAME + 1];
 
     if (!target_to_dns(target, name, cname))
       continue;
@@ -1135,7 +1135,7 @@ hsk_resource_to_dname(hsk_resource_t *res, char *name, ldns_rr_list *an) {
     ldns_rr_set_class(rr, LDNS_RR_CLASS_IN);
     ldns_rr_set_owner(rr, ldns_dname_new_frm_str(name));
 
-    char dname[256];
+    char dname[HSK_DNS_MAX_NAME + 1];
 
     if (!target_to_dns(target, name, dname))
       continue;
@@ -1161,7 +1161,7 @@ hsk_resource_to_ns(hsk_resource_t *res, char *name, ldns_rr_list *an) {
     hsk_ns_record_t *rec = (hsk_ns_record_t *)c;
     hsk_target_t *target = &rec->target;
 
-    char nsname[256];
+    char nsname[HSK_DNS_MAX_NAME + 1];
 
     if (!target_to_dns(target, name, nsname))
       continue;
@@ -1206,7 +1206,7 @@ hsk_resource_to_nsip(hsk_resource_t *res, char *name, ldns_rr_list *ad) {
       size = 16;
     }
 
-    char ptr[256];
+    char ptr[HSK_DNS_MAX_NAME + 1];
 
     if (!target_to_dns(target, name, ptr))
       continue;
@@ -1264,7 +1264,7 @@ hsk_resource_to_srvip(
       size = 16;
     }
 
-    char ptr[256];
+    char ptr[HSK_DNS_MAX_NAME + 1];
 
     if (!target_to_dns(target, name, ptr))
       continue;
@@ -1302,7 +1302,7 @@ hsk_resource_to_mx(hsk_resource_t *res, char *name, ldns_rr_list *an) {
       continue;
     }
 
-    char mx[256];
+    char mx[HSK_DNS_MAX_NAME + 1];
 
     if (!target_to_dns(target, name, mx))
       continue;
@@ -1347,7 +1347,7 @@ hsk_resource_to_srv(hsk_resource_t *res, char *name, char *protocol, char *servi
     if (strcasecmp(service, rec->service) != 0)
       continue;
 
-    char host[256];
+    char host[HSK_DNS_MAX_NAME + 1];
 
     if (!target_to_dns(target, name, host))
       continue;
@@ -1865,8 +1865,8 @@ hsk_resource_to_dns(
   if (labels == 3) {
     switch ((ldns_rr_type)type) {
       case LDNS_RR_TYPE_SRV: {
-        char protocol[256];
-        char service[256];
+        char protocol[HSK_DNS_MAX_LABEL + 1];
+        char service[HSK_DNS_MAX_LABEL + 1];
         bool is_srv = hsk_dns_label_decode_srv(name, protocol, service);
 
         if (is_srv) {
@@ -1879,7 +1879,7 @@ hsk_resource_to_dns(
         break;
       }
       case LDNS_RR_TYPE_TLSA: {
-        char protocol[256];
+        char protocol[HSK_DNS_MAX_LABEL + 1];
         uint16_t port;
         bool is_tlsa = hsk_dns_label_decode_tlsa(name, protocol, &port);
 
@@ -2568,7 +2568,7 @@ b32_to_ip(char *str, uint8_t *ip, uint16_t *family) {
 
 static bool
 pointer_to_ip(char *name, uint8_t *ip, uint16_t *family) {
-  char label[256];
+  char label[HSK_DNS_MAX_LABEL + 1];
   size_t len = hsk_dns_label_get(name, 0, label);
 
   if (len < 2 || label[0] != '_')
@@ -2580,22 +2580,10 @@ pointer_to_ip(char *name, uint8_t *ip, uint16_t *family) {
 static bool
 target_to_dns(hsk_target_t *target, char *name, char *host) {
   if (target->type == HSK_NAME || target->type == HSK_GLUE) {
-    size_t len = strlen(target->name);
-
-    if (len == 0)
+    if (!hsk_dns_name_verify(target->name))
       return false;
 
-    bool fqdn = false;
-
-    if (target->name[len - 1] == '.') {
-      fqdn = true;
-      len -= 1;
-    }
-
-    if (len > 254)
-      return false;
-
-    if (fqdn)
+    if (hsk_dns_name_is_fqdn(target->name))
       strcpy(host, target->name);
     else
       sprintf(host, "%s.", target->name);
@@ -2605,13 +2593,13 @@ target_to_dns(hsk_target_t *target, char *name, char *host) {
 
   if (target->type == HSK_INET4 || target->type == HSK_INET6) {
     char b32[29];
-    char tld[256];
+    char tld[HSK_DNS_MAX_LABEL + 1];
 
     ip_to_b32(target, b32);
 
     int32_t len = hsk_dns_label_get(name, -1, tld);
 
-    if (len <= 0 || len > 64)
+    if (len <= 0)
       return false;
 
     sprintf(host, "_%s.%s.", b32, tld);

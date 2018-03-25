@@ -1758,7 +1758,7 @@ hsk_dns_name_parse(
   int32_t off = 0;
   int32_t noff = 0;
   int32_t res = 0;
-  int32_t max = 255;
+  int32_t max = HSK_DNS_MAX_NAME;
   int32_t ptr = 0;
 
   for (;;) {
@@ -1773,8 +1773,14 @@ hsk_dns_name_parse(
 
     switch (c & 0xc0) {
       case 0x00: {
+        if (c > HSK_DNS_MAX_LABEL)
+          return -1;
+
         if (off + c > data_len)
           return -1; // EOF
+
+        if (noff + c + 1 > max)
+          return -1;
 
         int32_t j;
         for (j = off; j < off + c; j++) {
@@ -1786,17 +1792,11 @@ hsk_dns_name_parse(
           // if (b < 0x20 || b > 0x7e)
           //   return -1;
 
-          if (noff + 1 > max)
-            return -1;
-
           if (name)
             name[noff] = b;
 
           noff += 1;
         }
-
-        if (noff + 1 > max)
-          return -1;
 
         if (name)
           name[noff] = '.';
@@ -1858,73 +1858,105 @@ hsk_dns_name_parse(
   return noff;
 }
 
-int32_t
-hsk_dns_name_write(char *name, uint8_t **data) {
+static bool
+hsk_dns_name_serialize(char *name, uint8_t *data, int32_t *len) {
   int32_t off = 0;
   int32_t begin = 0;
+  size_t data_len = 256;
+  int32_t size;
   int32_t i;
   char *s;
 
   for (s = name, i = 0; *s; s++, i++) {
-    if (i >= 255)
-      return off; // fail
-
     if (name[i] == '.') {
-      if (i > 0 && name[i - 1] == '.')
-        return off; // fail
+      if (i > 0 && name[i - 1] == '.') {
+        *len = off;
+        return false;
+      }
 
-      if (i - begin >= (1 << 6))
-        return off; // fail
+      size = i - begin;
 
-      if (off + 1 > 256)
-        return off; // fail
+      if (size > HSK_DNS_MAX_LABEL) {
+        *len = off;
+        return false;
+      }
 
-      if (data)
-        (*data)[off] = (i - begin) & 0xff;
+      if (data) {
+        if (off + 1 + size > data_len) {
+          *len = off;
+          return false;
+        }
+        data[off] = size;
+      }
 
       off += 1;
 
-      int32_t j;
-      for (j = begin; j < i; j++) {
-        char ch = name[j];
+      if (data) {
+        int32_t j;
+        for (j = begin; j < i; j++) {
+          char ch = name[j];
 
-        if (off + 1 > 256)
-          return off; // fail
+          if (ch == -1)
+            ch = 0x00;
 
-        if (ch == -1)
-          ch = 0x00;
-
-        if (data)
-          (*data)[off] = ch;
-
-        off += 1;
+          data[off] = ch;
+        }
       }
+
+      off += size;
 
       begin = i + 1;
     }
   }
 
-  if (i == 0 || name[i - 1] != '.')
-    return off; // fail
+  if (i > HSK_DNS_MAX_NAME) {
+    *len = off;
+    return false;
+  }
+
+  if (i == 0 || name[i - 1] != '.') {
+    *len = off;
+    return false;
+  }
 
   if (i == 1 && name[0] == '.') {
-    if (data)
-      *data += off;
+    *len = off;
     return off;
   }
 
-  if (off + 1 > 256)
-    return off; // fail
-
-  if (data)
-    (*data)[off] = 0;
+  if (data) {
+    if (off >= data_len) {
+      *len = off;
+      return false;
+    }
+    data[off] = 0;
+  }
 
   off += 1;
 
-  if (data)
-    *data += off;
+  *len = off;
 
   return off;
+}
+
+int32_t
+hsk_dns_name_pack(char *name, uint8_t *data) {
+  int32_t len;
+  if (!hsk_dns_name_serialize(name, data, &len))
+    return 0;
+  return len;
+}
+
+int32_t
+hsk_dns_name_write(char *name, uint8_t **data) {
+  uint8_t *buf = data ? *data : NULL;
+  int32_t len;
+
+  hsk_dns_name_serialize(name, buf, &len);
+
+  *data += len;
+
+  return len;
 }
 
 bool
@@ -1969,6 +2001,77 @@ hsk_dns_name_alloc(
   assert(hsk_dns_name_read(data, data_len, pd, pd_len, n));
 
   *name = n;
+
+  return true;
+}
+
+void
+hsk_dns_name_sanitize(char *name, char *out) {
+  char *s = name;
+  int32_t off = 0;
+
+  while (*s && off < HSK_DNS_MAX_SANITIZED) {
+    uint8_t c = (uint8_t)*s;
+
+    switch (c) {
+      case 0x28 /*(*/:
+      case 0x29 /*)*/:
+      case 0x3b /*;*/:
+      case 0x20 /* */:
+      case 0x40 /*@*/:
+      case 0x22 /*"*/:
+      case 0x5c /*\\*/: {
+        out[off++] = '\\';
+        out[off++] = c;
+        break;
+      }
+      case 0xff: {
+        c = 0x00;
+        ; // fall through
+      }
+      default: {
+        if (c < 0x20 || c > 0x7e) {
+          out[off++] = '\\';
+          out[off++] = (c / 100) + 0x30;
+          out[off++] = (c / 10) + 0x30;
+          out[off++] = (c % 10) + 0x30;
+        } else {
+          out[off++] = c;
+        }
+        break;
+      }
+    }
+
+    s += 1;
+  }
+
+  out[off] = '\0';
+}
+
+bool
+hsk_dns_name_verify(char *name) {
+  size_t len = strlen(name);
+  char n[HSK_DNS_MAX_NAME + 1];
+
+  if (len == 0 || name[len - 1] != '.') {
+    if (len + 1 > HSK_DNS_MAX_NAME)
+      return false;
+
+    memcpy(&n[0], name, len);
+    name = &n[0];
+    name[len + 0] = '.';
+    name[len + 1] = '\0';
+  }
+
+  return hsk_dns_name_pack(name, NULL) != 0;
+}
+
+bool
+hsk_dns_name_is_fqdn(char *name) {
+  size_t len = strlen(name);
+
+  if (len == 0 || name[len - 1] != '.')
+    return false;
 
   return true;
 }
@@ -2030,7 +2133,7 @@ hsk_dns_label_split(const char *name, uint8_t *labels, size_t size) {
   int32_t i;
 
   if (!labels)
-    size = 255;
+    size = HSK_DNS_MAX_LABELS;
 
   for (i = 0; *s && count < size; s++, i++) {
     if (*s == '.') {
@@ -2074,7 +2177,7 @@ hsk_dns_label_from2(
   size_t end = strlen(name);
   size_t len = end - start;
 
-  if (len == 0 || len > 255) {
+  if (len == 0 || len > HSK_DNS_MAX_NAME) {
     ret[0] = '\0';
     return 0;
   }
@@ -2131,7 +2234,7 @@ hsk_dns_label_get2(
 
   size_t len = end - start;
 
-  if (len == 0 || len > 255) {
+  if (len == 0 || len > HSK_DNS_MAX_LABEL) {
     ret[0] = '\0';
     return 0;
   }
@@ -2170,7 +2273,7 @@ hsk_dns_label_decode_srv(char *name, char *protocol, char *service) {
 
   assert(hsk_dns_label_split(name, labels, count) == count);
 
-  char label[256];
+  char label[HSK_DNS_MAX_LABEL + 1];
   int32_t len;
 
   len = hsk_dns_label_get2(name, labels, count, 1, label);
@@ -2232,7 +2335,7 @@ hsk_dns_label_decode_tlsa(char *name, char *protocol, uint16_t *port) {
 
   assert(hsk_dns_label_split(name, labels, count) == count);
 
-  char label[256];
+  char label[HSK_DNS_MAX_LABEL + 1];
   int32_t len;
 
   len = hsk_dns_label_get2(name, labels, count, 1, label);
@@ -2301,7 +2404,7 @@ hsk_dns_label_decode_smimea(char *name, uint8_t *hash) {
 
   assert(hsk_dns_label_split(name, labels, count) == count);
 
-  char label[256];
+  char label[HSK_DNS_MAX_LABEL + 1];
   int32_t len;
 
   len = hsk_dns_label_get2(name, labels, count, 1, label);
