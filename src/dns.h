@@ -129,6 +129,11 @@ typedef struct {
 } hsk_dns_sshfp_rd_t;
 
 typedef struct {
+  size_t pubkey_len;
+  uint8_t *pubkey;
+} hsk_dns_openpgpkey_rd_t;
+
+typedef struct {
   size_t rd_len;
   uint8_t *rd;
 } hsk_dns_opt_rd_t;
@@ -137,8 +142,8 @@ typedef struct {
   uint16_t flags;
   uint8_t protocol;
   uint8_t algorithm;
-  size_t public_key_len;
-  uint8_t *public_key;
+  size_t pubkey_len;
+  uint8_t *pubkey;
 } hsk_dns_dnskey_rd_t;
 
 typedef struct {
@@ -576,35 +581,53 @@ hsk_dns_name_alloc(
 int32_t
 hsk_dns_name_cmp(char *a, char *b);
 
-void
-hsk_dns_label_split(char *fqdn, uint8_t *labels, int32_t *count);
+int32_t
+hsk_dns_label_split(const char *name, uint8_t *labels, size_t size);
 
 int32_t
-hsk_dns_label_count(char *fqdn);
+hsk_dns_label_count(char *name);
 
-void
+int32_t
 hsk_dns_label_from2(
-  char *fqdn,
+  char *name,
   uint8_t *labels,
   int32_t count,
   int32_t index,
   char *ret
 );
 
-void
-hsk_dns_label_from(char *fqdn, int32_t index, char *ret);
+int32_t
+hsk_dns_label_from(char *name, int32_t index, char *ret);
 
-void
+int32_t
 hsk_dns_label_get2(
-  char *fqdn,
+  char *name,
   uint8_t *labels,
   int32_t count,
   int32_t index,
   char *ret
 );
 
-void
-hsk_dns_label_get(char *fqdn, int32_t index, char *ret);
+int32_t
+hsk_dns_label_get(char *name, int32_t index, char *ret);
+
+bool
+hsk_dns_label_decode_srv(char *name, char *protocol, char *service);
+
+bool
+hsk_dns_label_is_srv(char *name);
+
+bool
+hsk_dns_label_decode_tlsa(char *name, char *protocol, uint16_t *port);
+
+bool
+hsk_dns_label_is_tlsa(char *name);
+
+bool
+hsk_dns_label_decode_smimea(char *name, uint8_t *hash);
+
+bool
+hsk_dns_label_is_smimea(char *name);
 
 void
 hsk_dns_iter_init(

@@ -18,9 +18,10 @@
 #define HSK_MAGNET 15
 #define HSK_DS 16
 #define HSK_TLS 17
-#define HSK_SSH 18
-#define HSK_PGP 19
-#define HSK_ADDR 20
+#define HSK_SMIME 18
+#define HSK_SSH 19
+#define HSK_PGP 20
+#define HSK_ADDR 21
 #define HSK_EXTRA 255
 
 #include <stdint.h>
@@ -112,6 +113,16 @@ typedef struct hsk_tls_record_s {
   uint8_t certificate[64];
 } hsk_tls_record_t;
 
+typedef struct hsk_smime_record_s {
+  uint8_t type;
+  uint8_t hash[28];
+  uint8_t usage;
+  uint8_t selector;
+  uint8_t matching_type;
+  size_t certificate_len;
+  uint8_t certificate[64];
+} hsk_smime_record_t;
+
 typedef struct hsk_ssh_record_s {
   uint8_t type;
   uint8_t algorithm;
@@ -120,7 +131,10 @@ typedef struct hsk_ssh_record_s {
   uint8_t fingerprint[64];
 } hsk_ssh_record_t;
 
-typedef hsk_ssh_record_t hsk_pgp_record_t;
+typedef struct hsk_pgp_record_s {
+  size_t pubkey_len;
+  uint8_t pubkey[512];
+} hsk_pgp_record_t;
 
 typedef struct hsk_addr_record_s {
   uint8_t type;

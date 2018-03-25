@@ -8,6 +8,7 @@
 
 #include "bio.h"
 #include "dns.h"
+#include "utils.h"
 
 void
 hsk_dns_msg_init(hsk_dns_msg_t *msg) {
@@ -707,6 +708,12 @@ hsk_dns_rd_init(void *rd, uint16_t type) {
       r->fingerprint = NULL;
       break;
     }
+    case HSK_DNS_OPENPGPKEY: {
+      hsk_dns_openpgpkey_rd_t *r = (hsk_dns_openpgpkey_rd_t *)rd;
+      r->pubkey_len = 0;
+      r->pubkey = NULL;
+      break;
+    }
     case HSK_DNS_OPT: {
       hsk_dns_opt_rd_t *r = (hsk_dns_opt_rd_t *)rd;
       r->rd_len = 0;
@@ -718,8 +725,8 @@ hsk_dns_rd_init(void *rd, uint16_t type) {
       r->flags = 0;
       r->protocol = 0;
       r->algorithm = 0;
-      r->public_key_len = 0;
-      r->public_key = NULL;
+      r->pubkey_len = 0;
+      r->pubkey = NULL;
       break;
     }
     case HSK_DNS_RRSIG: {
@@ -836,6 +843,12 @@ hsk_dns_rd_uninit(void *rd, uint16_t type) {
       }
       break;
     }
+    case HSK_DNS_OPENPGPKEY: {
+      hsk_dns_openpgpkey_rd_t *r = (hsk_dns_openpgpkey_rd_t *)rd;
+      if (r->pubkey)
+        free(r->pubkey);
+      break;
+    }
     case HSK_DNS_OPT: {
       hsk_dns_opt_rd_t *r = (hsk_dns_opt_rd_t *)rd;
       if (r->rd) {
@@ -846,9 +859,9 @@ hsk_dns_rd_uninit(void *rd, uint16_t type) {
     }
     case HSK_DNS_DNSKEY: {
       hsk_dns_dnskey_rd_t *r = (hsk_dns_dnskey_rd_t *)rd;
-      if (r->public_key) {
-        free(r->public_key);
-        r->public_key = NULL;
+      if (r->pubkey) {
+        free(r->pubkey);
+        r->pubkey = NULL;
       }
       break;
     }
@@ -942,6 +955,10 @@ hsk_dns_rd_alloc(uint16_t type) {
     }
     case HSK_DNS_SSHFP: {
       rd = malloc(sizeof(hsk_dns_sshfp_rd_t));
+      break;
+    }
+    case HSK_DNS_OPENPGPKEY: {
+      rd = malloc(sizeof(hsk_dns_openpgpkey_rd_t));
       break;
     }
     case HSK_DNS_OPT: {
@@ -1107,6 +1124,13 @@ hsk_dns_rd_write(void *rd, uint16_t type, uint8_t **data) {
 
       break;
     }
+    case HSK_DNS_OPENPGPKEY: {
+      hsk_dns_openpgpkey_rd_t *r = (hsk_dns_openpgpkey_rd_t *)rd;
+
+      size += write_bytes(data, r->pubkey, r->pubkey_len);
+
+      break;
+    }
     case HSK_DNS_OPT: {
       hsk_dns_opt_rd_t *r = (hsk_dns_opt_rd_t *)rd;
 
@@ -1120,8 +1144,8 @@ hsk_dns_rd_write(void *rd, uint16_t type, uint8_t **data) {
       size += write_u16be(data, r->flags);
       size += write_u8(data, r->protocol);
       size += write_u8(data, r->algorithm);
-      size += write_u8(data, r->public_key_len);
-      size += write_bytes(data, r->public_key, r->public_key_len);
+      size += write_u8(data, r->pubkey_len);
+      size += write_bytes(data, r->pubkey, r->pubkey_len);
 
       break;
     }
@@ -1373,6 +1397,16 @@ fail_txt:
 
       break;
     }
+    case HSK_DNS_OPENPGPKEY: {
+      hsk_dns_openpgpkey_rd_t *r = (hsk_dns_openpgpkey_rd_t *)rd;
+
+      r->pubkey_len = *data_len;
+
+      if (!alloc_bytes(data, data_len, &r->pubkey, *data_len))
+        return false;
+
+      break;
+    }
     case HSK_DNS_OPT: {
       hsk_dns_opt_rd_t *r = (hsk_dns_opt_rd_t *)rd;
 
@@ -1395,9 +1429,9 @@ fail_txt:
       if (!read_u8(data, data_len, &r->algorithm))
         return false;
 
-      r->public_key_len = *data_len;
+      r->pubkey_len = *data_len;
 
-      if (!alloc_bytes(data, data_len, &r->public_key, *data_len))
+      if (!alloc_bytes(data, data_len, &r->pubkey, *data_len))
         return false;
 
       break;
@@ -1988,44 +2022,41 @@ hsk_dns_name_cmp(char *a, char *b) {
   return 0;
 }
 
-void
-hsk_dns_label_split(char *fqdn, uint8_t *labels, int32_t *count) {
-  size_t len = strlen(fqdn);
-  bool dot = false;
+int32_t
+hsk_dns_label_split(const char *name, uint8_t *labels, size_t size) {
+  char *s = (char *)name;
+  bool dot = true;
+  int32_t count = 0;
   int32_t i;
-  int32_t j = 0;
 
-  for (i = 0; i < len; i++) {
-    if (j == 255)
-      break;
+  if (!labels)
+    size = 255;
 
-    if (dot) {
-      if (labels)
-        labels[j++] = i;
-      dot = false;
-      continue;
-    }
-
-    if (fqdn[i] == '.') {
+  for (i = 0; *s && count < size; s++, i++) {
+    if (*s == '.') {
       dot = true;
       continue;
     }
+
+    if (dot) {
+      if (labels)
+        labels[count++] = i;
+      dot = false;
+      continue;
+    }
   }
 
-  if (count)
-    *count = j;
-}
-
-int32_t
-hsk_dns_label_count(char *fqdn) {
-  int32_t count;
-  hsk_dns_label_split(fqdn, NULL, &count);
   return count;
 }
 
-void
+int32_t
+hsk_dns_label_count(char *name) {
+  return hsk_dns_label_split(name, NULL, 0);
+}
+
+int32_t
 hsk_dns_label_from2(
-  char *fqdn,
+  char *name,
   uint8_t *labels,
   int32_t count,
   int32_t index,
@@ -2036,29 +2067,44 @@ hsk_dns_label_from2(
 
   if (index >= count) {
     ret[0] = '\0';
-    return;
+    return 0;
   }
 
   size_t start = (size_t)labels[index];
-  size_t end = strlen(fqdn);
+  size_t end = strlen(name);
   size_t len = end - start;
 
-  memcpy(ret, fqdn + start, len);
+  if (len == 0 || len > 255) {
+    ret[0] = '\0';
+    return 0;
+  }
+
+  memcpy(ret, &name[start], len);
 
   ret[len] = '\0';
+
+  return len;
 }
 
-void
-hsk_dns_label_from(char *fqdn, int32_t index, char *ret) {
-  uint8_t labels[255];
-  int32_t count;
-  hsk_dns_label_split(fqdn, labels, &count);
-  hsk_dns_label_from2(fqdn, labels, count, index, ret);
+int32_t
+hsk_dns_label_from(char *name, int32_t index, char *ret) {
+  int32_t count = hsk_dns_label_count(name);
+
+  if (count == 0) {
+    ret[0] = '\0';
+    return 0;
+  }
+
+  uint8_t labels[count];
+
+  assert(hsk_dns_label_split(name, labels, count) == count);
+
+  return hsk_dns_label_from2(name, labels, count, index, ret);
 }
 
-void
+int32_t
 hsk_dns_label_get2(
-  char *fqdn,
+  char *name,
   uint8_t *labels,
   int32_t count,
   int32_t index,
@@ -2069,30 +2115,220 @@ hsk_dns_label_get2(
 
   if (index >= count) {
     ret[0] = '\0';
-    return;
+    return 0;
   }
 
   size_t start = (size_t)labels[index];
   size_t end;
 
-  if (index + 1 >= count)
-    end = strlen(fqdn);
-  else
+  if (index + 1 >= count) {
+    end = strlen(name) - 1;
+    if (name[end] != '.')
+      end += 1;
+  } else {
     end = ((size_t)labels[index + 1]) - 1;
+  }
 
   size_t len = end - start;
 
-  memcpy(ret, fqdn + start, len);
+  if (len == 0 || len > 255) {
+    ret[0] = '\0';
+    return 0;
+  }
+
+  memcpy(ret, &name[start], len);
 
   ret[len] = '\0';
+
+  return len;
 }
 
-void
-hsk_dns_label_get(char *fqdn, int32_t index, char *ret) {
-  uint8_t labels[255];
-  int32_t count;
-  hsk_dns_label_split(fqdn, labels, &count);
-  hsk_dns_label_get2(fqdn, labels, count, index, ret);
+int32_t
+hsk_dns_label_get(char *name, int32_t index, char *ret) {
+  int32_t count = hsk_dns_label_count(name);
+
+  if (count == 0) {
+    ret[0] = '\0';
+    return 0;
+  }
+
+  uint8_t labels[count];
+
+  assert(hsk_dns_label_split(name, labels, count) == count);
+
+  return hsk_dns_label_get2(name, labels, count, index, ret);
+}
+
+bool
+hsk_dns_label_decode_srv(char *name, char *protocol, char *service) {
+  int32_t count = hsk_dns_label_count(name);
+
+  if (count < 3)
+    return false;
+
+  uint8_t labels[count];
+
+  assert(hsk_dns_label_split(name, labels, count) == count);
+
+  char label[256];
+  int32_t len;
+
+  len = hsk_dns_label_get2(name, labels, count, 1, label);
+
+  if (len < 2)
+    return false;
+
+  if (label[0] != '_')
+    return false;
+
+  if (protocol) {
+    char *s = &label[1];
+
+    while (*s) {
+      if (*s >= 'A' && *s <= 'Z')
+        *s += ' ';
+      s += 1;
+    }
+
+    strcpy(protocol, &label[1]);
+  }
+
+  len = hsk_dns_label_get2(name, labels, count, 0, label);
+
+  if (len < 2)
+    return false;
+
+  if (label[0] != '_')
+    return false;
+
+  if (service) {
+    char *s = &label[1];
+
+    while (*s) {
+      if (*s >= 'A' && *s <= 'Z')
+        *s += ' ';
+      s += 1;
+    }
+
+    strcpy(service, &label[1]);
+  }
+
+  return true;
+}
+
+bool
+hsk_dns_label_is_srv(char *name) {
+  return hsk_dns_label_decode_srv(name, NULL, NULL);
+}
+
+bool
+hsk_dns_label_decode_tlsa(char *name, char *protocol, uint16_t *port) {
+  int32_t count = hsk_dns_label_count(name);
+
+  if (count < 3)
+    return false;
+
+  uint8_t labels[count];
+
+  assert(hsk_dns_label_split(name, labels, count) == count);
+
+  char label[256];
+  int32_t len;
+
+  len = hsk_dns_label_get2(name, labels, count, 1, label);
+
+  if (len < 2)
+    return false;
+
+  if (label[0] != '_')
+    return false;
+
+  if (protocol) {
+    char *s = &label[1];
+
+    while (*s) {
+      if (*s >= 'A' && *s <= 'Z')
+        *s += ' ';
+      s += 1;
+    }
+
+    strcpy(protocol, &label[1]);
+  }
+
+  len = hsk_dns_label_get2(name, labels, count, 0, label);
+
+  if (len < 2 || len > 6)
+    return false;
+
+  if (label[0] != '_')
+    return false;
+
+  uint32_t word = 0;
+  char *s = &label[1];
+
+  while (*s) {
+    int32_t ch = ((int32_t)*s) - 0x30;
+
+    if (ch < 0 || ch > 9)
+      return false;
+
+    word *= 10;
+    word += ch;
+
+    if (word > 0xffff)
+      return false;
+  }
+
+  if (port)
+    *port = (uint16_t)word;
+
+  return true;
+}
+
+bool
+hsk_dns_label_is_tlsa(char *name) {
+  return hsk_dns_label_decode_tlsa(name, NULL, NULL);
+}
+
+bool
+hsk_dns_label_decode_smimea(char *name, uint8_t *hash) {
+  int32_t count = hsk_dns_label_count(name);
+
+  if (count < 3)
+    return false;
+
+  uint8_t labels[count];
+
+  assert(hsk_dns_label_split(name, labels, count) == count);
+
+  char label[256];
+  int32_t len;
+
+  len = hsk_dns_label_get2(name, labels, count, 1, label);
+
+  if (len != 7)
+    return false;
+
+  if (strcasecmp(label, "_smimea") != 0)
+    return false;
+
+  len = hsk_dns_label_get2(name, labels, count, 0, label);
+
+  if (len != 57)
+    return false;
+
+  if (label[0] != '_')
+    return false;
+
+  if (!hsk_hex_decode(&label[1], hash))
+    return false;
+
+  return true;
+}
+
+bool
+hsk_dns_label_is_smimea(char *name) {
+  return hsk_dns_label_decode_smimea(name, NULL);
 }
 
 void

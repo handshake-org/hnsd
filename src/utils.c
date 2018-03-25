@@ -126,9 +126,6 @@ hsk_hex_decode(char *str, uint8_t *data) {
   if (str == NULL)
     return true;
 
-  if (data == NULL)
-    return false;
-
   int32_t i;
   char *s;
 
@@ -143,7 +140,8 @@ hsk_hex_decode(char *str, uint8_t *data) {
 
     if (i & 1) {
       w |= (uint8_t)n;
-      data[p] = w;
+      if (data)
+        data[p] = w;
       p += 1;
     } else {
       w = ((uint8_t)n) << 4;

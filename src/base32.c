@@ -292,7 +292,7 @@ hsk_base32_decode_size(char *str) {
 }
 
 int32_t
-hsk_base32_decode_hex_size(char *str, uint8_t *out) {
+hsk_base32_decode_hex_size(char *str) {
   int32_t size = hsk_base32_decode2(TABLE_HEX, str, NULL, false);
 
   if (size == -1)
