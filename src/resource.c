@@ -2010,13 +2010,11 @@ hsk_resource_to_dns(
     if (hsk_resource_has(rs, HSK_CANONICAL)) {
       ldns_pkt_set_aa(res, 1);
       hsk_resource_to_cname(rs, name, an);
-      hsk_resource_to_glue(rs, ad);
       if (dnssec)
         hsk_dnssec_sign(an, LDNS_RR_TYPE_CNAME);
     } else if (hsk_resource_has(rs, HSK_NS)) {
       hsk_resource_to_ns(rs, name, ns);
       hsk_resource_to_nsip(rs, name, ad);
-      hsk_resource_to_glue(rs, ad);
       if (dnssec) {
         hsk_dnssec_sign(ns, LDNS_RR_TYPE_NS);
         hsk_resource_to_ds(rs, name, ns);
@@ -2024,6 +2022,8 @@ hsk_resource_to_dns(
       }
     }
   }
+
+  hsk_resource_to_glue(rs, ad);
 
 done:
   ldns_rdf_deep_free(tld_rdf);
@@ -2541,7 +2541,7 @@ static bool
 b32_to_ip(char *str, uint8_t *ip, uint16_t *family) {
   size_t size = hsk_base32_decode_hex_size(str);
 
-  if (size > 17)
+  if (size == 0 || size > 17)
     return false;
 
   uint8_t data[17];
@@ -2571,7 +2571,7 @@ pointer_to_ip(char *name, uint8_t *ip, uint16_t *family) {
   char label[HSK_DNS_MAX_LABEL + 1];
   size_t len = hsk_dns_label_get(name, 0, label);
 
-  if (len < 2 || label[0] != '_')
+  if (len < 2 || len > 29 || label[0] != '_')
     return false;
 
   return b32_to_ip(&label[1], ip, family);
