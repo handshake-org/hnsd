@@ -104,7 +104,7 @@ hsk_hex_encode(uint8_t *data, size_t data_len, char *str) {
 
   str[i] = '\0';
 
-  return str;
+  return true;
 }
 
 char *
