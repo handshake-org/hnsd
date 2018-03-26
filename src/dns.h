@@ -450,7 +450,7 @@ hsk_dns_rr_create(uint16_t type);
 void
 hsk_dns_rr_free(hsk_dns_rr_t *rr);
 
-void
+bool
 hsk_dns_rr_set_name(hsk_dns_rr_t *rr, char *name);
 
 int32_t
