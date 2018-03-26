@@ -2359,7 +2359,8 @@ hsk_dns_label_split(const char *name, uint8_t *labels, size_t size) {
 
     if (dot) {
       if (labels)
-        labels[count++] = i;
+        labels[count] = i;
+      count += 1;
       dot = false;
       continue;
     }
