@@ -44,7 +44,7 @@ hsk_dns_msg_init(hsk_dns_msg_t *msg) {
   msg->edns.enabled = false;
   msg->edns.version = 0;
   msg->edns.flags = 0;
-  msg->edns.size = 0;
+  msg->edns.size = 512;
   msg->edns.code = 0;
   msg->edns.rd_len = 0;
   msg->edns.rd = NULL;
@@ -3089,6 +3089,69 @@ done:
   free(records);
 
   return ret;
+}
+
+bool
+hsk_dns_msg_clean(hsk_dns_msg_t *msg, uint16_t type) {
+  if (!msg)
+    return false;
+
+  if (!hsk_dns_rrs_clean(&msg->an, type))
+    return false;
+
+  if (!hsk_dns_rrs_clean(&msg->ns, type))
+    return false;
+
+  if (!hsk_dns_rrs_clean(&msg->ar, type))
+    return false;
+
+  return true;
+}
+
+bool
+hsk_dns_rrs_clean(hsk_dns_rrs_t *rrs, uint16_t type) {
+  if (!rrs)
+    return false;
+
+  hsk_dns_rrs_t *tmp = hsk_dns_rrs_alloc();
+
+  if (!tmp)
+    return false;
+
+  int32_t i;
+  for (i = 0; i < rrs->size; i++) {
+    hsk_dns_rr_t *rr = rrs->items[i];
+
+    switch (rr->type) {
+      case HSK_DNS_RRSIG:
+      case HSK_DNS_DNSKEY:
+      case HSK_DNS_DS:
+      case HSK_DNS_NSEC3:
+      case HSK_DNS_NSEC3PARAM:
+      case HSK_DNS_NSEC:
+        if (type != rr->type) {
+          hsk_dns_rr_free(rr);
+          rrs->items[i] = NULL;
+          break;
+        }
+        // fall through
+      default:
+        assert(hsk_dns_rrs_push(tmp, rr));
+        break;
+    }
+  }
+
+  rrs->size = 0;
+
+  for (i = 0; i < tmp->size; i++) {
+    hsk_dns_rr_t *rr = tmp->items[i];
+    rrs->items[i] = rr;
+    rrs->size += 1;
+  }
+
+  free(tmp);
+
+  return true;
 }
 
 /*

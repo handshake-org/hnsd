@@ -8,6 +8,8 @@
 #include <arpa/inet.h>
 #include <netinet/in.h>
 
+#include "dns.h"
+
 typedef struct {
   // Reference.
   void *ns;
@@ -15,14 +17,14 @@ typedef struct {
   // DNS stuff
   uint16_t id;
   size_t labels;
-  char name[256];
+  char name[HSK_DNS_MAX_NAME + 1];
   uint16_t type;
   uint16_t class;
   bool edns;
   bool dnssec;
 
   // HSK stuff
-  char tld[256];
+  char tld[HSK_DNS_MAX_LABEL + 1];
 
   // Who it's from.
   struct sockaddr_storage ss;

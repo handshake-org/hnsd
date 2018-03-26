@@ -10,7 +10,6 @@
 #include <netinet/in.h>
 
 #include "uv.h"
-#include "ldns/ldns.h"
 
 #include "hsk-addr.h"
 #include "hsk-constants.h"
@@ -21,6 +20,8 @@
 #include "pool.h"
 #include "req.h"
 #include "sig0.h"
+
+#include "dns.h"
 
 /*
  * Types

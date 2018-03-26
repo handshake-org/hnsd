@@ -10,7 +10,6 @@
 #include <netinet/in.h>
 
 #include "uv.h"
-#include "ldns/ldns.h"
 #include "unbound.h"
 
 #include "hsk-addr.h"
@@ -23,6 +22,8 @@
 #include "rs.h"
 #include "sig0.h"
 #include "utils.h"
+
+#include "dns.h"
 
 /*
  * Types
@@ -441,10 +442,9 @@ hsk_rs_respond(
   int32_t status,
   struct ub_result *result
 ) {
-  ldns_pkt *pkt = NULL;
+  hsk_dns_msg_t *msg = NULL;
   uint8_t *wire;
   size_t wire_len;
-  ldns_status rc;
   bool ok;
 
   if (status != 0) {
@@ -465,86 +465,66 @@ hsk_rs_respond(
   size_t data_len = result->answer_len;
 
   // Deserialize to do some preprocessing.
-  rc = ldns_wire2pkt(&pkt, data, data_len);
-
-  if (rc != LDNS_STATUS_OK) {
-    hsk_rs_log(ns,
-      "failed parsing answer: %s\n",
-      ldns_get_errorstr_by_id(rc));
+  if (!hsk_dns_msg_decode(data, data_len, &msg)) {
+    hsk_rs_log(ns, "failed parsing answer\n");
     goto fail;
   }
 
   // Set to stub's request ID.
-  ldns_pkt_set_id(pkt, req->id);
+  msg->id = req->id;
 
   // "Clean" the packet.
-  ldns_pkt_set_flags(pkt, 0);
-  ldns_pkt_set_opcode(pkt, LDNS_PACKET_QUERY);
-  ldns_pkt_set_rcode(pkt, result->rcode);
-  ldns_pkt_set_qr(pkt, 1);
-  ldns_pkt_set_aa(pkt, 0);
-  ldns_pkt_set_tc(pkt, 0);
-  ldns_pkt_set_rd(pkt, 1);
-  ldns_pkt_set_ra(pkt, 1);
-  ldns_pkt_set_ad(pkt, 0);
-  ldns_pkt_set_cd(pkt, 0);
+  msg->flags = 0;
+  msg->opcode = HSK_DNS_QUERY;
+  msg->code = result->rcode;
+  msg->flags |= HSK_DNS_QR;
+  msg->flags |= HSK_DNS_RD;
+  msg->flags |= HSK_DNS_RA;
 
   // Remove EDNS stuff.
-  ldns_rdf *ed = ldns_pkt_edns_data(pkt);
+  msg->edns.enabled = false;
+  msg->edns.version = 0;
+  msg->edns.flags = 0;
+  msg->edns.size = 512;
+  msg->edns.code = 0;
+  msg->edns.rd_len = 0;
 
-  if (ed)
-    ldns_rdf_deep_free(ed);
-
-  ldns_pkt_set_edns_version(pkt, 0);
-  ldns_pkt_set_edns_extended_rcode(pkt, 0);
-  ldns_pkt_set_edns_udp_size(pkt, 0);
-  ldns_pkt_set_edns_data(pkt, NULL);
-  ldns_pkt_set_edns_do(pkt, 0);
-  ldns_pkt_set_edns_z(pkt, 0);
-
-  // Hack.
-  pkt->_edns_present = false;
+  if (msg->edns.rd) {
+    free(msg->edns.rd);
+    msg->edns.rd = NULL;
+  }
 
   // Remove all RRSIGs: stub resolvers don't
   // need them and they take up space.
-  if (!hsk_dnssec_clean(pkt, (ldns_rr_type)req->type))
+  if (!hsk_dns_msg_clean(msg, req->type))
     goto fail;
 
   // Verify and remove SIG0 from
   // our authoritative server.
-  if (req->labels <= 1) {
-    ldns_rr_list *ar = ldns_pkt_additional(pkt);
-    int32_t count = ldns_rr_list_rr_count(ar);
+  if (req->labels <= 1 && msg->ar.size > 0) {
+    hsk_dns_rr_t *rr = msg->ar.items[msg->ar.size - 1];
 
-    if (count > 0) {
-      ldns_rr *rr = ldns_rr_list_rr(ar, count - 1);
-      if (ldns_rr_get_type(rr) == HSK_SIG0_TYPE) {
-        ldns_rr_list_pop_rr(ar);
-        ldns_rr_free(rr);
-        ldns_pkt_set_arcount(pkt, count - 1);
-      }
+    if (rr->type == HSK_DNS_SIG) {
+      hsk_dns_rrs_pop(&msg->ar);
+      hsk_dns_rr_free(rr);
     }
   }
 
   // Handle EDNS and DNSSEC flags.
   if (req->edns) {
-    ldns_pkt_set_edns_udp_size(pkt, 4096);
+    msg->edns.enabled = true;
+    msg->edns.size = 4096;
 
-    if (req->dnssec) {
-      ldns_pkt_set_edns_do(pkt, 1);
-
-      if (result->secure && !result->bogus)
-        ldns_pkt_set_ad(pkt, 1);
-    }
+    if (req->dnssec)
+      msg->edns.flags |= HSK_DNS_DO;
   }
 
-  // Reserialize once we're done.
-  rc = ldns_pkt2wire(&wire, pkt, &wire_len);
+  if (result->secure && !result->bogus)
+    msg->flags |= HSK_DNS_AD;
 
-  if (rc != LDNS_STATUS_OK) {
-    hsk_rs_log(ns,
-      "could not serialize response: %s\n",
-      ldns_get_errorstr_by_id(rc));
+  // Reserialize once we're done.
+  if (!hsk_dns_msg_encode(msg, &wire, &wire_len)) {
+    hsk_rs_log(ns, "could not serialize response\n");
     goto fail;
   }
 
@@ -555,13 +535,13 @@ hsk_rs_respond(
     }
   }
 
-  ldns_pkt_free(pkt);
+  hsk_dns_msg_free(msg);
 
   goto done;
 
 fail:
-  if (pkt)
-    ldns_pkt_free(pkt);
+  if (msg)
+    hsk_dns_msg_free(msg);
 
   ok = hsk_resource_to_servfail(
     req->id,
