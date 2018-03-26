@@ -1965,9 +1965,6 @@ hsk_dns_name_parse(
           if (b == 0x00)
             b = 0xff;
 
-          // if (b < 0x20 || b > 0x7e)
-          //   return -1;
-
           if (name)
             name[noff] = b;
 
@@ -2075,11 +2072,11 @@ hsk_dns_name_serialize(char *name, uint8_t *data, int32_t *len) {
           if (ch == -1)
             ch = 0x00;
 
-          data[off] = ch;
+          data[off++] = ch;
         }
+      } else {
+        off += size;
       }
-
-      off += size;
 
       begin = i + 1;
     }
@@ -2097,7 +2094,7 @@ hsk_dns_name_serialize(char *name, uint8_t *data, int32_t *len) {
 
   if (i == 1 && name[0] == '.') {
     *len = off;
-    return off;
+    return true;
   }
 
   if (data) {
@@ -2112,7 +2109,7 @@ hsk_dns_name_serialize(char *name, uint8_t *data, int32_t *len) {
 
   *len = off;
 
-  return off;
+  return true;
 }
 
 int32_t
@@ -2130,7 +2127,8 @@ hsk_dns_name_write(char *name, uint8_t **data) {
 
   hsk_dns_name_serialize(name, buf, &len);
 
-  *data += len;
+  if (data)
+    *data += len;
 
   return len;
 }
