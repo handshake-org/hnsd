@@ -10,6 +10,7 @@
 #include "dns.h"
 #include "utils.h"
 #include "sha256.h"
+#include "ecc.h"
 
 typedef struct hsk_dns_raw_rr_s {
   uint8_t *data;
@@ -2719,7 +2720,7 @@ hsk_dns_rrsig_tbs(hsk_dns_rrsig_rd_t *rrsig, uint8_t **data, size_t *data_len) {
 }
 
 hsk_dns_rr_t *
-hsk_dns_dnskey_create(char *zone, uint8_t *pub, bool ksk) {
+hsk_dns_dnskey_create(char *zone, uint8_t *priv, bool ksk) {
   hsk_dns_rr_t *key = hsk_dns_rr_alloc();
 
   if (!key)
@@ -2739,7 +2740,10 @@ hsk_dns_dnskey_create(char *zone, uint8_t *pub, bool ksk) {
     return NULL;
   }
 
-  memcpy(pubkey, pub, 64);
+  if (!ecc_make_pubkey(priv, pubkey)) {
+    hsk_dns_rr_free(key);
+    return NULL;
+  }
 
   strcpy(key->name, zone);
   to_lower(key->name);
@@ -2923,7 +2927,8 @@ hsk_dns_sign_rrsig(hsk_dns_rrs_t *rrset, hsk_dns_rr_t *sig, uint8_t *priv) {
 
 bool
 hsk_dns_sign_sig(uint8_t *priv, uint8_t *hash, uint8_t *sigbuf) {
-  memset(sigbuf, 0, 64);
+  if (!ecdsa_sign(priv, hash, sigbuf))
+    return false;
   return true;
 }
 

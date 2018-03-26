@@ -690,7 +690,7 @@ bool
 hsk_dns_rrsig_tbs(hsk_dns_rrsig_rd_t *rrsig, uint8_t **data, size_t *data_len);
 
 hsk_dns_rr_t *
-hsk_dns_dnskey_create(char *zone, uint8_t *pub, bool ksk);
+hsk_dns_dnskey_create(char *zone, uint8_t *priv, bool ksk);
 
 hsk_dns_rr_t *
 hsk_dns_ds_create(hsk_dns_rr_t *key);

@@ -59,6 +59,7 @@ libhsk_la_SOURCES = src/addr.c     \
                     src/cuckoo.c   \
                     src/dns.c      \
                     src/dnssec.c   \
+                    src/ecc.c      \
                     src/ec.c       \
                     src/hash.c     \
                     src/header.c   \
