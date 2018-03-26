@@ -2005,6 +2005,22 @@ hsk_dns_name_alloc(
   return true;
 }
 
+bool
+hsk_dns_name_dirty(char *name) {
+  char *s = name;
+
+  while (*s) {
+    uint8_t c = (uint8_t)*s;
+
+    if (c < 0x20 || c > 0x7e)
+      return true;
+
+    s += 1;
+  }
+
+  return false;
+}
+
 void
 hsk_dns_name_sanitize(char *name, char *out) {
   char *s = name;

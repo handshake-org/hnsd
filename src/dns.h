@@ -587,6 +587,9 @@ hsk_dns_name_alloc(
   char **name
 );
 
+bool
+hsk_dns_name_dirty(char *name);
+
 void
 hsk_dns_name_sanitize(char *name, char *out);
 
