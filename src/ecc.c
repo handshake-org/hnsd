@@ -1139,8 +1139,8 @@ int ecc_make_pubkey(
   if (EccPoint_isZero(&l_public))
     return 0;
 
-  ecc_native2bytes(p_publicKey, l_public.x);
-  ecc_native2bytes(p_publicKey, l_public.y);
+  ecc_native2bytes(&p_publicKey[0], l_public.x);
+  ecc_native2bytes(&p_publicKey[ECC_BYTES], l_public.y);
 
   return 1;
 }
