@@ -2838,6 +2838,40 @@ hsk_dns_ds_create(hsk_dns_rr_t *key) {
   return ds;
 }
 
+bool
+hsk_dns_sign_type(
+  hsk_dns_rrs_t *rrs,
+  uint16_t type,
+  hsk_dns_rr_t *key,
+  uint8_t *priv
+) {
+  if (!rrs || rrs->size >= 255 || !key || !priv)
+    return false;
+
+  hsk_dns_rrs_t *rrset = hsk_dns_rrs_alloc();
+
+  if (!rrset)
+    return false;
+
+  int32_t i;
+  for (i = 0; i < rrs->size; i++) {
+    hsk_dns_rr_t *rr = rrs->items[i];
+    if (rr->type == type)
+      assert(hsk_dns_rrs_push(rrset, rr));
+  }
+
+  hsk_dns_rr_t *sig = hsk_dns_sign_rrset(rrset, key, priv);
+
+  free(rrset);
+
+  if (!sig)
+    return false;
+
+  assert(hsk_dns_rrs_push(rrs, sig));
+
+  return true;
+}
+
 hsk_dns_rr_t *
 hsk_dns_sign_rrset(hsk_dns_rrs_t *rrset, hsk_dns_rr_t *key, uint8_t *priv) {
   if (!rrset || !key || !priv)

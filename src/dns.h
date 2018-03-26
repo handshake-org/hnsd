@@ -695,6 +695,14 @@ hsk_dns_dnskey_create(char *zone, uint8_t *priv, bool ksk);
 hsk_dns_rr_t *
 hsk_dns_ds_create(hsk_dns_rr_t *key);
 
+bool
+hsk_dns_sign_type(
+  hsk_dns_rrs_t *rrs,
+  uint16_t type,
+  hsk_dns_rr_t *key,
+  uint8_t *priv
+);
+
 hsk_dns_rr_t *
 hsk_dns_sign_rrset(hsk_dns_rrs_t *rrset, hsk_dns_rr_t *key, uint8_t *priv);
 
