@@ -178,7 +178,7 @@ hsk_dnssec_get_key(void) {
 
   ldns_key_assign_rsa_key(key, rsa);
 
-  ldns_key_set_inception(key, hsk_now());
+  ldns_key_set_inception(key, hsk_now() - 172800);
   ldns_key_set_expiration(key, hsk_now() + 172800);
   ldns_key_set_pubkey_owner(key, ldns_dname_new_frm_str("."));
   ldns_key_set_flags(key, 257);

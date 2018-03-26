@@ -456,6 +456,9 @@ hsk_dns_rr_set_name(hsk_dns_rr_t *rr, char *name);
 int32_t
 hsk_dns_rr_write(hsk_dns_rr_t *rr, uint8_t **data);
 
+int32_t
+hsk_dns_rr_size(hsk_dns_rr_t *rr);
+
 bool
 hsk_dns_rr_read(
   uint8_t **data,
@@ -464,6 +467,15 @@ hsk_dns_rr_read(
   size_t pd_len,
   hsk_dns_rr_t *rr
 );
+
+bool
+hsk_dns_rr_encode(hsk_dns_rr_t *rr, uint8_t **data, size_t *data_len);
+
+bool
+hsk_dns_rr_decode(uint8_t *data, size_t data_len, hsk_dns_rr_t **out);
+
+hsk_dns_rr_t *
+hsk_dns_rr_clone(hsk_dns_rr_t *rr);
 
 void
 hsk_dns_rd_init(void *rd, uint16_t type);
@@ -492,6 +504,12 @@ hsk_dns_rd_read(
   void *rd,
   uint16_t type
 );
+
+bool
+hsk_dns_rd_encode(void *rd, uint16_t type, uint8_t **data, size_t *data_len);
+
+bool
+hsk_dns_rd_decode(uint8_t *data, size_t data_len, uint16_t type, void **out);
 
 void
 hsk_dns_txts_init(hsk_dns_txts_t *txts);
@@ -660,4 +678,33 @@ hsk_dns_iter_init(
 
 hsk_dns_rr_t *
 hsk_dns_iter_next(hsk_dns_iter_t *it);
+
+/*
+ * DNSSEC
+ */
+
+int32_t
+hsk_dns_dnskey_keytag(hsk_dns_dnskey_rd_t *rd);
+
+bool
+hsk_dns_rrsig_tbs(hsk_dns_rrsig_rd_t *rrsig, uint8_t **data, size_t *data_len);
+
+hsk_dns_rr_t *
+hsk_dns_dnskey_create(char *zone, uint8_t *pub, bool ksk);
+
+hsk_dns_rr_t *
+hsk_dns_ds_create(hsk_dns_rr_t *key);
+
+hsk_dns_rr_t *
+hsk_dns_sign_rrset(hsk_dns_rrs_t *rrset, hsk_dns_rr_t *key, uint8_t *priv);
+
+bool
+hsk_dns_sign_rrsig(hsk_dns_rrs_t *rrset, hsk_dns_rr_t *sig, uint8_t *priv);
+
+bool
+hsk_dns_sign_sig(uint8_t *priv, uint8_t *hash, uint8_t *sigbuf);
+
+bool
+hsk_dns_sighash(hsk_dns_rrs_t *rrset, hsk_dns_rr_t *sig, uint8_t *hash);
+
 #endif
