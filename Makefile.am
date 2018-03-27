@@ -2,7 +2,7 @@
 # CFLAGS = -Wall -std=gnu11 -O2
 # LDFLAGS =
 
-SUBDIRS = uv ldns secp256k1 unbound
+SUBDIRS = uv secp256k1 unbound
 
 ACLOCAL_AMFLAGS = -I m4
 
@@ -10,7 +10,6 @@ AM_CPPFLAGS = -I$(top_builddir)                  \
               -I$(top_srcdir)/include            \
               -I$(top_srcdir)/src                \
               -I$(top_srcdir)/uv/include         \
-              -I$(top_srcdir)/ldns/include       \
               -I$(top_srcdir)/secp256k1/include  \
               -I$(top_srcdir)/unbound/libunbound
 
@@ -42,7 +41,6 @@ lib_LTLIBRARIES = libhsk.la
 libhsk_la_LIBADD = -lssl                                           \
                    -lcrypto                                        \
                    $(top_builddir)/uv/.libs/libuv.la               \
-                   $(top_builddir)/ldns/.libs/libldns.la           \
                    $(top_builddir)/secp256k1/.libs/libsecp256k1.la
 
 libhsk_la_CFLAGS = @CFLAGS@
