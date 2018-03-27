@@ -3022,30 +3022,21 @@ hsk_dns_sign_rrsig(hsk_dns_rrs_t *rrset, hsk_dns_rr_t *sig, uint8_t *priv) {
 
   uint8_t hash[32];
 
+  // Hash with sha256.
   if (!hsk_dns_sighash(rrset, sig, hash)) {
     free(sigbuf);
     return false;
   }
 
-  if (!hsk_dns_sign_sig(priv, hash, sigbuf)) {
+  // Sign with secp256r1.
+  if (!hsk_ecdsa_sign(priv, hash, sigbuf)) {
     free(sigbuf);
     return false;
   }
 
-  uint8_t pubkey[33];
-  assert(hsk_ecc_make_pubkey_compressed(priv, pubkey));
-  assert(hsk_ecdsa_verify(pubkey, hash, sigbuf));
-
   rrsig->signature_len = 64;
   rrsig->signature = sigbuf;
 
-  return true;
-}
-
-bool
-hsk_dns_sign_sig(uint8_t *priv, uint8_t *hash, uint8_t *sigbuf) {
-  if (!hsk_ecdsa_sign(priv, hash, sigbuf))
-    return false;
   return true;
 }
 
@@ -3220,12 +3211,11 @@ hsk_dns_rrs_clean(hsk_dns_rrs_t *rrs, uint16_t type) {
     }
   }
 
-  rrs->size = 0;
+  hsk_dns_rrs_init(rrs);
 
   for (i = 0; i < tmp->size; i++) {
     hsk_dns_rr_t *rr = tmp->items[i];
-    rrs->items[i] = rr;
-    rrs->size += 1;
+    assert(hsk_dns_rrs_push(rrs, rr));
   }
 
   free(tmp);

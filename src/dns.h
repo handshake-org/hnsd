@@ -722,9 +722,6 @@ bool
 hsk_dns_sign_rrsig(hsk_dns_rrs_t *rrset, hsk_dns_rr_t *sig, uint8_t *priv);
 
 bool
-hsk_dns_sign_sig(uint8_t *priv, uint8_t *hash, uint8_t *sigbuf);
-
-bool
 hsk_dns_sighash(hsk_dns_rrs_t *rrset, hsk_dns_rr_t *sig, uint8_t *hash);
 
 bool

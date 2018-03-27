@@ -1830,14 +1830,15 @@ hsk_resource_to_dns(
   uint8_t **wire,
   size_t *wire_len
 ) {
-  size_t labels = hsk_dns_label_count(fqdn);
+  int32_t labels = hsk_dns_label_count(fqdn);
+
+  if (labels == 0)
+    return false;
+
   char name[HSK_DNS_MAX_LABEL + 1];
   bool ret;
 
   hsk_dns_label_get(fqdn, -1, name);
-
-  if (labels == 0)
-    return false;
 
   hsk_dns_msg_t *msg = hsk_dns_msg_alloc();
 
@@ -1962,7 +1963,7 @@ hsk_resource_to_dns(
         if (is_smimea) {
           hsk_resource_to_smimea(rs, name, hash, an);
           if (dnssec)
-            hsk_dnssec_sign(an, HSK_DNS_TLSA);
+            hsk_dnssec_sign(an, HSK_DNS_SMIMEA);
         }
 
         break;
