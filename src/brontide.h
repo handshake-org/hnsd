@@ -7,9 +7,9 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "hsk-aead.h"
-#include "hsk-hash.h"
-#include "hsk-ec.h"
+#include "aead.h"
+#include "hash.h"
+#include "ec.h"
 
 typedef struct hsk_cs_s {
   uint32_t nonce;

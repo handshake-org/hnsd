@@ -5,10 +5,10 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-#include "hsk-constants.h"
-#include "hsk-error.h"
-#include "hsk-hash.h"
-#include "hsk-proof.h"
+#include "constants.h"
+#include "error.h"
+#include "hash.h"
+#include "proof.h"
 #include "bio.h"
 
 static bool

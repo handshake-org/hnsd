@@ -4,7 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "hsk-hash.h"
+#include "hash.h"
 #include "blake2b.h"
 #include "sha256.h"
 

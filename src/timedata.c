@@ -4,10 +4,10 @@
 #include <string.h>
 #include <stdarg.h>
 
-#include "hsk-addr.h"
-#include "hsk-error.h"
-#include "hsk-map.h"
-#include "hsk-timedata.h"
+#include "addr.h"
+#include "error.h"
+#include "map.h"
+#include "timedata.h"
 #include "utils.h"
 
 int32_t

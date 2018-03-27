@@ -4,9 +4,9 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "hsk-ec.h"
-#include "hsk-hash.h"
-#include "hsk-hsig.h"
+#include "ec.h"
+#include "hash.h"
+#include "hsig.h"
 
 bool
 hsk_hsig_get_nonce(uint8_t *wire, size_t wire_len, uint8_t *nonce) {

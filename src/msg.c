@@ -4,10 +4,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "hsk-addr.h"
-#include "hsk-header.h"
-#include "hsk-msg.h"
-#include "hsk-proof.h"
+#include "addr.h"
+#include "header.h"
+#include "msg.h"
+#include "proof.h"
 #include "bio.h"
 #include "utils.h"
 

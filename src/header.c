@@ -2,11 +2,11 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-#include "hsk-error.h"
-#include "hsk-constants.h"
-#include "hsk-hash.h"
-#include "hsk-header.h"
-#include "hsk-cuckoo.h"
+#include "error.h"
+#include "constants.h"
+#include "hash.h"
+#include "header.h"
+#include "cuckoo.h"
 #include "bio.h"
 #include "bn.h"
 #include "utils.h"

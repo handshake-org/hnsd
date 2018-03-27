@@ -26,7 +26,7 @@
 
 #include <stdint.h>
 #include <stdbool.h>
-#include "hsk-addr.h"
+#include "addr.h"
 
 // Records
 typedef struct hsk_record_s {

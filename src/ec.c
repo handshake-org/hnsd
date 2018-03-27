@@ -6,9 +6,9 @@
 
 #include "secp256k1.h"
 
-#include "hsk-ec.h"
-#include "hsk-hash.h"
-#include "hsk-random.h"
+#include "ec.h"
+#include "hash.h"
+#include "random.h"
 
 hsk_ec_t *
 hsk_ec_alloc(void) {

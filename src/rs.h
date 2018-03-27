@@ -5,7 +5,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-#include "hsk-ec.h"
+#include "ec.h"
 #include <unbound.h>
 #include "uv.h"
 

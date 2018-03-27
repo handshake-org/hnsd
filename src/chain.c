@@ -6,13 +6,13 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "hsk-chain.h"
-#include "hsk-constants.h"
-#include "hsk-error.h"
-#include "hsk-header.h"
-#include "hsk-map.h"
-#include "hsk-msg.h"
-#include "hsk-timedata.h"
+#include "chain.h"
+#include "constants.h"
+#include "error.h"
+#include "header.h"
+#include "map.h"
+#include "msg.h"
+#include "timedata.h"
 #include "bn.h"
 #include "utils.h"
 

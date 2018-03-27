@@ -3,8 +3,8 @@
 #include <stdbool.h>
 #include <stdlib.h>
 
-#include "hsk-cuckoo.h"
-#include "hsk-error.h"
+#include "cuckoo.h"
+#include "error.h"
 #include "blake2b.h"
 #include "siphash.h"
 

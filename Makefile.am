@@ -7,31 +7,11 @@ SUBDIRS = uv
 ACLOCAL_AMFLAGS = -I m4
 
 AM_CPPFLAGS = -I$(top_builddir)                  \
-              -I$(top_srcdir)/include            \
               -I$(top_srcdir)/src                \
               -I$(top_srcdir)/uv/include         \
               -I$(top_srcdir)/src/secp256k1
 
-include_HEADERS = include/hsk.h           \
-                  include/hsk-addr.h      \
-                  include/hsk-addrmgr.h   \
-                  include/hsk-aead.h      \
-                  include/hsk-brontide.h  \
-                  include/hsk-chain.h     \
-                  include/hsk-constants.h \
-                  include/hsk-cuckoo.h    \
-                  include/hsk-ec.h        \
-                  include/hsk-error.h     \
-                  include/hsk-hash.h      \
-                  include/hsk-header.h    \
-                  include/hsk-hsig.h      \
-                  include/hsk-list.h      \
-                  include/hsk-map.h       \
-                  include/hsk-msg.h       \
-                  include/hsk-proof.h     \
-                  include/hsk-random.h    \
-                  include/hsk-resource.h  \
-                  include/hsk-timedata.h
+include_HEADERS =
 
 CLEANFILES =
 
@@ -75,8 +55,7 @@ libhsk_la_SOURCES = src/addr.c     \
                     src/utils.c    \
                     src/secp256k1/secp256k1.c
 
-EXTRA_DIST = include   \
-             README.md \
+EXTRA_DIST = README.md \
              LICENSE
 
 PROGS = hsk

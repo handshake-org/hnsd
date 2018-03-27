@@ -4,7 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "hsk-ec.h"
+#include "ec.h"
 #include "blake2b.h"
 #include "bio.h"
 #include "sig0.h"

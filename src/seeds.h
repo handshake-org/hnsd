@@ -1,4 +1,4 @@
-#include "hsk-constants.h"
+#include "constants.h"
 
 #if HSK_NETWORK == HSK_MAIN
 

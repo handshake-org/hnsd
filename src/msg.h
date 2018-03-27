@@ -6,9 +6,9 @@
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include "hsk-addr.h"
-#include "hsk-header.h"
-#include "hsk-proof.h"
+#include "addr.h"
+#include "header.h"
+#include "proof.h"
 
 #define HSK_MSG_VERSION 0
 #define HSK_MSG_VERACK 1

@@ -6,7 +6,7 @@
 #include <stdbool.h>
 #include "uv.h"
 
-#include "hsk-ec.h"
+#include "ec.h"
 #include "pool.h"
 
 /*

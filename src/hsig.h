@@ -5,7 +5,7 @@
 #include <stdbool.h>
 #include <stdlib.h>
 
-#include "hsk-ec.h"
+#include "ec.h"
 
 #define HDK_DNS_HNONCE 598
 #define HSK_DNS_HSIG 599

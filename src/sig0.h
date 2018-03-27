@@ -5,7 +5,7 @@
 #include <stdbool.h>
 #include <stdlib.h>
 
-#include "hsk-ec.h"
+#include "ec.h"
 
 #define HSK_SIG0_RR_SIZE 94
 #define HSK_SIG0_RD_SIZE 83

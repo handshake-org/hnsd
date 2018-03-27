@@ -6,14 +6,14 @@
 #include <stdbool.h>
 #include "uv.h"
 
-#include "hsk-addr.h"
-#include "hsk-addrmgr.h"
-#include "hsk-brontide.h"
-#include "hsk-chain.h"
-#include "hsk-ec.h"
-#include "hsk-header.h"
-#include "hsk-map.h"
-#include "hsk-timedata.h"
+#include "addr.h"
+#include "addrmgr.h"
+#include "brontide.h"
+#include "chain.h"
+#include "ec.h"
+#include "header.h"
+#include "map.h"
+#include "timedata.h"
 
 /*
  * Defs

@@ -7,11 +7,11 @@
 
 #include "bio.h"
 #include "sha256.h"
-#include "hsk-aead.h"
-#include "hsk-brontide.h"
-#include "hsk-ec.h"
-#include "hsk-error.h"
-#include "hsk-hash.h"
+#include "aead.h"
+#include "brontide.h"
+#include "ec.h"
+#include "error.h"
+#include "hash.h"
 #include "utils.h"
 
 static const char brontide_protocol_name[] =

@@ -11,11 +11,11 @@
 
 #include "uv.h"
 
-#include "hsk-addr.h"
-#include "hsk-constants.h"
-#include "hsk-ec.h"
-#include "hsk-error.h"
-#include "hsk-resource.h"
+#include "addr.h"
+#include "constants.h"
+#include "ec.h"
+#include "error.h"
+#include "resource.h"
 #include "ns.h"
 #include "pool.h"
 #include "req.h"

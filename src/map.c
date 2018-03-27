@@ -33,7 +33,7 @@
 #include <stdbool.h>
 #include <stdio.h>
 
-#include "hsk-map.h"
+#include "map.h"
 
 void
 hsk_map_init(

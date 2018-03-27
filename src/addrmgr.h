@@ -7,9 +7,9 @@
 #include <arpa/inet.h>
 #include <netinet/in.h>
 
-#include "hsk-addr.h"
-#include "hsk-timedata.h"
-#include "hsk-map.h"
+#include "addr.h"
+#include "timedata.h"
+#include "map.h"
 
 typedef struct hsk_addrentry_s {
   hsk_addr_t addr;

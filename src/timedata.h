@@ -5,8 +5,8 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-#include "hsk-map.h"
-#include "hsk-addr.h"
+#include "map.h"
+#include "addr.h"
 
 #define HSK_TIMEDATA_LIMIT 200
 

@@ -5,10 +5,10 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-#include "hsk-addr.h"
-#include "hsk-constants.h"
+#include "addr.h"
+#include "constants.h"
 #include "dns.h"
-#include "hsk-error.h"
+#include "error.h"
 #include "req.h"
 #include "utils.h"
 

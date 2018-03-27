@@ -3,7 +3,7 @@
 #include <stdbool.h>
 #include <stdlib.h>
 
-#include "hsk-list.h"
+#include "list.h"
 
 void
 hsk_list_init(hsk_list_t *list) {

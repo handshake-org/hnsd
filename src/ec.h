@@ -8,7 +8,7 @@
 
 #include "secp256k1.h"
 
-#include "hsk-hash.h"
+#include "hash.h"
 
 typedef hsk_secp256k1_context hsk_ec_t;
 

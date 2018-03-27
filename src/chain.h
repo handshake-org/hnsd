@@ -5,9 +5,9 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-#include "hsk-map.h"
-#include "hsk-header.h"
-#include "hsk-timedata.h"
+#include "map.h"
+#include "header.h"
+#include "timedata.h"
 
 /*
  * Types

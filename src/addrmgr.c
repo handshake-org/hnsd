@@ -5,12 +5,12 @@
 #include <netinet/in.h>
 #include <math.h>
 
-#include "hsk-addr.h"
-#include "hsk-addrmgr.h"
-#include "hsk-constants.h"
-#include "hsk-error.h"
-#include "hsk-map.h"
-#include "hsk-timedata.h"
+#include "addr.h"
+#include "addrmgr.h"
+#include "constants.h"
+#include "error.h"
+#include "map.h"
+#include "timedata.h"
 #include "utils.h"
 #include "seeds.h"
 

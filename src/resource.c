@@ -8,9 +8,9 @@
 
 #include "bio.h"
 #include "dns.h"
-#include "hsk-addr.h"
-#include "hsk-resource.h"
-#include "hsk-error.h"
+#include "addr.h"
+#include "resource.h"
+#include "error.h"
 #include "utils.h"
 #include "dnssec.h"
 #include "base32.h"

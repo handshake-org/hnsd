@@ -12,11 +12,11 @@
 #include "uv.h"
 #include <unbound.h>
 
-#include "hsk-addr.h"
-#include "hsk-constants.h"
-#include "hsk-resource.h"
-#include "hsk-error.h"
-#include "hsk-ec.h"
+#include "addr.h"
+#include "constants.h"
+#include "resource.h"
+#include "error.h"
+#include "ec.h"
 #include "dnssec.h"
 #include "req.h"
 #include "rs.h"

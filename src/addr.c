@@ -9,9 +9,9 @@
 
 #include "uv.h"
 
-#include "hsk-addr.h"
-#include "hsk-constants.h"
-#include "hsk-map.h"
+#include "addr.h"
+#include "constants.h"
+#include "map.h"
 #include "base32.h"
 #include "bio.h"
 

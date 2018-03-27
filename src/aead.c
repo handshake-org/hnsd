@@ -5,12 +5,12 @@
 #include <string.h>
 
 #include "bio.h"
-#include "hsk-hash.h"
+#include "hash.h"
 #include "blake2b.h"
 #include "sha256.h"
 #include "chacha20/chacha20.h"
 #include "poly1305/poly1305-donna.h"
-#include "hsk-aead.h"
+#include "aead.h"
 
 void
 hsk_aead_init(hsk_aead_t *aead) {

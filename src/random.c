@@ -15,7 +15,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "hsk-random.h"
+#include "random.h"
 
 #if defined(HAVE_RANDOMBYTES) || defined(SUPERCOP)
 extern void randombytes(unsigned char *x, unsigned long long xlen);
