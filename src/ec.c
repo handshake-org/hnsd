@@ -5,8 +5,6 @@
 #include <string.h>
 
 #include "secp256k1.h"
-#include "secp256k1_recovery.h"
-#include "secp256k1_ecdh.h"
 
 #include "hsk-ec.h"
 #include "hsk-hash.h"
@@ -14,39 +12,39 @@
 
 hsk_ec_t *
 hsk_ec_alloc(void) {
-  return secp256k1_context_create(
-    SECP256K1_CONTEXT_SIGN | SECP256K1_CONTEXT_VERIFY);
+  return hsk_secp256k1_context_create(
+    HSK_SECP256K1_CONTEXT_SIGN | HSK_SECP256K1_CONTEXT_VERIFY);
 }
 
 hsk_ec_t *
 hsk_ec_clone(hsk_ec_t *ec) {
   assert(ec);
-  return secp256k1_context_clone(ec);
+  return hsk_secp256k1_context_clone(ec);
 }
 
 void
 hsk_ec_free(hsk_ec_t *ec) {
   assert(ec);
-  secp256k1_context_destroy(ec);
+  hsk_secp256k1_context_destroy(ec);
 }
 
 bool
 hsk_ec_randomize(hsk_ec_t *ec, uint8_t *seed) {
   assert(ec && seed);
-  return secp256k1_context_randomize(ec, seed) != 0;
+  return hsk_secp256k1_context_randomize(ec, seed) != 0;
 }
 
 bool
 hsk_ec_verify_privkey(hsk_ec_t *ec, uint8_t *key) {
   assert(ec && key);
-  return secp256k1_ec_seckey_verify(ec, key) != 0;
+  return hsk_secp256k1_ec_seckey_verify(ec, key) != 0;
 }
 
 bool
 hsk_ec_verify_pubkey(hsk_ec_t *ec, uint8_t *key) {
   assert(ec && key);
-  secp256k1_pubkey pub;
-  return secp256k1_ec_pubkey_parse(ec, &pub, key, 33) != 0;
+  hsk_secp256k1_pubkey pub;
+  return hsk_secp256k1_ec_pubkey_parse(ec, &pub, key, 33) != 0;
 }
 
 bool
@@ -74,15 +72,15 @@ bool
 hsk_ec_create_pubkey(hsk_ec_t *ec, uint8_t *key, uint8_t *pubkey) {
   assert(ec && key && pubkey);
 
-  secp256k1_pubkey pub;
+  hsk_secp256k1_pubkey pub;
 
-  if (!secp256k1_ec_pubkey_create(ec, &pub, key))
+  if (!hsk_secp256k1_ec_pubkey_create(ec, &pub, key))
     return false;
 
-  unsigned int flags = SECP256K1_EC_COMPRESSED;
+  unsigned int flags = HSK_SECP256K1_EC_COMPRESSED;
   size_t len = 33;
 
-  if (!secp256k1_ec_pubkey_serialize(ec, pubkey, &len, &pub, flags))
+  if (!hsk_secp256k1_ec_pubkey_serialize(ec, pubkey, &len, &pub, flags))
     return false;
 
   assert(len == 33);
@@ -100,11 +98,11 @@ hsk_ec_sign_msg(
 ) {
   assert(ec && key && sig);
 
-  secp256k1_nonce_function noncefn = secp256k1_nonce_function_rfc6979;
+  hsk_secp256k1_nonce_function noncefn = hsk_secp256k1_nonce_function_rfc6979;
 
-  secp256k1_ecdsa_recoverable_signature s;
+  hsk_secp256k1_ecdsa_recoverable_signature s;
 
-  int32_t result = secp256k1_ecdsa_sign_recoverable(
+  int32_t result = hsk_secp256k1_ecdsa_sign_recoverable(
     ec,
     &s,
     msg,
@@ -116,7 +114,7 @@ hsk_ec_sign_msg(
   if (result == 0)
     return false;
 
-  secp256k1_ecdsa_recoverable_signature_serialize_compact(ec, sig, rec, &s);
+  hsk_secp256k1_ecdsa_recoverable_signature_serialize_compact(ec, sig, rec, &s);
 
   return true;
 }
@@ -130,17 +128,17 @@ hsk_ec_verify_msg(
 ) {
   assert(ec && pubkey && msg && sig);
 
-  secp256k1_ecdsa_signature s;
+  hsk_secp256k1_ecdsa_signature s;
 
-  if (!secp256k1_ecdsa_signature_parse_compact(ec, &s, sig))
+  if (!hsk_secp256k1_ecdsa_signature_parse_compact(ec, &s, sig))
     return false;
 
-  secp256k1_pubkey pub;
+  hsk_secp256k1_pubkey pub;
 
-  if (!secp256k1_ec_pubkey_parse(ec, &pub, pubkey, 33))
+  if (!hsk_secp256k1_ec_pubkey_parse(ec, &pub, pubkey, 33))
     return false;
 
-  if (!secp256k1_ecdsa_verify(ec, &s, msg, &pub))
+  if (!hsk_secp256k1_ecdsa_verify(ec, &s, msg, &pub))
     return false;
 
   return true;
@@ -156,20 +154,20 @@ hsk_ec_recover(
 ) {
   assert(ec && msg && sig && pubkey);
 
-  secp256k1_ecdsa_recoverable_signature s;
+  hsk_secp256k1_ecdsa_recoverable_signature s;
 
-  if (!secp256k1_ecdsa_recoverable_signature_parse_compact(ec, &s, sig, rec))
+  if (!hsk_secp256k1_ecdsa_recoverable_signature_parse_compact(ec, &s, sig, rec))
     return false;
 
-  secp256k1_pubkey pub;
+  hsk_secp256k1_pubkey pub;
 
-  if (!secp256k1_ecdsa_recover(ec, &pub, &s, msg))
+  if (!hsk_secp256k1_ecdsa_recover(ec, &pub, &s, msg))
     return false;
 
-  unsigned int flags = SECP256K1_EC_COMPRESSED;
+  unsigned int flags = HSK_SECP256K1_EC_COMPRESSED;
   size_t len = 33;
 
-  if (!secp256k1_ec_pubkey_serialize(ec, pubkey, &len, &pub, flags))
+  if (!hsk_secp256k1_ec_pubkey_serialize(ec, pubkey, &len, &pub, flags))
     return false;
 
   assert(len == 33);
@@ -201,13 +199,13 @@ bool
 hsk_ec_ecdh(hsk_ec_t *ec, uint8_t *pubkey, uint8_t *key, uint8_t *result) {
   assert(ec && pubkey && key && result);
 
-  secp256k1_pubkey pub;
+  hsk_secp256k1_pubkey pub;
 
-  if (!secp256k1_ec_pubkey_parse(ec, &pub, pubkey, 33))
+  if (!hsk_secp256k1_ec_pubkey_parse(ec, &pub, pubkey, 33))
     return false;
 
   // NOTE: This always does SHA256.
-  if (!secp256k1_ecdh(ec, result, &pub, key))
+  if (!hsk_secp256k1_ecdh(ec, result, &pub, key))
     return false;
 
   return true;

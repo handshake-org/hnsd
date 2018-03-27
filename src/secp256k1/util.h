@@ -8,7 +8,7 @@
 #define HSK_SECP256K1_UTIL_H
 
 #if defined HAVE_CONFIG_H
-#include "hsk_config.h"
+#include "config.h"
 #endif
 
 #include <stdlib.h>

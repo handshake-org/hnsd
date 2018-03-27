@@ -590,10 +590,5 @@ int hsk_secp256k1_ec_pubkey_combine(const hsk_secp256k1_context* ctx, hsk_secp25
     return 1;
 }
 
-#ifdef ENABLE_MODULE_ECDH
-# include "modules/ecdh/main_impl.h"
-#endif
-
-#ifdef ENABLE_MODULE_RECOVERY
-# include "modules/recovery/main_impl.h"
-#endif
+#include "ecdh_impl.h"
+#include "recovery_impl.h"

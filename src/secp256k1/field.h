@@ -19,7 +19,7 @@
  */
 
 #if defined HAVE_CONFIG_H
-#include "hsk_config.h"
+#include "config.h"
 #endif
 
 #if defined(USE_FIELD_10X26)

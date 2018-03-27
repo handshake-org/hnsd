@@ -10,11 +10,14 @@
 /* Define to 1 if you have the <arpa/inet.h> header file. */
 #undef HAVE_ARPA_INET_H
 
+/* Define this symbol if __builtin_expect is available */
+#undef HAVE_BUILTIN_EXPECT
+
 /* Define to 1 if you have the <dlfcn.h> header file. */
 #undef HAVE_DLFCN_H
 
-/* Define to 1 if you have the `gethostbyname' function. */
-#undef HAVE_GETHOSTBYNAME
+/* Define to 1 if you have the <fcntl.h> header file. */
+#undef HAVE_FCNTL_H
 
 /* Define to 1 if you have the <inttypes.h> header file. */
 #undef HAVE_INTTYPES_H
@@ -32,18 +35,12 @@
 /* Define to 1 if you have the `memset' function. */
 #undef HAVE_MEMSET
 
-/* Define to 1 if you have the <netdb.h> header file. */
-#undef HAVE_NETDB_H
-
 /* Define to 1 if you have the <netinet/in.h> header file. */
 #undef HAVE_NETINET_IN_H
 
 /* Define to 1 if your system has a GNU libc compatible `realloc' function,
    and to 0 otherwise. */
 #undef HAVE_REALLOC
-
-/* Define to 1 if you have the `select' function. */
-#undef HAVE_SELECT
 
 /* Define to 1 if you have the <stddef.h> header file. */
 #undef HAVE_STDDEF_H
@@ -54,6 +51,9 @@
 /* Define to 1 if you have the <stdlib.h> header file. */
 #undef HAVE_STDLIB_H
 
+/* Define to 1 if you have the `strcasecmp' function. */
+#undef HAVE_STRCASECMP
+
 /* Define to 1 if you have the `strdup' function. */
 #undef HAVE_STRDUP
 
@@ -63,17 +63,11 @@
 /* Define to 1 if you have the <string.h> header file. */
 #undef HAVE_STRING_H
 
-/* Define to 1 if you have the `strtol' function. */
-#undef HAVE_STRTOL
-
-/* Define to 1 if you have the <sys/socket.h> header file. */
-#undef HAVE_SYS_SOCKET_H
+/* Define to 1 if you have the `strstr' function. */
+#undef HAVE_STRSTR
 
 /* Define to 1 if you have the <sys/stat.h> header file. */
 #undef HAVE_SYS_STAT_H
-
-/* Define to 1 if you have the <sys/time.h> header file. */
-#undef HAVE_SYS_TIME_H
 
 /* Define to 1 if you have the <sys/types.h> header file. */
 #undef HAVE_SYS_TYPES_H
@@ -84,11 +78,11 @@
 /* Define to 1 if the system has the type `_Bool'. */
 #undef HAVE__BOOL
 
-/* define this if built for a big endian system */
-#undef HSK_BIG_ENDIAN
+/* Define to 1 if the system has the type `__int128'. */
+#undef HAVE___INT128
 
 /* define this if built for a big endian system */
-#undef HSK_LITTLE_ENDIAN
+#undef HSK_BIG_ENDIAN
 
 /* Define to the sub-directory where libtool stores uninstalled libraries. */
 #undef LT_OBJDIR
@@ -116,6 +110,30 @@
 
 /* Define to 1 if you have the ANSI C header files. */
 #undef STDC_HEADERS
+
+/* Define this symbol to enable x86_64 assembly optimizations */
+#undef USE_ASM_X86_64
+
+/* Define this symbol to use a statically generated ecmult table */
+#undef USE_ECMULT_STATIC_PRECOMPUTATION
+
+/* Define this symbol to use endomorphism optimization */
+#undef USE_ENDOMORPHISM
+
+/* Define this symbol if an external assembly implementation is used */
+#undef USE_EXTERNAL_ASM
+
+/* Define this symbol to use the FIELD_10X26 implementation */
+#undef USE_FIELD_10X26
+
+/* Define this symbol to use the FIELD_5X52 implementation */
+#undef USE_FIELD_5X52
+
+/* Define this symbol to use the 4x64 scalar implementation */
+#undef USE_SCALAR_4X64
+
+/* Define this symbol to use the 8x32 scalar implementation */
+#undef USE_SCALAR_8X32
 
 /* Version number of package */
 #undef VERSION

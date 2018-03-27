@@ -649,6 +649,9 @@ HSK_SECP256K1_API HSK_SECP256K1_WARN_UNUSED_RESULT int hsk_secp256k1_ec_pubkey_c
     size_t n
 ) HSK_SECP256K1_ARG_NONNULL(2) HSK_SECP256K1_ARG_NONNULL(3);
 
+#include "ecdh.h"
+#include "recovery.h"
+
 #ifdef __cplusplus
 }
 #endif

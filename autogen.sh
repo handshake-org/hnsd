@@ -20,12 +20,6 @@ if ! test -f configure; then
 fi
 popd
 
-pushd secp256k1
-if ! test -f configure; then
-  ./autogen.sh
-fi
-popd
-
 "$LIBTOOLIZE" --copy
 "$ACLOCAL" -I m4
 "$AUTOCONF"

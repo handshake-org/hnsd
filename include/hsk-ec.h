@@ -10,7 +10,7 @@
 
 #include "hsk-hash.h"
 
-typedef secp256k1_context hsk_ec_t;
+typedef hsk_secp256k1_context hsk_ec_t;
 
 hsk_ec_t *
 hsk_ec_alloc(void);

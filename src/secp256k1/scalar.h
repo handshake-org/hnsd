@@ -10,7 +10,7 @@
 #include "num.h"
 
 #if defined HAVE_CONFIG_H
-#include "hsk_config.h"
+#include "config.h"
 #endif
 
 #if defined(EXHAUSTIVE_TEST_ORDER)

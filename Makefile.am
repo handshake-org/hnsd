@@ -2,7 +2,7 @@
 # CFLAGS = -Wall -std=gnu11 -O2
 # LDFLAGS =
 
-SUBDIRS = uv secp256k1
+SUBDIRS = uv
 
 ACLOCAL_AMFLAGS = -I m4
 
@@ -10,7 +10,7 @@ AM_CPPFLAGS = -I$(top_builddir)                  \
               -I$(top_srcdir)/include            \
               -I$(top_srcdir)/src                \
               -I$(top_srcdir)/uv/include         \
-              -I$(top_srcdir)/secp256k1/include
+              -I$(top_srcdir)/src/secp256k1
 
 include_HEADERS = include/hsk.h           \
                   include/hsk-addr.h      \
@@ -38,10 +38,9 @@ CLEANFILES =
 lib_LTLIBRARIES = libhsk.la
 
 libhsk_la_LIBADD = -lunbound                                       \
-                   $(top_builddir)/uv/.libs/libuv.la               \
-                   $(top_builddir)/secp256k1/.libs/libsecp256k1.la
+                   $(top_builddir)/uv/.libs/libuv.la
 
-libhsk_la_CFLAGS = @CFLAGS@
+libhsk_la_CFLAGS = -DHSK_BUILD @CFLAGS@
 libhsk_la_LDFLAGS = -no-undefined -version-info 0:0:0
 libhsk_la_SOURCES = src/addr.c     \
                     src/addrmgr.c  \
@@ -73,7 +72,8 @@ libhsk_la_SOURCES = src/addr.c     \
                     src/sig0.c     \
                     src/siphash.c  \
                     src/timedata.c \
-                    src/utils.c
+                    src/utils.c    \
+                    src/secp256k1/secp256k1.c
 
 EXTRA_DIST = include   \
              README.md \
@@ -89,7 +89,7 @@ hsk_SOURCES = src/daemon.c \
 hsk_LDADD = $(top_builddir)/libhsk.la
 
 hsk_LDFLAGS = -static
-hsk_CFLAGS = $(AM_CFLAGS)
+hsk_CFLAGS = -DHSK_BUILD $(AM_CFLAGS)
 hsk_CPPFLAGS = $(AM_CPPFLAGS)
 
 pkgconfigdir = $(libdir)/pkgconfig

@@ -21,7 +21,7 @@ AH_BOTTOM([#endif /* _HSK_CONFIG_H */])
 AC_CONFIG_SRCDIR([src/bio.h])
 AC_CONFIG_HEADERS([src/config.h])
 AC_CONFIG_FILES([Makefile libhsk.pc])
-AC_CONFIG_SUBDIRS([uv secp256k1])
+AC_CONFIG_SUBDIRS([uv])
 
 dnl PKG_PROG_PKG_CONFIG
 
@@ -45,21 +45,248 @@ AC_TYPE_INT64_T
 AC_FUNC_MALLOC
 AC_FUNC_REALLOC
 AC_SYS_LARGEFILE
-AC_CHECK_FUNCS([gethostbyname memset select strdup strtol])
+AC_CHECK_FUNCS([memset strcasecmp strdup strstr])
 
 AC_CHECK_HEADERS([ \
   arpa/inet.h \
+  fcntl.h \
   limits.h \
-  netdb.h \
   netinet/in.h \
   stddef.h \
   stdint.h \
   stdlib.h \
   string.h \
   strings.h \
-  sys/socket.h \
-  sys/time.h \
   unistd.h \
 ])
+
+dnl
+dnl Secp256k1
+dnl
+
+AX_PROG_CC_FOR_BUILD
+AM_PROG_CC_C_O
+AC_PROG_CC_C89
+if test x"$ac_cv_prog_cc_c89" = x"no"; then
+  AC_MSG_ERROR([c89 compiler support required])
+fi
+AM_PROG_AS
+
+AC_ARG_ENABLE(endomorphism,
+  AS_HELP_STRING(
+    [--enable-endomorphism],
+    [Enable endomorphism. Default is yes.)]
+  ),
+  [use_endomorphism=$enableval],
+  [use_endomorphism=no])
+
+AC_ARG_ENABLE(ecmult_static_precomputation,
+  AS_HELP_STRING(
+    [--enable-ecmult-static-precomputation],
+    [Enable precomputed ecmult table for signing. Default is yes.)]
+  ),
+  [use_precomp=$enableval],
+  [use_precomp=yes])
+
+AC_ARG_WITH([field],
+  [AS_HELP_STRING(
+    [--with-field=64bit|32bit|auto],
+    [Specify Field Implementation. Default is auto.]
+  )],
+  [req_field=$withval],
+  [req_field=auto])
+
+AC_ARG_WITH([scalar],
+  [AS_HELP_STRING(
+    [--with-scalar=64bit|32bit|auto],
+    [Specify scalar implementation. Default is auto.]
+  )],
+  [req_scalar=$withval],
+  [req_scalar=auto])
+
+AC_ARG_WITH([asm],
+  [AS_HELP_STRING(
+    [--with-asm=x86_64|arm|no|auto]
+    [Specify assembly optimizations to use. Default is auto.]
+  )],
+  [req_asm=$withval],
+  [req_asm=auto])
+
+AC_CHECK_TYPES([__int128])
+
+AC_MSG_CHECKING([for __builtin_expect])
+AC_COMPILE_IFELSE(
+  [AC_LANG_SOURCE([[void myfunc() {__builtin_expect(0,0);}]])],
+  [
+    AC_MSG_RESULT([yes]);
+    AC_DEFINE(HAVE_BUILTIN_EXPECT, 1,
+      [Define this symbol if __builtin_expect is available])
+  ],
+  [ AC_MSG_RESULT([no]) ]
+)
+
+if test x"$req_asm" = x"auto"; then
+  SECP_64BIT_ASM_CHECK
+  if test x"$has_64bit_asm" = x"yes"; then
+    set_asm=x86_64
+  fi
+  if test x"$set_asm" = x; then
+    set_asm=no
+  fi
+else
+  set_asm=$req_asm
+  case $set_asm in
+    x86_64)
+      SECP_64BIT_ASM_CHECK
+      if test x"$has_64bit_asm" != x"yes"; then
+        AC_MSG_ERROR([x86_64 assembly optimization requested but not available])
+      fi
+    ;;
+    arm)
+    ;;
+    no)
+    ;;
+    *)
+      AC_MSG_ERROR([invalid assembly optimization selection])
+    ;;
+  esac
+fi
+
+if test x"$req_field" = x"auto"; then
+  if test x"set_asm" = x"x86_64"; then
+    set_field=64bit
+  fi
+  if test x"$set_field" = x; then
+    SECP_INT128_CHECK
+    if test x"$has_int128" = x"yes"; then
+      set_field=64bit
+    fi
+  fi
+  if test x"$set_field" = x; then
+    set_field=32bit
+  fi
+else
+  set_field=$req_field
+  case $set_field in
+    64bit)
+      if test x"$set_asm" != x"x86_64"; then
+        SECP_INT128_CHECK
+        if test x"$has_int128" != x"yes"; then
+          AC_MSG_ERROR([Neither __int128 support or x86_64 assembly available])
+        fi
+      fi
+    ;;
+    32bit)
+    ;;
+    *)
+      AC_MSG_ERROR([invalid field implementation selection])
+    ;;
+  esac
+fi
+
+if test x"$req_scalar" = x"auto"; then
+  SECP_INT128_CHECK
+  if test x"$has_int128" = x"yes"; then
+    set_scalar=64bit
+  fi
+  if test x"$set_scalar" = x; then
+    set_scalar=32bit
+  fi
+else
+  set_scalar=$req_scalar
+  case $set_scalar in
+  64bit)
+    SECP_INT128_CHECK
+    if test x"$has_int128" != x"yes"; then
+      AC_MSG_ERROR([__int128 support not available])
+    fi
+    ;;
+  32bit)
+    ;;
+  *)
+    AC_MSG_ERROR([invalid scalar implementation selected])
+    ;;
+  esac
+fi
+
+# select assembly optimization
+use_external_asm=no
+
+case $set_asm in
+  x86_64)
+    AC_DEFINE(USE_ASM_X86_64, 1,
+      [Define this symbol to enable x86_64 assembly optimizations])
+  ;;
+  arm)
+    use_external_asm=yes
+  ;;
+  no)
+  ;;
+  *)
+    AC_MSG_ERROR([invalid assembly optimizations])
+  ;;
+esac
+
+# select field implementation
+case $set_field in
+  64bit)
+    AC_DEFINE(USE_FIELD_5X52, 1,
+      [Define this symbol to use the FIELD_5X52 implementation])
+  ;;
+  32bit)
+    AC_DEFINE(USE_FIELD_10X26, 1,
+      [Define this symbol to use the FIELD_10X26 implementation])
+  ;;
+  *)
+    AC_MSG_ERROR([invalid field implementation])
+  ;;
+esac
+
+#select scalar implementation
+case $set_scalar in
+  64bit)
+    AC_DEFINE(USE_SCALAR_4X64, 1,
+      [Define this symbol to use the 4x64 scalar implementation])
+  ;;
+  32bit)
+    AC_DEFINE(USE_SCALAR_8X32, 1,
+      [Define this symbol to use the 8x32 scalar implementation])
+  ;;
+*)
+  AC_MSG_ERROR([invalid scalar implementation])
+  ;;
+esac
+
+if test x"$use_endomorphism" = x"yes"; then
+  AC_DEFINE(USE_ENDOMORPHISM, 1,
+    [Define this symbol to use endomorphism optimization])
+fi
+
+if test x"$use_precomp" = x"yes"; then
+  AC_DEFINE(USE_ECMULT_STATIC_PRECOMPUTATION, 1,
+    [Define this symbol to use a statically generated ecmult table])
+fi
+
+if test x"$use_external_asm" = x"yes"; then
+  AC_DEFINE(USE_EXTERNAL_ASM, 1,
+    [Define this symbol if an external assembly implementation is used])
+fi
+
+AC_MSG_NOTICE([Using endomorphism optimizations: $use_endomorphism])
+AC_MSG_NOTICE([Using static precomputation: $use_precomp])
+AC_MSG_NOTICE([Using assembly optimizations: $set_asm])
+AC_MSG_NOTICE([Using field implementation: $set_field])
+AC_MSG_NOTICE([Using scalar implementation: $set_scalar])
+
+AM_CONDITIONAL(
+  [USE_ECMULT_STATIC_PRECOMPUTATION],
+  [test x"$use_precomp" = x"yes"])
+
+AM_CONDITIONAL([USE_EXTERNAL_ASM], [test x"$use_external_asm" = x"yes"])
+AM_CONDITIONAL([USE_ASM_ARM], [test x"$set_asm" = x"arm"])
+
+dnl
+dnl /Secp256k1
+dnl
 
 AC_OUTPUT
