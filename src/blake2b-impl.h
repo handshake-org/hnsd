@@ -32,7 +32,7 @@
 
 static BLAKE2_INLINE uint32_t load32( const void *src )
 {
-#if defined(HSK_LITTLE_ENDIAN)
+#ifndef HSK_BIG_ENDIAN
   uint32_t w;
   memcpy(&w, src, sizeof w);
   return w;
@@ -47,7 +47,7 @@ static BLAKE2_INLINE uint32_t load32( const void *src )
 
 static BLAKE2_INLINE uint64_t load64( const void *src )
 {
-#if defined(HSK_LITTLE_ENDIAN)
+#ifndef HSK_BIG_ENDIAN
   uint64_t w;
   memcpy(&w, src, sizeof w);
   return w;
@@ -66,7 +66,7 @@ static BLAKE2_INLINE uint64_t load64( const void *src )
 
 static BLAKE2_INLINE uint16_t load16( const void *src )
 {
-#if defined(HSK_LITTLE_ENDIAN)
+#ifndef HSK_BIG_ENDIAN
   uint16_t w;
   memcpy(&w, src, sizeof w);
   return w;
@@ -79,7 +79,7 @@ static BLAKE2_INLINE uint16_t load16( const void *src )
 
 static BLAKE2_INLINE void store16( void *dst, uint16_t w )
 {
-#if defined(HSK_LITTLE_ENDIAN)
+#ifndef HSK_BIG_ENDIAN
   memcpy(dst, &w, sizeof w);
 #else
   uint8_t *p = ( uint8_t * )dst;
@@ -90,7 +90,7 @@ static BLAKE2_INLINE void store16( void *dst, uint16_t w )
 
 static BLAKE2_INLINE void store32( void *dst, uint32_t w )
 {
-#if defined(HSK_LITTLE_ENDIAN)
+#ifndef HSK_BIG_ENDIAN
   memcpy(dst, &w, sizeof w);
 #else
   uint8_t *p = ( uint8_t * )dst;
@@ -103,7 +103,7 @@ static BLAKE2_INLINE void store32( void *dst, uint32_t w )
 
 static BLAKE2_INLINE void store64( void *dst, uint64_t w )
 {
-#if defined(HSK_LITTLE_ENDIAN)
+#ifndef HSK_BIG_ENDIAN
   memcpy(dst, &w, sizeof w);
 #else
   uint8_t *p = ( uint8_t * )dst;

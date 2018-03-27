@@ -192,7 +192,7 @@ hsk_header_calc_work(hsk_header_t *hdr, hsk_header_t *prev) {
 
 static bool
 read_sol(uint8_t **data, size_t *data_len, uint32_t *sol, uint8_t sol_size) {
-#ifdef HSK_LITTLE_ENDIAN
+#ifndef HSK_BIG_ENDIAN
   int32_t size = (int32_t)sol_size << 2;
   if (!read_bytes(data, data_len, (uint8_t *)sol, size))
     return false;
@@ -208,7 +208,7 @@ read_sol(uint8_t **data, size_t *data_len, uint32_t *sol, uint8_t sol_size) {
 
 static size_t
 write_sol(uint8_t **data, uint32_t *sol, uint8_t sol_size) {
-#ifdef HSK_LITTLE_ENDIAN
+#ifndef HSK_BIG_ENDIAN
   int32_t size = (int32_t)sol_size << 2;
   return write_bytes(data, (uint8_t *)sol, size);
 #else

@@ -17,7 +17,7 @@
 
 static inline uint64_t
 read64(const void *src) {
-#ifdef HSK_LITTLE_ENDIAN
+#ifndef HSK_BIG_ENDIAN
   uint64_t w;
   memcpy(&w, src, sizeof w);
   return w;

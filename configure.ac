@@ -9,22 +9,27 @@ AC_ENABLE_STATIC
 AC_PROG_CXX
 AC_PROG_CC
 
-# AC_CONFIG_HEADERS([config.h])
-# AC_CONFIG_SRCDIR([src])
-# AC_CONFIG_HEADERS([include])
-
 m4_ifdef([AM_PROG_AR], [AM_PROG_AR])
 AC_PROG_LIBTOOL
 m4_ifdef([AM_SILENT_RULES], [AM_SILENT_RULES([yes])])
 LT_INIT
 
-AC_C_BIGENDIAN(
-  [AC_DEFINE(HSK_BIG_ENDIAN, 1,
-    [define this if built for a big endian system])],
-  ,
-  [AC_MSG_WARN([couldn't figure out endianess, assuming little endian!])]
-)
+AH_TOP([#ifndef _HSK_CONFIG_H])
+AH_TOP([#define _HSK_CONFIG_H])
+AH_BOTTOM([#endif /* _HSK_CONFIG_H */])
 
+AC_CONFIG_SRCDIR([src/bio.h])
+AC_CONFIG_HEADERS([src/config.h])
+AC_CONFIG_FILES([Makefile libhsk.pc])
+AC_CONFIG_SUBDIRS([uv secp256k1])
+
+dnl PKG_PROG_PKG_CONFIG
+
+AC_C_BIGENDIAN(
+  [AC_DEFINE(HSK_BIG_ENDIAN, 1, [define this if built for a big endian system])],
+  ,
+  [AC_MSG_WARN([falling back to little endian])]
+)
 
 AC_CHECK_HEADER_STDBOOL
 AC_C_INLINE
@@ -57,6 +62,4 @@ AC_CHECK_HEADERS([ \
   unistd.h \
 ])
 
-AC_CONFIG_FILES([Makefile libhsk.pc])
-AC_CONFIG_SUBDIRS([uv secp256k1])
 AC_OUTPUT
