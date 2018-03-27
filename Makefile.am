@@ -2,7 +2,7 @@
 # CFLAGS = -Wall -std=gnu11 -O2
 # LDFLAGS =
 
-SUBDIRS = uv secp256k1 unbound
+SUBDIRS = uv secp256k1
 
 ACLOCAL_AMFLAGS = -I m4
 
@@ -10,8 +10,7 @@ AM_CPPFLAGS = -I$(top_builddir)                  \
               -I$(top_srcdir)/include            \
               -I$(top_srcdir)/src                \
               -I$(top_srcdir)/uv/include         \
-              -I$(top_srcdir)/secp256k1/include  \
-              -I$(top_srcdir)/unbound/libunbound
+              -I$(top_srcdir)/secp256k1/include
 
 include_HEADERS = include/hsk.h           \
                   include/hsk-addr.h      \
@@ -38,8 +37,7 @@ CLEANFILES =
 
 lib_LTLIBRARIES = libhsk.la
 
-libhsk_la_LIBADD = -lssl                                           \
-                   -lcrypto                                        \
+libhsk_la_LIBADD = -lunbound                                       \
                    $(top_builddir)/uv/.libs/libuv.la               \
                    $(top_builddir)/secp256k1/.libs/libsecp256k1.la
 
@@ -88,8 +86,7 @@ hsk_SOURCES = src/daemon.c \
               src/ns.c     \
               src/rs.c
 
-hsk_LDADD = $(top_builddir)/libhsk.la                   \
-            $(top_builddir)/unbound/.libs/libunbound.la
+hsk_LDADD = $(top_builddir)/libhsk.la
 
 hsk_LDFLAGS = -static
 hsk_CFLAGS = $(AM_CFLAGS)

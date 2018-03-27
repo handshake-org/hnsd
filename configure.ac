@@ -18,6 +18,14 @@ AC_PROG_LIBTOOL
 m4_ifdef([AM_SILENT_RULES], [AM_SILENT_RULES([yes])])
 LT_INIT
 
+AC_C_BIGENDIAN(
+  [AC_DEFINE(HSK_BIG_ENDIAN, 1,
+    [define this if built for a big endian system])],
+  ,
+  [AC_MSG_WARN([couldn't figure out endianess, assuming little endian!])]
+)
+
+
 AC_CHECK_HEADER_STDBOOL
 AC_C_INLINE
 AC_TYPE_SIZE_T
@@ -50,5 +58,5 @@ AC_CHECK_HEADERS([ \
 ])
 
 AC_CONFIG_FILES([Makefile libhsk.pc])
-AC_CONFIG_SUBDIRS([uv secp256k1 unbound])
+AC_CONFIG_SUBDIRS([uv secp256k1])
 AC_OUTPUT

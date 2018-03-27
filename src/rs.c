@@ -10,7 +10,7 @@
 #include <netinet/in.h>
 
 #include "uv.h"
-#include "unbound.h"
+#include <unbound.h>
 
 #include "hsk-addr.h"
 #include "hsk-constants.h"
