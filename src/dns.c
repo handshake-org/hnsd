@@ -2903,11 +2903,11 @@ hsk_dns_ds_create(hsk_dns_rr_t *key) {
   uint8_t owner[HSK_DNS_MAX_NAME + 1];
   size_t owner_len = hsk_dns_name_pack(ds->name, owner);
 
-  sha256_ctx ctx;
-  sha256_init(&ctx);
-  sha256_update(&ctx, owner, owner_len);
-  sha256_update(&ctx, data, size);
-  sha256_final(&ctx, digest);
+  hsk_sha256_ctx ctx;
+  hsk_sha256_init(&ctx);
+  hsk_sha256_update(&ctx, owner, owner_len);
+  hsk_sha256_update(&ctx, data, size);
+  hsk_sha256_final(&ctx, digest);
 
   free(data);
 
@@ -3131,9 +3131,9 @@ hsk_dns_sighash(hsk_dns_rrs_t *rrset, hsk_dns_rr_t *sig, uint8_t *hash) {
   if (!hsk_dns_rrsig_tbs(rrsig, &data, &size))
     goto fail;
 
-  sha256_ctx ctx;
-  sha256_init(&ctx);
-  sha256_update(&ctx, data, size);
+  hsk_sha256_ctx ctx;
+  hsk_sha256_init(&ctx);
+  hsk_sha256_update(&ctx, data, size);
 
   free(data);
 
@@ -3145,12 +3145,12 @@ hsk_dns_sighash(hsk_dns_rrs_t *rrset, hsk_dns_rr_t *sig, uint8_t *hash) {
     if (last && raw_rr_equal(raw, last))
       continue;
 
-    sha256_update(&ctx, raw->data, raw->size);
+    hsk_sha256_update(&ctx, raw->data, raw->size);
 
     last = raw;
   }
 
-  sha256_final(&ctx, hash);
+  hsk_sha256_final(&ctx, hash);
 
   goto done;
 

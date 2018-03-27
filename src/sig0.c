@@ -123,20 +123,20 @@ hsk_sig0_sighash(uint8_t *wire, size_t wire_len, uint8_t *hash) {
   uint8_t count[2];
   set_u16be(&count[0], arcount - 1);
 
-  blake2b_ctx ctx;
-  assert(blake2b_init(&ctx, 32) == 0);
+  hsk_blake2b_ctx ctx;
+  assert(hsk_blake2b_init(&ctx, 32) == 0);
 
   // SIG rdata (without signature bytes).
-  blake2b_update(&ctx, &rd[0], 19);
+  hsk_blake2b_update(&ctx, &rd[0], 19);
 
   // Message header with decremented arcount.
-  blake2b_update(&ctx, &wire[0], 10);
-  blake2b_update(&ctx, &count[0], 2);
+  hsk_blake2b_update(&ctx, &wire[0], 10);
+  hsk_blake2b_update(&ctx, &count[0], 2);
 
   // Message body, stopping just before SIG record.
-  blake2b_update(&ctx, &wire[12], wire_len - 12 - HSK_SIG0_RR_SIZE);
+  hsk_blake2b_update(&ctx, &wire[12], wire_len - 12 - HSK_SIG0_RR_SIZE);
 
-  assert(blake2b_final(&ctx, hash, 32) == 0);
+  assert(hsk_blake2b_final(&ctx, hash, 32) == 0);
 
   return true;
 }

@@ -14,31 +14,31 @@
 void
 hsk_hash_blake2b(uint8_t *data, size_t data_len, uint8_t *hash) {
   assert(hash != NULL);
-  blake2b_ctx ctx;
-  assert(blake2b_init(&ctx, 32) == 0);
-  blake2b_update(&ctx, data, data_len);
-  assert(blake2b_final(&ctx, hash, 32) == 0);
+  hsk_blake2b_ctx ctx;
+  assert(hsk_blake2b_init(&ctx, 32) == 0);
+  hsk_blake2b_update(&ctx, data, data_len);
+  assert(hsk_blake2b_final(&ctx, hash, 32) == 0);
 }
 
 void
 hsk_hash_sha256(uint8_t *data, size_t data_len, uint8_t *hash) {
   assert(hash != NULL);
-  sha256_ctx ctx;
-  sha256_init(&ctx);
-  sha256_update(&ctx, data, data_len);
-  sha256_final(&ctx, hash);
+  hsk_sha256_ctx ctx;
+  hsk_sha256_init(&ctx);
+  hsk_sha256_update(&ctx, data, data_len);
+  hsk_sha256_final(&ctx, hash);
 }
 
 void
 hsk_hash_hash256(uint8_t *data, size_t data_len, uint8_t *hash) {
   assert(hash != NULL);
-  sha256_ctx ctx;
-  sha256_init(&ctx);
-  sha256_update(&ctx, data, data_len);
-  sha256_final(&ctx, hash);
-  sha256_init(&ctx);
-  sha256_update(&ctx, hash, 32);
-  sha256_final(&ctx, hash);
+  hsk_sha256_ctx ctx;
+  hsk_sha256_init(&ctx);
+  hsk_sha256_update(&ctx, data, data_len);
+  hsk_sha256_final(&ctx, hash);
+  hsk_sha256_init(&ctx);
+  hsk_sha256_update(&ctx, hash, 32);
+  hsk_sha256_final(&ctx, hash);
 }
 
 void
@@ -50,8 +50,8 @@ hsk_hash_sha256_hmac(
   uint8_t *mac
 ) {
   // Initializing.
-  sha256_ctx inner;
-  sha256_ctx outer;
+  hsk_sha256_ctx inner;
+  hsk_sha256_ctx outer;
 
   uint8_t k[32];
   uint8_t pad[64];
@@ -70,8 +70,8 @@ hsk_hash_sha256_hmac(
   for (i = key_len; i < 64; i++)
     pad[i] = 0x36;
 
-  sha256_init(&inner);
-  sha256_update(&inner, pad, 64);
+  hsk_sha256_init(&inner);
+  hsk_sha256_update(&inner, pad, 64);
 
   for (i = 0; i < key_len; i++)
     pad[i] = key[i] ^ 0x5c;
@@ -79,16 +79,16 @@ hsk_hash_sha256_hmac(
   for (i = key_len; i < 64; i++)
     pad[i] = 0x5c;
 
-  sha256_init(&outer);
-  sha256_update(&outer, pad, 64);
+  hsk_sha256_init(&outer);
+  hsk_sha256_update(&outer, pad, 64);
 
   // Updating
-  sha256_update(&inner, data, data_len);
+  hsk_sha256_update(&inner, data, data_len);
 
   // Finalizing
-  sha256_final(&inner, mac);
-  sha256_update(&outer, mac, 32);
-  sha256_final(&outer, mac);
+  hsk_sha256_final(&inner, mac);
+  hsk_sha256_update(&outer, mac, 32);
+  hsk_sha256_final(&outer, mac);
 }
 
 void

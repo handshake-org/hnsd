@@ -100,21 +100,21 @@ static const unsigned k256[64] = {
  *
  * @param ctx context to initialize
  */
-void sha256_init(sha256_ctx *ctx)
+void hsk_sha256_init(hsk_sha256_ctx *ctx)
 {
 	/* Initial values. These words were obtained by taking the first 32
 	 * bits of the fractional parts of the square roots of the first
 	 * eight prime numbers. */
-	static const unsigned SHA256_H0[8] = {
+	static const unsigned HSK_SHA_256_H0[8] = {
 		0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a,
 		0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19
 	};
 
 	ctx->length = 0;
-	ctx->digest_length = sha256_hash_size;
+	ctx->digest_length = hsk_sha256_hash_size;
 
 	/* initialize algorithm state */
-	memcpy(ctx->hash, SHA256_H0, sizeof(ctx->hash));
+	memcpy(ctx->hash, HSK_SHA_256_H0, sizeof(ctx->hash));
 }
 
 /**
@@ -123,7 +123,7 @@ void sha256_init(sha256_ctx *ctx)
  * @param hash algorithm state
  * @param block the message block to process
  */
-static void sha256_process_block(unsigned hash[8], unsigned block[16])
+static void hsk_sha256_process_block(unsigned hash[8], unsigned block[16])
 {
 	unsigned A, B, C, D, E, F, G, H;
 	unsigned W[16];
@@ -182,36 +182,36 @@ static void sha256_process_block(unsigned hash[8], unsigned block[16])
  * @param msg message chunk
  * @param size length of the message chunk
  */
-void sha256_update(sha256_ctx *ctx, const unsigned char *msg, size_t size)
+void hsk_sha256_update(hsk_sha256_ctx *ctx, const unsigned char *msg, size_t size)
 {
 	size_t index = (size_t)ctx->length & 63;
 	ctx->length += size;
 
 	/* fill partial block */
 	if (index) {
-		size_t left = sha256_block_size - index;
+		size_t left = hsk_sha256_block_size - index;
 		memcpy((char*)ctx->message + index, msg, (size < left ? size : left));
 		if (size < left) return;
 
 		/* process partial block */
-		sha256_process_block(ctx->hash, (unsigned*)ctx->message);
+		hsk_sha256_process_block(ctx->hash, (unsigned*)ctx->message);
 		msg  += left;
 		size -= left;
 	}
-	while (size >= sha256_block_size) {
+	while (size >= hsk_sha256_block_size) {
 		unsigned* aligned_message_block;
 		if (IS_ALIGNED_32(msg)) {
 			/* the most common case is processing of an already aligned message
 			without copying it */
 			aligned_message_block = (unsigned*)msg;
 		} else {
-			memcpy(ctx->message, msg, sha256_block_size);
+			memcpy(ctx->message, msg, hsk_sha256_block_size);
 			aligned_message_block = (unsigned*)ctx->message;
 		}
 
-		sha256_process_block(ctx->hash, aligned_message_block);
-		msg  += sha256_block_size;
-		size -= sha256_block_size;
+		hsk_sha256_process_block(ctx->hash, aligned_message_block);
+		msg  += hsk_sha256_block_size;
+		size -= hsk_sha256_block_size;
 	}
 	if (size) {
 		memcpy(ctx->message, msg, size); /* save leftovers */
@@ -224,7 +224,7 @@ void sha256_update(sha256_ctx *ctx, const unsigned char *msg, size_t size)
  * @param ctx the algorithm context containing current hashing state
  * @param result calculated hash in binary form
  */
-void sha256_final(sha256_ctx *ctx, unsigned char* result)
+void hsk_sha256_final(hsk_sha256_ctx *ctx, unsigned char* result)
 {
 	size_t index = ((unsigned)ctx->length & 63) >> 2;
 	unsigned shift = ((unsigned)ctx->length & 3) * 8;
@@ -241,7 +241,7 @@ void sha256_final(sha256_ctx *ctx, unsigned char* result)
 		while (index < 16) {
 			ctx->message[index++] = 0;
 		}
-		sha256_process_block(ctx->hash, ctx->message);
+		hsk_sha256_process_block(ctx->hash, ctx->message);
 		index = 0;
 	}
 	while (index < 14) {
@@ -249,7 +249,7 @@ void sha256_final(sha256_ctx *ctx, unsigned char* result)
 	}
 	ctx->message[14] = be2me_32( (unsigned)(ctx->length >> 29) );
 	ctx->message[15] = be2me_32( (unsigned)(ctx->length << 3) );
-	sha256_process_block(ctx->hash, ctx->message);
+	hsk_sha256_process_block(ctx->hash, ctx->message);
 
 	if (result) be32_copy(result, 0, ctx->hash, ctx->digest_length);
 }

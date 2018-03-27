@@ -12,42 +12,42 @@
    More information about the BLAKE2 hash function can be found at
    https://blake2.net.
 */
-#ifndef BLAKE2_H
-#define BLAKE2_H
+#ifndef HSK_BLAKE2_H
+#define HSK_BLAKE2_H
 
 #include <stddef.h>
 #include <stdint.h>
 
 #if defined(_MSC_VER)
-#define BLAKE2_PACKED(x) __pragma(pack(push, 1)) x __pragma(pack(pop))
+#define HSK_BLAKE2_PACKED(x) __pragma(pack(push, 1)) x __pragma(pack(pop))
 #else
-#define BLAKE2_PACKED(x) x __attribute__((packed))
+#define HSK_BLAKE2_PACKED(x) x __attribute__((packed))
 #endif
 
 #if defined(__cplusplus)
 extern "C" {
 #endif
-  enum blake2b_constant
+  enum hsk_blake2b_constant
   {
-    BLAKE2B_BLOCKBYTES = 128,
-    BLAKE2B_OUTBYTES   = 64,
-    BLAKE2B_KEYBYTES   = 64,
-    BLAKE2B_SALTBYTES  = 16,
-    BLAKE2B_PERSONALBYTES = 16
+    HSK_BLAKE2B_BLOCKBYTES = 128,
+    HSK_BLAKE2B_OUTBYTES   = 64,
+    HSK_BLAKE2B_KEYBYTES   = 64,
+    HSK_BLAKE2B_SALTBYTES  = 16,
+    HSK_BLAKE2B_PERSONALBYTES = 16
   };
 
-  typedef struct blake2b_ctx__
+  typedef struct hsk_blake2b_ctx__
   {
     uint64_t h[8];
     uint64_t t[2];
     uint64_t f[2];
-    uint8_t  buf[BLAKE2B_BLOCKBYTES];
+    uint8_t  buf[HSK_BLAKE2B_BLOCKBYTES];
     size_t   buflen;
     size_t   outlen;
     uint8_t  last_node;
-  } blake2b_ctx;
+  } hsk_blake2b_ctx;
 
-  BLAKE2_PACKED(struct blake2b_param__
+  HSK_BLAKE2_PACKED(struct hsk_blake2b_param__
   {
     uint8_t  digest_length; /* 1 */
     uint8_t  key_length;    /* 2 */
@@ -59,23 +59,23 @@ extern "C" {
     uint8_t  node_depth;    /* 17 */
     uint8_t  inner_length;  /* 18 */
     uint8_t  reserved[14];  /* 32 */
-    uint8_t  salt[BLAKE2B_SALTBYTES]; /* 48 */
-    uint8_t  personal[BLAKE2B_PERSONALBYTES];  /* 64 */
+    uint8_t  salt[HSK_BLAKE2B_SALTBYTES]; /* 48 */
+    uint8_t  personal[HSK_BLAKE2B_PERSONALBYTES];  /* 64 */
   });
 
-  typedef struct blake2b_param__ blake2b_param;
+  typedef struct hsk_blake2b_param__ hsk_blake2b_param;
 
   /* Padded structs result in a compile-time error */
   enum {
-    BLAKE2_DUMMY_1 = 1/(sizeof(blake2b_param) == BLAKE2B_OUTBYTES)
+    HSK_BLAKE2_DUMMY_1 = 1/(sizeof(hsk_blake2b_param) == HSK_BLAKE2B_OUTBYTES)
   };
 
   /* Streaming API */
-  int blake2b_init( blake2b_ctx *S, size_t outlen );
-  int blake2b_init_key( blake2b_ctx *S, size_t outlen, const void *key, size_t keylen );
-  int blake2b_init_param( blake2b_ctx *S, const blake2b_param *P );
-  int blake2b_update( blake2b_ctx *S, const void *in, size_t inlen );
-  int blake2b_final( blake2b_ctx *S, void *out, size_t outlen );
+  int hsk_blake2b_init( hsk_blake2b_ctx *S, size_t outlen );
+  int hsk_blake2b_init_key( hsk_blake2b_ctx *S, size_t outlen, const void *key, size_t keylen );
+  int hsk_blake2b_init_param( hsk_blake2b_ctx *S, const hsk_blake2b_param *P );
+  int hsk_blake2b_update( hsk_blake2b_ctx *S, const void *in, size_t inlen );
+  int hsk_blake2b_final( hsk_blake2b_ctx *S, void *out, size_t outlen );
 
   /* Simple API */
   int blake2b( void *out, size_t outlen, const void *in, size_t inlen, const void *key, size_t keylen );

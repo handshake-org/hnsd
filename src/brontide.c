@@ -233,15 +233,15 @@ hsk_brontide__mix_hash(
   uint8_t *tag,
   uint8_t *hash
 ) {
-  sha256_ctx ctx;
-  sha256_init(&ctx);
-  sha256_update(&ctx, b->handshake_digest, 32);
-  sha256_update(&ctx, data, data_len);
+  hsk_sha256_ctx ctx;
+  hsk_sha256_init(&ctx);
+  hsk_sha256_update(&ctx, b->handshake_digest, 32);
+  hsk_sha256_update(&ctx, data, data_len);
 
   if (tag)
-    sha256_update(&ctx, tag, 16);
+    hsk_sha256_update(&ctx, tag, 16);
 
-  sha256_final(&ctx, hash);
+  hsk_sha256_final(&ctx, hash);
 }
 
 void

@@ -64,11 +64,11 @@ hsk_cuckoo_sipkey(
   if (ctx == NULL || hdr == NULL)
     return HSK_EBADARGS;
 
-  blake2b_ctx blake;
+  hsk_blake2b_ctx blake;
 
-  assert(blake2b_init(&blake, 32) == 0);
-  blake2b_update(&blake, hdr, hdr_len);
-  blake2b_final(&blake, key, 32);
+  assert(hsk_blake2b_init(&blake, 32) == 0);
+  hsk_blake2b_update(&blake, hdr, hdr_len);
+  hsk_blake2b_final(&blake, key, 32);
 
   return HSK_SUCCESS;
 }
