@@ -270,7 +270,7 @@ int hsk_blake2b_final( hsk_blake2b_ctx *S, void *out, size_t outlen )
 }
 
 /* inlen, at least, should be uint64_t. Others can be size_t. */
-int blake2b( void *out, size_t outlen, const void *in, size_t inlen, const void *key, size_t keylen )
+int hsk_blake2b( void *out, size_t outlen, const void *in, size_t inlen, const void *key, size_t keylen )
 {
   hsk_blake2b_ctx S[1];
 

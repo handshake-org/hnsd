@@ -78,7 +78,7 @@ extern "C" {
   int hsk_blake2b_final( hsk_blake2b_ctx *S, void *out, size_t outlen );
 
   /* Simple API */
-  int blake2b( void *out, size_t outlen, const void *in, size_t inlen, const void *key, size_t keylen );
+  int hsk_blake2b( void *out, size_t outlen, const void *in, size_t inlen, const void *key, size_t keylen );
 
 #if defined(__cplusplus)
 }
