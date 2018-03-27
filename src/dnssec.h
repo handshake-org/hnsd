@@ -1,31 +1,17 @@
 #ifndef _HSK_DNSSEC_H
 #define _HSK_DNSSEC_H
 
-#include "ldns/ldns.h"
+#include <stdint.h>
+#include "dns.h"
 
-ldns_key *
-hsk_dnssec_get_key(void);
-
-ldns_key_list *
-hsk_dnssec_get_list(void);
-
-ldns_rr *
+hsk_dns_rr_t *
 hsk_dnssec_get_dnskey(void);
 
-ldns_rr *
+hsk_dns_rr_t *
 hsk_dnssec_get_ds(void);
 
 bool
-hsk_dnssec_sign_rr_list(ldns_rr_list *an);
-
-bool
-hsk_dnssec_sign(ldns_rr_list *an, ldns_rr_type type);
-
-ldns_rr_list *
-hsk_dnssec_filter(ldns_rr_list *list, ldns_rr_type type);
-
-bool
-hsk_dnssec_clean(ldns_pkt *pkt, ldns_rr_type type);
+hsk_dnssec_sign(hsk_dns_rrs_t *rrs, uint16_t type);
 
 // priv: 1c74c825c5b0f08cf6be846bfc93c423f03e3e1f6202fb2d96474b1520bbafad
 // cpub: 034fd714449d8cfcccfdaba52c64d63e3aca72be3f94bfeb60aeb5a42ed3d0c205

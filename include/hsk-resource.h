@@ -126,7 +126,7 @@ typedef struct hsk_smime_record_s {
 typedef struct hsk_ssh_record_s {
   uint8_t type;
   uint8_t algorithm;
-  uint8_t key_type;
+  uint8_t digest_type;
   size_t fingerprint_len;
   uint8_t fingerprint[64];
 } hsk_ssh_record_t;

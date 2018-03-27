@@ -64,6 +64,11 @@ int ecc_make_pubkey(
   uint8_t p_publicKey[ECC_BYTES * 2]
 );
 
+int ecc_make_pubkey_compressed(
+  uint8_t p_privateKey[ECC_BYTES],
+  uint8_t p_publicKey[ECC_BYTES + 1]
+);
+
 /* ecdh_shared_secret() function.
 Compute a shared secret given your secret key and someone else's public key.
 Note: It is recommended that you hash the result of ecdh_shared_secret before using it for symmetric encryption or HMAC.

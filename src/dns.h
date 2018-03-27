@@ -74,6 +74,16 @@ typedef struct {
 } hsk_dns_aaaa_rd_t;
 
 typedef struct {
+  uint8_t version;
+  uint8_t size;
+  uint8_t horiz_pre;
+  uint8_t vert_pre;
+  uint32_t latitude;
+  uint32_t longitude;
+  uint32_t altitude;
+} hsk_dns_loc_rd_t;
+
+typedef struct {
   char target[256];
 } hsk_dns_cname_rd_t;
 
@@ -120,6 +130,8 @@ typedef struct {
   size_t certificate_len;
   uint8_t *certificate;
 } hsk_dns_tlsa_rd_t;
+
+#define hsk_dns_smimea_rd_t hsk_dns_tlsa_rd_t
 
 typedef struct {
   uint8_t algorithm;

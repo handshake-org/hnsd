@@ -34,8 +34,8 @@ void
 hsk_dns_msg_init(hsk_dns_msg_t *msg) {
   assert(msg);
   msg->id = 0;
-  msg->opcode = 0;
-  msg->code = 0;
+  msg->opcode = HSK_DNS_QUERY;
+  msg->code = HSK_DNS_NOERROR;
   msg->flags = 0;
   hsk_dns_rrs_init(&msg->qd);
   hsk_dns_rrs_init(&msg->an);
@@ -452,8 +452,9 @@ hsk_dns_qs_init(hsk_dns_qs_t *qs) {
   assert(qs);
 
   memset(qs->name, 0, sizeof(qs->name));
-  qs->type = 0;
-  qs->class = 0;
+  strcpy(qs->name, ".");
+  qs->type = HSK_DNS_UNKNOWN;
+  qs->class = HSK_DNS_IN;
   qs->ttl = 0;
   qs->rd = NULL;
 }
@@ -523,8 +524,9 @@ hsk_dns_rr_init(hsk_dns_rr_t *rr) {
   assert(rr);
 
   memset(rr->name, 0, sizeof(rr->name));
-  rr->type = 0;
-  rr->class = 0;
+  strcpy(rr->name, ".");
+  rr->type = HSK_DNS_UNKNOWN;
+  rr->class = HSK_DNS_IN;
   rr->ttl = 0;
   rr->rd = NULL;
 }
@@ -743,6 +745,8 @@ hsk_dns_rd_init(void *rd, uint16_t type) {
       hsk_dns_soa_rd_t *r = (hsk_dns_soa_rd_t *)rd;
       memset(r->ns, 0, sizeof(r->ns));
       memset(r->mbox, 0, sizeof(r->mbox));
+      strcpy(r->ns, ".");
+      strcpy(r->mbox, ".");
       r->serial = 0;
       r->refresh = 0;
       r->retry = 0;
@@ -760,30 +764,46 @@ hsk_dns_rd_init(void *rd, uint16_t type) {
       memset(r->addr, 0, 16);
       break;
     }
+    case HSK_DNS_LOC: {
+      hsk_dns_loc_rd_t *r = (hsk_dns_loc_rd_t *)rd;
+      r->version = 0;
+      r->size = 0;
+      r->horiz_pre = 0;
+      r->vert_pre = 0;
+      r->latitude = 0;
+      r->longitude = 0;
+      r->altitude = 0;
+      break;
+    }
     case HSK_DNS_CNAME: {
       hsk_dns_cname_rd_t *r = (hsk_dns_cname_rd_t *)rd;
       memset(r->target, 0, sizeof(r->target));
+      strcpy(r->target, ".");
       break;
     }
     case HSK_DNS_DNAME: {
       hsk_dns_dname_rd_t *r = (hsk_dns_dname_rd_t *)rd;
       memset(r->target, 0, sizeof(r->target));
+      strcpy(r->target, ".");
       break;
     }
     case HSK_DNS_NS: {
       hsk_dns_ns_rd_t *r = (hsk_dns_ns_rd_t *)rd;
       memset(r->ns, 0, sizeof(r->ns));
+      strcpy(r->ns, ".");
       break;
     }
     case HSK_DNS_MX: {
       hsk_dns_mx_rd_t *r = (hsk_dns_mx_rd_t *)rd;
       r->preference = 0;
       memset(r->mx, 0, sizeof(r->mx));
+      strcpy(r->mx, ".");
       break;
     }
     case HSK_DNS_PTR: {
       hsk_dns_ptr_rd_t *r = (hsk_dns_ptr_rd_t *)rd;
       memset(r->ptr, 0, sizeof(r->ptr));
+      strcpy(r->ptr, ".");
       break;
     }
     case HSK_DNS_SRV: {
@@ -792,6 +812,7 @@ hsk_dns_rd_init(void *rd, uint16_t type) {
       r->weight = 0;
       r->port = 0;
       memset(r->target, 0, sizeof(r->target));
+      strcpy(r->target, ".");
       break;
     }
     case HSK_DNS_TXT: {
@@ -808,6 +829,7 @@ hsk_dns_rd_init(void *rd, uint16_t type) {
       r->digest = NULL;
       break;
     }
+    case HSK_DNS_SMIMEA:
     case HSK_DNS_TLSA: {
       hsk_dns_tlsa_rd_t *r = (hsk_dns_tlsa_rd_t *)rd;
       r->usage = 0;
@@ -872,11 +894,14 @@ hsk_dns_rd_init(void *rd, uint16_t type) {
       hsk_dns_rp_rd_t *r = (hsk_dns_rp_rd_t *)rd;
       memset(r->mbox, 0, sizeof(r->mbox));
       memset(r->txt, 0, sizeof(r->txt));
+      strcpy(r->mbox, ".");
+      strcpy(r->txt, ".");
       break;
     }
     case HSK_DNS_NSEC: {
       hsk_dns_nsec_rd_t *r = (hsk_dns_nsec_rd_t *)rd;
       memset(r->next_domain, 0, sizeof(r->next_domain));
+      strcpy(r->next_domain, ".");
       r->type_map_len = 0;
       r->type_map = NULL;
       break;
@@ -905,6 +930,10 @@ hsk_dns_rd_uninit(void *rd, uint16_t type) {
     }
     case HSK_DNS_AAAA: {
       hsk_dns_aaaa_rd_t *r = (hsk_dns_aaaa_rd_t *)rd;
+      break;
+    }
+    case HSK_DNS_LOC: {
+      hsk_dns_loc_rd_t *r = (hsk_dns_loc_rd_t *)rd;
       break;
     }
     case HSK_DNS_CNAME: {
@@ -944,6 +973,7 @@ hsk_dns_rd_uninit(void *rd, uint16_t type) {
       }
       break;
     }
+    case HSK_DNS_SMIMEA:
     case HSK_DNS_TLSA: {
       hsk_dns_tlsa_rd_t *r = (hsk_dns_tlsa_rd_t *)rd;
       if (r->certificate) {
@@ -1034,6 +1064,10 @@ hsk_dns_rd_alloc(uint16_t type) {
       rd = malloc(sizeof(hsk_dns_aaaa_rd_t));
       break;
     }
+    case HSK_DNS_LOC: {
+      rd = malloc(sizeof(hsk_dns_loc_rd_t));
+      break;
+    }
     case HSK_DNS_CNAME: {
       rd = malloc(sizeof(hsk_dns_cname_rd_t));
       break;
@@ -1066,6 +1100,7 @@ hsk_dns_rd_alloc(uint16_t type) {
       rd = malloc(sizeof(hsk_dns_ds_rd_t));
       break;
     }
+    case HSK_DNS_SMIMEA:
     case HSK_DNS_TLSA: {
       rd = malloc(sizeof(hsk_dns_tlsa_rd_t));
       break;
@@ -1153,6 +1188,19 @@ hsk_dns_rd_write(void *rd, uint16_t type, uint8_t **data) {
 
       break;
     }
+    case HSK_DNS_LOC: {
+      hsk_dns_loc_rd_t *r = (hsk_dns_loc_rd_t *)rd;
+
+      size += write_u8(data, r->version);
+      size += write_u8(data, r->size);
+      size += write_u8(data, r->horiz_pre);
+      size += write_u8(data, r->vert_pre);
+      size += write_u32be(data, r->latitude);
+      size += write_u32be(data, r->longitude);
+      size += write_u32be(data, r->altitude);
+
+      break;
+    }
     case HSK_DNS_CNAME: {
       hsk_dns_cname_rd_t *r = (hsk_dns_cname_rd_t *)rd;
 
@@ -1222,6 +1270,7 @@ hsk_dns_rd_write(void *rd, uint16_t type, uint8_t **data) {
 
       break;
     }
+    case HSK_DNS_SMIMEA:
     case HSK_DNS_TLSA: {
       hsk_dns_tlsa_rd_t *r = (hsk_dns_tlsa_rd_t *)rd;
 
@@ -1261,7 +1310,6 @@ hsk_dns_rd_write(void *rd, uint16_t type, uint8_t **data) {
       size += write_u16be(data, r->flags);
       size += write_u8(data, r->protocol);
       size += write_u8(data, r->algorithm);
-      size += write_u8(data, r->pubkey_len);
       size += write_bytes(data, r->pubkey, r->pubkey_len);
 
       break;
@@ -1376,6 +1424,32 @@ hsk_dns_rd_read(
 
       break;
     }
+    case HSK_DNS_LOC: {
+      hsk_dns_loc_rd_t *r = (hsk_dns_loc_rd_t *)rd;
+
+      if (!read_u8(data, data_len, &r->version))
+        return false;
+
+      if (!read_u8(data, data_len, &r->size))
+        return false;
+
+      if (!read_u8(data, data_len, &r->horiz_pre))
+        return false;
+
+      if (!read_u8(data, data_len, &r->vert_pre))
+        return false;
+
+      if (!read_u32be(data, data_len, &r->latitude))
+        return false;
+
+      if (!read_u32be(data, data_len, &r->longitude))
+        return false;
+
+      if (!read_u32be(data, data_len, &r->altitude))
+        return false;
+
+      break;
+    }
     case HSK_DNS_CNAME: {
       hsk_dns_cname_rd_t *r = (hsk_dns_cname_rd_t *)rd;
 
@@ -1479,6 +1553,7 @@ fail_txt:
 
       break;
     }
+    case HSK_DNS_SMIMEA:
     case HSK_DNS_TLSA: {
       hsk_dns_tlsa_rd_t *r = (hsk_dns_tlsa_rd_t *)rd;
 
@@ -2704,7 +2779,7 @@ hsk_dns_dnskey_keytag(hsk_dns_dnskey_rd_t *rd) {
   size_t i;
 
   for (i = 0; i < size; i++) {
-    uint8_t ch = data[i];
+    uint32_t ch = (uint32_t)data[i];
 
     if (i & 1)
       tag += ch;
@@ -2900,7 +2975,7 @@ hsk_dns_sign_rrset(hsk_dns_rrs_t *rrset, hsk_dns_rr_t *key, uint8_t *priv) {
     return NULL;
   }
 
-  strcpy(sig->name, key->name);
+  strcpy(sig->name, rrset->items[0]->name);
   to_lower(sig->name);
   sig->type = HSK_DNS_RRSIG;
   sig->class = key->class;
@@ -2956,6 +3031,10 @@ hsk_dns_sign_rrsig(hsk_dns_rrs_t *rrset, hsk_dns_rr_t *sig, uint8_t *priv) {
     free(sigbuf);
     return false;
   }
+
+  uint8_t pubkey[33];
+  assert(ecc_make_pubkey_compressed(priv, pubkey));
+  assert(ecdsa_verify(pubkey, hash, sigbuf));
 
   rrsig->signature_len = 64;
   rrsig->signature = sigbuf;
@@ -3041,10 +3120,10 @@ hsk_dns_sighash(hsk_dns_rrs_t *rrset, hsk_dns_rr_t *sig, uint8_t *hash) {
 
     hsk_dns_rr_free(rr);
 
-    hsk_dns_raw_rr_t *rec = &records[i];
+    hsk_dns_raw_rr_t *raw = &records[i];
 
-    rec->size = size;
-    rec->data = data;
+    raw->size = size;
+    raw->data = data;
   }
 
   qsort((void *)records, rrset->size, sizeof(hsk_dns_raw_rr_t), raw_rr_cmp);
@@ -3060,15 +3139,15 @@ hsk_dns_sighash(hsk_dns_rrs_t *rrset, hsk_dns_rr_t *sig, uint8_t *hash) {
 
   hsk_dns_raw_rr_t *last = NULL;
 
-  for (j = 0; i < rrset->size; j++) {
-    hsk_dns_raw_rr_t *item = &records[j];
+  for (j = 0; j < rrset->size; j++) {
+    hsk_dns_raw_rr_t *raw = &records[j];
 
-    if (last && raw_rr_equal(item, last))
+    if (last && raw_rr_equal(raw, last))
       continue;
 
-    sha256_update(&ctx, item->data, item->size);
+    sha256_update(&ctx, raw->data, raw->size);
 
-    last = item;
+    last = raw;
   }
 
   sha256_final(&ctx, hash);
@@ -3080,10 +3159,10 @@ fail:
 
 done:
   for (j = 0; j < i; j++) {
-    hsk_dns_raw_rr_t *item = &records[i];
+    hsk_dns_raw_rr_t *raw = &records[i];
 
-    if (item->data)
-      free(item->data);
+    if (raw->data)
+      free(raw->data);
   }
 
   free(records);

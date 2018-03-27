@@ -1145,6 +1145,32 @@ int ecc_make_pubkey(
   return 1;
 }
 
+int ecc_make_pubkey_compressed(
+  uint8_t p_privateKey[ECC_BYTES],
+  uint8_t p_publicKey[ECC_BYTES + 1]
+) {
+  uint64_t l_private[NUM_ECC_DIGITS];
+  EccPoint l_public;
+
+  ecc_bytes2native(l_private, p_privateKey);
+
+  if (vli_isZero(l_private))
+    return 0;
+
+  if (vli_cmp(curve_n, l_private) != 1)
+    vli_sub(l_private, l_private, curve_n);
+
+  EccPoint_mult(&l_public, &curve_G, l_private, NULL);
+
+  if (EccPoint_isZero(&l_public))
+    return 0;
+
+  ecc_native2bytes(p_publicKey + 1, l_public.x);
+  p_publicKey[0] = 2 + (l_public.y[0] & 0x01);
+
+  return 1;
+}
+
 int ecdh_shared_secret(const uint8_t p_publicKey[ECC_BYTES+1], const uint8_t p_privateKey[ECC_BYTES], uint8_t p_secret[ECC_BYTES])
 {
     EccPoint l_public;
