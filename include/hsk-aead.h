@@ -11,8 +11,8 @@
 #include "poly1305/poly1305-donna.h"
 
 typedef struct hsk_aead_s {
-  chacha20_ctx chacha;
-  poly1305_context poly;
+  hsk_chacha20_ctx chacha;
+  hsk_poly1305_ctx poly;
   size_t aad_len;
   size_t cipher_len;
   bool has_cipher;

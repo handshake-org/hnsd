@@ -1,20 +1,20 @@
-#ifndef POLY1305_DONNA_H
-#define POLY1305_DONNA_H
+#ifndef HSK_POLY1305_DONNA_H
+#define HSK_POLY1305_DONNA_H
 
 #include <stddef.h>
 
-typedef struct poly1305_context {
+typedef struct hsk_poly1305_ctx {
 	size_t aligner;
 	unsigned char opaque[136];
-} poly1305_context;
+} hsk_poly1305_ctx;
 
-void poly1305_init(poly1305_context *ctx, const unsigned char key[32]);
-void poly1305_update(poly1305_context *ctx, const unsigned char *m, size_t bytes);
-void poly1305_finish(poly1305_context *ctx, unsigned char mac[16]);
-void poly1305_auth(unsigned char mac[16], const unsigned char *m, size_t bytes, const unsigned char key[32]);
+void hsk_poly1305_init(hsk_poly1305_ctx *ctx, const unsigned char key[32]);
+void hsk_poly1305_update(hsk_poly1305_ctx *ctx, const unsigned char *m, size_t bytes);
+void hsk_poly1305_finish(hsk_poly1305_ctx *ctx, unsigned char mac[16]);
+void hsk_poly1305_auth(unsigned char mac[16], const unsigned char *m, size_t bytes, const unsigned char key[32]);
 
-int poly1305_verify(const unsigned char mac1[16], const unsigned char mac2[16]);
-int poly1305_power_on_self_test(void);
+int hsk_poly1305_verify(const unsigned char mac1[16], const unsigned char mac2[16]);
+int hsk_poly1305_power_on_self_test(void);
 
-#endif /* POLY1305_DONNA_H */
+#endif /* HSK_POLY1305_DONNA_H */
 

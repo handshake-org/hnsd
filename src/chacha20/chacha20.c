@@ -19,13 +19,13 @@ This implementation is intended to be simple, many optimizations can be performe
 #include <string.h>
 #include "chacha20.h"
 
-void chacha20_setup(chacha20_ctx *ctx, const uint8_t *key, size_t length, uint8_t *nonce, uint8_t iv_size)
+void hsk_chacha20_setup(hsk_chacha20_ctx *ctx, const uint8_t *key, size_t length, uint8_t *nonce, uint8_t iv_size)
 {
-  chacha20_keysetup(ctx, key, length);
-  chacha20_ivsetup(ctx, nonce, iv_size);
+  hsk_chacha20_keysetup(ctx, key, length);
+  hsk_chacha20_ivsetup(ctx, nonce, iv_size);
 }
 
-void chacha20_keysetup(chacha20_ctx *ctx, const uint8_t *key, size_t length)
+void hsk_chacha20_keysetup(hsk_chacha20_ctx *ctx, const uint8_t *key, size_t length)
 {
   const char *constants = (length == 32) ? "expand 32-byte k" : "expand 16-byte k";
 
@@ -47,7 +47,7 @@ void chacha20_keysetup(chacha20_ctx *ctx, const uint8_t *key, size_t length)
   ctx->iv_size = 8;
 }
 
-void chacha20_ivsetup(chacha20_ctx *ctx, uint8_t *nonce, uint8_t iv_size)
+void hsk_chacha20_ivsetup(hsk_chacha20_ctx *ctx, uint8_t *nonce, uint8_t iv_size)
 {
   //Surprise! This is really a block cipher in CTR mode
   ctx->schedule[12] = 0; //Counter
@@ -63,7 +63,7 @@ void chacha20_ivsetup(chacha20_ctx *ctx, uint8_t *nonce, uint8_t iv_size)
   ctx->iv_size = iv_size;
 }
 
-void chacha20_counter_set(chacha20_ctx *ctx, uint64_t counter)
+void hsk_chacha20_counter_set(hsk_chacha20_ctx *ctx, uint64_t counter)
 {
   if (ctx->iv_size == 8) {
     ctx->schedule[12] = counter & UINT32_C(0xFFFFFFFF);
@@ -74,7 +74,7 @@ void chacha20_counter_set(chacha20_ctx *ctx, uint64_t counter)
   ctx->available = 0;
 }
 
-uint64_t chacha20_counter_get(chacha20_ctx *ctx)
+uint64_t hsk_chacha20_counter_get(hsk_chacha20_ctx *ctx)
 {
   if (ctx->iv_size == 8)
     return ((uint64_t)ctx->schedule[13] << 32) | ctx->schedule[12];
@@ -88,7 +88,7 @@ uint64_t chacha20_counter_get(chacha20_ctx *ctx)
     x[a] += x[b]; x[d] = ROTL32(x[d] ^ x[a], 8); \
     x[c] += x[d]; x[b] = ROTL32(x[b] ^ x[c], 7);
 
-void chacha20_block(chacha20_ctx *ctx, uint32_t output[16])
+void hsk_chacha20_block(hsk_chacha20_ctx *ctx, uint32_t output[16])
 {
   uint32_t *const nonce = ctx->schedule+12; //12 is where the 128 bit counter is
   int i = 10;
@@ -125,13 +125,13 @@ void chacha20_block(chacha20_ctx *ctx, uint32_t output[16])
   // if (!++nonce[0] && !++nonce[1] && !++nonce[2]) { ++nonce[3]; }
 }
 
-static inline void chacha20_xor(uint8_t *keystream, const uint8_t **in, uint8_t **out, size_t length)
+static inline void hsk_chacha20_xor(uint8_t *keystream, const uint8_t **in, uint8_t **out, size_t length)
 {
   uint8_t *end_keystream = keystream + length;
   do { *(*out)++ = *(*in)++ ^ *keystream++; } while (keystream < end_keystream);
 }
 
-void chacha20_encrypt(chacha20_ctx *ctx, const uint8_t *in, uint8_t *out, size_t length)
+void hsk_chacha20_encrypt(hsk_chacha20_ctx *ctx, const uint8_t *in, uint8_t *out, size_t length)
 {
   if (length)
   {
@@ -141,7 +141,7 @@ void chacha20_encrypt(chacha20_ctx *ctx, const uint8_t *in, uint8_t *out, size_t
     if (ctx->available)
     {
       size_t amount = MIN(length, ctx->available);
-      chacha20_xor(k + (sizeof(ctx->keystream)-ctx->available), &in, &out, amount);
+      hsk_chacha20_xor(k + (sizeof(ctx->keystream)-ctx->available), &in, &out, amount);
       ctx->available -= amount;
       length -= amount;
     }
@@ -150,15 +150,15 @@ void chacha20_encrypt(chacha20_ctx *ctx, const uint8_t *in, uint8_t *out, size_t
     while (length)
     {
       size_t amount = MIN(length, sizeof(ctx->keystream));
-      chacha20_block(ctx, ctx->keystream);
-      chacha20_xor(k, &in, &out, amount);
+      hsk_chacha20_block(ctx, ctx->keystream);
+      hsk_chacha20_xor(k, &in, &out, amount);
       length -= amount;
       ctx->available = sizeof(ctx->keystream) - amount;
     }
   }
 }
 
-void chacha20_decrypt(chacha20_ctx *ctx, const uint8_t *in, uint8_t *out, size_t length)
+void hsk_chacha20_decrypt(hsk_chacha20_ctx *ctx, const uint8_t *in, uint8_t *out, size_t length)
 {
-  chacha20_encrypt(ctx, in, out, length);
+  hsk_chacha20_encrypt(ctx, in, out, length);
 }

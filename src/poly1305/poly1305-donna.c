@@ -1,12 +1,12 @@
 #include "poly1305-donna.h"
 
-#if defined(POLY1305_8BIT)
+#if defined(HSK_POLY1305_8BIT)
 #include "poly1305-donna-8.h"
-#elif defined(POLY1305_16BIT)
+#elif defined(HSK_POLY1305_16BIT)
 #include "poly1305-donna-16.h"
-#elif defined(POLY1305_32BIT)
+#elif defined(HSK_POLY1305_32BIT)
 #include "poly1305-donna-32.h"
-#elif defined(POLY1305_64BIT)
+#elif defined(HSK_POLY1305_64BIT)
 #include "poly1305-donna-64.h"
 #else
 
@@ -24,13 +24,13 @@
 #endif
 
 void
-poly1305_update(poly1305_context *ctx, const unsigned char *m, size_t bytes) {
-	poly1305_state_internal_t *st = (poly1305_state_internal_t *)ctx;
+hsk_poly1305_update(hsk_poly1305_ctx *ctx, const unsigned char *m, size_t bytes) {
+	hsk_poly1305_state_internal_t *st = (hsk_poly1305_state_internal_t *)ctx;
 	size_t i;
 
 	/* handle leftover */
 	if (st->leftover) {
-		size_t want = (poly1305_block_size - st->leftover);
+		size_t want = (hsk_poly1305_block_size - st->leftover);
 		if (want > bytes)
 			want = bytes;
 		for (i = 0; i < want; i++)
@@ -38,16 +38,16 @@ poly1305_update(poly1305_context *ctx, const unsigned char *m, size_t bytes) {
 		bytes -= want;
 		m += want;
 		st->leftover += want;
-		if (st->leftover < poly1305_block_size)
+		if (st->leftover < hsk_poly1305_block_size)
 			return;
-		poly1305_blocks(st, st->buffer, poly1305_block_size);
+		hsk_poly1305_blocks(st, st->buffer, hsk_poly1305_block_size);
 		st->leftover = 0;
 	}
 
 	/* process full blocks */
-	if (bytes >= poly1305_block_size) {
-		size_t want = (bytes & ~(poly1305_block_size - 1));
-		poly1305_blocks(st, m, want);
+	if (bytes >= hsk_poly1305_block_size) {
+		size_t want = (bytes & ~(hsk_poly1305_block_size - 1));
+		hsk_poly1305_blocks(st, m, want);
 		m += want;
 		bytes -= want;
 	}
@@ -61,15 +61,15 @@ poly1305_update(poly1305_context *ctx, const unsigned char *m, size_t bytes) {
 }
 
 void
-poly1305_auth(unsigned char mac[16], const unsigned char *m, size_t bytes, const unsigned char key[32]) {
-	poly1305_context ctx;
-	poly1305_init(&ctx, key);
-	poly1305_update(&ctx, m, bytes);
-	poly1305_finish(&ctx, mac);
+hsk_poly1305_auth(unsigned char mac[16], const unsigned char *m, size_t bytes, const unsigned char key[32]) {
+	hsk_poly1305_ctx ctx;
+	hsk_poly1305_init(&ctx, key);
+	hsk_poly1305_update(&ctx, m, bytes);
+	hsk_poly1305_finish(&ctx, mac);
 }
 
 int
-poly1305_verify(const unsigned char mac1[16], const unsigned char mac2[16]) {
+hsk_poly1305_verify(const unsigned char mac1[16], const unsigned char mac2[16]) {
 	size_t i;
 	unsigned int dif = 0;
 	for (i = 0; i < 16; i++)
@@ -81,7 +81,7 @@ poly1305_verify(const unsigned char mac1[16], const unsigned char mac2[16]) {
 
 /* test a few basic operations */
 int
-poly1305_power_on_self_test(void) {
+hsk_poly1305_power_on_self_test(void) {
 	/* example from nacl */
 	static const unsigned char nacl_key[32] = {
 		0xee,0xa6,0xa7,0x25,0x1c,0x1e,0x72,0x91,
@@ -149,8 +149,8 @@ poly1305_power_on_self_test(void) {
 		0xd2,0x87,0xf9,0x7c,0x44,0x62,0x3d,0x39
 	};
 
-	poly1305_context ctx;
-	poly1305_context total_ctx;
+	hsk_poly1305_ctx ctx;
+	hsk_poly1305_ctx total_ctx;
 	unsigned char all_key[32];
 	unsigned char all_msg[256];
 	unsigned char mac[16];
@@ -159,43 +159,43 @@ poly1305_power_on_self_test(void) {
 
 	for (i = 0; i < sizeof(mac); i++)
 		mac[i] = 0;
-	poly1305_auth(mac, nacl_msg, sizeof(nacl_msg), nacl_key);
-	result &= poly1305_verify(nacl_mac, mac);
+	hsk_poly1305_auth(mac, nacl_msg, sizeof(nacl_msg), nacl_key);
+	result &= hsk_poly1305_verify(nacl_mac, mac);
 
 	for (i = 0; i < sizeof(mac); i++)
 		mac[i] = 0;
-	poly1305_init(&ctx, nacl_key);
-	poly1305_update(&ctx, nacl_msg +   0, 32);
-	poly1305_update(&ctx, nacl_msg +  32, 64);
-	poly1305_update(&ctx, nacl_msg +  96, 16);
-	poly1305_update(&ctx, nacl_msg + 112,  8);
-	poly1305_update(&ctx, nacl_msg + 120,  4);
-	poly1305_update(&ctx, nacl_msg + 124,  2);
-	poly1305_update(&ctx, nacl_msg + 126,  1);
-	poly1305_update(&ctx, nacl_msg + 127,  1);
-	poly1305_update(&ctx, nacl_msg + 128,  1);
-	poly1305_update(&ctx, nacl_msg + 129,  1);
-	poly1305_update(&ctx, nacl_msg + 130,  1);
-	poly1305_finish(&ctx, mac);
-	result &= poly1305_verify(nacl_mac, mac);
+	hsk_poly1305_init(&ctx, nacl_key);
+	hsk_poly1305_update(&ctx, nacl_msg +   0, 32);
+	hsk_poly1305_update(&ctx, nacl_msg +  32, 64);
+	hsk_poly1305_update(&ctx, nacl_msg +  96, 16);
+	hsk_poly1305_update(&ctx, nacl_msg + 112,  8);
+	hsk_poly1305_update(&ctx, nacl_msg + 120,  4);
+	hsk_poly1305_update(&ctx, nacl_msg + 124,  2);
+	hsk_poly1305_update(&ctx, nacl_msg + 126,  1);
+	hsk_poly1305_update(&ctx, nacl_msg + 127,  1);
+	hsk_poly1305_update(&ctx, nacl_msg + 128,  1);
+	hsk_poly1305_update(&ctx, nacl_msg + 129,  1);
+	hsk_poly1305_update(&ctx, nacl_msg + 130,  1);
+	hsk_poly1305_finish(&ctx, mac);
+	result &= hsk_poly1305_verify(nacl_mac, mac);
 
 	for (i = 0; i < sizeof(mac); i++)
 		mac[i] = 0;
-	poly1305_auth(mac, wrap_msg, sizeof(wrap_msg), wrap_key);
-	result &= poly1305_verify(wrap_mac, mac);
+	hsk_poly1305_auth(mac, wrap_msg, sizeof(wrap_msg), wrap_key);
+	result &= hsk_poly1305_verify(wrap_mac, mac);
 
-	poly1305_init(&total_ctx, total_key);
+	hsk_poly1305_init(&total_ctx, total_key);
 	for (i = 0; i < 256; i++) {
 		/* set key and message to 'i,i,i..' */
 		for (j = 0; j < sizeof(all_key); j++)
 			all_key[j] = i;
 		for (j = 0; j < i; j++)
 			all_msg[j] = i;
-		poly1305_auth(mac, all_msg, i, all_key);
-		poly1305_update(&total_ctx, mac, 16);
+		hsk_poly1305_auth(mac, all_msg, i, all_key);
+		hsk_poly1305_update(&total_ctx, mac, 16);
 	}
-	poly1305_finish(&total_ctx, mac);
-	result &= poly1305_verify(total_mac, mac);
+	hsk_poly1305_finish(&total_ctx, mac);
+	result &= hsk_poly1305_verify(total_mac, mac);
 
 	return result;
 }
