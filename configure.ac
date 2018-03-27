@@ -1,5 +1,5 @@
 AC_PREREQ([2.57])
-AC_INIT([libhsk], [0.0.0], [chjj@handshake.org])
+AC_INIT([hnsd], [0.0.0], [chjj@handshake.org])
 AC_CONFIG_MACRO_DIR([m4])
 AM_INIT_AUTOMAKE([-Wall -Werror foreign subdir-objects])
 
@@ -20,7 +20,7 @@ AH_BOTTOM([#endif /* _HSK_CONFIG_H */])
 
 AC_CONFIG_SRCDIR([src/bio.h])
 AC_CONFIG_HEADERS([src/config.h])
-AC_CONFIG_FILES([Makefile libhsk.pc])
+AC_CONFIG_FILES([Makefile])
 AC_CONFIG_SUBDIRS([uv])
 
 dnl PKG_PROG_PKG_CONFIG

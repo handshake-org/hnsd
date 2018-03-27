@@ -61,10 +61,10 @@ static void
 help(int32_t r) {
   fprintf(stderr,
     "\n"
-    "hskd 0.0.0\n"
+    "hnsd 0.0.0\n"
     "  Copyright (c) 2018, Christopher Jeffrey <chjj@handshake.org>\n"
     "\n"
-    "Usage: hskd [options]\n"
+    "Usage: hnsd [options]\n"
     "\n"
     "  -c, --config <config>\n"
     "    Path to config file.\n"

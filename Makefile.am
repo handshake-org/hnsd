@@ -6,70 +6,70 @@ SUBDIRS = uv
 
 ACLOCAL_AMFLAGS = -I m4
 
-AM_CPPFLAGS = -I$(top_builddir)                  \
-              -I$(top_srcdir)/src                \
-              -I$(top_srcdir)/uv/include         \
+AM_CPPFLAGS = -I$(top_builddir)             \
+              -I$(top_srcdir)/src           \
+              -I$(top_srcdir)/uv/include    \
               -I$(top_srcdir)/src/secp256k1
 
 include_HEADERS =
 
 CLEANFILES =
 
-lib_LTLIBRARIES = libhsk.la
+lib_LTLIBRARIES = libhnsd.la
 
-libhsk_la_LIBADD = -lunbound                                       \
-                   $(top_builddir)/uv/.libs/libuv.la
+libhnsd_la_LIBADD = $(top_builddir)/uv/.libs/libuv.la
 
-libhsk_la_CFLAGS = -DHSK_BUILD @CFLAGS@
-libhsk_la_LDFLAGS = -no-undefined -version-info 0:0:0
-libhsk_la_SOURCES = src/addr.c     \
-                    src/addrmgr.c  \
-                    src/aead.c     \
-                    src/base32.c   \
-                    src/blake2b.c  \
-                    src/bn.c       \
-                    src/brontide.c \
-                    src/chacha20/chacha20.c \
-                    src/chain.c    \
-                    src/cuckoo.c   \
-                    src/dns.c      \
-                    src/dnssec.c   \
-                    src/ecc.c      \
-                    src/ec.c       \
-                    src/hash.c     \
-                    src/header.c   \
-                    src/hsig.c     \
-                    src/list.c     \
-                    src/map.c      \
-                    src/msg.c      \
-                    src/poly1305/poly1305-donna.c \
-                    src/pool.c     \
-                    src/proof.c    \
-                    src/random.c   \
-                    src/req.c      \
-                    src/resource.c \
-                    src/sha256.c   \
-                    src/sig0.c     \
-                    src/siphash.c  \
-                    src/timedata.c \
-                    src/utils.c    \
-                    src/secp256k1/secp256k1.c
+libhnsd_la_CFLAGS = -DHSK_BUILD @CFLAGS@
+libhnsd_la_LDFLAGS = -no-undefined -version-info 0:0:0
+libhnsd_la_SOURCES = src/addr.c                    \
+                     src/addrmgr.c                 \
+                     src/aead.c                    \
+                     src/base32.c                  \
+                     src/blake2b.c                 \
+                     src/bn.c                      \
+                     src/brontide.c                \
+                     src/chacha20/chacha20.c       \
+                     src/chain.c                   \
+                     src/cuckoo.c                  \
+                     src/dns.c                     \
+                     src/dnssec.c                  \
+                     src/ecc.c                     \
+                     src/ec.c                      \
+                     src/hash.c                    \
+                     src/header.c                  \
+                     src/hsig.c                    \
+                     src/list.c                    \
+                     src/map.c                     \
+                     src/msg.c                     \
+                     src/poly1305/poly1305-donna.c \
+                     src/pool.c                    \
+                     src/proof.c                   \
+                     src/random.c                  \
+                     src/req.c                     \
+                     src/resource.c                \
+                     src/sha256.c                  \
+                     src/sig0.c                    \
+                     src/siphash.c                 \
+                     src/timedata.c                \
+                     src/utils.c                   \
+                     src/secp256k1/secp256k1.c
 
 EXTRA_DIST = README.md \
              LICENSE
 
-PROGS = hsk
+PROGS = hnsd
 noinst_PROGRAMS = $(PROGS)
 
-hsk_SOURCES = src/daemon.c \
-              src/ns.c     \
-              src/rs.c
+hnsd_SOURCES = src/daemon.c \
+               src/ns.c     \
+               src/rs.c
 
-hsk_LDADD = $(top_builddir)/libhsk.la
+hnsd_LDADD = -lunbound                  \
+             $(top_builddir)/libhnsd.la
 
-hsk_LDFLAGS = -static
-hsk_CFLAGS = -DHSK_BUILD $(AM_CFLAGS)
-hsk_CPPFLAGS = $(AM_CPPFLAGS)
+hnsd_LDFLAGS = -static
+hnsd_CFLAGS = -DHSK_BUILD $(AM_CFLAGS)
+hnsd_CPPFLAGS = $(AM_CPPFLAGS)
 
-pkgconfigdir = $(libdir)/pkgconfig
-pkgconfig_DATA = @PACKAGE_NAME@.pc
+# pkgconfigdir = $(libdir)/pkgconfig
+# pkgconfig_DATA = @PACKAGE_NAME@.pc

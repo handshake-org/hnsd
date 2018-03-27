@@ -1,12 +1,12 @@
-# hskd
+# hnsd
 
-Small daemon to resolve domain names through handshake.
+SPV resolver daemon for the Handshake network.
 
 ## Architecture
 
-hskd exists as a 3-layer architecture:
+hnsd exists as a 3-layer architecture:
 
-1. A handshake SPV node wich syncs headers and requests name proofs and data
+1. A Handshake SPV node wich syncs headers and requests name proofs and data
    from peers over the HSK P2P network.
 2. An authoritative root server which translates the handshake name data to DNS
    responses. These responses appear as if they came from a root zone.
@@ -42,7 +42,7 @@ peer
 
 ## Setup
 
-Currently, hskd will setup a recursive name server listening on port 53. If you
+Currently, hnsd will setup a recursive name server listening on port 53. If you
 want to resolve names through the handshake network, this requires you to
 change your resolv.conf to 127.0.0.1.
 
@@ -60,12 +60,10 @@ name_servers="127.0.0.1"
 
 ## Build/Runtime Deps
 
-- lssl >= 1.1.0
-- lcrypto >= 1.1.0
-- lgmp >= 6.1.2 (optional)
+- libunbound >= 1.7.0
 
-hskd will recursively build and statically link to `uv`, `ldns`, `secp256k1`,
-and `unbound` which are included in the source repo.
+hnsd will recursively build and statically link to `uv`, which is included in
+the source repo.
 
 ## Building
 
@@ -78,7 +76,7 @@ $ make
 ## Usage
 
 ``` sh
-$ hskd [options]
+$ hnsd [options]
 ```
 
 ### Options
