@@ -28,11 +28,11 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <stdint.h>
 
-/* Curve selection options. */
 #define HSK_SECP128R1 16
 #define HSK_SECP192R1 24
 #define HSK_SECP256R1 32
 #define HSK_SECP384R1 48
+
 #ifndef HSK_ECC_CURVE
 #  define HSK_ECC_CURVE HSK_SECP256R1
 #endif
@@ -51,37 +51,43 @@ extern "C"
 {
 #endif
 
-int hsk_ecc_make_key(
-  uint8_t p_publicKey[HSK_ECC_BYTES + 1],
-  uint8_t p_privateKey[HSK_ECC_BYTES]
+int
+hsk_ecc_make_key(
+  uint8_t public_key[HSK_ECC_BYTES + 1],
+  uint8_t private_key[HSK_ECC_BYTES]
 );
 
-int hsk_ecc_make_pubkey(
-  uint8_t p_privateKey[HSK_ECC_BYTES],
-  uint8_t p_publicKey[HSK_ECC_BYTES * 2]
+int
+hsk_ecc_make_pubkey(
+  uint8_t private_key[HSK_ECC_BYTES],
+  uint8_t public_key[HSK_ECC_BYTES * 2]
 );
 
-int hsk_ecc_make_pubkey_compressed(
-  uint8_t p_privateKey[HSK_ECC_BYTES],
-  uint8_t p_publicKey[HSK_ECC_BYTES + 1]
+int
+hsk_ecc_make_pubkey_compressed(
+  uint8_t private_key[HSK_ECC_BYTES],
+  uint8_t public_key[HSK_ECC_BYTES + 1]
 );
 
-int hsk_ecdh_shared_secret(
-  const uint8_t p_publicKey[HSK_ECC_BYTES + 1],
-  const uint8_t p_privateKey[HSK_ECC_BYTES],
-  uint8_t p_secret[HSK_ECC_BYTES]
+int
+hsk_ecdh_shared_secret(
+  const uint8_t public_key[HSK_ECC_BYTES + 1],
+  const uint8_t private_key[HSK_ECC_BYTES],
+  uint8_t secret[HSK_ECC_BYTES]
 );
 
-int hsk_ecdsa_sign(
-  const uint8_t p_privateKey[HSK_ECC_BYTES],
-  const uint8_t p_hash[HSK_ECC_BYTES],
-  uint8_t p_signature[HSK_ECC_BYTES * 2]
+int
+hsk_ecdsa_sign(
+  const uint8_t private_key[HSK_ECC_BYTES],
+  const uint8_t hash[HSK_ECC_BYTES],
+  uint8_t signature[HSK_ECC_BYTES * 2]
 );
 
-int hsk_ecdsa_verify(
-  const uint8_t p_publicKey[HSK_ECC_BYTES + 1],
-  const uint8_t p_hash[HSK_ECC_BYTES],
-  const uint8_t p_signature[HSK_ECC_BYTES * 2]
+int
+hsk_ecdsa_verify(
+  const uint8_t public_key[HSK_ECC_BYTES + 1],
+  const uint8_t hash[HSK_ECC_BYTES],
+  const uint8_t signature[HSK_ECC_BYTES * 2]
 );
 
 #ifdef __cplusplus
