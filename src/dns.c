@@ -2832,7 +2832,7 @@ hsk_dns_dnskey_create(char *zone, uint8_t *priv, bool ksk) {
     return NULL;
   }
 
-  if (!ecc_make_pubkey(priv, pubkey)) {
+  if (!hsk_ecc_make_pubkey(priv, pubkey)) {
     hsk_dns_rr_free(key);
     return NULL;
   }
@@ -3033,8 +3033,8 @@ hsk_dns_sign_rrsig(hsk_dns_rrs_t *rrset, hsk_dns_rr_t *sig, uint8_t *priv) {
   }
 
   uint8_t pubkey[33];
-  assert(ecc_make_pubkey_compressed(priv, pubkey));
-  assert(ecdsa_verify(pubkey, hash, sigbuf));
+  assert(hsk_ecc_make_pubkey_compressed(priv, pubkey));
+  assert(hsk_ecdsa_verify(pubkey, hash, sigbuf));
 
   rrsig->signature_len = 64;
   rrsig->signature = sigbuf;
@@ -3044,7 +3044,7 @@ hsk_dns_sign_rrsig(hsk_dns_rrs_t *rrset, hsk_dns_rr_t *sig, uint8_t *priv) {
 
 bool
 hsk_dns_sign_sig(uint8_t *priv, uint8_t *hash, uint8_t *sigbuf) {
-  if (!ecdsa_sign(priv, hash, sigbuf))
+  if (!hsk_ecdsa_sign(priv, hash, sigbuf))
     return false;
   return true;
 }

@@ -23,101 +23,69 @@ ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-#ifndef _EASY_ECC_H_
-#define _EASY_ECC_H_
+#ifndef _HSK_ECC_H
+#define _HSK_ECC_H
 
 #include <stdint.h>
 
 /* Curve selection options. */
-#define secp128r1 16
-#define secp192r1 24
-#define secp256r1 32
-#define secp384r1 48
-#ifndef ECC_CURVE
-    #define ECC_CURVE secp256r1
+#define HSK_SECP128R1 16
+#define HSK_SECP192R1 24
+#define HSK_SECP256R1 32
+#define HSK_SECP384R1 48
+#ifndef HSK_ECC_CURVE
+#  define HSK_ECC_CURVE HSK_SECP256R1
 #endif
 
-#if (ECC_CURVE != secp128r1 && ECC_CURVE != secp192r1 && ECC_CURVE != secp256r1 && ECC_CURVE != secp384r1)
-    #error "Must define ECC_CURVE to one of the available curves"
+#if (HSK_ECC_CURVE != HSK_SECP128R1 \
+  && HSK_ECC_CURVE != HSK_SECP192R1 \
+  && HSK_ECC_CURVE != HSK_SECP256R1 \
+  && HSK_ECC_CURVE != HSK_SECP384R1)
+#  error "Must define HSK_ECC_CURVE to one of the available curves"
 #endif
 
-#define ECC_BYTES ECC_CURVE
+#define HSK_ECC_BYTES HSK_ECC_CURVE
 
 #ifdef __cplusplus
 extern "C"
 {
 #endif
 
-/* ecc_make_key() function.
-Create a public/private key pair.
-
-Outputs:
-    p_publicKey  - Will be filled in with the public key.
-    p_privateKey - Will be filled in with the private key.
-
-Returns 1 if the key pair was generated successfully, 0 if an error occurred.
-*/
-int ecc_make_key(uint8_t p_publicKey[ECC_BYTES+1], uint8_t p_privateKey[ECC_BYTES]);
-
-int ecc_make_pubkey(
-  uint8_t p_privateKey[ECC_BYTES],
-  uint8_t p_publicKey[ECC_BYTES * 2]
+int hsk_ecc_make_key(
+  uint8_t p_publicKey[HSK_ECC_BYTES + 1],
+  uint8_t p_privateKey[HSK_ECC_BYTES]
 );
 
-int ecc_make_pubkey_compressed(
-  uint8_t p_privateKey[ECC_BYTES],
-  uint8_t p_publicKey[ECC_BYTES + 1]
+int hsk_ecc_make_pubkey(
+  uint8_t p_privateKey[HSK_ECC_BYTES],
+  uint8_t p_publicKey[HSK_ECC_BYTES * 2]
 );
 
-/* ecdh_shared_secret() function.
-Compute a shared secret given your secret key and someone else's public key.
-Note: It is recommended that you hash the result of ecdh_shared_secret before using it for symmetric encryption or HMAC.
+int hsk_ecc_make_pubkey_compressed(
+  uint8_t p_privateKey[HSK_ECC_BYTES],
+  uint8_t p_publicKey[HSK_ECC_BYTES + 1]
+);
 
-Inputs:
-    p_publicKey  - The public key of the remote party.
-    p_privateKey - Your private key.
+int hsk_ecdh_shared_secret(
+  const uint8_t p_publicKey[HSK_ECC_BYTES + 1],
+  const uint8_t p_privateKey[HSK_ECC_BYTES],
+  uint8_t p_secret[HSK_ECC_BYTES]
+);
 
-Outputs:
-    p_secret - Will be filled in with the shared secret value.
+int hsk_ecdsa_sign(
+  const uint8_t p_privateKey[HSK_ECC_BYTES],
+  const uint8_t p_hash[HSK_ECC_BYTES],
+  uint8_t p_signature[HSK_ECC_BYTES * 2]
+);
 
-Returns 1 if the shared secret was generated successfully, 0 if an error occurred.
-*/
-int ecdh_shared_secret(const uint8_t p_publicKey[ECC_BYTES+1], const uint8_t p_privateKey[ECC_BYTES], uint8_t p_secret[ECC_BYTES]);
-
-/* ecdsa_sign() function.
-Generate an ECDSA signature for a given hash value.
-
-Usage: Compute a hash of the data you wish to sign (SHA-2 is recommended) and pass it in to
-this function along with your private key.
-
-Inputs:
-    p_privateKey - Your private key.
-    p_hash       - The message hash to sign.
-
-Outputs:
-    p_signature  - Will be filled in with the signature value.
-
-Returns 1 if the signature generated successfully, 0 if an error occurred.
-*/
-int ecdsa_sign(const uint8_t p_privateKey[ECC_BYTES], const uint8_t p_hash[ECC_BYTES], uint8_t p_signature[ECC_BYTES*2]);
-
-/* ecdsa_verify() function.
-Verify an ECDSA signature.
-
-Usage: Compute the hash of the signed data using the same hash as the signer and
-pass it to this function along with the signer's public key and the signature values (r and s).
-
-Inputs:
-    p_publicKey - The signer's public key
-    p_hash      - The hash of the signed data.
-    p_signature - The signature value.
-
-Returns 1 if the signature is valid, 0 if it is invalid.
-*/
-int ecdsa_verify(const uint8_t p_publicKey[ECC_BYTES+1], const uint8_t p_hash[ECC_BYTES], const uint8_t p_signature[ECC_BYTES*2]);
+int hsk_ecdsa_verify(
+  const uint8_t p_publicKey[HSK_ECC_BYTES + 1],
+  const uint8_t p_hash[HSK_ECC_BYTES],
+  const uint8_t p_signature[HSK_ECC_BYTES * 2]
+);
 
 #ifdef __cplusplus
 } /* end of extern "C" */
 #endif
 
-#endif /* _EASY_ECC_H_ */
+#endif /* _HSK_ECC_H */
