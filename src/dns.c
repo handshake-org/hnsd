@@ -3159,7 +3159,7 @@ fail:
 
 done:
   for (j = 0; j < i; j++) {
-    hsk_dns_raw_rr_t *raw = &records[i];
+    hsk_dns_raw_rr_t *raw = &records[j];
 
     if (raw->data)
       free(raw->data);
