@@ -57,7 +57,7 @@ hsk_randombytes(uint8_t *dst, size_t len) {
   if (!urandom)
     return false;
 
-  size_t nbytes = fread(dst, 1, len, urandom)
+  size_t nbytes = fread(dst, 1, len, urandom);
 
   fclose(urandom);
 
