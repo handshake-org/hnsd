@@ -40,16 +40,67 @@ peer
   -> stub resolver
 ```
 
-## Setup
+## Build/Runtime Deps
 
-Currently, hnsd will setup a recursive name server listening on port 53. If you
-want to resolve names through the handshake network, this requires you to
-change your resolv.conf to 127.0.0.1.
+- libunbound >= 1.7.0
 
-e.g.
+hnsd will recursively build and statically link to `uv`, which is included in
+the source repo.
+
+## Installation
+
+### Installing Dependencies
+
+#### OSX
 
 ``` sh
-echo 'nameserver 127.0.0.1' | sudo tee /etc/resolve.conf > /dev/null
+$ brew install git automake autoconf libtool unbound
+```
+
+#### Linux
+
+You're a Linux user so you probably already know what to do. Make sure you have
+git, autotools, libtool, and unbound installed via whatever package manager
+your OS uses.
+
+### Cloning
+
+``` sh
+$ git clone git@github.com:handshakecompany/hnsd.git
+$ cd hnsd
+```
+
+### Building
+
+``` sh
+$ ./autogen.sh && ./configure && make
+```
+
+### Setup
+
+Currently, hnsd will setup a recursive name server listening locally. If
+you want to resolve names through the handshake network, this requires you to
+change your resolv.conf to 127.0.0.1, as well as configure the daemon to listen
+on port 53 -- this requires root access on OSX, and some hackery on Linux.
+
+#### OSX
+
+1. Open "System Preferences" on the panel/dock/whateveritis.
+2. Select "Network".
+3. Select "Advanced".
+4. Select "DNS".
+5. Here, you can add and remove nameservers. Remove all
+   nameservers and add a single server: "127.0.0.1".
+   You can change this back to google's servers
+   (8.8.8.8 and 8.8.4.4) later if you want.
+6. Run hnsd with `$ sudo ./hnsd --pool-size=1 --rs-host=127.0.0.1:53`.
+
+#### Linux
+
+First we need to alter our resolv.conf:
+
+``` sh
+echo 'nameserver 127.0.0.1' | sudo tee /etc/resolv.conf > /dev/null
 ```
 
 If you're using resolvconf, `/etc/resolvconf.conf` must be altered by setting:
@@ -58,19 +109,17 @@ If you're using resolvconf, `/etc/resolvconf.conf` must be altered by setting:
 name_servers="127.0.0.1"
 ```
 
-## Build/Runtime Deps
-
-- libunbound >= 1.7.0
-
-hnsd will recursively build and statically link to `uv`, which is included in
-the source repo.
-
-## Building
+Secondly, we need to allow our daemon to listen on low ports, without root
+access (much safer than running as root directly).
 
 ``` sh
-$ ./autogen.sh
-$ ./configure
-$ make
+$ sudo setcap 'cap_net_bind_service=+ep' /path/to/hnsd
+```
+
+Now run with:
+
+``` sh
+$ ./hnsd --pool-size=1 --rs-host=127.0.0.1:53
 ```
 
 ## Usage
