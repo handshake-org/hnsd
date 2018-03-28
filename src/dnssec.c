@@ -1,6 +1,4 @@
-#include <openssl/ssl.h>
-#include <openssl/bn.h>
-#include <openssl/rsa.h>
+#include <assert.h>
 
 #include "dns.h"
 #include "dnssec.h"

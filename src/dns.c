@@ -2037,6 +2037,14 @@ hsk_dns_name_parse(
         for (j = off; j < off + c; j++) {
           uint8_t b = data[j];
 
+          // This allows for double-dots
+          // too easily in our design.
+          // Do not allow.
+          if (b == 0x2e)
+            return -1;
+
+          // Hack because we're
+          // using c-strings.
           if (b == 0x00)
             b = 0xff;
 
@@ -2074,7 +2082,7 @@ hsk_dns_name_parse(
         if (ptr > 10)
           return -1;
 
-        off = ((c ^ 0xc0) << 8) | c1;
+        off = (((int32_t)(c ^ 0xc0)) << 8) | c1;
 
         data = pd;
         data_len = pd_len;
@@ -2144,6 +2152,7 @@ hsk_dns_name_serialize(char *name, uint8_t *data, int32_t *len) {
         for (j = begin; j < i; j++) {
           char ch = name[j];
 
+          // Hack.
           if (ch == -1)
             ch = 0x00;
 

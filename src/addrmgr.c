@@ -1,6 +1,7 @@
 #include <assert.h>
 #include <stdint.h>
 #include <stdbool.h>
+#include <stdarg.h>
 #include <arpa/inet.h>
 #include <netinet/in.h>
 #include <math.h>
