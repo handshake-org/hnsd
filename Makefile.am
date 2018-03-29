@@ -15,44 +15,44 @@ include_HEADERS =
 
 CLEANFILES =
 
-lib_LTLIBRARIES = libhnsd.la
+lib_LTLIBRARIES = libhsk.la
 
-libhnsd_la_LIBADD = $(top_builddir)/uv/.libs/libuv.la
+libhsk_la_LIBADD = $(top_builddir)/uv/.libs/libuv.la
 
-libhnsd_la_CFLAGS = -DHSK_BUILD @CFLAGS@
-libhnsd_la_LDFLAGS = -no-undefined -version-info 0:0:0
-libhnsd_la_SOURCES = src/addr.c                    \
-                     src/addrmgr.c                 \
-                     src/aead.c                    \
-                     src/base32.c                  \
-                     src/blake2b.c                 \
-                     src/bn.c                      \
-                     src/brontide.c                \
-                     src/chacha20/chacha20.c       \
-                     src/chain.c                   \
-                     src/cuckoo.c                  \
-                     src/dns.c                     \
-                     src/dnssec.c                  \
-                     src/ecc.c                     \
-                     src/ec.c                      \
-                     src/hash.c                    \
-                     src/header.c                  \
-                     src/hsig.c                    \
-                     src/list.c                    \
-                     src/map.c                     \
-                     src/msg.c                     \
-                     src/poly1305/poly1305.c       \
-                     src/pool.c                    \
-                     src/proof.c                   \
-                     src/random.c                  \
-                     src/req.c                     \
-                     src/resource.c                \
-                     src/sha256.c                  \
-                     src/sig0.c                    \
-                     src/siphash.c                 \
-                     src/timedata.c                \
-                     src/utils.c                   \
-                     src/secp256k1/secp256k1.c
+libhsk_la_CFLAGS = -DHSK_BUILD @CFLAGS@
+libhsk_la_LDFLAGS = -no-undefined -version-info 0:0:0
+libhsk_la_SOURCES = src/addr.c                   \
+                    src/addrmgr.c                \
+                    src/aead.c                   \
+                    src/base32.c                 \
+                    src/blake2b.c                \
+                    src/bn.c                     \
+                    src/brontide.c               \
+                    src/chacha20/chacha20.c      \
+                    src/chain.c                  \
+                    src/cuckoo.c                 \
+                    src/dns.c                    \
+                    src/dnssec.c                 \
+                    src/ecc.c                    \
+                    src/ec.c                     \
+                    src/hash.c                   \
+                    src/header.c                 \
+                    src/hsig.c                   \
+                    src/list.c                   \
+                    src/map.c                    \
+                    src/msg.c                    \
+                    src/poly1305/poly1305.c      \
+                    src/pool.c                   \
+                    src/proof.c                  \
+                    src/random.c                 \
+                    src/req.c                    \
+                    src/resource.c               \
+                    src/sha256.c                 \
+                    src/sig0.c                   \
+                    src/siphash.c                \
+                    src/timedata.c               \
+                    src/utils.c                  \
+                    src/secp256k1/secp256k1.c
 
 EXTRA_DIST = README.md \
              LICENSE
@@ -65,7 +65,7 @@ hnsd_SOURCES = src/daemon.c \
                src/rs.c
 
 hnsd_LDADD = -lunbound                  \
-             $(top_builddir)/libhnsd.la
+             $(top_builddir)/libhsk.la
 
 hnsd_LDFLAGS = -static
 hnsd_CFLAGS = -DHSK_BUILD $(AM_CFLAGS)
