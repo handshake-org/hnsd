@@ -3,6 +3,7 @@
 #include <stdbool.h>
 #include <stdio.h>
 
+#include "config.h"
 #include "error.h"
 #include "constants.h"
 #include "hash.h"

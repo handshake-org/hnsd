@@ -17,6 +17,8 @@
  */
 
 #include <string.h>
+
+#include "config.h"
 #include "sha256.h"
 
 static inline uint32_t

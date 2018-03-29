@@ -7,6 +7,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "config.h"
+
 static inline bool
 read_u8(uint8_t **data, size_t *len, uint8_t *out) {
   if (*len < 1)
