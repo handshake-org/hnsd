@@ -1922,6 +1922,9 @@ hsk_resource_to_dns(
 
       hsk_dns_rrs_push(an, rr);
 
+      if (dnssec)
+        hsk_dnssec_sign(ar, rrtype);
+
       goto done;
     }
   }
