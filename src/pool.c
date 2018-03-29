@@ -347,8 +347,6 @@ hsk_pool_getaddr(hsk_pool_t *pool, hsk_addr_t *addr) {
 static int32_t
 hsk_pool_refill(hsk_pool_t *pool) {
   while (pool->size < pool->max_size) {
-    hsk_peer_t *peer = hsk_peer_alloc(pool);
-
     hsk_addr_t addr;
 
     if (!hsk_pool_getaddr(pool, &addr)) {
@@ -359,6 +357,13 @@ hsk_pool_refill(hsk_pool_t *pool) {
     if (!hsk_ec_verify_pubkey(pool->ec, addr.key)) {
       hsk_addrman_remove_addr(&pool->am, &addr);
       continue;
+    }
+
+    hsk_peer_t *peer = hsk_peer_alloc(pool);
+
+    if (!peer) {
+      hsk_pool_log(pool, "could not allocate peer\n");
+      return HSK_ENOMEM;
     }
 
     hsk_addrman_mark_attempt(&pool->am, &addr);
