@@ -3038,7 +3038,7 @@ hsk_dns_sign_rrsig(hsk_dns_rrs_t *rrset, hsk_dns_rr_t *sig, uint8_t *priv) {
   }
 
   // Sign with secp256r1.
-  if (!hsk_ecdsa_sign(priv, hash, sigbuf)) {
+  if (!hsk_ecc_sign(priv, hash, sigbuf)) {
     free(sigbuf);
     return false;
   }

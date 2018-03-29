@@ -1,6 +1,7 @@
 #ifndef _HSK_CONSTANTS_H
 #define _HSK_CONSTANTS_H
 
+#include "config.h"
 #include "genesis.h"
 
 #define HSK_MAIN 0

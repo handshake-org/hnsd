@@ -37,14 +37,14 @@
 #define HSK_SECP384R1 48
 
 #ifndef HSK_ECC_CURVE
-#  define HSK_ECC_CURVE HSK_SECP256R1
+#define HSK_ECC_CURVE HSK_SECP256R1
 #endif
 
 #if (HSK_ECC_CURVE != HSK_SECP128R1 \
   && HSK_ECC_CURVE != HSK_SECP192R1 \
   && HSK_ECC_CURVE != HSK_SECP256R1 \
   && HSK_ECC_CURVE != HSK_SECP384R1)
-#  error "Must define HSK_ECC_CURVE to one of the available curves"
+#error "Must define HSK_ECC_CURVE to one of the available curves"
 #endif
 
 #define HSK_ECC_BYTES HSK_ECC_CURVE
@@ -68,21 +68,21 @@ hsk_ecc_make_pubkey_compressed(
 );
 
 int
-hsk_ecdh_shared_secret(
+hsk_ecc_ecdh(
   const uint8_t public_key[HSK_ECC_BYTES + 1],
   const uint8_t private_key[HSK_ECC_BYTES],
   uint8_t secret[HSK_ECC_BYTES]
 );
 
 int
-hsk_ecdsa_sign(
+hsk_ecc_sign(
   const uint8_t private_key[HSK_ECC_BYTES],
   const uint8_t hash[HSK_ECC_BYTES],
   uint8_t signature[HSK_ECC_BYTES * 2]
 );
 
 int
-hsk_ecdsa_verify(
+hsk_ecc_verify(
   const uint8_t public_key[HSK_ECC_BYTES + 1],
   const uint8_t hash[HSK_ECC_BYTES],
   const uint8_t signature[HSK_ECC_BYTES * 2]
