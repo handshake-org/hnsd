@@ -7,11 +7,11 @@
  */
 
 #if defined(_MSC_VER)
-  #define HSK_POLY1305_NOINLINE __declspec(noinline)
+#define HSK_POLY1305_NOINLINE __declspec(noinline)
 #elif defined(__GNUC__)
-  #define HSK_POLY1305_NOINLINE __attribute__((noinline))
+#define HSK_POLY1305_NOINLINE __attribute__((noinline))
 #else
-  #define HSK_POLY1305_NOINLINE
+#define HSK_POLY1305_NOINLINE
 #endif
 
 #define hsk_poly1305_block_size 16
@@ -141,6 +141,7 @@ hsk_poly1305_blocks(
     // h += m
     for (i = 0; i < 16; i++)
       c[i] = m[i];
+
     c[16] = hibit;
     hsk_poly1305_add(st->h, c);
 

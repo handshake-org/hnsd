@@ -7,11 +7,11 @@
  */
 
 #if defined(_MSC_VER)
-  #define HSK_POLY1305_NOINLINE __declspec(noinline)
+#define HSK_POLY1305_NOINLINE __declspec(noinline)
 #elif defined(__GNUC__)
-  #define HSK_POLY1305_NOINLINE __attribute__((noinline))
+#define HSK_POLY1305_NOINLINE __attribute__((noinline))
 #else
-  #define HSK_POLY1305_NOINLINE
+#define HSK_POLY1305_NOINLINE
 #endif
 
 #define hsk_poly1305_block_size 16

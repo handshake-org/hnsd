@@ -160,29 +160,29 @@ hsk_blake2b_init_key(
   return 0;
 }
 
-#define G(r,i,a,b,c,d)                      \
-  do {                                      \
+#define G(r, i, a, b, c, d)                     \
+  do {                                          \
     a = a + b + m[hsk_blake2b_sigma[r][2*i+0]]; \
-    d = rotr64(d ^ a, 32);                  \
-    c = c + d;                              \
-    b = rotr64(b ^ c, 24);                  \
+    d = rotr64(d ^ a, 32);                      \
+    c = c + d;                                  \
+    b = rotr64(b ^ c, 24);                      \
     a = a + b + m[hsk_blake2b_sigma[r][2*i+1]]; \
-    d = rotr64(d ^ a, 16);                  \
-    c = c + d;                              \
-    b = rotr64(b ^ c, 63);                  \
-  } while(0)
+    d = rotr64(d ^ a, 16);                      \
+    c = c + d;                                  \
+    b = rotr64(b ^ c, 63);                      \
+  } while (0)
 
-#define ROUND(r)                    \
-  do {                              \
-    G(r,0,v[ 0],v[ 4],v[ 8],v[12]); \
-    G(r,1,v[ 1],v[ 5],v[ 9],v[13]); \
-    G(r,2,v[ 2],v[ 6],v[10],v[14]); \
-    G(r,3,v[ 3],v[ 7],v[11],v[15]); \
-    G(r,4,v[ 0],v[ 5],v[10],v[15]); \
-    G(r,5,v[ 1],v[ 6],v[11],v[12]); \
-    G(r,6,v[ 2],v[ 7],v[ 8],v[13]); \
-    G(r,7,v[ 3],v[ 4],v[ 9],v[14]); \
-  } while(0)
+#define ROUND(r)                       \
+  do {                                 \
+    G(r, 0, v[0], v[4], v[8], v[12]);  \
+    G(r, 1, v[1], v[5], v[9], v[13]);  \
+    G(r, 2, v[2], v[6], v[10], v[14]); \
+    G(r, 3, v[3], v[7], v[11], v[15]); \
+    G(r, 4, v[0], v[5], v[10], v[15]); \
+    G(r, 5, v[1], v[6], v[11], v[12]); \
+    G(r, 6, v[2], v[7], v[8], v[13]);  \
+    G(r, 7, v[3], v[4], v[9], v[14]);  \
+  } while (0)
 
 static void
 hsk_blake2b_compress(
@@ -280,7 +280,7 @@ hsk_blake2b_final(hsk_blake2b_ctx *S, void *out, size_t outlen) {
   for (i = 0; i < 8; i++)
     store64(buffer + sizeof(S->h[i]) * i, S->h[i]);
 
-  memcpy( out, buffer, S->outlen );
+  memcpy(out, buffer, S->outlen);
   secure_zero_memory(buffer, sizeof(buffer));
 
   return 0;
@@ -297,13 +297,13 @@ hsk_blake2b(
 ) {
   hsk_blake2b_ctx S[1];
 
-  if (NULL == in && inlen > 0)
+  if (in == NULL && inlen > 0)
     return -1;
 
-  if (NULL == out)
+  if (out == NULL)
     return -1;
 
-  if (NULL == key && keylen > 0)
+  if (key == NULL && keylen > 0)
     return -1;
 
   if (!outlen || outlen > HSK_BLAKE2B_OUTBYTES)
@@ -313,7 +313,7 @@ hsk_blake2b(
     return -1;
 
   if (keylen > 0) {
-    if (hsk_blake2b_init_key( S, outlen, key, keylen ) < 0)
+    if (hsk_blake2b_init_key(S, outlen, key, keylen) < 0)
       return -1;
   } else {
     if (hsk_blake2b_init(S, outlen) < 0)

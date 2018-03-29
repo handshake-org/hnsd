@@ -31,21 +31,19 @@ hsk_bn_from_int(hsk_bn_t *n, HSK_BN_DTYPE_TMP i) {
 
   hsk_bn_init(n);
 
-#ifdef HSK_BN_WORD_SIZE
- #if (HSK_BN_WORD_SIZE == 1)
+#if (HSK_BN_WORD_SIZE == 1)
   n->array[0] = (i & 0x000000ff);
   n->array[1] = (i & 0x0000ff00) >> 8;
   n->array[2] = (i & 0x00ff0000) >> 16;
   n->array[3] = (i & 0xff000000) >> 24;
- #elif (HSK_BN_WORD_SIZE == 2)
+#elif (HSK_BN_WORD_SIZE == 2)
   n->array[0] = (i & 0x0000ffff);
   n->array[1] = (i & 0xffff0000) >> 16;
- #elif (HSK_BN_WORD_SIZE == 4)
+#elif (HSK_BN_WORD_SIZE == 4)
   n->array[0] = i;
   HSK_BN_DTYPE_TMP num_32 = 32;
   HSK_BN_DTYPE_TMP tmp = i >> num_32;
   n->array[1] = tmp;
- #endif
 #endif
 }
 
@@ -558,7 +556,6 @@ hsk_bn_pow(hsk_bn_t *a, hsk_bn_t *b, hsk_bn_t *c) {
 
     // Begin summing products:
     while (!hsk_bn_is_zero(b)) {
-
       // c = tmp * tmp
       hsk_bn_mul(&tmp, a, &cc);
 
