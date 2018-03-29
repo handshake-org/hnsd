@@ -24,6 +24,24 @@
 
 #include "chacha20.h"
 
+#define ROTL32(v, n) ((v) << (n)) | ((v) >> (32 - (n)))
+
+#define LE(p)                   \
+  (((uint32_t)((p)[0]))         \
+  | ((uint32_t)((p)[1]) << 8)   \
+  | ((uint32_t)((p)[2]) << 16)  \
+  | ((uint32_t)((p)[3]) << 24))
+
+#define FROMLE(b, i)         \
+  (b)[0] = i & 0xFF;         \
+  (b)[1] = (i >> 8) & 0xFF;  \
+  (b)[2] = (i >> 16) & 0xFF; \
+  (b)[3] = (i >> 24) & 0xFF;
+
+#ifndef MIN
+#define MIN(a, b) (((a) < (b)) ? (a) : (b))
+#endif
+
 void
 hsk_chacha20_setup(
   hsk_chacha20_ctx *ctx,
