@@ -6,19 +6,19 @@
  * http://www.opensource.org/licenses/mit-license.php
  */
 
-#include "poly1305-donna.h"
+#include "poly1305.h"
 
 #if defined(HSK_POLY1305_8BIT)
-#include "poly1305-donna-8.h"
+#include "poly1305-8.h"
 #elif defined(HSK_POLY1305_16BIT)
-#include "poly1305-donna-16.h"
+#include "poly1305-16.h"
 #elif defined(HSK_POLY1305_32BIT)
-#include "poly1305-donna-32.h"
+#include "poly1305-32.h"
 #elif defined(HSK_POLY1305_64BIT)
-#include "poly1305-donna-64.h"
+#include "poly1305-64.h"
 #else
 
-/* auto detect between 32bit / 64bit */
+// auto detect between 32bit / 64bit
 #define HAS_SIZEOF_INT128_64BIT \
   (defined(__SIZEOF_INT128__) && defined(__LP64__))
 
@@ -30,9 +30,9 @@
   || ((__GNUC__ == 4) && (__GNUC_MINOR__ >= 4))))
 
 #if (HAS_SIZEOF_INT128_64BIT || HAS_MSVC_64BIT || HAS_GCC_4_4_64BIT)
-#include "poly1305-donna-64.h"
+#include "poly1305-64.h"
 #else
-#include "poly1305-donna-32.h"
+#include "poly1305-32.h"
 #endif
 
 #endif

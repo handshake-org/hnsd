@@ -41,7 +41,7 @@ libhnsd_la_SOURCES = src/addr.c                    \
                      src/list.c                    \
                      src/map.c                     \
                      src/msg.c                     \
-                     src/poly1305/poly1305-donna.c \
+                     src/poly1305/poly1305.c       \
                      src/pool.c                    \
                      src/proof.c                   \
                      src/random.c                  \

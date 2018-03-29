@@ -9,7 +9,7 @@
 #include "blake2b.h"
 #include "sha256.h"
 #include "chacha20/chacha20.h"
-#include "poly1305/poly1305-donna.h"
+#include "poly1305/poly1305.h"
 #include "aead.h"
 
 void
