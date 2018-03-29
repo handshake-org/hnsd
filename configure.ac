@@ -26,7 +26,7 @@ AC_CONFIG_SUBDIRS([uv])
 dnl PKG_PROG_PKG_CONFIG
 
 AC_C_BIGENDIAN(
-  [AC_DEFINE(HSK_BIG_ENDIAN, 1, [define this if built for a big endian system])],
+  [AC_DEFINE(HSK_BIG_ENDIAN, 1, [define if built for a big endian system])],
   ,
   [AC_MSG_WARN([falling back to little endian])]
 )
@@ -59,6 +59,36 @@ AC_CHECK_HEADERS([ \
   strings.h \
   unistd.h \
 ])
+
+AC_ARG_WITH([network],
+  [AS_HELP_STRING(
+    [--with-network=main|testnet|regtest|simnet],
+    [Specify network. Default is simnet.]
+  )],
+  [hsk_network=$withval],
+  [hsk_network=simnet])
+
+case $hsk_network in
+  main)
+    AC_DEFINE(HSK_NETWORK, HSK_MAIN,
+      [Define this symbol to choose a network])
+  ;;
+  testnet)
+    AC_DEFINE(HSK_NETWORK, HSK_TESTNET,
+      [Define this symbol to choose a network])
+  ;;
+  regtest)
+    AC_DEFINE(HSK_NETWORK, HSK_REGTEST,
+      [Define this symbol to choose a network])
+  ;;
+  simnet)
+    AC_DEFINE(HSK_NETWORK, HSK_SIMNET,
+      [Define this symbol to choose a network])
+  ;;
+  *)
+    AC_MSG_ERROR([invalid network])
+  ;;
+esac
 
 dnl
 dnl Secp256k1
@@ -209,7 +239,6 @@ else
   esac
 fi
 
-# select assembly optimization
 use_external_asm=no
 
 case $set_asm in
@@ -227,7 +256,6 @@ case $set_asm in
   ;;
 esac
 
-# select field implementation
 case $set_field in
   64bit)
     AC_DEFINE(USE_FIELD_5X52, 1,
@@ -242,7 +270,6 @@ case $set_field in
   ;;
 esac
 
-#select scalar implementation
 case $set_scalar in
   64bit)
     AC_DEFINE(USE_SCALAR_4X64, 1,
@@ -252,8 +279,8 @@ case $set_scalar in
     AC_DEFINE(USE_SCALAR_8X32, 1,
       [Define this symbol to use the 8x32 scalar implementation])
   ;;
-*)
-  AC_MSG_ERROR([invalid scalar implementation])
+  *)
+    AC_MSG_ERROR([invalid scalar implementation])
   ;;
 esac
 

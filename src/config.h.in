@@ -81,8 +81,11 @@
 /* Define to 1 if the system has the type `__int128'. */
 #undef HAVE___INT128
 
-/* define this if built for a big endian system */
+/* define if built for a big endian system */
 #undef HSK_BIG_ENDIAN
+
+/* Define this symbol to choose a network */
+#undef HSK_NETWORK
 
 /* Define to the sub-directory where libtool stores uninstalled libraries. */
 #undef LT_OBJDIR
