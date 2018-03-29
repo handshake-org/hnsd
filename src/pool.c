@@ -1766,13 +1766,13 @@ brontide_do_write(void *arg, uint8_t *data, size_t data_len, bool is_heap) {
   hsk_peer_t *peer = (hsk_peer_t *)arg;
 
   if (!is_heap) {
-    uint8_t *d = malloc(data_len);
+    uint8_t *buf = malloc(data_len);
 
-    if (!d)
+    if (!buf)
       return HSK_ENOMEM;
 
-    memcpy(d, data, data_len);
-    data = d;
+    memcpy(buf, data, data_len);
+    data = buf;
   }
 
   return hsk_peer_write_raw(peer, data, data_len, true);

@@ -1,12 +1,28 @@
-/*
- *  https://github.com/IAIK/Picnic/blob/master/randomness.c
+/**
+ * Parts of this software are based on Picnic:
+ * https://github.com/IAIK/Picnic
  *
- *  This file is part of the optimized implementation of the Picnic signature scheme.
- *  See the accompanying documentation for complete details.
+ *   Copyright (c) 2016-2017 Graz University of Technology
+ *   Copyright (c) 2017 Angela Promitzer
  *
- *  The code is provided under the MIT license, see LICENSE for
- *  more details.
- *  SPDX-License-Identifier: MIT
+ *   Permission is hereby granted, free of charge, to any person obtaining a
+ *   copy of this software and associated documentation files (the
+ *   ""Software""), to deal in the Software without restriction, including
+ *   without limitation the rights to use, copy, modify, merge, publish,
+ *   distribute, sublicense, and/or sell copies of the Software, and to permit
+ *   persons to whom the Software is furnished to do so, subject to the
+ *   following conditions:
+ *
+ *   The above copyright notice and this permission notice shall be included in
+ *   all copies or substantial portions of the Software.
+ *
+ *   THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ *   IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ *   FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ *   AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ *   LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ *   FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+ *   DEALINGS IN THE SOFTWARE.
  */
 
 #include <assert.h>
@@ -17,15 +33,6 @@
 
 #include "random.h"
 
-#if defined(HAVE_RANDOMBYTES) || defined(SUPERCOP)
-extern void randombytes(unsigned char *x, unsigned long long xlen);
-
-bool
-hsk_randombytes(uint8_t *dst, size_t len) {
-  randombytes(dst, len);
-  return true;
-}
-#else
 #if defined(__linux__) \
   && ((defined(HAVE_SYS_RANDOM_H) && defined(HAVE_GETRANDOM)) \
   || (__GLIBC__ > 2 || __GLIBC_MINOR__ >= 25))
@@ -77,5 +84,4 @@ hsk_randombytes(uint8_t *dst, size_t len) {
 }
 #else
 #error "Unsupported OS for randomness."
-#endif
 #endif

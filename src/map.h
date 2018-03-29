@@ -1,6 +1,3 @@
-#ifndef _HSK_MAP_H
-#define _HSK_MAP_H
-
 /*
  * Parts of this software are based on khash.h:
  *
@@ -28,6 +25,9 @@
  *  CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  *  SOFTWARE.
  */
+
+#ifndef _HSK_MAP_H
+#define _HSK_MAP_H
 
 #include <stdlib.h>
 #include <string.h>

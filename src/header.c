@@ -153,18 +153,18 @@ hsk_header_get_proof(hsk_header_t *hdr, uint8_t *proof) {
   if (!hsk_pow_to_target(hdr->bits, target))
     return false;
 
-  bn_t max_bn;
-  bignum_from_int(&max_bn, 1);
-  bignum_lshift(&max_bn, &max_bn, 256);
+  hsk_bn_t max_bn;
+  hsk_bn_from_int(&max_bn, 1);
+  hsk_bn_lshift(&max_bn, &max_bn, 256);
 
-  bn_t target_bn;
-  bignum_from_array(&target_bn, target, 32);
-  bignum_inc(&target_bn);
+  hsk_bn_t target_bn;
+  hsk_bn_from_array(&target_bn, target, 32);
+  hsk_bn_inc(&target_bn);
 
   // (1 << 256) / (target + 1)
-  bignum_div(&max_bn, &target_bn, &target_bn);
+  hsk_bn_div(&max_bn, &target_bn, &target_bn);
 
-  bignum_to_array(&target_bn, proof, 32);
+  hsk_bn_to_array(&target_bn, proof, 32);
 
   return true;
 }
@@ -174,19 +174,19 @@ hsk_header_calc_work(hsk_header_t *hdr, hsk_header_t *prev) {
   if (!prev)
     return hsk_header_get_proof(hdr, hdr->work);
 
-  bn_t prev_bn;
-  bignum_from_array(&prev_bn, prev->work, 32);
+  hsk_bn_t prev_bn;
+  hsk_bn_from_array(&prev_bn, prev->work, 32);
 
   uint8_t proof[32];
 
   if (!hsk_header_get_proof(hdr, proof))
     return false;
 
-  bn_t proof_bn;
-  bignum_from_array(&proof_bn, proof, 32);
+  hsk_bn_t proof_bn;
+  hsk_bn_from_array(&proof_bn, proof, 32);
 
-  bignum_add(&prev_bn, &proof_bn, &proof_bn);
-  bignum_to_array(&proof_bn, hdr->work, 32);
+  hsk_bn_add(&prev_bn, &proof_bn, &proof_bn);
+  hsk_bn_to_array(&proof_bn, hdr->work, 32);
 
   return true;
 }

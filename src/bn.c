@@ -1,203 +1,196 @@
-/*
+/**
+ * Parts of this software are based on tiny-bignum-c:
+ * https://github.com/kokke/tiny-bignum-c
+ *
+ * tiny-bignum-c resides in the public domain.
+ */
 
-Big number library - arithmetic on multiple-precision unsigned integers.
-
-This library is an implementation of arithmetic on arbitrarily large integers.
-
-The difference between this and other implementations, is that the data structure
-has optimal memory utilization (i.e. a 1024 bit integer takes up 128 bytes RAM),
-and all memory is allocated statically: no dynamic allocation for better or worse.
-
-Primary goals are correctness, clarity of code and clean, portable implementation.
-Secondary goal is a memory footprint small enough to make it suitable for use in
-embedded applications.
-
-
-The current state is correct functionality and adequate performance.
-There may well be room for performance-optimizations and improvements.
-
-*/
-
+#include <assert.h>
 #include <stdio.h>
 #include <stdbool.h>
-#include <assert.h>
+
 #include "bn.h"
 
+static void _lshift_one_bit(hsk_bn_t *a);
+static void _rshift_one_bit(hsk_bn_t *a);
+static void _lshift_word(hsk_bn_t *a, int nwords);
+static void _rshift_word(hsk_bn_t *a, int nwords);
 
-
-/* Functions for shifting number in-place. */
-static void _lshift_one_bit(struct bn* a);
-static void _rshift_one_bit(struct bn* a);
-static void _lshift_word(struct bn* a, int nwords);
-static void _rshift_word(struct bn* a, int nwords);
-
-
-
-/* Public / Exported functions. */
-void bignum_init(struct bn* n)
-{
-  require(n, "n is null");
+void
+hsk_bn_init(hsk_bn_t *n) {
+  HSK_BN_REQUIRE(n, "n is null");
 
   int i;
-  for (i = 0; i < BN_ARRAY_SIZE; ++i)
-  {
+  for (i = 0; i < HSK_BN_ARRAY_SIZE; i++)
     n->array[i] = 0;
-  }
 }
 
+void
+hsk_bn_from_int(hsk_bn_t *n, HSK_BN_DTYPE_TMP i) {
+  HSK_BN_REQUIRE(n, "n is null");
 
-void bignum_from_int(struct bn* n, DTYPE_TMP i)
-{
-  require(n, "n is null");
+  hsk_bn_init(n);
 
-  bignum_init(n);
-
-  /* Endianness issue if machine is not little-endian? */
-#ifdef WORD_SIZE
- #if (WORD_SIZE == 1)
+#ifdef HSK_BN_WORD_SIZE
+ #if (HSK_BN_WORD_SIZE == 1)
   n->array[0] = (i & 0x000000ff);
   n->array[1] = (i & 0x0000ff00) >> 8;
   n->array[2] = (i & 0x00ff0000) >> 16;
   n->array[3] = (i & 0xff000000) >> 24;
- #elif (WORD_SIZE == 2)
+ #elif (HSK_BN_WORD_SIZE == 2)
   n->array[0] = (i & 0x0000ffff);
   n->array[1] = (i & 0xffff0000) >> 16;
- #elif (WORD_SIZE == 4)
+ #elif (HSK_BN_WORD_SIZE == 4)
   n->array[0] = i;
-  DTYPE_TMP num_32 = 32;
-  DTYPE_TMP tmp = i >> num_32; /* bit-shift with U64 operands to force 64-bit results */
+  HSK_BN_DTYPE_TMP num_32 = 32;
+  HSK_BN_DTYPE_TMP tmp = i >> num_32;
   n->array[1] = tmp;
  #endif
 #endif
 }
 
-
-int bignum_to_int(struct bn* n)
-{
-  require(n, "n is null");
+int
+hsk_bn_to_int(hsk_bn_t *n) {
+  HSK_BN_REQUIRE(n, "n is null");
 
   int ret = 0;
 
-  /* Endianness issue if machine is not little-endian? */
-#if (WORD_SIZE == 1)
+  // Endianness issue if machine
+  // is not little-endian?
+#if (HSK_BN_WORD_SIZE == 1)
   ret += n->array[0];
   ret += n->array[1] << 8;
   ret += n->array[2] << 16;
   ret += n->array[3] << 24;
-#elif (WORD_SIZE == 2)
+#elif (HSK_BN_WORD_SIZE == 2)
   ret += n->array[0];
   ret += n->array[1] << 16;
-#elif (WORD_SIZE == 4)
+#elif (HSK_BN_WORD_SIZE == 4)
   ret += n->array[0];
 #endif
 
   return ret;
 }
 
+void
+hsk_bn_from_string(hsk_bn_t *n, char *str, int nbytes) {
+  HSK_BN_REQUIRE(n, "n is null");
+  HSK_BN_REQUIRE(str, "str is null");
+  HSK_BN_REQUIRE(nbytes > 0, "nbytes must be positive");
+  HSK_BN_REQUIRE((nbytes & 1) == 0,
+    "string format must be in hex -> equal number of bytes");
 
-void bignum_from_string(struct bn* n, char* str, int nbytes)
-{
-  require(n, "n is null");
-  require(str, "str is null");
-  require(nbytes > 0, "nbytes must be positive");
-  require((nbytes & 1) == 0, "string format must be in hex -> equal number of bytes");
+  hsk_bn_init(n);
 
-  bignum_init(n);
+  // HSK_BN_DTYPE is defined in bn.h - uint{8,16,32,64}_t
+  HSK_BN_DTYPE tmp;
 
-  DTYPE tmp;                        /* DTYPE is defined in bn.h - uint{8,16,32,64}_t */
-  int i = nbytes - (2 * WORD_SIZE); /* index into string */
-  int j = 0;                        /* index into array */
+  // index into string
+  int i = nbytes - (2 * HSK_BN_WORD_SIZE);
 
-  /* reading last hex-byte "MSB" from string first -> big endian */
-  /* MSB ~= most significant byte / block ? :) */
-  while (i >= 0)
-  {
+  // index into array
+  int j = 0;
+
+  // reading last hex-byte "MSB" from string first -> big endian
+  // MSB ~= most significant byte / block ? :)
+  while (i >= 0) {
     tmp = 0;
-    sscanf(&str[i], SSCANF_FORMAT_STR, &tmp);
+
+    sscanf(&str[i], HSK_BN_SSCANF_FMT, &tmp);
+
     n->array[j] = tmp;
-    i -= (2 * WORD_SIZE); /* step WORD_SIZE hex-byte(s) back in the string. */
-    j += 1;               /* step one element forward in the array. */
+
+    // step HSK_BN_WORD_SIZE hex-byte(s) back in the string.
+    i -= (2 * HSK_BN_WORD_SIZE);
+
+    // step one element forward in the array.
+    j += 1;
   }
 }
 
+void
+hsk_bn_to_string(hsk_bn_t *n, char *str, int nbytes) {
+  HSK_BN_REQUIRE(n, "n is null");
+  HSK_BN_REQUIRE(str, "str is null");
+  HSK_BN_REQUIRE(nbytes > 0, "nbytes must be positive");
+  HSK_BN_REQUIRE((nbytes & 1) == 0,
+    "string format must be in hex -> equal number of bytes");
 
-void bignum_to_string(struct bn* n, char* str, int nbytes)
-{
-  require(n, "n is null");
-  require(str, "str is null");
-  require(nbytes > 0, "nbytes must be positive");
-  require((nbytes & 1) == 0, "string format must be in hex -> equal number of bytes");
+  // index into array - reading
+  // "MSB" first -> big-endian
+  int j = HSK_BN_ARRAY_SIZE - 1;
 
-  int j = BN_ARRAY_SIZE - 1; /* index into array - reading "MSB" first -> big-endian */
-  int i = 0;                 /* index into string representation. */
+  // index into string representation.
+  int i = 0;
 
-  /* reading last array-element "MSB" first -> big endian */
-  while ((j >= 0) && (nbytes > (i + 1)))
-  {
-    sprintf(&str[i], SPRINTF_FORMAT_STR, n->array[j]);
-    i += (2 * WORD_SIZE); /* step WORD_SIZE hex-byte(s) forward in the string. */
-    j -= 1;               /* step one element back in the array. */
+  // reading last array-element
+  // "MSB" first -> big endian
+  while ((j >= 0) && (nbytes > (i + 1))) {
+    sprintf(&str[i], HSK_BN_SPRINTF_FMT, n->array[j]);
+
+    // step HSK_BN_WORD_SIZE hex-byte(s)
+    // forward in the string.
+    i += (2 * HSK_BN_WORD_SIZE);
+
+    // step one element back
+    // in the array.
+    j -= 1;
   }
 
-  /* Count leading zeros: */
+  // Count leading zeros:
   j = 0;
   while (str[j] == '0')
-  {
     j += 1;
-  }
 
-  /* Move string j places ahead, effectively skipping leading zeros */
-  for (i = 0; i < (nbytes - j); ++i)
-  {
+  // Move string j places ahead,
+  // effectively skipping leading zeros
+  for (i = 0; i < (nbytes - j); i++)
     str[i] = str[i + j];
-  }
 
-  /* Zero-terminate string */
+  // Zero-terminate string
   str[i] = 0;
 }
 
+void
+hsk_bn_from_array(hsk_bn_t *n, unsigned char *array, size_t size) {
+  HSK_BN_REQUIRE(n, "n is null");
+  HSK_BN_REQUIRE(array, "array is null");
 
-void bignum_from_array(struct bn* n, unsigned char* array, size_t size)
-{
-  require(n, "n is null");
-  require(array, "array is null");
+  hsk_bn_init(n);
 
-  bignum_init(n);
-
-  int j = (size / WORD_SIZE) - 1;
+  int j = (size / HSK_BN_WORD_SIZE) - 1;
   int i = 0;
 
   for (; j >= 0; j--) {
-#if (WORD_SIZE == 1)
-    n->array[j] = (DTYPE)array[i++];
-#elif (WORD_SIZE == 2)
-    n->array[j] = ((DTYPE)array[i++]) << 8;
-    n->array[j] |= (DTYPE)array[i++];
-#elif (WORD_SIZE == 4)
-    n->array[j] = ((DTYPE)array[i++]) << 24;
-    n->array[j] |= ((DTYPE)array[i++]) << 16;
-    n->array[j] |= ((DTYPE)array[i++]) << 8;
-    n->array[j] |= (DTYPE)array[i++];
+#if (HSK_BN_WORD_SIZE == 1)
+    n->array[j] = (HSK_BN_DTYPE)array[i++];
+#elif (HSK_BN_WORD_SIZE == 2)
+    n->array[j] = ((HSK_BN_DTYPE)array[i++]) << 8;
+    n->array[j] |= (HSK_BN_DTYPE)array[i++];
+#elif (HSK_BN_WORD_SIZE == 4)
+    n->array[j] = ((HSK_BN_DTYPE)array[i++]) << 24;
+    n->array[j] |= ((HSK_BN_DTYPE)array[i++]) << 16;
+    n->array[j] |= ((HSK_BN_DTYPE)array[i++]) << 8;
+    n->array[j] |= (HSK_BN_DTYPE)array[i++];
 #endif
   }
 }
 
+void
+hsk_bn_to_array(hsk_bn_t *n, unsigned char *array, size_t size) {
+  HSK_BN_REQUIRE(n, "n is null");
+  HSK_BN_REQUIRE(array, "array is null");
 
-void bignum_to_array(struct bn* n, unsigned char* array, size_t size)
-{
-  require(n, "n is null");
-  require(array, "array is null");
-
-  int j = (size / WORD_SIZE) - 1;
+  int j = (size / HSK_BN_WORD_SIZE) - 1;
   int i = 0;
 
   for (; j >= 0; j--) {
-#if (WORD_SIZE == 1)
+#if (HSK_BN_WORD_SIZE == 1)
     array[i++] = (unsigned char)n->array[j];
-#elif (WORD_SIZE == 2)
+#elif (HSK_BN_WORD_SIZE == 2)
     array[i++] = (unsigned char)(n->array[j] >> 8);
     array[i++] = (unsigned char)n->array[j];
-#elif (WORD_SIZE == 4)
+#elif (HSK_BN_WORD_SIZE == 4)
     array[i++] = (unsigned char)(n->array[j] >> 24);
     array[i++] = (unsigned char)(n->array[j] >> 16);
     array[i++] = (unsigned char)(n->array[j] >> 8);
@@ -206,468 +199,444 @@ void bignum_to_array(struct bn* n, unsigned char* array, size_t size)
   }
 }
 
+void
+hsk_bn_neg(hsk_bn_t *n) {
+  HSK_BN_REQUIRE(n, "n is null");
 
-void bignum_neg(struct bn* n)
-{
-  require(n, "n is null");
-
-  DTYPE res;
-  DTYPE_TMP tmp; /* copy of n */
+  HSK_BN_DTYPE res;
+  HSK_BN_DTYPE_TMP tmp; // copy of n
 
   int i;
-  for (i = 0; i < BN_ARRAY_SIZE; ++i)
-  {
+  for (i = 0; i < HSK_BN_ARRAY_SIZE; i++) {
     tmp = n->array[i];
     res = ~tmp;
     n->array[i] = res;
   }
 }
 
+void
+hsk_bn_dec(hsk_bn_t *n) {
+  HSK_BN_REQUIRE(n, "n is null");
 
-void bignum_dec(struct bn* n)
-{
-  require(n, "n is null");
-
-  DTYPE tmp; /* copy of n */
-  DTYPE res;
+  HSK_BN_DTYPE tmp; // copy of n
+  HSK_BN_DTYPE res;
 
   int i;
-  for (i = 0; i < BN_ARRAY_SIZE; ++i)
-  {
+  for (i = 0; i < HSK_BN_ARRAY_SIZE; i++) {
     tmp = n->array[i];
     res = tmp - 1;
     n->array[i] = res;
 
     if (!(res > tmp))
-    {
       break;
-    }
   }
 }
 
+void
+hsk_bn_inc(hsk_bn_t *n) {
+  HSK_BN_REQUIRE(n, "n is null");
 
-void bignum_inc(struct bn* n)
-{
-  require(n, "n is null");
-
-  DTYPE res;
-  DTYPE_TMP tmp; /* copy of n */
+  HSK_BN_DTYPE res;
+  HSK_BN_DTYPE_TMP tmp; // copy of n
 
   int i;
-  for (i = 0; i < BN_ARRAY_SIZE; ++i)
-  {
+  for (i = 0; i < HSK_BN_ARRAY_SIZE; i++) {
     tmp = n->array[i];
     res = tmp + 1;
     n->array[i] = res;
 
     if (res > tmp)
-    {
       break;
-    }
   }
 }
 
+void
+hsk_bn_add(hsk_bn_t *a, hsk_bn_t *b, hsk_bn_t *c) {
+  HSK_BN_REQUIRE(a, "a is null");
+  HSK_BN_REQUIRE(b, "b is null");
+  HSK_BN_REQUIRE(c, "c is null");
 
-void bignum_add(struct bn* a, struct bn* b, struct bn* c)
-{
-  require(a, "a is null");
-  require(b, "b is null");
-  require(c, "c is null");
-
-  DTYPE_TMP tmp;
+  HSK_BN_DTYPE_TMP tmp;
   int carry = 0;
+
   int i;
-  for (i = 0; i < BN_ARRAY_SIZE; ++i)
-  {
+  for (i = 0; i < HSK_BN_ARRAY_SIZE; i++) {
     tmp = a->array[i] + b->array[i] + carry;
-    carry = (tmp > MAX_VAL);
-    c->array[i] = (tmp & MAX_VAL);
+    carry = (tmp > HSK_BN_MAX_VAL);
+    c->array[i] = (tmp & HSK_BN_MAX_VAL);
   }
 }
 
+void
+hsk_bn_sub(hsk_bn_t *a, hsk_bn_t *b, hsk_bn_t *c) {
+  HSK_BN_REQUIRE(a, "a is null");
+  HSK_BN_REQUIRE(b, "b is null");
+  HSK_BN_REQUIRE(c, "c is null");
 
-void bignum_sub(struct bn* a, struct bn* b, struct bn* c)
-{
-  require(a, "a is null");
-  require(b, "b is null");
-  require(c, "c is null");
-
-  DTYPE_TMP res;
-  DTYPE_TMP tmp1;
-  DTYPE_TMP tmp2;
+  HSK_BN_DTYPE_TMP res;
+  HSK_BN_DTYPE_TMP tmp1;
+  HSK_BN_DTYPE_TMP tmp2;
   int borrow = 0;
+
   int i;
-  for (i = 0; i < BN_ARRAY_SIZE; ++i)
-  {
-    tmp1 = (DTYPE_TMP)a->array[i] + (MAX_VAL + 1); /* + number_base */
-    tmp2 = (DTYPE_TMP)b->array[i] + borrow;;
+  for (i = 0; i < HSK_BN_ARRAY_SIZE; i++) {
+    // + number_base
+    tmp1 = (HSK_BN_DTYPE_TMP)a->array[i] + (HSK_BN_MAX_VAL + 1);
+    tmp2 = (HSK_BN_DTYPE_TMP)b->array[i] + borrow;;
     res = (tmp1 - tmp2);
-    c->array[i] = (DTYPE)(res & MAX_VAL); /* "modulo number_base" == "% (number_base - 1)" if number_base is 2^N */
-    borrow = (res <= MAX_VAL);
+
+    // "modulo number_base" == "% (number_base - 1)"
+    // if number_base is 2^N
+    c->array[i] = (HSK_BN_DTYPE)(res & HSK_BN_MAX_VAL);
+    borrow = (res <= HSK_BN_MAX_VAL);
   }
 }
 
+void
+hsk_bn_mul(hsk_bn_t *a, hsk_bn_t *b, hsk_bn_t *c) {
+  HSK_BN_REQUIRE(a, "a is null");
+  HSK_BN_REQUIRE(b, "b is null");
+  HSK_BN_REQUIRE(c, "c is null");
 
-void bignum_mul(struct bn* a, struct bn* b, struct bn* c)
-{
-  require(a, "a is null");
-  require(b, "b is null");
-  require(c, "c is null");
-
-  struct bn row;
-  struct bn tmp;
-  struct bn cc;
+  hsk_bn_t row;
+  hsk_bn_t tmp;
+  hsk_bn_t cc;
   int i, j;
 
-  bignum_init(&cc);
+  hsk_bn_init(&cc);
 
-  for (i = 0; i < BN_ARRAY_SIZE; ++i)
-  {
-    bignum_init(&row);
+  for (i = 0; i < HSK_BN_ARRAY_SIZE; i++) {
+    hsk_bn_init(&row);
 
-    for (j = 0; j < BN_ARRAY_SIZE; ++j)
-    {
-      if (i + j < BN_ARRAY_SIZE)
-      {
-        bignum_init(&tmp);
-        DTYPE_TMP intermediate = ((DTYPE_TMP)a->array[i] * (DTYPE_TMP)b->array[j]);
-        bignum_from_int(&tmp, intermediate);
+    for (j = 0; j < HSK_BN_ARRAY_SIZE; j++) {
+      if (i + j < HSK_BN_ARRAY_SIZE) {
+        hsk_bn_init(&tmp);
+
+        HSK_BN_DTYPE_TMP intermediate =
+          ((HSK_BN_DTYPE_TMP)a->array[i] * (HSK_BN_DTYPE_TMP)b->array[j]);
+
+        hsk_bn_from_int(&tmp, intermediate);
         _lshift_word(&tmp, i + j);
-        bignum_add(&tmp, &row, &row);
+        hsk_bn_add(&tmp, &row, &row);
       }
     }
-    bignum_add(&cc, &row, &cc);
+
+    hsk_bn_add(&cc, &row, &cc);
   }
 
-  bignum_assign(c, &cc);
+  hsk_bn_assign(c, &cc);
 }
 
+void
+hsk_bn_div(hsk_bn_t *a, hsk_bn_t *b, hsk_bn_t *c) {
+  HSK_BN_REQUIRE(a, "a is null");
+  HSK_BN_REQUIRE(b, "b is null");
+  HSK_BN_REQUIRE(c, "c is null");
 
-void bignum_div(struct bn* a, struct bn* b, struct bn* c)
-{
-  require(a, "a is null");
-  require(b, "b is null");
-  require(c, "c is null");
+  hsk_bn_t current;
+  hsk_bn_t denom;
+  hsk_bn_t tmp;
 
-  struct bn current;
-  struct bn denom;
-  struct bn tmp;
+  // int current = 1;
+  hsk_bn_from_int(&current, 1);
+  // denom = b
+  hsk_bn_assign(&denom, b);
+  // tmp = a
+  hsk_bn_assign(&tmp, a);
 
-  bignum_from_int(&current, 1);               // int current = 1;
-  bignum_assign(&denom, b);                   // denom = b
-  bignum_assign(&tmp, a);                     // tmp   = a
-
-  const DTYPE_TMP half_max = 1 + (DTYPE_TMP)(MAX_VAL / 2);
+  const HSK_BN_DTYPE_TMP half_max = 1 + (HSK_BN_DTYPE_TMP)(HSK_BN_MAX_VAL / 2);
   bool overflow = false;
-  while (bignum_cmp(&denom, a) != LARGER)     // while (denom <= a) {
-  {
-    if (denom.array[BN_ARRAY_SIZE - 1] >= half_max)
-    {
+
+  // while (denom <= a) {
+  while (hsk_bn_cmp(&denom, a) != 1) {
+    if (denom.array[HSK_BN_ARRAY_SIZE - 1] >= half_max) {
       overflow = true;
       break;
     }
-    _lshift_one_bit(&current);                //   current <<= 1;
-    _lshift_one_bit(&denom);                  //   denom <<= 1;
-  }
-  if (!overflow)
-  {
-    _rshift_one_bit(&denom);                  // denom >>= 1;
-    _rshift_one_bit(&current);                // current >>= 1;
-  }
-  bignum_init(c);                             // int answer = 0;
 
-  while (!bignum_is_zero(&current))           // while (current != 0)
-  {
-    if (bignum_cmp(&tmp, &denom) != SMALLER)  //   if (dividend >= denom)
-    {
-      bignum_sub(&tmp, &denom, &tmp);         //     dividend -= denom;
-      bignum_or(c, &current, c);              //     answer |= current;
+    // current <<= 1;
+    _lshift_one_bit(&current);
+
+    // denom <<= 1;
+    _lshift_one_bit(&denom);
+  }
+
+  if (!overflow) {
+    // denom >>= 1;
+    _rshift_one_bit(&denom);
+    // current >>= 1;
+    _rshift_one_bit(&current);
+  }
+
+  // int answer = 0;
+  hsk_bn_init(c);
+
+  // while (current != 0)
+  while (!hsk_bn_is_zero(&current)) {
+    // if (dividend >= denom)
+    if (hsk_bn_cmp(&tmp, &denom) != -1)  {
+      // dividend -= denom;
+      hsk_bn_sub(&tmp, &denom, &tmp);
+      // answer |= current;
+      hsk_bn_or(c, &current, c);
     }
-    _rshift_one_bit(&current);                //   current >>= 1;
-    _rshift_one_bit(&denom);                  //   denom >>= 1;
-  }                                           // return answer;
+
+    // current >>= 1;
+    _rshift_one_bit(&current);
+
+    // denom >>= 1;
+    _rshift_one_bit(&denom);
+  }
+
+  // return answer;
 }
 
+void
+hsk_bn_lshift(hsk_bn_t *a, hsk_bn_t *b, int nbits) {
+  HSK_BN_REQUIRE(a, "a is null");
+  HSK_BN_REQUIRE(b, "b is null");
+  HSK_BN_REQUIRE(nbits >= 0, "no negative shifts");
 
-void bignum_lshift(struct bn* a, struct bn* b, int nbits)
-{
-  require(a, "a is null");
-  require(b, "b is null");
-  require(nbits >= 0, "no negative shifts");
-
-  /* Handle shift in multiples of word-size */
-  const int nbits_pr_word = (WORD_SIZE * 8);
+  // Handle shift in multiples of word-size
+  const int nbits_pr_word = (HSK_BN_WORD_SIZE * 8);
   int nwords = nbits / nbits_pr_word;
-  if (nwords != 0)
-  {
+
+  if (nwords != 0) {
     _lshift_word(a, nwords);
     nbits -= (nwords * nbits_pr_word);
   }
 
-  if (nbits != 0)
-  {
+  if (nbits != 0) {
     int i;
-    for (i = (BN_ARRAY_SIZE - 1); i > 0; --i)
-    {
-      a->array[i] = (a->array[i] << nbits) | (a->array[i - 1] >> ((8 * WORD_SIZE) - nbits));
+    for (i = (HSK_BN_ARRAY_SIZE - 1); i > 0; i--) {
+      a->array[i] = (a->array[i] << nbits)
+        | (a->array[i - 1] >> ((8 * HSK_BN_WORD_SIZE) - nbits));
     }
+
     a->array[i] <<= nbits;
   }
-  bignum_assign(b, a);
+
+  hsk_bn_assign(b, a);
 }
 
+void
+hsk_bn_rshift(hsk_bn_t *a, hsk_bn_t *b, int nbits) {
+  HSK_BN_REQUIRE(a, "a is null");
+  HSK_BN_REQUIRE(b, "b is null");
+  HSK_BN_REQUIRE(nbits >= 0, "no negative shifts");
 
-void bignum_rshift(struct bn* a, struct bn* b, int nbits)
-{
-  require(a, "a is null");
-  require(b, "b is null");
-  require(nbits >= 0, "no negative shifts");
-
-  /* Handle shift in multiples of word-size */
-  const int nbits_pr_word = (WORD_SIZE * 8);
+  // Handle shift in multiples of word-size
+  const int nbits_pr_word = (HSK_BN_WORD_SIZE * 8);
   int nwords = nbits / nbits_pr_word;
-  if (nwords != 0)
-  {
+
+  if (nwords != 0) {
     _rshift_word(a, nwords);
     nbits -= (nwords * nbits_pr_word);
   }
 
-  if (nbits != 0)
-  {
+  if (nbits != 0) {
     int i;
-    for (i = 0; i < (BN_ARRAY_SIZE - 1); ++i)
-    {
-      a->array[i] = (a->array[i] >> nbits) | (a->array[i + 1] << ((8 * WORD_SIZE) - nbits));
+    for (i = 0; i < (HSK_BN_ARRAY_SIZE - 1); i++) {
+      a->array[i] = (a->array[i] >> nbits)
+        | (a->array[i + 1] << ((8 * HSK_BN_WORD_SIZE) - nbits));
     }
+
     a->array[i] >>= nbits;
   }
-  bignum_assign(b, a);
+
+  hsk_bn_assign(b, a);
 }
 
+void
+hsk_bn_mod(hsk_bn_t *a, hsk_bn_t *b, hsk_bn_t *c) {
+  // mod(a, b) = a - ((a / b) * b)
+  // example:
+  //   mod(8, 3) = 8 - ((8 / 3) * 3) = 2
+  HSK_BN_REQUIRE(a, "a is null");
+  HSK_BN_REQUIRE(b, "b is null");
+  HSK_BN_REQUIRE(c, "c is null");
 
-void bignum_mod(struct bn* a, struct bn* b, struct bn* c)
-{
-  /*
-    mod(a,b) = a - ((a / b) * b)
+  hsk_bn_t tmp;
 
-    example:
-      mod(8, 3) = 8 - ((8 / 3) * 3) = 2
-  */
-  require(a, "a is null");
-  require(b, "b is null");
-  require(c, "c is null");
+  // c = (a / b)
+  hsk_bn_div(a, b, c);
 
-  struct bn tmp;
+  // tmp = (c * b)
+  hsk_bn_mul(c, b, &tmp);
 
-  /* c = (a / b) */
-  bignum_div(a, b, c);
-
-  /* tmp = (c * b) */
-  bignum_mul(c, b, &tmp);
-
-  /* c = a - tmp */
-  bignum_sub(a, &tmp, c);
+  // c = a - tmp
+  hsk_bn_sub(a, &tmp, c);
 }
 
-
-void bignum_and(struct bn* a, struct bn* b, struct bn* c)
-{
-  require(a, "a is null");
-  require(b, "b is null");
-  require(c, "c is null");
+void
+hsk_bn_and(hsk_bn_t *a, hsk_bn_t *b, hsk_bn_t *c) {
+  HSK_BN_REQUIRE(a, "a is null");
+  HSK_BN_REQUIRE(b, "b is null");
+  HSK_BN_REQUIRE(c, "c is null");
 
   int i;
-  for (i = 0; i < BN_ARRAY_SIZE; ++i)
-  {
+  for (i = 0; i < HSK_BN_ARRAY_SIZE; i++)
     c->array[i] = (a->array[i] & b->array[i]);
-  }
 }
 
-
-void bignum_or(struct bn* a, struct bn* b, struct bn* c)
-{
-  require(a, "a is null");
-  require(b, "b is null");
-  require(c, "c is null");
+void
+hsk_bn_or(hsk_bn_t *a, hsk_bn_t *b, hsk_bn_t *c) {
+  HSK_BN_REQUIRE(a, "a is null");
+  HSK_BN_REQUIRE(b, "b is null");
+  HSK_BN_REQUIRE(c, "c is null");
 
   int i;
-  for (i = 0; i < BN_ARRAY_SIZE; ++i)
-  {
+  for (i = 0; i < HSK_BN_ARRAY_SIZE; i++)
     c->array[i] = (a->array[i] | b->array[i]);
-  }
 }
 
-
-void bignum_xor(struct bn* a, struct bn* b, struct bn* c)
-{
-  require(a, "a is null");
-  require(b, "b is null");
-  require(c, "c is null");
+void
+hsk_bn_xor(hsk_bn_t *a, hsk_bn_t *b, hsk_bn_t *c) {
+  HSK_BN_REQUIRE(a, "a is null");
+  HSK_BN_REQUIRE(b, "b is null");
+  HSK_BN_REQUIRE(c, "c is null");
 
   int i;
-  for (i = 0; i < BN_ARRAY_SIZE; ++i)
-  {
+  for (i = 0; i < HSK_BN_ARRAY_SIZE; i++)
     c->array[i] = (a->array[i] ^ b->array[i]);
-  }
 }
 
+int
+hsk_bn_cmp(hsk_bn_t *a, hsk_bn_t *b) {
+  HSK_BN_REQUIRE(a, "a is null");
+  HSK_BN_REQUIRE(b, "b is null");
 
-int bignum_cmp(struct bn* a, struct bn* b)
-{
-  require(a, "a is null");
-  require(b, "b is null");
+  int i = HSK_BN_ARRAY_SIZE;
 
-  int i = BN_ARRAY_SIZE;
-  do
-  {
-    i -= 1; /* Decrement first, to start with last array element */
+  do {
+    // Decrement first, to start
+    // with last array element
+    i -= 1;
+
     if (a->array[i] > b->array[i])
-    {
-      return LARGER;
-    }
+      return 1;
     else if (a->array[i] < b->array[i])
-    {
-      return SMALLER;
-    }
-  }
-  while (i != 0);
+      return -1;
+  } while (i != 0);
 
-  return EQUAL;
+  return 0;
 }
 
-
-int bignum_is_zero(struct bn* n)
-{
-  require(n, "n is null");
+int
+hsk_bn_is_zero(hsk_bn_t *n) {
+  HSK_BN_REQUIRE(n, "n is null");
 
   int i;
-  for (i = 0; i < BN_ARRAY_SIZE; ++i)
-  {
+  for (i = 0; i < HSK_BN_ARRAY_SIZE; i++) {
     if (n->array[i])
-    {
       return 0;
-    }
   }
 
   return 1;
 }
 
+void
+hsk_bn_pow(hsk_bn_t *a, hsk_bn_t *b, hsk_bn_t *c) {
+  HSK_BN_REQUIRE(a, "a is null");
+  HSK_BN_REQUIRE(b, "b is null");
+  HSK_BN_REQUIRE(c, "c is null");
 
-void bignum_pow(struct bn* a, struct bn* b, struct bn* c)
-{
-  require(a, "a is null");
-  require(b, "b is null");
-  require(c, "c is null");
+  hsk_bn_t tmp;
+  hsk_bn_t cc;
 
-  struct bn tmp;
-  struct bn cc;
+  hsk_bn_init(&cc);
 
-  bignum_init(&cc);
+  if (hsk_bn_cmp(b, &cc) == 0) {
+    // Return 1 when exponent
+    // is 0 -- n^0 = 1
+    hsk_bn_inc(&cc);
+  } else {
+    // Copy a -> tmp
+    hsk_bn_assign(&tmp, a);
 
-  if (bignum_cmp(b, &cc) == EQUAL)
-  {
-    /* Return 1 when exponent is 0 -- n^0 = 1 */
-    bignum_inc(&cc);
-  }
-  else
-  {
-    /* Copy a -> tmp */
-    bignum_assign(&tmp, a);
+    hsk_bn_dec(b);
 
-    bignum_dec(b);
+    // Begin summing products:
+    while (!hsk_bn_is_zero(b)) {
 
-    /* Begin summing products: */
-    while (!bignum_is_zero(b))
-    {
+      // c = tmp * tmp
+      hsk_bn_mul(&tmp, a, &cc);
 
-      /* c = tmp * tmp */
-      bignum_mul(&tmp, a, &cc);
-      /* Decrement b by one */
-      bignum_dec(b);
+      // Decrement b by one
+      hsk_bn_dec(b);
 
-      bignum_assign(&tmp, &cc);
+      hsk_bn_assign(&tmp, &cc);
     }
 
-    /* c = tmp */
-    bignum_assign(&cc, &tmp);
+    // c = tmp
+    hsk_bn_assign(&cc, &tmp);
   }
 
-  bignum_assign(c, &cc);
+  hsk_bn_assign(c, &cc);
 }
 
-
-void bignum_assign(struct bn* dst, struct bn* src)
-{
-  require(dst, "dst is null");
-  require(src, "src is null");
+void
+hsk_bn_assign(hsk_bn_t *dst, hsk_bn_t *src) {
+  HSK_BN_REQUIRE(dst, "dst is null");
+  HSK_BN_REQUIRE(src, "src is null");
 
   int i;
-  for (i = 0; i < BN_ARRAY_SIZE; ++i)
-  {
+  for (i = 0; i < HSK_BN_ARRAY_SIZE; i++)
     dst->array[i] = src->array[i];
-  }
 }
 
-
-/* Private / Static functions. */
-static void _rshift_word(struct bn* a, int nwords)
-{
-  /* Naive method: */
-  require(a, "a is null");
-  require(nwords >= 0, "no negative shifts");
+static void
+_rshift_word(hsk_bn_t *a, int nwords) {
+  // Naive method:
+  HSK_BN_REQUIRE(a, "a is null");
+  HSK_BN_REQUIRE(nwords >= 0, "no negative shifts");
 
   int i;
-  for (i = 0; i < nwords; ++i)
-  {
+  for (i = 0; i < nwords; i++)
     a->array[i] = a->array[i + 1];
-  }
-  for (; i < BN_ARRAY_SIZE; ++i)
-  {
+
+  for (; i < HSK_BN_ARRAY_SIZE; i++)
     a->array[i] = 0;
-  }
 }
 
-
-static void _lshift_word(struct bn* a, int nwords)
-{
-  require(a, "a is null");
-  require(nwords >= 0, "no negative shifts");
+static void
+_lshift_word(hsk_bn_t *a, int nwords) {
+  HSK_BN_REQUIRE(a, "a is null");
+  HSK_BN_REQUIRE(nwords >= 0, "no negative shifts");
 
   int i;
-  /* Shift whole words */
-  for (i = (BN_ARRAY_SIZE - 1); i >= nwords; --i)
-  {
+
+  // Shift whole words
+  for (i = (HSK_BN_ARRAY_SIZE - 1); i >= nwords; i--)
     a->array[i] = a->array[i - nwords];
-  }
-  /* Zero pad shifted words. */
-  for (; i >= 0; --i)
-  {
+
+  // Zero pad shifted words.
+  for (; i >= 0; i--)
     a->array[i] = 0;
-  }
 }
 
-
-static void _lshift_one_bit(struct bn* a)
-{
-  require(a, "a is null");
+static void
+_lshift_one_bit(hsk_bn_t *a) {
+  HSK_BN_REQUIRE(a, "a is null");
 
   int i;
-  for (i = (BN_ARRAY_SIZE - 1); i > 0; --i)
-  {
-    a->array[i] = (a->array[i] << 1) | (a->array[i - 1] >> ((8 * WORD_SIZE) - 1));
+  for (i = (HSK_BN_ARRAY_SIZE - 1); i > 0; i--) {
+    a->array[i] = (a->array[i] << 1)
+      | (a->array[i - 1] >> ((8 * HSK_BN_WORD_SIZE) - 1));
   }
+
   a->array[0] <<= 1;
 }
 
-
-static void _rshift_one_bit(struct bn* a)
-{
-  require(a, "a is null");
+static void
+_rshift_one_bit(hsk_bn_t *a) {
+  HSK_BN_REQUIRE(a, "a is null");
 
   int i;
-  for (i = 0; i < (BN_ARRAY_SIZE - 1); ++i)
-  {
-    a->array[i] = (a->array[i] >> 1) | (a->array[i + 1] << ((8 * WORD_SIZE) - 1));
+  for (i = 0; i < (HSK_BN_ARRAY_SIZE - 1); i++) {
+    a->array[i] = (a->array[i] >> 1)
+      | (a->array[i + 1] << ((8 * HSK_BN_WORD_SIZE) - 1));
   }
-  a->array[BN_ARRAY_SIZE - 1] >>= 1;
+
+  a->array[HSK_BN_ARRAY_SIZE - 1] >>= 1;
 }

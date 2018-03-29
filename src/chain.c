@@ -314,8 +314,8 @@ hsk_chain_retarget(hsk_chain_t *chain, hsk_header_t *prev) {
   if (!prev)
     return bits;
 
-  bn_t target_bn;
-  bignum_init(&target_bn);
+  hsk_bn_t target_bn;
+  hsk_bn_init(&target_bn);
 
   hsk_header_t *last = prev;
   hsk_header_t *first = last;
@@ -324,19 +324,19 @@ hsk_chain_retarget(hsk_chain_t *chain, hsk_header_t *prev) {
   for (i = 0; first && i < window; i++) {
     uint8_t diff[32];
     assert(hsk_pow_to_target(first->bits, diff));
-    bn_t diff_bn;
-    bignum_from_array(&diff_bn, diff, 32);
-    bignum_add(&target_bn, &diff_bn, &target_bn);
+    hsk_bn_t diff_bn;
+    hsk_bn_from_array(&diff_bn, diff, 32);
+    hsk_bn_add(&target_bn, &diff_bn, &target_bn);
     first = (hsk_header_t *)hsk_map_get(&chain->hashes, first->prev_block);
   }
 
   if (!first)
     return bits;
 
-  bn_t window_bn;
-  bignum_from_int(&window_bn, window);
+  hsk_bn_t window_bn;
+  hsk_bn_from_int(&window_bn, window);
 
-  bignum_div(&target_bn, &window_bn, &target_bn);
+  hsk_bn_div(&target_bn, &window_bn, &target_bn);
 
   int64_t start = hsk_chain_get_mtp(chain, first);
   int64_t end = hsk_chain_get_mtp(chain, last);
@@ -349,23 +349,23 @@ hsk_chain_retarget(hsk_chain_t *chain, hsk_header_t *prev) {
   if (actual > max)
     actual = max;
 
-  bn_t actual_bn;
-  bignum_from_int(&actual_bn, actual);
+  hsk_bn_t actual_bn;
+  hsk_bn_from_int(&actual_bn, actual);
 
-  bn_t timespan_bn;
-  bignum_from_int(&timespan_bn, timespan);
+  hsk_bn_t timespan_bn;
+  hsk_bn_from_int(&timespan_bn, timespan);
 
-  bignum_div(&target_bn, &timespan_bn, &target_bn);
-  bignum_mul(&target_bn, &actual_bn, &target_bn);
+  hsk_bn_div(&target_bn, &timespan_bn, &target_bn);
+  hsk_bn_mul(&target_bn, &actual_bn, &target_bn);
 
-  bn_t limit_bn;
-  bignum_from_array(&limit_bn, limit, 32);
+  hsk_bn_t limit_bn;
+  hsk_bn_from_array(&limit_bn, limit, 32);
 
-  if (bignum_cmp(&target_bn, &limit_bn) > 0)
+  if (hsk_bn_cmp(&target_bn, &limit_bn) > 0)
     return bits;
 
   uint8_t target[32];
-  bignum_to_array(&target_bn, target, 32);
+  hsk_bn_to_array(&target_bn, target, 32);
 
   uint32_t cmpct;
 

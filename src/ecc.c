@@ -1,31 +1,35 @@
-/*
-https://github.com/esxgx/easy-ecc
-Copyright (c) 2013, Kenneth MacKay
-All rights reserved.
+/**
+ * Parts of this software are based on easy-ecc:
+ * https://github.com/esxgx/easy-ecc
+ *
+ * Copyright (c) 2013, Kenneth MacKay
+ * All rights reserved.
 
-Redistribution and use in source and binary forms, with or without modification,
-are permitted provided that the following conditions are met:
- * Redistributions of source code must retain the above copyright notice, this
-   list of conditions and the following disclaimer.
- * Redistributions in binary form must reproduce the above copyright notice,
-   this list of conditions and the following disclaimer in the documentation
-   and/or other materials provided with the distribution.
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are met:
+ * * Redistributions of source code must retain the above copyright notice, this
+ *   list of conditions and the following disclaimer.
+ * * Redistributions in binary form must reproduce the above copyright notice,
+ *   this list of conditions and the following disclaimer in the documentation
+ *   and/or other materials provided with the distribution.
 
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
-ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
-WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR
-ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
-(INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
-LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON
-ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
-SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-*/
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
+ * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+ * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+ * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ * POSSIBILITY OF SUCH DAMAGE.
+ */
+
+#include <stdint.h>
+#include <string.h>
 
 #include "ecc.h"
-
-#include <string.h>
 
 #define NUM_ECC_DIGITS (HSK_ECC_BYTES / 8)
 #define MAX_TRIES 16
@@ -48,7 +52,7 @@ typedef struct {
 } uint128_t;
 #endif
 
-typedef struct ecc_point_t {
+typedef struct ecc_point_s {
   uint64_t x[NUM_ECC_DIGITS];
   uint64_t y[NUM_ECC_DIGITS];
 } ecc_point_t;
@@ -242,7 +246,7 @@ get_rand_num(uint64_t *vli) {
 static void
 vli_clear(uint64_t *vli) {
   uint i;
-  for (i = 0; i<NUM_ECC_DIGITS; i++)
+  for (i = 0; i < NUM_ECC_DIGITS; i++)
     vli[i] = 0;
 }
 
@@ -422,7 +426,7 @@ vli_mult(uint64_t *result, uint64_t *left, uint64_t *right) {
 
 // Computes result = left^2.
 static void
-vli_square(uint64_t *result, uint64_t *left) {
+vli_sqr(uint64_t *result, uint64_t *left) {
   uint128_t r01 = 0;
   uint64_t r2 = 0;
 
@@ -514,7 +518,7 @@ vli_mult(uint64_t *result, uint64_t *left, uint64_t *right) {
 }
 
 static void
-vli_square(uint64_t *result, uint64_t *left) {
+vli_sqr(uint64_t *result, uint64_t *left) {
   uint128_t r01 = {0, 0};
   uint64_t r2 = 0;
 
@@ -808,7 +812,7 @@ vli_mmod_fast(uint64_t *result, uint64_t *product) {
 
 // Computes result = (left * right) % curve_p.
 static void
-vli_modmult_fast(uint64_t *result, uint64_t *left, uint64_t *right) {
+vli_mod_mult_fast(uint64_t *result, uint64_t *left, uint64_t *right) {
   uint64_t product[2 * NUM_ECC_DIGITS];
   vli_mult(product, left, right);
   vli_mmod_fast(result, product);
@@ -816,9 +820,9 @@ vli_modmult_fast(uint64_t *result, uint64_t *left, uint64_t *right) {
 
 // Computes result = left^2 % curve_p.
 static void
-vli_modsqr_fast(uint64_t *result, uint64_t *left) {
+vli_mod_sqr_fast(uint64_t *result, uint64_t *left) {
   uint64_t product[2 * NUM_ECC_DIGITS];
-  vli_square(product, left);
+  vli_sqr(product, left);
   vli_mmod_fast(result, product);
 }
 
@@ -828,7 +832,7 @@ vli_modsqr_fast(uint64_t *result, uint64_t *left) {
 // See "From Euclid's GCD to Montgomery Multiplication to the Great Divide"
 // https://labs.oracle.com/techrep/2001/smli_tr-2001-95.pdf */
 static void
-vli_modinv(uint64_t *result, uint64_t *input, uint64_t *mod) {
+vli_mod_inv(uint64_t *result, uint64_t *input, uint64_t *mod) {
   uint64_t a[NUM_ECC_DIGITS], b[NUM_ECC_DIGITS];
   uint64_t u[NUM_ECC_DIGITS], v[NUM_ECC_DIGITS];
   uint64_t carry;
@@ -928,16 +932,16 @@ ecc_point_double_jacobian(uint64_t *X1, uint64_t *Y1, uint64_t *Z1) {
   if (vli_is_zero(Z1))
     return;
 
-  vli_modsqr_fast(t4, Y1); // t4 = y1^2
-  vli_modmult_fast(t5, X1, t4); // t5 = x1*y1^2 = A
-  vli_modsqr_fast(t4, t4); // t4 = y1^4
-  vli_modmult_fast(Y1, Y1, Z1); // t2 = y1*z1 = z3
-  vli_modsqr_fast(Z1, Z1); // t3 = z1^2
+  vli_mod_sqr_fast(t4, Y1); // t4 = y1^2
+  vli_mod_mult_fast(t5, X1, t4); // t5 = x1*y1^2 = A
+  vli_mod_sqr_fast(t4, t4); // t4 = y1^4
+  vli_mod_mult_fast(Y1, Y1, Z1); // t2 = y1*z1 = z3
+  vli_mod_sqr_fast(Z1, Z1); // t3 = z1^2
 
   vli_mod_add(X1, X1, Z1, curve_p); // t1 = x1 + z1^2
   vli_mod_add(Z1, Z1, Z1, curve_p); // t3 = 2*z1^2
   vli_mod_sub(Z1, X1, Z1, curve_p); // t3 = x1 - z1^2
-  vli_modmult_fast(X1, X1, Z1); // t1 = x1^2 - z1^4
+  vli_mod_mult_fast(X1, X1, Z1); // t1 = x1^2 - z1^4
 
   vli_mod_add(Z1, X1, X1, curve_p); // t3 = 2*(x1^2 - z1^4)
   vli_mod_add(X1, X1, Z1, curve_p); // t1 = 3*(x1^2 - z1^4)
@@ -952,11 +956,11 @@ ecc_point_double_jacobian(uint64_t *X1, uint64_t *Y1, uint64_t *Z1) {
 
   // t1 = 3/2*(x1^2 - z1^4) = B
 
-  vli_modsqr_fast(Z1, X1); // t3 = B^2
+  vli_mod_sqr_fast(Z1, X1); // t3 = B^2
   vli_mod_sub(Z1, Z1, t5, curve_p); // t3 = B^2 - A
   vli_mod_sub(Z1, Z1, t5, curve_p); // t3 = B^2 - 2A = x3
   vli_mod_sub(t5, t5, Z1, curve_p); // t5 = A - x3
-  vli_modmult_fast(X1, X1, t5); // t1 = B * (A - x3)
+  vli_mod_mult_fast(X1, X1, t5); // t1 = B * (A - x3)
   vli_mod_sub(t4, X1, t4, curve_p); // t4 = B * (A - x3) - y1^4 = y3
 
   vli_set(X1, Z1);
@@ -969,10 +973,10 @@ static void
 apply_z(uint64_t *X1, uint64_t *Y1, uint64_t *Z) {
   uint64_t t1[NUM_ECC_DIGITS];
 
-  vli_modsqr_fast(t1, Z);  // z^2
-  vli_modmult_fast(X1, X1, t1); // x1 * z^2
-  vli_modmult_fast(t1, t1, Z);  // z^3
-  vli_modmult_fast(Y1, Y1, t1); // y1 * z^3
+  vli_mod_sqr_fast(t1, Z);  // z^2
+  vli_mod_mult_fast(X1, X1, t1); // x1 * z^2
+  vli_mod_mult_fast(t1, t1, Z);  // z^3
+  vli_mod_mult_fast(Y1, Y1, t1); // y1 * z^3
 }
 
 // P = (x1, y1) => 2P, (x2, y2) => P'
@@ -1011,18 +1015,18 @@ xycz_add(uint64_t *X1, uint64_t *Y1, uint64_t *X2, uint64_t *Y2) {
   uint64_t t5[NUM_ECC_DIGITS];
 
   vli_mod_sub(t5, X2, X1, curve_p); // t5 = x2 - x1
-  vli_modsqr_fast(t5, t5); // t5 = (x2 - x1)^2 = A
-  vli_modmult_fast(X1, X1, t5);  // t1 = x1*A = B
-  vli_modmult_fast(X2, X2, t5);  // t3 = x2*A = C
+  vli_mod_sqr_fast(t5, t5); // t5 = (x2 - x1)^2 = A
+  vli_mod_mult_fast(X1, X1, t5);  // t1 = x1*A = B
+  vli_mod_mult_fast(X2, X2, t5);  // t3 = x2*A = C
   vli_mod_sub(Y2, Y2, Y1, curve_p); // t4 = y2 - y1
-  vli_modsqr_fast(t5, Y2); // t5 = (y2 - y1)^2 = D
+  vli_mod_sqr_fast(t5, Y2); // t5 = (y2 - y1)^2 = D
 
   vli_mod_sub(t5, t5, X1, curve_p); // t5 = D - B
   vli_mod_sub(t5, t5, X2, curve_p); // t5 = D - B - C = x3
   vli_mod_sub(X2, X2, X1, curve_p); // t3 = C - B
-  vli_modmult_fast(Y1, Y1, X2); // t2 = y1*(C - B)
+  vli_mod_mult_fast(Y1, Y1, X2); // t2 = y1*(C - B)
   vli_mod_sub(X2, X1, t5, curve_p); // t3 = B - x3
-  vli_modmult_fast(Y2, Y2, X2); // t4 = (y2 - y1)*(B - x3)
+  vli_mod_mult_fast(Y2, Y2, X2); // t4 = (y2 - y1)*(B - x3)
   vli_mod_sub(Y2, Y2, Y1, curve_p); // t4 = y3
 
   vli_set(X2, t5);
@@ -1039,26 +1043,26 @@ xycz_addc(uint64_t *X1, uint64_t *Y1, uint64_t *X2, uint64_t *Y2) {
   uint64_t t7[NUM_ECC_DIGITS];
 
   vli_mod_sub(t5, X2, X1, curve_p); // t5 = x2 - x1
-  vli_modsqr_fast(t5, t5); // t5 = (x2 - x1)^2 = A
-  vli_modmult_fast(X1, X1, t5); // t1 = x1*A = B
-  vli_modmult_fast(X2, X2, t5); // t3 = x2*A = C
+  vli_mod_sqr_fast(t5, t5); // t5 = (x2 - x1)^2 = A
+  vli_mod_mult_fast(X1, X1, t5); // t1 = x1*A = B
+  vli_mod_mult_fast(X2, X2, t5); // t3 = x2*A = C
   vli_mod_add(t5, Y2, Y1, curve_p); // t4 = y2 + y1
   vli_mod_sub(Y2, Y2, Y1, curve_p); // t4 = y2 - y1
 
   vli_mod_sub(t6, X2, X1, curve_p); // t6 = C - B
-  vli_modmult_fast(Y1, Y1, t6); // t2 = y1 * (C - B)
+  vli_mod_mult_fast(Y1, Y1, t6); // t2 = y1 * (C - B)
   vli_mod_add(t6, X1, X2, curve_p); // t6 = B + C
-  vli_modsqr_fast(X2, Y2); // t3 = (y2 - y1)^2
+  vli_mod_sqr_fast(X2, Y2); // t3 = (y2 - y1)^2
   vli_mod_sub(X2, X2, t6, curve_p); // t3 = x3
 
   vli_mod_sub(t7, X1, X2, curve_p); // t7 = B - x3
-  vli_modmult_fast(Y2, Y2, t7); // t4 = (y2 - y1)*(B - x3)
+  vli_mod_mult_fast(Y2, Y2, t7); // t4 = (y2 - y1)*(B - x3)
   vli_mod_sub(Y2, Y2, Y1, curve_p); // t4 = y3
 
-  vli_modsqr_fast(t7, t5); // t7 = (y2 + y1)^2 = F
+  vli_mod_sqr_fast(t7, t5); // t7 = (y2 + y1)^2 = F
   vli_mod_sub(t7, t7, t6, curve_p); // t7 = x3'
   vli_mod_sub(t6, t7, X1, curve_p); // t6 = x3' - B
-  vli_modmult_fast(t6, t6, t5); // t6 = (y2 + y1)*(x3' - B)
+  vli_mod_mult_fast(t6, t6, t5); // t6 = (y2 + y1)*(x3' - B)
   vli_mod_sub(Y1, t6, Y1, curve_p); // t2 = y3'
 
   vli_set(X1, t7);
@@ -1094,11 +1098,11 @@ ecc_point_mult(
 
   // Find final 1/Z value.
   vli_mod_sub(z, Rx[1], Rx[0], curve_p); // X1 - X0
-  vli_modmult_fast(z, z, Ry[1 - nb]); // Yb * (X1 - X0)
-  vli_modmult_fast(z, z, point->x); // xP * Yb * (X1 - X0)
-  vli_modinv(z, z, curve_p); // 1 / (xP * Yb * (X1 - X0))
-  vli_modmult_fast(z, z, point->y); // yP / (xP * Yb * (X1 - X0))
-  vli_modmult_fast(z, z, Rx[1 - nb]); // Xb * yP / (xP * Yb * (X1 - X0))
+  vli_mod_mult_fast(z, z, Ry[1 - nb]); // Yb * (X1 - X0)
+  vli_mod_mult_fast(z, z, point->x); // xP * Yb * (X1 - X0)
+  vli_mod_inv(z, z, curve_p); // 1 / (xP * Yb * (X1 - X0))
+  vli_mod_mult_fast(z, z, point->y); // yP / (xP * Yb * (X1 - X0))
+  vli_mod_mult_fast(z, z, Rx[1 - nb]); // Xb * yP / (xP * Yb * (X1 - X0))
 
   // End 1/Z calculation
 
@@ -1163,9 +1167,9 @@ mod_sqrt(uint64_t a[NUM_ECC_DIGITS]) {
   vli_add(p1, curve_p, p1); // p1 = curve_p + 1
 
   for (i = vli_num_bits(p1) - 1; i > 1; i--) {
-    vli_modsqr_fast(result, result);
+    vli_mod_sqr_fast(result, result);
     if (vli_test_bit(p1, i))
-      vli_modmult_fast(result, result, a);
+      vli_mod_mult_fast(result, result, a);
   }
 
   vli_set(a, result);
@@ -1179,9 +1183,9 @@ ecc_point_decompress(
   uint64_t _3[NUM_ECC_DIGITS] = {3}; // -a = 3
   ecc_bytes2native(point->x, compressed + 1);
 
-  vli_modsqr_fast(point->y, point->x); // y = x^2
+  vli_mod_sqr_fast(point->y, point->x); // y = x^2
   vli_mod_sub(point->y, point->y, _3, curve_p); // y = x^2 - 3
-  vli_modmult_fast(point->y, point->y, point->x); // y = x^3 - 3x
+  vli_mod_mult_fast(point->y, point->y, point->x); // y = x^3 - 3x
   vli_mod_add(point->y, point->y, curve_b, curve_p); // y = x^3 - 3x + b
 
   mod_sqrt(point->y);
@@ -1304,7 +1308,7 @@ hsk_ecdh_shared_secret(
 
 // Computes result = (left * right) % mod.
 static void
-vli_modmult(
+vli_mod_mult(
   uint64_t *result,
   uint64_t *left,
   uint64_t *right,
@@ -1421,11 +1425,11 @@ hsk_ecdsa_sign(
   ecc_native2bytes(signature, p.x);
 
   ecc_bytes2native(tmp, private_key);
-  vli_modmult(s, p.x, tmp, curve_n); // s = r*d
+  vli_mod_mult(s, p.x, tmp, curve_n); // s = r*d
   ecc_bytes2native(tmp, hash);
   vli_mod_add(s, tmp, s, curve_n); // s = e + r*d
-  vli_modinv(k, k, curve_n); // k = 1 / k
-  vli_modmult(s, s, k, curve_n); // s = (e + r*d) / k
+  vli_mod_inv(k, k, curve_n); // k = 1 / k
+  vli_mod_mult(s, s, k, curve_n); // s = (e + r*d) / k
   ecc_native2bytes(signature + HSK_ECC_BYTES, s);
 
   return 1;
@@ -1461,10 +1465,10 @@ hsk_ecdsa_verify(
     return 0;
 
   // Calculate u1 and u2.
-  vli_modinv(z, s, curve_n); // Z = s^-1
+  vli_mod_inv(z, s, curve_n); // Z = s^-1
   ecc_bytes2native(u1, hash);
-  vli_modmult(u1, u1, z, curve_n); // u1 = e/s
-  vli_modmult(u2, r, z, curve_n); // u2 = r/s
+  vli_mod_mult(u1, u1, z, curve_n); // u1 = e/s
+  vli_mod_mult(u2, r, z, curve_n); // u2 = r/s
 
   // Calculate sum = G + Q.
   vli_set(sum.x, public.x);
@@ -1473,7 +1477,7 @@ hsk_ecdsa_verify(
   vli_set(ty, curve_g.y);
   vli_mod_sub(z, sum.x, tx, curve_p); // Z = x2 - x1
   xycz_add(tx, ty, sum.x, sum.y);
-  vli_modinv(z, z, curve_p); // Z = 1/Z
+  vli_mod_inv(z, z, curve_p); // Z = 1/Z
   apply_z(sum.x, sum.y, z);
 
   // Use Shamir's trick to calculate u1*G + u2*Q
@@ -1501,11 +1505,11 @@ hsk_ecdsa_verify(
       apply_z(tx, ty, z);
       vli_mod_sub(tz, rx, tx, curve_p); // Z = x2 - x1
       xycz_add(tx, ty, rx, ry);
-      vli_modmult_fast(z, z, tz);
+      vli_mod_mult_fast(z, z, tz);
     }
   }
 
-  vli_modinv(z, z, curve_p); // Z = 1/Z
+  vli_mod_inv(z, z, curve_p); // Z = 1/Z
   apply_z(rx, ry, z);
 
   // v = x1 (mod n)
