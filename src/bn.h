@@ -66,16 +66,16 @@ int
 hsk_bn_to_int(hsk_bn_t *n);
 
 void
-hsk_bn_from_string(hsk_bn_t *n, char* str, int nbytes);
+hsk_bn_from_string(hsk_bn_t *n, char *str, int nbytes);
 
 void
-hsk_bn_to_string(hsk_bn_t *n, char* str, int maxsize);
+hsk_bn_to_string(hsk_bn_t *n, char *str, int maxsize);
 
 void
-hsk_bn_from_array(hsk_bn_t *n, unsigned char* array, size_t size);
+hsk_bn_from_array(hsk_bn_t *n, unsigned char *array, size_t size);
 
 void
-hsk_bn_to_array(hsk_bn_t *n, unsigned char* array, size_t size);
+hsk_bn_to_array(hsk_bn_t *n, unsigned char *array, size_t size);
 
 /*
  * Basic arithmetic operations
