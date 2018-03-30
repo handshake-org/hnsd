@@ -40,6 +40,11 @@ peer
   -> stub resolver
 ```
 
+---
+
+This daemon currently stores no data, and uses about 12mb of memory when
+operating with a full DNS cache.
+
 ## Build/Runtime Deps
 
 - libunbound >= 1.7.0

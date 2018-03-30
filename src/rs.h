@@ -5,8 +5,9 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-#include "ec.h"
 #include <unbound.h>
+
+#include "ec.h"
 #include "uv.h"
 
 /*

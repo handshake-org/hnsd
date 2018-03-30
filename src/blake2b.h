@@ -67,20 +67,20 @@ enum {
   HSK_BLAKE2_DUMMY_1 = 1 / (sizeof(hsk_blake2b_param) == HSK_BLAKE2B_OUTBYTES)
 };
 
-int hsk_blake2b_init(hsk_blake2b_ctx *S, size_t outlen);
+int hsk_blake2b_init(hsk_blake2b_ctx *ctx, size_t outlen);
 
 int hsk_blake2b_init_key(
-  hsk_blake2b_ctx *S,
+  hsk_blake2b_ctx *ctx,
   size_t outlen,
   const void *key,
   size_t keylen
 );
 
-int hsk_blake2b_init_param(hsk_blake2b_ctx *S, const hsk_blake2b_param *P);
+int hsk_blake2b_init_param(hsk_blake2b_ctx *ctx, const hsk_blake2b_param *P);
 
-int hsk_blake2b_update(hsk_blake2b_ctx *S, const void *in, size_t inlen);
+int hsk_blake2b_update(hsk_blake2b_ctx *ctx, const void *in, size_t inlen);
 
-int hsk_blake2b_final(hsk_blake2b_ctx *S, void *out, size_t outlen);
+int hsk_blake2b_final(hsk_blake2b_ctx *ctx, void *out, size_t outlen);
 
 int hsk_blake2b(
   void *out,

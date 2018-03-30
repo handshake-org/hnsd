@@ -75,8 +75,8 @@ static const unsigned int k256[64] = {
   0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2
 };
 
-#define Ch(x,y,z)  ((z) ^ ((x) & ((y) ^ (z))))
-#define Maj(x,y,z) (((x) & (y)) ^ ((z) & ((x) ^ (y))))
+#define Ch(x, y, z)  ((z) ^ ((x) & ((y) ^ (z))))
+#define Maj(x, y, z) (((x) & (y)) ^ ((z) & ((x) ^ (y))))
 
 #define Sigma0(x) (ROTR32((x), 2) ^ ROTR32((x), 13) ^ ROTR32((x), 22))
 #define Sigma1(x) (ROTR32((x), 6) ^ ROTR32((x), 11) ^ ROTR32((x), 25))
@@ -84,15 +84,21 @@ static const unsigned int k256[64] = {
 #define sigma1(x) (ROTR32((x),17) ^ ROTR32((x), 19) ^ ((x) >> 10))
 
 #define RECALCULATE_W(W,n) (W[n] += \
-  (sigma1(W[(n - 2) & 15]) + W[(n - 7) & 15] + sigma0(W[(n - 15) & 15])))
+  (sigma1(W[(n - 2) & 15])          \
+   + W[(n - 7) & 15]                \
+   + sigma0(W[(n - 15) & 15])))
 
-#define ROUND(a,b,c,d,e,f,g,h,k,data) { \
-  unsigned int T1 = h + Sigma1(e) + Ch(e,f,g) + k + (data); \
-  d += T1, h = T1 + Sigma0(a) + Maj(a,b,c); }
-#define ROUND_1_16(a,b,c,d,e,f,g,h,n) \
-  ROUND(a,b,c,d,e,f,g,h, k256[n], W[n] = be2me_32(block[n]))
-#define ROUND_17_64(a,b,c,d,e,f,g,h,n) \
-  ROUND(a,b,c,d,e,f,g,h, k[n], RECALCULATE_W(W, n))
+#define ROUND(a, b, c, d, e, f, g, h, k, data) {              \
+  unsigned int T1 = h + Sigma1(e) + Ch(e, f, g) + k + (data); \
+  d += T1;                                                    \
+  h = T1 + Sigma0(a) + Maj(a, b, c);                          \
+}
+
+#define ROUND_1_16(a, b, c, d, e, f, g, h, n)                       \
+  ROUND(a, b, c, d, e, f, g, h, k256[n], W[n] = be2me_32(block[n]))
+
+#define ROUND_17_64(a, b, c, d, e, f, g, h, n)             \
+  ROUND(a, b, c, d, e, f, g, h, k[n], RECALCULATE_W(W, n))
 
 void
 hsk_sha256_init(hsk_sha256_ctx *ctx) {

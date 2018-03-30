@@ -47,56 +47,56 @@ static const uint8_t hsk_blake2b_sigma[12][16] = {
 
 
 static void
-hsk_blake2b_set_lastnode(hsk_blake2b_ctx *S) {
-  S->f[1] = (uint64_t)-1;
+hsk_blake2b_set_lastnode(hsk_blake2b_ctx *ctx) {
+  ctx->f[1] = (uint64_t)-1;
 }
 
 static int
-hsk_blake2b_is_lastblock(const hsk_blake2b_ctx *S) {
-  return S->f[0] != 0;
+hsk_blake2b_is_lastblock(const hsk_blake2b_ctx *ctx) {
+  return ctx->f[0] != 0;
 }
 
 static void
-hsk_blake2b_set_lastblock(hsk_blake2b_ctx *S) {
-  if (S->last_node)
-    hsk_blake2b_set_lastnode(S);
+hsk_blake2b_set_lastblock(hsk_blake2b_ctx *ctx) {
+  if (ctx->last_node)
+    hsk_blake2b_set_lastnode(ctx);
 
-  S->f[0] = (uint64_t)-1;
+  ctx->f[0] = (uint64_t)-1;
 }
 
 static void
-hsk_blake2b_increment_counter(hsk_blake2b_ctx *S, const uint64_t inc) {
-  S->t[0] += inc;
-  S->t[1] += (S->t[0] < inc);
+hsk_blake2b_increment_counter(hsk_blake2b_ctx *ctx, const uint64_t inc) {
+  ctx->t[0] += inc;
+  ctx->t[1] += (ctx->t[0] < inc);
 }
 
 static void
-hsk_blake2b_init0(hsk_blake2b_ctx *S) {
+hsk_blake2b_init0(hsk_blake2b_ctx *ctx) {
   size_t i;
 
-  memset(S, 0, sizeof(hsk_blake2b_ctx));
+  memset(ctx, 0, sizeof(hsk_blake2b_ctx));
 
   for (i = 0; i < 8; i++)
-    S->h[i] = hsk_blake2b_IV[i];
+    ctx->h[i] = hsk_blake2b_IV[i];
 }
 
 int
-hsk_blake2b_init_param(hsk_blake2b_ctx *S, const hsk_blake2b_param *P) {
+hsk_blake2b_init_param(hsk_blake2b_ctx *ctx, const hsk_blake2b_param *P) {
   const uint8_t *p = (const uint8_t *)(P);
   size_t i;
 
-  hsk_blake2b_init0(S);
+  hsk_blake2b_init0(ctx);
 
   for (i = 0; i < 8; i++)
-    S->h[i] ^= load64(p + sizeof(S->h[i]) * i);
+    ctx->h[i] ^= load64(p + sizeof(ctx->h[i]) * i);
 
-  S->outlen = P->digest_length;
+  ctx->outlen = P->digest_length;
 
   return 0;
 }
 
 int
-hsk_blake2b_init(hsk_blake2b_ctx *S, size_t outlen) {
+hsk_blake2b_init(hsk_blake2b_ctx *ctx, size_t outlen) {
   hsk_blake2b_param P[1];
 
   if ((!outlen) || (outlen > HSK_BLAKE2B_OUTBYTES))
@@ -115,12 +115,12 @@ hsk_blake2b_init(hsk_blake2b_ctx *S, size_t outlen) {
   memset(P->salt, 0, sizeof(P->salt));
   memset(P->personal, 0, sizeof(P->personal));
 
-  return hsk_blake2b_init_param(S, P);
+  return hsk_blake2b_init_param(ctx, P);
 }
 
 int
 hsk_blake2b_init_key(
-  hsk_blake2b_ctx *S,
+  hsk_blake2b_ctx *ctx,
   size_t outlen,
   const void *key,
   size_t keylen
@@ -146,14 +146,14 @@ hsk_blake2b_init_key(
   memset(P->salt, 0, sizeof(P->salt));
   memset(P->personal, 0, sizeof(P->personal));
 
-  if (hsk_blake2b_init_param(S, P) < 0)
+  if (hsk_blake2b_init_param(ctx, P) < 0)
     return -1;
 
   {
     uint8_t block[HSK_BLAKE2B_BLOCKBYTES];
     memset(block, 0, HSK_BLAKE2B_BLOCKBYTES);
     memcpy(block, key, keylen);
-    hsk_blake2b_update(S, block, HSK_BLAKE2B_BLOCKBYTES);
+    hsk_blake2b_update(ctx, block, HSK_BLAKE2B_BLOCKBYTES);
     secure_zero_memory(block, HSK_BLAKE2B_BLOCKBYTES);
   }
 
@@ -186,7 +186,7 @@ hsk_blake2b_init_key(
 
 static void
 hsk_blake2b_compress(
-  hsk_blake2b_ctx *S,
+  hsk_blake2b_ctx *ctx,
   const uint8_t block[HSK_BLAKE2B_BLOCKBYTES]
 ) {
   uint64_t m[16];
@@ -197,16 +197,16 @@ hsk_blake2b_compress(
     m[i] = load64(block + i * sizeof(m[i]));
 
   for (i = 0; i < 8; i++)
-    v[i] = S->h[i];
+    v[i] = ctx->h[i];
 
   v[8] = hsk_blake2b_IV[0];
   v[9] = hsk_blake2b_IV[1];
   v[10] = hsk_blake2b_IV[2];
   v[11] = hsk_blake2b_IV[3];
-  v[12] = hsk_blake2b_IV[4] ^ S->t[0];
-  v[13] = hsk_blake2b_IV[5] ^ S->t[1];
-  v[14] = hsk_blake2b_IV[6] ^ S->f[0];
-  v[15] = hsk_blake2b_IV[7] ^ S->f[1];
+  v[12] = hsk_blake2b_IV[4] ^ ctx->t[0];
+  v[13] = hsk_blake2b_IV[5] ^ ctx->t[1];
+  v[14] = hsk_blake2b_IV[6] ^ ctx->f[0];
+  v[15] = hsk_blake2b_IV[7] ^ ctx->f[1];
 
   ROUND(0);
   ROUND(1);
@@ -222,65 +222,65 @@ hsk_blake2b_compress(
   ROUND(11);
 
   for (i = 0; i < 8; i++)
-    S->h[i] = S->h[i] ^ v[i] ^ v[i + 8];
+    ctx->h[i] = ctx->h[i] ^ v[i] ^ v[i + 8];
 }
 
 #undef G
 #undef ROUND
 
 int
-hsk_blake2b_update(hsk_blake2b_ctx *S, const void *pin, size_t inlen) {
+hsk_blake2b_update(hsk_blake2b_ctx *ctx, const void *pin, size_t inlen) {
   const unsigned char * in = (const unsigned char *)pin;
 
   if (inlen > 0) {
-    size_t left = S->buflen;
+    size_t left = ctx->buflen;
     size_t fill = HSK_BLAKE2B_BLOCKBYTES - left;
 
     if (inlen > fill) {
-      S->buflen = 0;
-      memcpy(S->buf + left, in, fill);
+      ctx->buflen = 0;
+      memcpy(ctx->buf + left, in, fill);
 
-      hsk_blake2b_increment_counter(S, HSK_BLAKE2B_BLOCKBYTES);
-      hsk_blake2b_compress(S, S->buf);
+      hsk_blake2b_increment_counter(ctx, HSK_BLAKE2B_BLOCKBYTES);
+      hsk_blake2b_compress(ctx, ctx->buf);
 
       in += fill;
       inlen -= fill;
 
       while (inlen > HSK_BLAKE2B_BLOCKBYTES) {
-        hsk_blake2b_increment_counter(S, HSK_BLAKE2B_BLOCKBYTES);
-        hsk_blake2b_compress(S, in);
+        hsk_blake2b_increment_counter(ctx, HSK_BLAKE2B_BLOCKBYTES);
+        hsk_blake2b_compress(ctx, in);
         in += HSK_BLAKE2B_BLOCKBYTES;
         inlen -= HSK_BLAKE2B_BLOCKBYTES;
       }
     }
 
-    memcpy(S->buf + S->buflen, in, inlen);
-    S->buflen += inlen;
+    memcpy(ctx->buf + ctx->buflen, in, inlen);
+    ctx->buflen += inlen;
   }
 
   return 0;
 }
 
 int
-hsk_blake2b_final(hsk_blake2b_ctx *S, void *out, size_t outlen) {
+hsk_blake2b_final(hsk_blake2b_ctx *ctx, void *out, size_t outlen) {
   uint8_t buffer[HSK_BLAKE2B_OUTBYTES] = {0};
   size_t i;
 
-  if (out == NULL || outlen < S->outlen)
+  if (out == NULL || outlen < ctx->outlen)
     return -1;
 
-  if (hsk_blake2b_is_lastblock(S))
+  if (hsk_blake2b_is_lastblock(ctx))
     return -1;
 
-  hsk_blake2b_increment_counter(S, S->buflen);
-  hsk_blake2b_set_lastblock(S);
-  memset(S->buf + S->buflen, 0, HSK_BLAKE2B_BLOCKBYTES - S->buflen);
-  hsk_blake2b_compress(S, S->buf);
+  hsk_blake2b_increment_counter(ctx, ctx->buflen);
+  hsk_blake2b_set_lastblock(ctx);
+  memset(ctx->buf + ctx->buflen, 0, HSK_BLAKE2B_BLOCKBYTES - ctx->buflen);
+  hsk_blake2b_compress(ctx, ctx->buf);
 
   for (i = 0; i < 8; i++)
-    store64(buffer + sizeof(S->h[i]) * i, S->h[i]);
+    store64(buffer + sizeof(ctx->h[i]) * i, ctx->h[i]);
 
-  memcpy(out, buffer, S->outlen);
+  memcpy(out, buffer, ctx->outlen);
   secure_zero_memory(buffer, sizeof(buffer));
 
   return 0;
@@ -295,7 +295,7 @@ hsk_blake2b(
   const void *key,
   size_t keylen
 ) {
-  hsk_blake2b_ctx S[1];
+  hsk_blake2b_ctx ctx;
 
   if (in == NULL && inlen > 0)
     return -1;
@@ -313,15 +313,15 @@ hsk_blake2b(
     return -1;
 
   if (keylen > 0) {
-    if (hsk_blake2b_init_key(S, outlen, key, keylen) < 0)
+    if (hsk_blake2b_init_key(&ctx, outlen, key, keylen) < 0)
       return -1;
   } else {
-    if (hsk_blake2b_init(S, outlen) < 0)
+    if (hsk_blake2b_init(&ctx, outlen) < 0)
       return -1;
   }
 
-  hsk_blake2b_update(S, (const uint8_t *)in, inlen);
-  hsk_blake2b_final(S, out, outlen);
+  hsk_blake2b_update(&ctx, (const uint8_t *)in, inlen);
+  hsk_blake2b_final(&ctx, out, outlen);
 
   return 0;
 }

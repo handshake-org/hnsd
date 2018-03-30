@@ -45,7 +45,7 @@ AC_TYPE_INT64_T
 AC_FUNC_MALLOC
 AC_FUNC_REALLOC
 AC_SYS_LARGEFILE
-AC_CHECK_FUNCS([memset strcasecmp strdup strstr])
+AC_CHECK_FUNCS([memset strcasecmp strdup strstr getrandom])
 
 AC_CHECK_HEADERS([ \
   arpa/inet.h \
@@ -57,6 +57,7 @@ AC_CHECK_HEADERS([ \
   stdlib.h \
   string.h \
   strings.h \
+  sys/random.h \
   unistd.h \
 ])
 

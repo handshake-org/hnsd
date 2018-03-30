@@ -1304,7 +1304,9 @@ hsk_ecc_ecdh(
   return !ecc_point_is_zero(&product);
 }
 
-// -------- ECDSA code --------
+/*
+ * -------- ECDSA code --------
+ */
 
 // Computes result = (left * right) % mod.
 static void

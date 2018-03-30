@@ -31,11 +31,13 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "config.h"
 #include "random.h"
 
 #if defined(__linux__) \
   && ((defined(HAVE_SYS_RANDOM_H) && defined(HAVE_GETRANDOM)) \
   || (__GLIBC__ > 2 || __GLIBC_MINOR__ >= 25))
+
 #include <sys/random.h>
 
 bool
@@ -45,7 +47,9 @@ hsk_randombytes(uint8_t *dst, size_t len) {
     return false;
   return true;
 }
+
 #elif defined(__APPLE__) && defined(HAVE_APPLE_FRAMEWORK)
+
 #include <Security/Security.h>
 
 bool
@@ -54,7 +58,9 @@ hsk_randombytes(uint8_t *dst, size_t len) {
     return true;
   return false;
 }
+
 #elif defined(__linux__) || defined(__APPLE__)
+
 #include <stdio.h>
 
 bool
@@ -70,7 +76,35 @@ hsk_randombytes(uint8_t *dst, size_t len) {
 
   return nbytes == len;
 }
+
 #elif defined(_WIN16) || defined(_WIN32) || defined(_WIN64)
+
+#if defined(HAVE_WINCRYPT_H)
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <wincrypt.h>
+
+bool
+hsk_randombytes(uint8_t *dst, size_t len) {
+  HCRYPTPROV prov;
+
+  BOOL r = CryptAcquireContext(
+    &prov,
+    NULL,
+    NULL,
+    PROV_RSA_FULL,
+    CRYPT_VERIFYCONTEXT
+  );
+
+  if (!r)
+    return false;
+
+  CryptGenRandom(prov, len, (BYTE *)dst);
+  CryptReleaseContext(prov, 0);
+
+  return true;
+}
+#else
 #include <windows.h>
 
 bool
@@ -82,6 +116,45 @@ hsk_randombytes(uint8_t *dst, size_t len) {
 
   return true;
 }
+#endif
+
 #else
-#error "Unsupported OS for randomness."
+
+#include <sys/types.h>
+#include <fcntl.h>
+#include <unistd.h>
+
+#ifndef O_CLOEXEC
+#define O_CLOEXEC 0
+#endif
+
+bool
+hsk_randombytes(uint8_t *dst, size_t len) {
+  int fd = open("/dev/urandom", O_RDONLY | O_CLOEXEC);
+
+  if (fd == -1) {
+    fd = open("/dev/random", O_RDONLY | O_CLOEXEC);
+    if (fd == -1)
+      return false;
+  }
+
+  char *ptr = (char *)dst;
+  size_t left = len;
+
+  while (left > 0) {
+    int bytes = read(fd, ptr, left);
+
+    if (bytes <= 0) {
+      close(fd);
+      return false;
+    }
+
+    left -= bytes;
+    ptr += bytes;
+  }
+
+  close(fd);
+  return true;
+}
+
 #endif

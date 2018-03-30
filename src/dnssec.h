@@ -4,15 +4,6 @@
 #include <stdint.h>
 #include "dns.h"
 
-hsk_dns_rr_t *
-hsk_dnssec_get_dnskey(void);
-
-hsk_dns_rr_t *
-hsk_dnssec_get_ds(void);
-
-bool
-hsk_dnssec_sign(hsk_dns_rrs_t *rrs, uint16_t type);
-
 // priv: 1c74c825c5b0f08cf6be846bfc93c423f03e3e1f6202fb2d96474b1520bbafad
 // cpub: 034fd714449d8cfcccfdaba52c64d63e3aca72be3f94bfeb60aeb5a42ed3d0c205
 static const uint8_t hsk_dnssec_ksk[] = ""
@@ -30,5 +21,14 @@ static const uint8_t hsk_dnssec_zsk[] = ""
 static const uint8_t hsk_dnssec_revoke[] = ""
   "\xf9\x1e\xc5\x39\x91\xa3\xf2\x3e\xf0\x97\x18\x20\x86\xa7\xef\xaa"
   "\xa5\x33\x9e\xf6\x59\xc1\x40\x2a\xfd\xa5\xd9\x47\xe2\x95\x79\xca";
+
+hsk_dns_rr_t *
+hsk_dnssec_get_dnskey(void);
+
+hsk_dns_rr_t *
+hsk_dnssec_get_ds(void);
+
+bool
+hsk_dnssec_sign(hsk_dns_rrs_t *rrs, uint16_t type);
 
 #endif

@@ -9,21 +9,20 @@
 #include <arpa/inet.h>
 #include <netinet/in.h>
 
-#include "uv.h"
 #include <unbound.h>
 
 #include "addr.h"
 #include "constants.h"
-#include "resource.h"
-#include "error.h"
-#include "ec.h"
+#include "dns.h"
 #include "dnssec.h"
+#include "ec.h"
+#include "error.h"
+#include "resource.h"
 #include "req.h"
 #include "rs.h"
 #include "sig0.h"
 #include "utils.h"
-
-#include "dns.h"
+#include "uv.h"
 
 /*
  * Types
