@@ -410,7 +410,7 @@ vli_mult(uint64_t *result, uint64_t *left, uint64_t *right) {
   for (k = 0; k < NUM_ECC_DIGITS * 2 - 1; k++) {
     uint min = (k < NUM_ECC_DIGITS ? 0 : (k + 1) - NUM_ECC_DIGITS);
 
-    for (i = min; i <= k && i<NUM_ECC_DIGITS; i++) {
+    for (i = min; i <= k && i < NUM_ECC_DIGITS; i++) {
       uint128_t product = (uint128_t)left[i] * right[k - i];
       r01 += product;
       r2 += (r01 < product);
@@ -502,7 +502,7 @@ vli_mult(uint64_t *result, uint64_t *left, uint64_t *right) {
   for (k = 0; k < NUM_ECC_DIGITS * 2 - 1; k++) {
     uint min = (k < NUM_ECC_DIGITS ? 0 : (k + 1) - NUM_ECC_DIGITS);
 
-    for (i = min; i <= k && i<NUM_ECC_DIGITS; i++) {
+    for (i = min; i <= k && i < NUM_ECC_DIGITS; i++) {
       uint128_t product = mul_64_64(left[i], right[k - i]);
       r01 = add_128_128(r01, product);
       r2 += (r01.m_high < product.m_high);
@@ -792,7 +792,7 @@ vli_mmod_fast(uint64_t *result, uint64_t *product) {
     vli_clear(product + NUM_ECC_DIGITS); // p = c0
 
     // (c1, c0) = c0 + w * c1
-    for (i = 0; i<NUM_ECC_DIGITS + 3; i++) {
+    for (i = 0; i < NUM_ECC_DIGITS + 3; i++) {
       uint64_t sum = product[i] + tmp[i] + carry;
 
       if (sum != product[i])
@@ -1141,7 +1141,7 @@ ecc_native2bytes(
   const uint64_t native[NUM_ECC_DIGITS]
 ) {
   unsigned i;
-  for (i = 0; i<NUM_ECC_DIGITS; i++) {
+  for (i = 0; i < NUM_ECC_DIGITS; i++) {
     uint8_t *digit = bytes + 8 * (NUM_ECC_DIGITS - 1 - i);
     digit[0] = native[i] >> 56;
     digit[1] = native[i] >> 48;
