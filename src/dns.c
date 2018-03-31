@@ -1,3 +1,5 @@
+#include "config.h"
+
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -8,9 +10,9 @@
 
 #include "bio.h"
 #include "dns.h"
-#include "utils.h"
-#include "sha256.h"
 #include "ecc.h"
+#include "sha256.h"
+#include "utils.h"
 
 typedef struct hsk_dns_raw_rr_s {
   uint8_t *data;

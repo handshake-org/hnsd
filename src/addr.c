@@ -1,3 +1,5 @@
+#include "config.h"
+
 #include <assert.h>
 #include <stdint.h>
 #include <stdbool.h>
@@ -606,7 +608,20 @@ hsk_addr_hash(void *key) {
 bool
 hsk_addr_equal(void *a, void *b) {
   assert(a && b);
-  return memcmp(a, b, sizeof(hsk_addr_t)) == 0;
+
+  hsk_addr_t *x = (hsk_addr_t *)a;
+  hsk_addr_t *y = (hsk_addr_t *)b;
+
+  if (x->type != y->type)
+    return false;
+
+  if (memcmp(x->ip, y->ip, 36) != 0)
+    return false;
+
+  if (x->port != y->port)
+    return false;
+
+  return true;
 }
 
 bool

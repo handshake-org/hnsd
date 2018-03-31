@@ -16,9 +16,10 @@
  * or FITNESS FOR A PARTICULAR PURPOSE.  Use this program  at  your own risk!
  */
 
+#include "config.h"
+
 #include <string.h>
 
-#include "config.h"
 #include "sha256.h"
 
 static inline uint32_t

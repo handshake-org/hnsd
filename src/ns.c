@@ -1,3 +1,5 @@
+#include "config.h"
+
 #include <assert.h>
 #include <stdint.h>
 #include <stdbool.h>
@@ -9,10 +11,10 @@
 #include <arpa/inet.h>
 #include <netinet/in.h>
 
-#include "uv.h"
 
 #include "addr.h"
 #include "constants.h"
+#include "dns.h"
 #include "ec.h"
 #include "error.h"
 #include "resource.h"
@@ -20,8 +22,7 @@
 #include "pool.h"
 #include "req.h"
 #include "sig0.h"
-
-#include "dns.h"
+#include "uv.h"
 
 /*
  * Types

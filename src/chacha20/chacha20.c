@@ -20,6 +20,8 @@
  *   performed.
  */
 
+#include "config.h"
+
 #include <string.h>
 
 #include "chacha20.h"

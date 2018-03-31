@@ -1,3 +1,5 @@
+#include "config.h"
+
 #include <assert.h>
 #include <stdint.h>
 #include <stdbool.h>
@@ -7,8 +9,6 @@
 #include "hash.h"
 #include "blake2b.h"
 #include "sha256.h"
-
-#include <stdio.h>
 #include "utils.h"
 
 void

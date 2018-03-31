@@ -5,6 +5,8 @@
  * tiny-bignum-c resides in the public domain.
  */
 
+#include "config.h"
+
 #include <assert.h>
 #include <stdio.h>
 #include <stdbool.h>

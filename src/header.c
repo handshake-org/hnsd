@@ -1,16 +1,17 @@
+#include "config.h"
+
 #include <assert.h>
 #include <stdint.h>
 #include <stdbool.h>
 #include <stdio.h>
 
-#include "config.h"
-#include "error.h"
-#include "constants.h"
-#include "hash.h"
-#include "header.h"
-#include "cuckoo.h"
 #include "bio.h"
 #include "bn.h"
+#include "constants.h"
+#include "cuckoo.h"
+#include "error.h"
+#include "hash.h"
+#include "header.h"
 #include "utils.h"
 
 void

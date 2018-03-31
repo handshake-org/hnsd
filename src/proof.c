@@ -1,3 +1,5 @@
+#include "config.h"
+
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -5,11 +7,11 @@
 #include <stdint.h>
 #include <stdbool.h>
 
+#include "bio.h"
 #include "constants.h"
 #include "error.h"
 #include "hash.h"
 #include "proof.h"
-#include "bio.h"
 
 static bool
 to_nibbles(uint8_t *data, size_t data_len, uint8_t *nib, size_t nib_len) {
@@ -35,7 +37,7 @@ to_nibbles(uint8_t *data, size_t data_len, uint8_t *nib, size_t nib_len) {
 static int32_t
 decompress(uint8_t *data, size_t data_len, uint8_t **dec, size_t *dec_len) {
   if (data_len == 0) {
-    *dec = malloc(0);
+    *dec = NULL;
     *dec_len = 0;
     return true;
   }
@@ -385,13 +387,13 @@ hsk_proof_verify(
 
   // Nibble key & key length
   uint8_t k[65];
-  uint8_t *kk = k;
+  uint8_t *kk = &k[0];
   size_t kl = 65;
 
   // Current hash and hash buffer.
   uint8_t expect[32];
   uint8_t hash[32];
-  memcpy(expect, root, 32);
+  memcpy(&expect[0], root, 32);
 
   // Current node.
   hsk_node_t *node = NULL;

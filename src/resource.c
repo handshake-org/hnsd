@@ -1,19 +1,20 @@
+#include "config.h"
+
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-
 #include <stdint.h>
 #include <stdbool.h>
 
+#include "addr.h"
+#include "base32.h"
 #include "bio.h"
 #include "dns.h"
-#include "addr.h"
-#include "resource.h"
-#include "error.h"
-#include "utils.h"
 #include "dnssec.h"
-#include "base32.h"
+#include "error.h"
+#include "resource.h"
+#include "utils.h"
 
 static const uint8_t hsk_zero_inet4[4] = {
   0x00, 0x00, 0x00, 0x00

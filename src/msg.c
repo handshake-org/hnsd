@@ -1,3 +1,5 @@
+#include "config.h"
+
 #include <assert.h>
 #include <stdint.h>
 #include <stdbool.h>
@@ -5,10 +7,10 @@
 #include <stdlib.h>
 
 #include "addr.h"
+#include "bio.h"
 #include "header.h"
 #include "msg.h"
 #include "proof.h"
-#include "bio.h"
 #include "utils.h"
 
 bool

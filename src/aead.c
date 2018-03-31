@@ -1,16 +1,18 @@
+#include "config.h"
+
 #include <assert.h>
 #include <stdint.h>
 #include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
 
-#include "bio.h"
-#include "hash.h"
-#include "blake2b.h"
-#include "sha256.h"
-#include "chacha20/chacha20.h"
-#include "poly1305/poly1305.h"
 #include "aead.h"
+#include "bio.h"
+#include "blake2b.h"
+#include "chacha20.h"
+#include "hash.h"
+#include "poly1305.h"
+#include "sha256.h"
 
 void
 hsk_aead_init(hsk_aead_t *aead) {

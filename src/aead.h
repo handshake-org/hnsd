@@ -7,8 +7,8 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "chacha20/chacha20.h"
-#include "poly1305/poly1305.h"
+#include "chacha20.h"
+#include "poly1305.h"
 
 typedef struct hsk_aead_s {
   hsk_chacha20_ctx chacha;

@@ -1,3 +1,5 @@
+#include "config.h"
+
 #include <assert.h>
 #include <stdint.h>
 #include <stdbool.h>
@@ -15,7 +17,7 @@
   || defined(__NetBSD__)      \
   || defined(__APPLE__)
 #define _HSK_RANDOM arc4random
-#elif __linux
+#elif defined(__linux)
 #define _HSK_RANDOM random
 #else
 #define _HSK_RANDOM rand

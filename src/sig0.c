@@ -1,12 +1,14 @@
+#include "config.h"
+
 #include <assert.h>
 #include <stdint.h>
 #include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
 
-#include "ec.h"
-#include "blake2b.h"
 #include "bio.h"
+#include "blake2b.h"
+#include "ec.h"
 #include "sig0.h"
 #include "utils.h"
 

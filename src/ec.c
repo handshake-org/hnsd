@@ -1,14 +1,15 @@
+#include "config.h"
+
 #include <assert.h>
 #include <stdint.h>
 #include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
 
-#include "secp256k1.h"
-
 #include "ec.h"
 #include "hash.h"
 #include "random.h"
+#include "secp256k1.h"
 
 hsk_ec_t *
 hsk_ec_alloc(void) {
@@ -56,7 +57,7 @@ hsk_ec_create_privkey(hsk_ec_t *ec, uint8_t *key) {
   int32_t i = 0;
 
   while (!hsk_ec_verify_privkey(ec, key)) {
-    if (i > 100000)
+    if (i > 1000)
       return false;
 
     if (!hsk_randombytes(key, 32))

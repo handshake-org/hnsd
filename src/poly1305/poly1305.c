@@ -6,6 +6,8 @@
  * http://www.opensource.org/licenses/mit-license.php
  */
 
+#include "config.h"
+
 #include "poly1305.h"
 
 #if defined(HSK_POLY1305_8BIT)

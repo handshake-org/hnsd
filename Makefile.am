@@ -8,6 +8,8 @@ ACLOCAL_AMFLAGS = -I m4
 
 AM_CPPFLAGS = -I$(top_builddir)             \
               -I$(top_srcdir)/src           \
+              -I$(top_srcdir)/src/chacha20  \
+              -I$(top_srcdir)/src/poly1305  \
               -I$(top_srcdir)/uv/include    \
               -I$(top_srcdir)/src/secp256k1
 
@@ -37,8 +39,6 @@ libhsk_la_SOURCES = src/addr.c                   \
                     src/ec.c                     \
                     src/hash.c                   \
                     src/header.c                 \
-                    src/hsig.c                   \
-                    src/list.c                   \
                     src/map.c                    \
                     src/msg.c                    \
                     src/poly1305/poly1305.c      \

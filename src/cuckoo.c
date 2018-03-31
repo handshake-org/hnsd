@@ -1,11 +1,13 @@
+#include "config.h"
+
 #include <assert.h>
 #include <stdint.h>
 #include <stdbool.h>
 #include <stdlib.h>
 
+#include "blake2b.h"
 #include "cuckoo.h"
 #include "error.h"
-#include "blake2b.h"
 #include "siphash.h"
 
 int32_t

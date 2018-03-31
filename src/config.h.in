@@ -7,6 +7,9 @@
 /* Define if building universal (internal helper macro) */
 #undef AC_APPLE_UNIVERSAL_BUILD
 
+/* Define to 1 if you have the `arc4random' function. */
+#undef HAVE_ARC4RANDOM
+
 /* Define to 1 if you have the <arpa/inet.h> header file. */
 #undef HAVE_ARPA_INET_H
 
@@ -40,6 +43,9 @@
 
 /* Define to 1 if you have the <netinet/in.h> header file. */
 #undef HAVE_NETINET_IN_H
+
+/* Define to 1 if you have the `random' function. */
+#undef HAVE_RANDOM
 
 /* Define to 1 if your system has a GNU libc compatible `realloc' function,
    and to 0 otherwise. */

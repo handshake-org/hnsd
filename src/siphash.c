@@ -1,8 +1,9 @@
+#include "config.h"
+
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 
-#include "config.h"
 #include "siphash.h"
 
 #define ROTL(x, b) (uint64_t)(((x) << (b)) | ((x) >> (64 - (b))))

@@ -6,9 +6,8 @@
 #include <stdbool.h>
 #include <stdlib.h>
 
-#include "secp256k1.h"
-
 #include "hash.h"
+#include "secp256k1.h"
 
 typedef hsk_secp256k1_context hsk_ec_t;
 

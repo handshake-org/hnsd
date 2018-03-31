@@ -1,3 +1,5 @@
+#include "config.h"
+
 #include <assert.h>
 #include <stdint.h>
 #include <stdbool.h>
@@ -10,14 +12,11 @@
 #include <netinet/in.h>
 #include <getopt.h>
 
-#include "uv.h"
-
-#include "base32.h"
 #include "hsk.h"
 #include "pool.h"
 #include "ns.h"
 #include "rs.h"
-#include "utils.h"
+#include "uv.h"
 
 extern char *optarg;
 extern int optind, opterr, optopt;
@@ -135,8 +134,8 @@ parse_arg(int argc, char **argv, hsk_options_t *opt) {
       case 'c': {
         if (strlen(optarg) > 255)
           return help(1);
-        strcpy(opt->config_, optarg);
-        opt->config = opt->config_;
+        strcpy(&opt->config_[0], optarg);
+        opt->config = &opt->config_[0];
         break;
       }
 
@@ -162,8 +161,8 @@ parse_arg(int argc, char **argv, hsk_options_t *opt) {
       case 'u': {
         if (strlen(optarg) > 255)
           return help(1);
-        strcpy(opt->rs_config_, optarg);
-        opt->rs_config = opt->rs_config_;
+        strcpy(&opt->rs_config_[0], optarg);
+        opt->rs_config = &opt->rs_config_[0];
         break;
       }
 
@@ -182,10 +181,10 @@ parse_arg(int argc, char **argv, hsk_options_t *opt) {
         if (hsk_hex_decode_size(optarg) != 32)
           return help(1);
 
-        if (!hsk_hex_decode(optarg, opt->identity_key_))
+        if (!hsk_hex_decode(optarg, &opt->identity_key_[0]))
           return help(1);
 
-        opt->identity_key = opt->identity_key_;
+        opt->identity_key = &opt->identity_key_[0];
 
         break;
       }

@@ -1,3 +1,5 @@
+#include "config.h"
+
 #include <assert.h>
 #include <stdint.h>
 #include <stdbool.h>
@@ -7,10 +9,10 @@
 #include <stdlib.h>
 #include <time.h>
 
-#include "uv.h"
-
 #include "addr.h"
 #include "addrmgr.h"
+#include "bio.h"
+#include "bn.h"
 #include "brontide.h"
 #include "chain.h"
 #include "constants.h"
@@ -23,10 +25,9 @@
 #include "proof.h"
 #include "resource.h"
 #include "timedata.h"
-#include "bio.h"
-#include "bn.h"
 #include "pool.h"
 #include "utils.h"
+#include "uv.h"
 
 /*
  * Types
