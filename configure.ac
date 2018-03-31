@@ -244,7 +244,7 @@ use_external_asm=no
 
 case $set_asm in
   x86_64)
-    AC_DEFINE(USE_ASM_X86_64, 1,
+    AC_DEFINE(HSK_USE_ASM_X86_64, 1,
       [Define this symbol to enable x86_64 assembly optimizations])
   ;;
   arm)
@@ -259,11 +259,11 @@ esac
 
 case $set_field in
   64bit)
-    AC_DEFINE(USE_FIELD_5X52, 1,
+    AC_DEFINE(HSK_USE_FIELD_5X52, 1,
       [Define this symbol to use the FIELD_5X52 implementation])
   ;;
   32bit)
-    AC_DEFINE(USE_FIELD_10X26, 1,
+    AC_DEFINE(HSK_USE_FIELD_10X26, 1,
       [Define this symbol to use the FIELD_10X26 implementation])
   ;;
   *)
@@ -273,11 +273,11 @@ esac
 
 case $set_scalar in
   64bit)
-    AC_DEFINE(USE_SCALAR_4X64, 1,
+    AC_DEFINE(HSK_USE_SCALAR_4X64, 1,
       [Define this symbol to use the 4x64 scalar implementation])
   ;;
   32bit)
-    AC_DEFINE(USE_SCALAR_8X32, 1,
+    AC_DEFINE(HSK_USE_SCALAR_8X32, 1,
       [Define this symbol to use the 8x32 scalar implementation])
   ;;
   *)
@@ -286,17 +286,17 @@ case $set_scalar in
 esac
 
 if test x"$use_endomorphism" = x"yes"; then
-  AC_DEFINE(USE_ENDOMORPHISM, 1,
+  AC_DEFINE(HSK_USE_ENDOMORPHISM, 1,
     [Define this symbol to use endomorphism optimization])
 fi
 
 if test x"$use_precomp" = x"yes"; then
-  AC_DEFINE(USE_ECMULT_STATIC_PRECOMPUTATION, 1,
+  AC_DEFINE(HSK_USE_ECMULT_STATIC_PRECOMPUTATION, 1,
     [Define this symbol to use a statically generated ecmult table])
 fi
 
 if test x"$use_external_asm" = x"yes"; then
-  AC_DEFINE(USE_EXTERNAL_ASM, 1,
+  AC_DEFINE(HSK_USE_EXTERNAL_ASM, 1,
     [Define this symbol if an external assembly implementation is used])
 fi
 
@@ -307,11 +307,11 @@ AC_MSG_NOTICE([Using field implementation: $set_field])
 AC_MSG_NOTICE([Using scalar implementation: $set_scalar])
 
 AM_CONDITIONAL(
-  [USE_ECMULT_STATIC_PRECOMPUTATION],
+  [HSK_USE_ECMULT_STATIC_PRECOMPUTATION],
   [test x"$use_precomp" = x"yes"])
 
-AM_CONDITIONAL([USE_EXTERNAL_ASM], [test x"$use_external_asm" = x"yes"])
-AM_CONDITIONAL([USE_ASM_ARM], [test x"$set_asm" = x"arm"])
+AM_CONDITIONAL([HSK_USE_EXTERNAL_ASM], [test x"$use_external_asm" = x"yes"])
+AM_CONDITIONAL([HSK_USE_ASM_ARM], [test x"$set_asm" = x"arm"])
 
 dnl
 dnl /Secp256k1

@@ -268,7 +268,7 @@ static int hsk_secp256k1_scalar_cond_negate(hsk_secp256k1_scalar *r, int flag) {
 }
 
 static void hsk_secp256k1_scalar_reduce_512(hsk_secp256k1_scalar *r, const uint64_t *l) {
-#ifdef USE_ASM_X86_64
+#ifdef HSK_USE_ASM_X86_64
     /* Reduce 512 bits into 385. */
     uint64_t m0, m1, m2, m3, m4, m5, m6;
     uint64_t p0, p1, p2, p3, p4;
@@ -577,7 +577,7 @@ static void hsk_secp256k1_scalar_reduce_512(hsk_secp256k1_scalar *r, const uint6
 }
 
 static void hsk_secp256k1_scalar_mul_512(uint64_t l[8], const hsk_secp256k1_scalar *a, const hsk_secp256k1_scalar *b) {
-#ifdef USE_ASM_X86_64
+#ifdef HSK_USE_ASM_X86_64
     const uint64_t *pb = b->d;
     __asm__ __volatile__(
     /* Preload */
@@ -744,7 +744,7 @@ static void hsk_secp256k1_scalar_mul_512(uint64_t l[8], const hsk_secp256k1_scal
 }
 
 static void hsk_secp256k1_scalar_sqr_512(uint64_t l[8], const hsk_secp256k1_scalar *a) {
-#ifdef USE_ASM_X86_64
+#ifdef HSK_USE_ASM_X86_64
     __asm__ __volatile__(
     /* Preload */
     "movq 0(%%rdi), %%r11\n"
@@ -912,7 +912,7 @@ static void hsk_secp256k1_scalar_sqr(hsk_secp256k1_scalar *r, const hsk_secp256k
     hsk_secp256k1_scalar_reduce_512(r, l);
 }
 
-#ifdef USE_ENDOMORPHISM
+#ifdef HSK_USE_ENDOMORPHISM
 static void hsk_secp256k1_scalar_split_128(hsk_secp256k1_scalar *r1, hsk_secp256k1_scalar *r2, const hsk_secp256k1_scalar *a) {
     r1->d[0] = a->d[0];
     r1->d[1] = a->d[1];

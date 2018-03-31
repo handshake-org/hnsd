@@ -678,7 +678,7 @@ static HSK_SECP256K1_INLINE void hsk_secp256k1_ge_storage_cmov(hsk_secp256k1_ge_
     hsk_secp256k1_fe_storage_cmov(&r->y, &a->y, flag);
 }
 
-#ifdef USE_ENDOMORPHISM
+#ifdef HSK_USE_ENDOMORPHISM
 static void hsk_secp256k1_ge_mul_lambda(hsk_secp256k1_ge *r, const hsk_secp256k1_ge *a) {
     static const hsk_secp256k1_fe beta = HSK_SECP256K1_FE_CONST(
         0x7ae96a2bul, 0x657c0710ul, 0x6e64479eul, 0xac3434e9ul,

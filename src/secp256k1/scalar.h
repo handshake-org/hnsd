@@ -15,9 +15,9 @@
 
 #if defined(EXHAUSTIVE_TEST_ORDER)
 #include "scalar_low.h"
-#elif defined(USE_SCALAR_4X64)
+#elif defined(HSK_USE_SCALAR_4X64)
 #include "scalar_4x64.h"
-#elif defined(USE_SCALAR_8X32)
+#elif defined(HSK_USE_SCALAR_8X32)
 #include "scalar_8x32.h"
 #else
 #error "Please select scalar implementation"
@@ -85,7 +85,7 @@ static int hsk_secp256k1_scalar_cond_negate(hsk_secp256k1_scalar *a, int flag);
 /** Compare two scalars. */
 static int hsk_secp256k1_scalar_eq(const hsk_secp256k1_scalar *a, const hsk_secp256k1_scalar *b);
 
-#ifdef USE_ENDOMORPHISM
+#ifdef HSK_USE_ENDOMORPHISM
 /** Find r1 and r2 such that r1+r2*2^128 = a. */
 static void hsk_secp256k1_scalar_split_128(hsk_secp256k1_scalar *r1, hsk_secp256k1_scalar *r2, const hsk_secp256k1_scalar *a);
 /** Find r1 and r2 such that r1+r2*lambda = a, and r1 and r2 are maximum 128 bits long (see hsk_secp256k1_gej_mul_lambda). */

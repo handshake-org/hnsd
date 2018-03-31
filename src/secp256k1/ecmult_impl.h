@@ -33,7 +33,7 @@
 #define WINDOW_A 5
 /** larger numbers may result in slightly better performance, at the cost of
     exponentially larger precomputed tables. */
-#ifdef USE_ENDOMORPHISM
+#ifdef HSK_USE_ENDOMORPHISM
 /** Two tables for window size 15: 1.375 MiB. */
 #define WINDOW_G 15
 #else
@@ -42,7 +42,7 @@
 #endif
 #endif
 
-#ifdef USE_ENDOMORPHISM
+#ifdef HSK_USE_ENDOMORPHISM
     #define WNAF_BITS 128
 #else
     #define WNAF_BITS 256
@@ -59,13 +59,13 @@
 #define PIPPENGER_MAX_BUCKET_WINDOW 12
 
 /* Minimum number of points for which pippenger_wnaf is faster than strauss wnaf */
-#ifdef USE_ENDOMORPHISM
+#ifdef HSK_USE_ENDOMORPHISM
     #define ECMULT_PIPPENGER_THRESHOLD 88
 #else
     #define ECMULT_PIPPENGER_THRESHOLD 160
 #endif
 
-#ifdef USE_ENDOMORPHISM
+#ifdef HSK_USE_ENDOMORPHISM
     #define ECMULT_MAX_POINTS_PER_BATCH 5000000
 #else
     #define ECMULT_MAX_POINTS_PER_BATCH 10000000
@@ -183,7 +183,7 @@ static void hsk_secp256k1_ecmult_odd_multiples_table_storage_var(int n, hsk_secp
 
 static void hsk_secp256k1_ecmult_context_init(hsk_secp256k1_ecmult_context *ctx) {
     ctx->pre_g = NULL;
-#ifdef USE_ENDOMORPHISM
+#ifdef HSK_USE_ENDOMORPHISM
     ctx->pre_g_128 = NULL;
 #endif
 }
@@ -203,7 +203,7 @@ static void hsk_secp256k1_ecmult_context_build(hsk_secp256k1_ecmult_context *ctx
     /* precompute the tables with odd multiples */
     hsk_secp256k1_ecmult_odd_multiples_table_storage_var(ECMULT_TABLE_SIZE(WINDOW_G), *ctx->pre_g, &gj, cb);
 
-#ifdef USE_ENDOMORPHISM
+#ifdef HSK_USE_ENDOMORPHISM
     {
         hsk_secp256k1_gej g_128j;
         int i;
@@ -229,7 +229,7 @@ static void hsk_secp256k1_ecmult_context_clone(hsk_secp256k1_ecmult_context *dst
         dst->pre_g = (hsk_secp256k1_ge_storage (*)[])checked_malloc(cb, size);
         memcpy(dst->pre_g, src->pre_g, size);
     }
-#ifdef USE_ENDOMORPHISM
+#ifdef HSK_USE_ENDOMORPHISM
     if (src->pre_g_128 == NULL) {
         dst->pre_g_128 = NULL;
     } else {
@@ -246,7 +246,7 @@ static int hsk_secp256k1_ecmult_context_is_built(const hsk_secp256k1_ecmult_cont
 
 static void hsk_secp256k1_ecmult_context_clear(hsk_secp256k1_ecmult_context *ctx) {
     free(ctx->pre_g);
-#ifdef USE_ENDOMORPHISM
+#ifdef HSK_USE_ENDOMORPHISM
     free(ctx->pre_g_128);
 #endif
     hsk_secp256k1_ecmult_context_init(ctx);
@@ -305,13 +305,13 @@ static int hsk_secp256k1_ecmult_wnaf(int *wnaf, int len, const hsk_secp256k1_sca
     CHECK(carry == 0);
     while (bit < 256) {
         CHECK(hsk_secp256k1_scalar_get_bits(&s, bit++, 1) == 0);
-    } 
+    }
 #endif
     return last_set_bit + 1;
 }
 
 struct hsk_secp256k1_strauss_point_state {
-#ifdef USE_ENDOMORPHISM
+#ifdef HSK_USE_ENDOMORPHISM
     hsk_secp256k1_scalar na_1, na_lam;
     int wnaf_na_1[130];
     int wnaf_na_lam[130];
@@ -328,7 +328,7 @@ struct hsk_secp256k1_strauss_state {
     hsk_secp256k1_gej* prej;
     hsk_secp256k1_fe* zr;
     hsk_secp256k1_ge* pre_a;
-#ifdef USE_ENDOMORPHISM
+#ifdef HSK_USE_ENDOMORPHISM
     hsk_secp256k1_ge* pre_a_lam;
 #endif
     struct hsk_secp256k1_strauss_point_state* ps;
@@ -337,7 +337,7 @@ struct hsk_secp256k1_strauss_state {
 static void hsk_secp256k1_ecmult_strauss_wnaf(const hsk_secp256k1_ecmult_context *ctx, const struct hsk_secp256k1_strauss_state *state, hsk_secp256k1_gej *r, int num, const hsk_secp256k1_gej *a, const hsk_secp256k1_scalar *na, const hsk_secp256k1_scalar *ng) {
     hsk_secp256k1_ge tmpa;
     hsk_secp256k1_fe Z;
-#ifdef USE_ENDOMORPHISM
+#ifdef HSK_USE_ENDOMORPHISM
     /* Splitted G factors. */
     hsk_secp256k1_scalar ng_1, ng_128;
     int wnaf_ng_1[129];
@@ -358,7 +358,7 @@ static void hsk_secp256k1_ecmult_strauss_wnaf(const hsk_secp256k1_ecmult_context
             continue;
         }
         state->ps[no].input_pos = np;
-#ifdef USE_ENDOMORPHISM
+#ifdef HSK_USE_ENDOMORPHISM
         /* split na into na_1 and na_lam (where na = na_1 + na_lam*lambda, and na_1 and na_lam are ~128 bit) */
         hsk_secp256k1_scalar_split_lambda(&state->ps[no].na_1, &state->ps[no].na_lam, &na[np]);
 
@@ -411,7 +411,7 @@ static void hsk_secp256k1_ecmult_strauss_wnaf(const hsk_secp256k1_ecmult_context
         hsk_secp256k1_fe_set_int(&Z, 1);
     }
 
-#ifdef USE_ENDOMORPHISM
+#ifdef HSK_USE_ENDOMORPHISM
     for (np = 0; np < no; ++np) {
         for (i = 0; i < ECMULT_TABLE_SIZE(WINDOW_A); i++) {
             hsk_secp256k1_ge_mul_lambda(&state->pre_a_lam[np * ECMULT_TABLE_SIZE(WINDOW_A) + i], &state->pre_a[np * ECMULT_TABLE_SIZE(WINDOW_A) + i]);
@@ -446,7 +446,7 @@ static void hsk_secp256k1_ecmult_strauss_wnaf(const hsk_secp256k1_ecmult_context
     for (i = bits - 1; i >= 0; i--) {
         int n;
         hsk_secp256k1_gej_double_var(r, r, NULL);
-#ifdef USE_ENDOMORPHISM
+#ifdef HSK_USE_ENDOMORPHISM
         for (np = 0; np < no; ++np) {
             if (i < state->ps[np].bits_na_1 && (n = state->ps[np].wnaf_na_1[i])) {
                 ECMULT_TABLE_GET_GE(&tmpa, state->pre_a + np * ECMULT_TABLE_SIZE(WINDOW_A), n, WINDOW_A);
@@ -489,7 +489,7 @@ static void hsk_secp256k1_ecmult(const hsk_secp256k1_ecmult_context *ctx, hsk_se
     hsk_secp256k1_fe zr[ECMULT_TABLE_SIZE(WINDOW_A)];
     hsk_secp256k1_ge pre_a[ECMULT_TABLE_SIZE(WINDOW_A)];
     struct hsk_secp256k1_strauss_point_state ps[1];
-#ifdef USE_ENDOMORPHISM
+#ifdef HSK_USE_ENDOMORPHISM
     hsk_secp256k1_ge pre_a_lam[ECMULT_TABLE_SIZE(WINDOW_A)];
 #endif
     struct hsk_secp256k1_strauss_state state;
@@ -497,7 +497,7 @@ static void hsk_secp256k1_ecmult(const hsk_secp256k1_ecmult_context *ctx, hsk_se
     state.prej = prej;
     state.zr = zr;
     state.pre_a = pre_a;
-#ifdef USE_ENDOMORPHISM
+#ifdef HSK_USE_ENDOMORPHISM
     state.pre_a_lam = pre_a_lam;
 #endif
     state.ps = ps;
@@ -505,7 +505,7 @@ static void hsk_secp256k1_ecmult(const hsk_secp256k1_ecmult_context *ctx, hsk_se
 }
 
 static size_t hsk_secp256k1_strauss_scratch_size(size_t n_points) {
-#ifdef USE_ENDOMORPHISM
+#ifdef HSK_USE_ENDOMORPHISM
     static const size_t point_size = (2 * sizeof(hsk_secp256k1_ge) + sizeof(hsk_secp256k1_gej) + sizeof(hsk_secp256k1_fe)) * ECMULT_TABLE_SIZE(WINDOW_A) + sizeof(struct hsk_secp256k1_strauss_point_state) + sizeof(hsk_secp256k1_gej) + sizeof(hsk_secp256k1_scalar);
 #else
     static const size_t point_size = (sizeof(hsk_secp256k1_ge) + sizeof(hsk_secp256k1_gej) + sizeof(hsk_secp256k1_fe)) * ECMULT_TABLE_SIZE(WINDOW_A) + sizeof(struct hsk_secp256k1_strauss_point_state) + sizeof(hsk_secp256k1_gej) + sizeof(hsk_secp256k1_scalar);
@@ -532,7 +532,7 @@ static int hsk_secp256k1_ecmult_strauss_batch(const hsk_secp256k1_ecmult_context
     scalars = (hsk_secp256k1_scalar*)hsk_secp256k1_scratch_alloc(scratch, n_points * sizeof(hsk_secp256k1_scalar));
     state.prej = (hsk_secp256k1_gej*)hsk_secp256k1_scratch_alloc(scratch, n_points * ECMULT_TABLE_SIZE(WINDOW_A) * sizeof(hsk_secp256k1_gej));
     state.zr = (hsk_secp256k1_fe*)hsk_secp256k1_scratch_alloc(scratch, n_points * ECMULT_TABLE_SIZE(WINDOW_A) * sizeof(hsk_secp256k1_fe));
-#ifdef USE_ENDOMORPHISM
+#ifdef HSK_USE_ENDOMORPHISM
     state.pre_a = (hsk_secp256k1_ge*)hsk_secp256k1_scratch_alloc(scratch, n_points * 2 * ECMULT_TABLE_SIZE(WINDOW_A) * sizeof(hsk_secp256k1_ge));
     state.pre_a_lam = state.pre_a + n_points * ECMULT_TABLE_SIZE(WINDOW_A);
 #else
@@ -569,7 +569,7 @@ static int hsk_secp256k1_wnaf_fixed(int *wnaf, const hsk_secp256k1_scalar *s, in
     int sign = 0;
     int skew = 0;
     int pos = 1;
-#ifndef USE_ENDOMORPHISM
+#ifndef HSK_USE_ENDOMORPHISM
     hsk_secp256k1_scalar neg_s;
 #endif
     const hsk_secp256k1_scalar *work = s;
@@ -583,7 +583,7 @@ static int hsk_secp256k1_wnaf_fixed(int *wnaf, const hsk_secp256k1_scalar *s, in
     }
 
     if (hsk_secp256k1_scalar_is_even(s)) {
-#ifdef USE_ENDOMORPHISM
+#ifdef HSK_USE_ENDOMORPHISM
         skew = 1;
 #else
         hsk_secp256k1_scalar_negate(&neg_s, s);
@@ -665,7 +665,7 @@ static int hsk_secp256k1_ecmult_pippenger_wnaf(hsk_secp256k1_gej *buckets, int b
             hsk_secp256k1_ge tmp;
             int idx;
 
-#ifdef USE_ENDOMORPHISM
+#ifdef HSK_USE_ENDOMORPHISM
             if (i == 0) {
                 /* correct for wnaf skew */
                 int skew = point_state.skew_na;
@@ -715,7 +715,7 @@ static int hsk_secp256k1_ecmult_pippenger_wnaf(hsk_secp256k1_gej *buckets, int b
  * set of buckets) for a given number of points.
  */
 static int hsk_secp256k1_pippenger_bucket_window(size_t n) {
-#ifdef USE_ENDOMORPHISM
+#ifdef HSK_USE_ENDOMORPHISM
     if (n <= 1) {
         return 1;
     } else if (n <= 4) {
@@ -773,7 +773,7 @@ static int hsk_secp256k1_pippenger_bucket_window(size_t n) {
  */
 static size_t hsk_secp256k1_pippenger_bucket_window_inv(int bucket_window) {
     switch(bucket_window) {
-#ifdef USE_ENDOMORPHISM
+#ifdef HSK_USE_ENDOMORPHISM
         case 1: return 1;
         case 2: return 4;
         case 3: return 20;
@@ -805,7 +805,7 @@ static size_t hsk_secp256k1_pippenger_bucket_window_inv(int bucket_window) {
 }
 
 
-#ifdef USE_ENDOMORPHISM
+#ifdef HSK_USE_ENDOMORPHISM
 HSK_SECP256K1_INLINE static void hsk_secp256k1_ecmult_endo_split(hsk_secp256k1_scalar *s1, hsk_secp256k1_scalar *s2, hsk_secp256k1_ge *p1, hsk_secp256k1_ge *p2) {
     hsk_secp256k1_scalar tmp = *s1;
     hsk_secp256k1_scalar_split_lambda(s1, s2, &tmp);
@@ -827,7 +827,7 @@ HSK_SECP256K1_INLINE static void hsk_secp256k1_ecmult_endo_split(hsk_secp256k1_s
  * base point G) without considering alignment.
  */
 static size_t hsk_secp256k1_pippenger_scratch_size(size_t n_points, int bucket_window) {
-#ifdef USE_ENDOMORPHISM
+#ifdef HSK_USE_ENDOMORPHISM
     size_t entries = 2*n_points + 2;
 #else
     size_t entries = n_points + 1;
@@ -840,7 +840,7 @@ static int hsk_secp256k1_ecmult_pippenger_batch(const hsk_secp256k1_ecmult_conte
     /* Use 2(n+1) with the endomorphism, n+1 without, when calculating batch
      * sizes. The reason for +1 is that we add the G scalar to the list of
      * other scalars. */
-#ifdef USE_ENDOMORPHISM
+#ifdef HSK_USE_ENDOMORPHISM
     size_t entries = 2*n_points + 2;
 #else
     size_t entries = n_points + 1;
@@ -876,7 +876,7 @@ static int hsk_secp256k1_ecmult_pippenger_batch(const hsk_secp256k1_ecmult_conte
         scalars[0] = *inp_g_sc;
         points[0] = hsk_secp256k1_ge_const_g;
         idx++;
-#ifdef USE_ENDOMORPHISM
+#ifdef HSK_USE_ENDOMORPHISM
         hsk_secp256k1_ecmult_endo_split(&scalars[0], &scalars[1], &points[0], &points[1]);
         idx++;
 #endif
@@ -887,7 +887,7 @@ static int hsk_secp256k1_ecmult_pippenger_batch(const hsk_secp256k1_ecmult_conte
             return 0;
         }
         idx++;
-#ifdef USE_ENDOMORPHISM
+#ifdef HSK_USE_ENDOMORPHISM
         hsk_secp256k1_ecmult_endo_split(&scalars[idx - 1], &scalars[idx], &points[idx - 1], &points[idx]);
         idx++;
 #endif
@@ -932,7 +932,7 @@ static size_t hsk_secp256k1_pippenger_max_points(hsk_secp256k1_scratch *scratch)
         size_t space_overhead;
         size_t entry_size = sizeof(hsk_secp256k1_ge) + sizeof(hsk_secp256k1_scalar) + sizeof(struct hsk_secp256k1_pippenger_point_state) + (WNAF_SIZE(bucket_window+1)+1)*sizeof(int);
 
-#ifdef USE_ENDOMORPHISM
+#ifdef HSK_USE_ENDOMORPHISM
         entry_size = 2*entry_size;
 #endif
         space_overhead = ((1<<bucket_window) * sizeof(hsk_secp256k1_gej) + entry_size + sizeof(struct hsk_secp256k1_pippenger_state));

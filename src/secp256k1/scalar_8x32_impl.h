@@ -672,7 +672,7 @@ static void hsk_secp256k1_scalar_sqr(hsk_secp256k1_scalar *r, const hsk_secp256k
     hsk_secp256k1_scalar_reduce_512(r, l);
 }
 
-#ifdef USE_ENDOMORPHISM
+#ifdef HSK_USE_ENDOMORPHISM
 static void hsk_secp256k1_scalar_split_128(hsk_secp256k1_scalar *r1, hsk_secp256k1_scalar *r2, const hsk_secp256k1_scalar *a) {
     r1->d[0] = a->d[0];
     r1->d[1] = a->d[1];

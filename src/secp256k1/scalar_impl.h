@@ -16,9 +16,9 @@
 
 #if defined(EXHAUSTIVE_TEST_ORDER)
 #include "scalar_low_impl.h"
-#elif defined(USE_SCALAR_4X64)
+#elif defined(HSK_USE_SCALAR_4X64)
 #include "scalar_4x64_impl.h"
-#elif defined(USE_SCALAR_8X32)
+#elif defined(HSK_USE_SCALAR_8X32)
 #include "scalar_8x32_impl.h"
 #else
 #error "Please select scalar implementation"
@@ -198,7 +198,7 @@ static void hsk_secp256k1_scalar_inverse_var(hsk_secp256k1_scalar *r, const hsk_
   hsk_secp256k1_scalar_inverse(r, x);
 }
 
-#ifdef USE_ENDOMORPHISM
+#ifdef HSK_USE_ENDOMORPHISM
 #if defined(EXHAUSTIVE_TEST_ORDER)
 /**
  * Find k1 and k2 given k, such that k1 + k2 * lambda == k mod n; unlike in the

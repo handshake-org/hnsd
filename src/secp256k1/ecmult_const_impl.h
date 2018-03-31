@@ -120,7 +120,7 @@ static void hsk_secp256k1_ecmult_const(hsk_secp256k1_gej *r, const hsk_secp256k1
 
     int skew_1;
     int wnaf_1[1 + WNAF_SIZE(WINDOW_A - 1)];
-#ifdef USE_ENDOMORPHISM
+#ifdef HSK_USE_ENDOMORPHISM
     hsk_secp256k1_ge pre_a_lam[ECMULT_TABLE_SIZE(WINDOW_A)];
     int wnaf_lam[1 + WNAF_SIZE(WINDOW_A - 1)];
     int skew_lam;
@@ -131,7 +131,7 @@ static void hsk_secp256k1_ecmult_const(hsk_secp256k1_gej *r, const hsk_secp256k1
     hsk_secp256k1_scalar sc = *scalar;
 
     /* build wnaf representation for q. */
-#ifdef USE_ENDOMORPHISM
+#ifdef HSK_USE_ENDOMORPHISM
     /* split q into q_1 and q_lam (where q = q_1 + q_lam*lambda, and q_1 and q_lam are ~128 bit) */
     hsk_secp256k1_scalar_split_lambda(&q_1, &q_lam, &sc);
     skew_1   = hsk_secp256k1_wnaf_const(wnaf_1,   q_1,   WINDOW_A - 1);
@@ -151,7 +151,7 @@ static void hsk_secp256k1_ecmult_const(hsk_secp256k1_gej *r, const hsk_secp256k1
     for (i = 0; i < ECMULT_TABLE_SIZE(WINDOW_A); i++) {
         hsk_secp256k1_fe_normalize_weak(&pre_a[i].y);
     }
-#ifdef USE_ENDOMORPHISM
+#ifdef HSK_USE_ENDOMORPHISM
     for (i = 0; i < ECMULT_TABLE_SIZE(WINDOW_A); i++) {
         hsk_secp256k1_ge_mul_lambda(&pre_a_lam[i], &pre_a[i]);
     }
@@ -164,7 +164,7 @@ static void hsk_secp256k1_ecmult_const(hsk_secp256k1_gej *r, const hsk_secp256k1
     VERIFY_CHECK(i != 0);
     ECMULT_CONST_TABLE_GET_GE(&tmpa, pre_a, i, WINDOW_A);
     hsk_secp256k1_gej_set_ge(r, &tmpa);
-#ifdef USE_ENDOMORPHISM
+#ifdef HSK_USE_ENDOMORPHISM
     i = wnaf_lam[WNAF_SIZE(WINDOW_A - 1)];
     VERIFY_CHECK(i != 0);
     ECMULT_CONST_TABLE_GET_GE(&tmpa, pre_a_lam, i, WINDOW_A);
@@ -182,7 +182,7 @@ static void hsk_secp256k1_ecmult_const(hsk_secp256k1_gej *r, const hsk_secp256k1
         ECMULT_CONST_TABLE_GET_GE(&tmpa, pre_a, n, WINDOW_A);
         VERIFY_CHECK(n != 0);
         hsk_secp256k1_gej_add_ge(r, r, &tmpa);
-#ifdef USE_ENDOMORPHISM
+#ifdef HSK_USE_ENDOMORPHISM
         n = wnaf_lam[i];
         ECMULT_CONST_TABLE_GET_GE(&tmpa, pre_a_lam, n, WINDOW_A);
         VERIFY_CHECK(n != 0);
@@ -196,7 +196,7 @@ static void hsk_secp256k1_ecmult_const(hsk_secp256k1_gej *r, const hsk_secp256k1
         /* Correct for wNAF skew */
         hsk_secp256k1_ge correction = *a;
         hsk_secp256k1_ge_storage correction_1_stor;
-#ifdef USE_ENDOMORPHISM
+#ifdef HSK_USE_ENDOMORPHISM
         hsk_secp256k1_ge_storage correction_lam_stor;
 #endif
         hsk_secp256k1_ge_storage a2_stor;
@@ -205,14 +205,14 @@ static void hsk_secp256k1_ecmult_const(hsk_secp256k1_gej *r, const hsk_secp256k1
         hsk_secp256k1_gej_double_var(&tmpj, &tmpj, NULL);
         hsk_secp256k1_ge_set_gej(&correction, &tmpj);
         hsk_secp256k1_ge_to_storage(&correction_1_stor, a);
-#ifdef USE_ENDOMORPHISM
+#ifdef HSK_USE_ENDOMORPHISM
         hsk_secp256k1_ge_to_storage(&correction_lam_stor, a);
 #endif
         hsk_secp256k1_ge_to_storage(&a2_stor, &correction);
 
         /* For odd numbers this is 2a (so replace it), for even ones a (so no-op) */
         hsk_secp256k1_ge_storage_cmov(&correction_1_stor, &a2_stor, skew_1 == 2);
-#ifdef USE_ENDOMORPHISM
+#ifdef HSK_USE_ENDOMORPHISM
         hsk_secp256k1_ge_storage_cmov(&correction_lam_stor, &a2_stor, skew_lam == 2);
 #endif
 
@@ -221,7 +221,7 @@ static void hsk_secp256k1_ecmult_const(hsk_secp256k1_gej *r, const hsk_secp256k1
         hsk_secp256k1_ge_neg(&correction, &correction);
         hsk_secp256k1_gej_add_ge(r, r, &correction);
 
-#ifdef USE_ENDOMORPHISM
+#ifdef HSK_USE_ENDOMORPHISM
         hsk_secp256k1_ge_from_storage(&correction, &correction_lam_stor);
         hsk_secp256k1_ge_neg(&correction, &correction);
         hsk_secp256k1_ge_mul_lambda(&correction, &correction);

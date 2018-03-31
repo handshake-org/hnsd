@@ -99,6 +99,30 @@
 /* Define this symbol to choose a network */
 #undef HSK_NETWORK
 
+/* Define this symbol to enable x86_64 assembly optimizations */
+#undef HSK_USE_ASM_X86_64
+
+/* Define this symbol to use a statically generated ecmult table */
+#undef HSK_USE_ECMULT_STATIC_PRECOMPUTATION
+
+/* Define this symbol to use endomorphism optimization */
+#undef HSK_USE_ENDOMORPHISM
+
+/* Define this symbol if an external assembly implementation is used */
+#undef HSK_USE_EXTERNAL_ASM
+
+/* Define this symbol to use the FIELD_10X26 implementation */
+#undef HSK_USE_FIELD_10X26
+
+/* Define this symbol to use the FIELD_5X52 implementation */
+#undef HSK_USE_FIELD_5X52
+
+/* Define this symbol to use the 4x64 scalar implementation */
+#undef HSK_USE_SCALAR_4X64
+
+/* Define this symbol to use the 8x32 scalar implementation */
+#undef HSK_USE_SCALAR_8X32
+
 /* Define to the sub-directory where libtool stores uninstalled libraries. */
 #undef LT_OBJDIR
 
@@ -125,30 +149,6 @@
 
 /* Define to 1 if you have the ANSI C header files. */
 #undef STDC_HEADERS
-
-/* Define this symbol to enable x86_64 assembly optimizations */
-#undef USE_ASM_X86_64
-
-/* Define this symbol to use a statically generated ecmult table */
-#undef USE_ECMULT_STATIC_PRECOMPUTATION
-
-/* Define this symbol to use endomorphism optimization */
-#undef USE_ENDOMORPHISM
-
-/* Define this symbol if an external assembly implementation is used */
-#undef USE_EXTERNAL_ASM
-
-/* Define this symbol to use the FIELD_10X26 implementation */
-#undef USE_FIELD_10X26
-
-/* Define this symbol to use the FIELD_5X52 implementation */
-#undef USE_FIELD_5X52
-
-/* Define this symbol to use the 4x64 scalar implementation */
-#undef USE_SCALAR_4X64
-
-/* Define this symbol to use the 8x32 scalar implementation */
-#undef USE_SCALAR_8X32
 
 /* Version number of package */
 #undef VERSION

@@ -15,7 +15,7 @@
 typedef struct {
     /* For accelerating the computation of a*P + b*G: */
     hsk_secp256k1_ge_storage (*pre_g)[];    /* odd multiples of the generator */
-#ifdef USE_ENDOMORPHISM
+#ifdef HSK_USE_ENDOMORPHISM
     hsk_secp256k1_ge_storage (*pre_g_128)[]; /* odd multiples of 2^128*generator */
 #endif
 } hsk_secp256k1_ecmult_context;

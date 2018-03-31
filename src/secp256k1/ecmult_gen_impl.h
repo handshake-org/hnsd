@@ -11,7 +11,7 @@
 #include "group.h"
 #include "ecmult_gen.h"
 #include "hash_impl.h"
-#ifdef USE_ECMULT_STATIC_PRECOMPUTATION
+#ifdef HSK_USE_ECMULT_STATIC_PRECOMPUTATION
 #include "ecmult_static_context.h"
 #endif
 static void hsk_secp256k1_ecmult_gen_context_init(hsk_secp256k1_ecmult_gen_context *ctx) {
@@ -19,7 +19,7 @@ static void hsk_secp256k1_ecmult_gen_context_init(hsk_secp256k1_ecmult_gen_conte
 }
 
 static void hsk_secp256k1_ecmult_gen_context_build(hsk_secp256k1_ecmult_gen_context *ctx, const hsk_secp256k1_callback* cb) {
-#ifndef USE_ECMULT_STATIC_PRECOMPUTATION
+#ifndef HSK_USE_ECMULT_STATIC_PRECOMPUTATION
     hsk_secp256k1_ge prec[1024];
     hsk_secp256k1_gej gj;
     hsk_secp256k1_gej nums_gej;
@@ -29,7 +29,7 @@ static void hsk_secp256k1_ecmult_gen_context_build(hsk_secp256k1_ecmult_gen_cont
     if (ctx->prec != NULL) {
         return;
     }
-#ifndef USE_ECMULT_STATIC_PRECOMPUTATION
+#ifndef HSK_USE_ECMULT_STATIC_PRECOMPUTATION
     ctx->prec = (hsk_secp256k1_ge_storage (*)[64][16])checked_malloc(cb, sizeof(*ctx->prec));
 
     /* get the generator */
@@ -100,7 +100,7 @@ static void hsk_secp256k1_ecmult_gen_context_clone(hsk_secp256k1_ecmult_gen_cont
     if (src->prec == NULL) {
         dst->prec = NULL;
     } else {
-#ifndef USE_ECMULT_STATIC_PRECOMPUTATION
+#ifndef HSK_USE_ECMULT_STATIC_PRECOMPUTATION
         dst->prec = (hsk_secp256k1_ge_storage (*)[64][16])checked_malloc(cb, sizeof(*dst->prec));
         memcpy(dst->prec, src->prec, sizeof(*dst->prec));
 #else
@@ -113,7 +113,7 @@ static void hsk_secp256k1_ecmult_gen_context_clone(hsk_secp256k1_ecmult_gen_cont
 }
 
 static void hsk_secp256k1_ecmult_gen_context_clear(hsk_secp256k1_ecmult_gen_context *ctx) {
-#ifndef USE_ECMULT_STATIC_PRECOMPUTATION
+#ifndef HSK_USE_ECMULT_STATIC_PRECOMPUTATION
     free(ctx->prec);
 #endif
     hsk_secp256k1_scalar_clear(&ctx->blind);

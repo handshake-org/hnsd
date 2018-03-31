@@ -444,7 +444,7 @@ HSK_SECP256K1_INLINE static void hsk_secp256k1_fe_add(hsk_secp256k1_fe *r, const
 #endif
 }
 
-#if defined(USE_EXTERNAL_ASM)
+#if defined(HSK_USE_EXTERNAL_ASM)
 
 /* External assembler implementation */
 void hsk_secp256k1_fe_mul_inner(uint32_t *r, const uint32_t *a, const uint32_t * HSK_SECP256K1_RESTRICT b);
