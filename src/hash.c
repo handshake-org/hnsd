@@ -6,8 +6,8 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "hash.h"
 #include "blake2b.h"
+#include "hash.h"
 #include "sha256.h"
 #include "utils.h"
 

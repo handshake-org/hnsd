@@ -8,6 +8,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "bn.h"
 #include "chain.h"
 #include "constants.h"
 #include "error.h"
@@ -15,7 +16,6 @@
 #include "map.h"
 #include "msg.h"
 #include "timedata.h"
-#include "bn.h"
 #include "utils.h"
 
 /*

@@ -3,11 +3,10 @@
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
-#include <strings.h>
-
 #include <stdint.h>
 #include <stdbool.h>
+#include <string.h>
+#include <strings.h>
 
 #include "base32.h"
 

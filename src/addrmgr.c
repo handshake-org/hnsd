@@ -13,9 +13,9 @@
 #include "constants.h"
 #include "error.h"
 #include "map.h"
+#include "seeds.h"
 #include "timedata.h"
 #include "utils.h"
-#include "seeds.h"
 
 #define HSK_ADDR_MAX 2000
 #define HSK_HORIZON_DAYS 30
@@ -23,10 +23,10 @@
 #define HSK_MIN_FAIL_DAYS 7
 #define HSK_MAX_FAILURES 10
 #define HSK_MAX_REFS 8
-#define HSK_BAN_TIME 24 * 60 * 60
+#define HSK_BAN_TIME (24 * 60 * 60)
 
-#define max(x, y) (((x) > (y)) ? (x) : (y))
-#define min(x, y) (((x) < (y)) ? (x) : (y))
+#define HSK_MAX(x, y) (((x) > (y)) ? (x) : (y))
+#define HSK_MIN(x, y) (((x) < (y)) ? (x) : (y))
 
 static const uint8_t hsk_ipv6_mapped[] = {
   0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -116,7 +116,7 @@ hsk_addrentry_t *
 hsk_addrman_alloc_entry(hsk_addrman_t *am, bool *alloc) {
   if (am->size == HSK_ADDR_MAX) {
     int32_t i;
-    for (i = 0; i < min(am->size, 10); i++) {
+    for (i = 0; i < HSK_MIN(am->size, 10); i++) {
       int32_t index = hsk_random() % am->size;
       hsk_addrentry_t *entry = &am->addrs[index];
       if (hsk_addrman_is_stale(am, entry)) {
@@ -516,7 +516,7 @@ hsk_addrentry_chance(hsk_addrentry_t *entry, int64_t now) {
   int32_t i;
 
   // c * (0.66 ^ attempts)
-  for (i = 0; i < min(entry->attempts, 8); i++)
+  for (i = 0; i < HSK_MIN(entry->attempts, 8); i++)
     r *= 0.66;
 
   c *= r;

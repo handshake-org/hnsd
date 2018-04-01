@@ -11,7 +11,6 @@
 #include <arpa/inet.h>
 #include <netinet/in.h>
 
-
 #include "addr.h"
 #include "constants.h"
 #include "dns.h"

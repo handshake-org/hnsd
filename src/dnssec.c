@@ -4,7 +4,6 @@
 
 #include "dns.h"
 #include "dnssec.h"
-#include "utils.h"
 
 static hsk_dns_rr_t *ksk_key = NULL;
 static hsk_dns_rr_t *ksk_ds = NULL;

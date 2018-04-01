@@ -7,13 +7,13 @@
 #include <string.h>
 #include <stdio.h>
 
-#include "bio.h"
-#include "sha256.h"
 #include "aead.h"
+#include "bio.h"
 #include "brontide.h"
 #include "ec.h"
 #include "error.h"
 #include "hash.h"
+#include "sha256.h"
 #include "utils.h"
 
 static const char brontide_protocol_name[] =

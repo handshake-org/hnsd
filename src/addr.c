@@ -9,13 +9,12 @@
 #include <netinet/in.h>
 #include <string.h>
 
-#include "uv.h"
-
 #include "addr.h"
-#include "constants.h"
-#include "map.h"
 #include "base32.h"
 #include "bio.h"
+#include "constants.h"
+#include "map.h"
+#include "uv.h"
 
 static const uint8_t hsk_ip4_mapped[12] = {
   0x00, 0x00, 0x00, 0x00,
@@ -216,6 +215,8 @@ bool
 hsk_addr_from_sa(hsk_addr_t *addr, struct sockaddr *sa) {
   assert(addr && sa);
 
+  hsk_addr_init(addr);
+
   if (sa->sa_family == AF_INET) {
     struct sockaddr_in *sai = (struct sockaddr_in *)sa;
     addr->type = 0;
@@ -264,6 +265,8 @@ bool
 hsk_addr_from_ip(hsk_addr_t *addr, uint16_t af, uint8_t *ip, uint16_t port) {
   assert(addr && ip);
 
+  hsk_addr_init(addr);
+
   if (!hsk_addr_set_ip(addr, af, ip))
     return false;
 
@@ -294,7 +297,9 @@ bool
 hsk_addr_from_string(hsk_addr_t *addr, char *src, uint16_t port) {
   assert(addr && src);
 
-  char *at = strstr(src, "@");
+  hsk_addr_init(addr);
+
+  char *at = strchr(src, '@');
 
   if (at) {
     char pubkey[54];
@@ -321,7 +326,7 @@ hsk_addr_from_string(hsk_addr_t *addr, char *src, uint16_t port) {
   char *port_s = NULL;
 
   if (src[0] == '[') {
-    char *bracket = strstr(src, "]");
+    char *bracket = strchr(src, ']');
 
     if (!bracket)
       return false;
@@ -336,10 +341,10 @@ hsk_addr_from_string(hsk_addr_t *addr, char *src, uint16_t port) {
     else
       return false;
   } else {
-    char *colon = strstr(src, ":");
+    char *colon = strchr(src, ':');
 
     // ipv6 with no port.
-    if (colon && strstr(&colon[1], ":"))
+    if (colon && strchr(&colon[1], ':'))
       colon = NULL;
 
     host_start = src;
