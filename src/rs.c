@@ -565,8 +565,6 @@ done:
   hsk_rs_send(ns, wire, wire_len, req->addr, true);
 }
 
-#define HSK_SIG0_RR_SIZE 94
-
 static int32_t
 hsk_rs_send(
   hsk_rs_t *ns,
