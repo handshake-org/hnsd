@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <stdlib.h>
+#include "map.h"
 
 typedef struct hsk_dns_rr_s {
   char name[256];
@@ -195,6 +196,16 @@ typedef struct {
   uint8_t type;
   int32_t index;
 } hsk_dns_iter_t;
+
+typedef struct {
+  hsk_map_t map;
+  uint8_t *pd;
+} hsk_dns_cmp_t;
+
+typedef struct {
+  uint8_t *pd;
+  size_t pd_len;
+} hsk_dns_dmp_t;
 
 // Constants
 #define HSK_DNS_MAX_NAME 255
@@ -436,14 +447,13 @@ void
 hsk_dns_qs_set(hsk_dns_qs_t *qs, char *name, uint16_t type);
 
 int32_t
-hsk_dns_qs_write(hsk_dns_qs_t *qs, uint8_t **data);
+hsk_dns_qs_write(hsk_dns_qs_t *qs, uint8_t **data, hsk_dns_cmp_t *cmp);
 
 bool
 hsk_dns_qs_read(
   uint8_t **data,
   size_t *data_len,
-  uint8_t *pd,
-  size_t pd_len,
+  hsk_dns_dmp_t *dmp,
   hsk_dns_qs_t *qs
 );
 
@@ -466,7 +476,7 @@ bool
 hsk_dns_rr_set_name(hsk_dns_rr_t *rr, char *name);
 
 int32_t
-hsk_dns_rr_write(hsk_dns_rr_t *rr, uint8_t **data);
+hsk_dns_rr_write(hsk_dns_rr_t *rr, uint8_t **data, hsk_dns_cmp_t *cmp);
 
 int32_t
 hsk_dns_rr_size(hsk_dns_rr_t *rr);
@@ -475,8 +485,7 @@ bool
 hsk_dns_rr_read(
   uint8_t **data,
   size_t *data_len,
-  uint8_t *pd,
-  size_t pd_len,
+  hsk_dns_dmp_t *dmp,
   hsk_dns_rr_t *rr
 );
 
@@ -502,7 +511,7 @@ void
 hsk_dns_rd_free(void *rd, uint16_t type);
 
 int32_t
-hsk_dns_rd_write(void *rd, uint16_t type, uint8_t **data);
+hsk_dns_rd_write(void *rd, uint16_t type, uint8_t **data, hsk_dns_cmp_t *cmp);
 
 int32_t
 hsk_dns_rd_size(void *rd, uint16_t type);
@@ -511,8 +520,7 @@ bool
 hsk_dns_rd_read(
   uint8_t **data,
   size_t *data_len,
-  uint8_t *pd,
-  size_t pd_len,
+  hsk_dns_dmp_t *dmp,
   void *rd,
   uint16_t type
 );
@@ -580,8 +588,7 @@ int32_t
 hsk_dns_name_parse(
   uint8_t **data_,
   size_t *data_len_,
-  uint8_t *pd,
-  size_t pd_len,
+  hsk_dns_dmp_t *dmp,
   char *name
 );
 
@@ -589,14 +596,13 @@ int32_t
 hsk_dns_name_pack(char *name, uint8_t *data);
 
 int32_t
-hsk_dns_name_write(char *name, uint8_t **data);
+hsk_dns_name_write(char *name, uint8_t **data, hsk_dns_cmp_t *cmp);
 
 bool
 hsk_dns_name_read(
   uint8_t **data,
   size_t *data_len,
-  uint8_t *pd,
-  size_t pd_len,
+  hsk_dns_dmp_t *dmp,
   char *name
 );
 
@@ -604,16 +610,14 @@ int32_t
 hsk_dns_name_read_size(
   uint8_t *data,
   size_t data_len,
-  uint8_t *pd,
-  size_t pd_len
+  hsk_dns_dmp_t *dmp
 );
 
 bool
 hsk_dns_name_alloc(
   uint8_t **data,
   size_t *data_len,
-  uint8_t *pd,
-  size_t pd_len,
+  hsk_dns_dmp_t *dmp,
   char **name
 );
 
