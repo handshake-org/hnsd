@@ -20,7 +20,10 @@ typedef struct {
   char name[HSK_DNS_MAX_NAME + 1];
   uint16_t type;
   uint16_t class;
+  bool rd;
+  bool cd;
   bool edns;
+  size_t max_size;
   bool dnssec;
 
   // HSK stuff

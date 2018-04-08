@@ -101,7 +101,12 @@ hsk_dns_req_create(uint8_t *data, size_t data_len, struct sockaddr *addr) {
   strcpy(req->name, qs->name);
   req->type = qs->type;
   req->class = qs->class;
+  req->rd = (msg->flags & HSK_DNS_RD) != 0;
+  req->cd = (msg->flags & HSK_DNS_CD) != 0;
   req->edns = msg->edns.enabled;
+  req->max_size = 512;
+  if (msg->edns.enabled && msg->edns.size >= 512)
+    req->max_size = msg->edns.size;
   req->dnssec = (msg->edns.flags & HSK_DNS_DO) != 0;
 
   // Sender address.

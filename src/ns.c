@@ -336,6 +336,9 @@ hsk_ns_onrecv(
 
   hsk_ns_log(ns, "sending root soa (%d): %d\n", req->id, wire_len);
 
+  if (!hsk_dns_msg_truncate(wire, wire_len, req->max_size, &wire_len))
+    hsk_ns_log(ns, "failed truncation (%d): %d\n", req->id, wire_len);
+
   hsk_ns_send(ns, wire, wire_len, addr, true);
 
   goto done;
@@ -357,6 +360,9 @@ fail:
   }
 
   hsk_ns_log(ns, "sending servfail (%d): %d\n", req->id, wire_len);
+
+  if (!hsk_dns_msg_truncate(wire, wire_len, req->max_size, &wire_len))
+    hsk_ns_log(ns, "failed truncation (%d): %d\n", req->id, wire_len);
 
   hsk_ns_send(ns, wire, wire_len, addr, true);
 
@@ -441,6 +447,9 @@ hsk_ns_respond(
 
     hsk_ns_log(ns, "sending servfail (%d): %d\n", req->id, wire_len);
   }
+
+  if (!hsk_dns_msg_truncate(wire, wire_len, req->max_size, &wire_len))
+    hsk_ns_log(ns, "failed truncation (%d): %d\n", req->id, wire_len);
 
   hsk_ns_send(ns, wire, wire_len, req->addr, true);
 }

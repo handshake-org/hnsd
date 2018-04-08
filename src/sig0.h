@@ -49,4 +49,13 @@ hsk_sig0_sign_msg(
   uint8_t **msg,
   size_t *msg_len
 );
+
+bool
+hsk_sign_and_truncate(
+  hsk_ec_t *ec,
+  uint8_t *key,
+  uint8_t **msg,
+  size_t *msg_len,
+  size_t max_size
+);
 #endif

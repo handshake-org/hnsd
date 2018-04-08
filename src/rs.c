@@ -479,7 +479,8 @@ hsk_rs_respond(
   msg->opcode = HSK_DNS_QUERY;
   msg->code = result->rcode;
   msg->flags |= HSK_DNS_QR;
-  msg->flags |= HSK_DNS_RD;
+  if (req->rd)
+    msg->flags |= HSK_DNS_RD;
   msg->flags |= HSK_DNS_RA;
 
   // Remove EDNS stuff.
@@ -560,8 +561,13 @@ fail:
   }
 
 done:
+  if (!hsk_dns_msg_truncate(wire, wire_len, req->max_size, &wire_len))
+    hsk_rs_log(ns, "failed truncation (%d): %d\n", req->id, wire_len);
+
   hsk_rs_send(ns, wire, wire_len, req->addr, true);
 }
+
+#define HSK_SIG0_RR_SIZE 94
 
 static int32_t
 hsk_rs_send(

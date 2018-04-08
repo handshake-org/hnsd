@@ -8,6 +8,7 @@
 
 #include "bio.h"
 #include "blake2b.h"
+#include "dns.h"
 #include "ec.h"
 #include "sig0.h"
 #include "utils.h"
@@ -296,4 +297,26 @@ hsk_sig0_sign_msg(
   *msg_len = res_len;
 
   return true;
+}
+
+bool
+hsk_sign_and_truncate(
+  hsk_ec_t *ec,
+  uint8_t *key,
+  uint8_t **msg,
+  size_t *msg_len,
+  size_t max_size
+) {
+  if (!key) {
+    if (!hsk_dns_msg_truncate(*msg, *msg_len, max_size, msg_len))
+      return false;
+    return true;
+  }
+
+  size_t max = max_size - HSK_SIG0_RR_SIZE;
+
+  if (!hsk_dns_msg_truncate(*msg, *msg_len, max, msg_len))
+    return false;
+
+  return hsk_sig0_sign_msg(ec, key, msg, msg_len);
 }

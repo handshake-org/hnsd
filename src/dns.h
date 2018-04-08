@@ -399,6 +399,9 @@ bool
 hsk_dns_msg_encode(hsk_dns_msg_t *msg, uint8_t **data, size_t *data_len);
 
 bool
+hsk_dns_msg_truncate(uint8_t *msg, size_t msg_len, size_t max, size_t *len);
+
+bool
 hsk_dns_msg_read(uint8_t **data, size_t *data_len, hsk_dns_msg_t *msg);
 
 void

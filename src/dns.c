@@ -193,6 +193,141 @@ hsk_dns_msg_encode(hsk_dns_msg_t *msg, uint8_t **data, size_t *data_len) {
 }
 
 bool
+hsk_dns_msg_truncate(uint8_t *msg, size_t msg_len, size_t max, size_t *len) {
+  if (msg_len < 12)
+    return false;
+
+  if (max < 512)
+    return false;
+
+  if (msg_len <= max) {
+    *len = msg_len;
+    return true;
+  }
+
+  uint8_t *data = msg;
+  size_t data_len = msg_len;
+
+  assert(msg_len >= 12);
+  assert(max >= 512);
+
+  uint16_t flags = 0;
+  uint16_t qdcount = 0;
+  uint16_t ancount = 0;
+  uint16_t nscount = 0;
+  uint16_t arcount = 0;
+
+  hsk_dns_dmp_t dmp;
+  dmp.pd = msg;
+  dmp.pd_len = msg_len;
+
+  data += 2;
+  data_len -= 2;
+
+  if (!read_u16be(&data, &data_len, &flags))
+    return false;
+
+  if (!read_u16be(&data, &data_len, &qdcount))
+    return false;
+
+  if (!read_u16be(&data, &data_len, &ancount))
+    return false;
+
+  if (!read_u16be(&data, &data_len, &nscount))
+    return false;
+
+  if (!read_u16be(&data, &data_len, &arcount))
+    return false;
+
+  uint8_t *end = msg + max;
+  uint8_t *last = NULL;
+  uint16_t rdlen;
+
+  uint16_t counts[4] = {
+    qdcount,
+    ancount,
+    nscount,
+    arcount
+  };
+
+  int32_t s;
+  for (s = 0; s < 4; s++) {
+    uint16_t count = counts[s];
+    int32_t i = 0;
+    int32_t j = 0;
+
+    while (data <= end) {
+      last = data;
+      j = i;
+
+      if (i == count)
+        break;
+
+      i += 1;
+
+      if (!hsk_dns_name_read(&data, &data_len, &dmp, NULL))
+        return false;
+
+      // Question.
+      if (s == 0) {
+        // QS header.
+        if (data_len < 4)
+          return false;
+
+        // Type and class.
+        data += 4;
+        data_len += 4;
+
+        continue;
+      }
+
+      // RR header.
+      if (data_len < 8)
+        return false;
+
+      // Type, class, TTL.
+      data += 8;
+      data_len -= 8;
+
+      // RD len.
+      if (!read_u16be(&data, &data_len, &rdlen))
+        return false;
+
+      if (data_len < rdlen)
+        return false;
+
+      data += rdlen;
+      data_len -= rdlen;
+    }
+
+    counts[s] = j;
+  }
+
+  if (last == NULL)
+    return false;
+
+  flags |= HSK_DNS_TC;
+
+  // We would normally set the truncate bit,
+  // but we don't support TCP yet.
+  // msg[2] = (flags >> 8) & 0xff;
+  // msg[3] = flags & 0xff;
+
+  msg[4] = (counts[0] >> 8) & 0xff;
+  msg[5] = counts[0] & 0xff;
+  msg[6] = (counts[1] >> 8) & 0xff;
+  msg[7] = counts[1] & 0xff;
+  msg[8] = (counts[2] >> 8) & 0xff;
+  msg[9] = counts[2] & 0xff;
+  msg[10] = (counts[3] >> 8) & 0xff;
+  msg[11] = counts[3] & 0xff;
+
+  *len = last - msg;
+
+  return true;
+}
+
+bool
 hsk_dns_msg_read(uint8_t **data, size_t *data_len, hsk_dns_msg_t *msg) {
   uint16_t id = 0;
   uint16_t flags = 0;
