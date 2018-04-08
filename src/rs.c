@@ -229,6 +229,9 @@ hsk_rs_inject_options(hsk_rs_t *ns) {
   if (ub_ctx_set_option(ns->ub, "edns-buffer-size:", "4096") != 0)
     return false;
 
+  if (ub_ctx_set_option(ns->ub, "max-udp-size:", "4096") != 0)
+    return false;
+
   char stub[HSK_MAX_HOST];
 
   if (!hsk_sa_to_at(ns->stub, stub, HSK_MAX_HOST, HSK_NS_PORT))
