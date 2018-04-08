@@ -270,7 +270,7 @@ hsk_dns_msg_truncate(uint8_t *msg, size_t msg_len, size_t max, size_t *len) {
 
         // Type and class.
         data += 4;
-        data_len += 4;
+        data_len -= 4;
 
         continue;
       }
@@ -2246,7 +2246,7 @@ hsk_dns_name_serialize(
         if (strcmp(sub, ".") != 0) {
           size_t p = (size_t)hsk_map_get(&cmp->map, sub);
           if (p == 0) {
-            size_t o = (size_t)((data + off) - cmp->msg);
+            size_t o = (size_t)(&data[off] - cmp->msg);
             if (o < (2 << 13))
               hsk_map_set(&cmp->map, sub, (void *)o);
           } else {
