@@ -2533,8 +2533,8 @@ hsk_dns_name_cmp(char *a, char *b) {
 
   int32_t i;
   for (i = 0; i < len; i++) {
-    char x = a[i];
-    char y = b[i];
+    uint8_t x = (uint8_t)a[i];
+    uint8_t y = (uint8_t)b[i];
 
     if (x >= 0x41 && x <= 0x5a)
       x |= 0x20;
@@ -2723,15 +2723,8 @@ hsk_dns_label_decode_srv(char *name, char *protocol, char *service) {
     return false;
 
   if (protocol) {
-    char *s = &label[1];
-
-    while (*s) {
-      if (*s >= 'A' && *s <= 'Z')
-        *s += ' ';
-      s += 1;
-    }
-
     strcpy(protocol, &label[1]);
+    hsk_to_lower(protocol);
   }
 
   len = hsk_dns_label_get2(name, labels, count, 0, label);
@@ -2743,15 +2736,8 @@ hsk_dns_label_decode_srv(char *name, char *protocol, char *service) {
     return false;
 
   if (service) {
-    char *s = &label[1];
-
-    while (*s) {
-      if (*s >= 'A' && *s <= 'Z')
-        *s += ' ';
-      s += 1;
-    }
-
     strcpy(service, &label[1]);
+    hsk_to_lower(service);
   }
 
   return true;
@@ -2785,15 +2771,8 @@ hsk_dns_label_decode_tlsa(char *name, char *protocol, uint16_t *port) {
     return false;
 
   if (protocol) {
-    char *s = &label[1];
-
-    while (*s) {
-      if (*s >= 'A' && *s <= 'Z')
-        *s += ' ';
-      s += 1;
-    }
-
     strcpy(protocol, &label[1]);
+    hsk_to_lower(protocol);
   }
 
   len = hsk_dns_label_get2(name, labels, count, 0, label);
