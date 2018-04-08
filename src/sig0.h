@@ -51,7 +51,7 @@ hsk_sig0_sign_msg(
 );
 
 bool
-hsk_sign_and_truncate(
+hsk_sig0_sign_tc(
   hsk_ec_t *ec,
   uint8_t *key,
   uint8_t **msg,

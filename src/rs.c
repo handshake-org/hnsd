@@ -530,11 +530,9 @@ hsk_rs_respond(
     goto fail;
   }
 
-  if (ns->key) {
-    if (!hsk_sig0_sign_msg(ns->ec, ns->key, &wire, &wire_len)) {
-      hsk_rs_log(ns, "could not sign response\n");
-      goto fail;
-    }
+  if (!hsk_sig0_sign_tc(ns->ec, ns->key, &wire, &wire_len, req->max_size)) {
+    hsk_rs_log(ns, "could not sign/truncate response\n");
+    goto fail;
   }
 
   hsk_dns_msg_free(msg);
@@ -561,9 +559,6 @@ fail:
   }
 
 done:
-  if (!hsk_dns_msg_truncate(wire, wire_len, req->max_size, &wire_len))
-    hsk_rs_log(ns, "failed truncation (%d): %d\n", req->id, wire_len);
-
   hsk_rs_send(ns, wire, wire_len, req->addr, true);
 }
 

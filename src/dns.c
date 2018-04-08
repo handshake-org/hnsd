@@ -197,7 +197,7 @@ hsk_dns_msg_truncate(uint8_t *msg, size_t msg_len, size_t max, size_t *len) {
   if (msg_len < 12)
     return false;
 
-  if (max < 512)
+  if (max < 12)
     return false;
 
   if (msg_len <= max) {
@@ -207,9 +207,6 @@ hsk_dns_msg_truncate(uint8_t *msg, size_t msg_len, size_t max, size_t *len) {
 
   uint8_t *data = msg;
   size_t data_len = msg_len;
-
-  assert(msg_len >= 12);
-  assert(max >= 512);
 
   uint16_t flags = 0;
   uint16_t qdcount = 0;
@@ -240,7 +237,7 @@ hsk_dns_msg_truncate(uint8_t *msg, size_t msg_len, size_t max, size_t *len) {
     return false;
 
   uint8_t *end = msg + max;
-  uint8_t *last = NULL;
+  uint8_t *last = data;
   uint16_t rdlen;
 
   uint16_t counts[4] = {
@@ -302,9 +299,6 @@ hsk_dns_msg_truncate(uint8_t *msg, size_t msg_len, size_t max, size_t *len) {
 
     counts[s] = j;
   }
-
-  if (last == NULL)
-    return false;
 
   flags |= HSK_DNS_TC;
 

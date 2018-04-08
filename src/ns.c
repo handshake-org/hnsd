@@ -327,17 +327,12 @@ hsk_ns_onrecv(
     goto fail;
   }
 
-  if (ns->key) {
-    if (!hsk_sig0_sign_msg(ns->ec, ns->key, &wire, &wire_len)) {
-      hsk_ns_log(ns, "could not sign response\n");
-      goto fail;
-    }
+  if (!hsk_sig0_sign_tc(ns->ec, ns->key, &wire, &wire_len, req->max_size)) {
+    hsk_ns_log(ns, "could not sign/truncate response\n");
+    goto fail;
   }
 
   hsk_ns_log(ns, "sending root soa (%d): %d\n", req->id, wire_len);
-
-  if (!hsk_dns_msg_truncate(wire, wire_len, req->max_size, &wire_len))
-    hsk_ns_log(ns, "failed truncation (%d): %d\n", req->id, wire_len);
 
   hsk_ns_send(ns, wire, wire_len, addr, true);
 
@@ -360,9 +355,6 @@ fail:
   }
 
   hsk_ns_log(ns, "sending servfail (%d): %d\n", req->id, wire_len);
-
-  if (!hsk_dns_msg_truncate(wire, wire_len, req->max_size, &wire_len))
-    hsk_ns_log(ns, "failed truncation (%d): %d\n", req->id, wire_len);
 
   hsk_ns_send(ns, wire, wire_len, addr, true);
 
@@ -421,9 +413,9 @@ hsk_ns_respond(
       hsk_ns_log(ns, "sending msg (%d): %d\n", req->id, wire_len);
   }
 
-  if (result && ns->key) {
-    if (!hsk_sig0_sign_msg(ns->ec, ns->key, &wire, &wire_len)) {
-      hsk_ns_log(ns, "could not sign response\n");
+  if (result) {
+    if (!hsk_sig0_sign_tc(ns->ec, ns->key, &wire, &wire_len, req->max_size)) {
+      hsk_ns_log(ns, "could not sign/truncate response\n");
       result = false;
     }
   }
@@ -447,9 +439,6 @@ hsk_ns_respond(
 
     hsk_ns_log(ns, "sending servfail (%d): %d\n", req->id, wire_len);
   }
-
-  if (!hsk_dns_msg_truncate(wire, wire_len, req->max_size, &wire_len))
-    hsk_ns_log(ns, "failed truncation (%d): %d\n", req->id, wire_len);
 
   hsk_ns_send(ns, wire, wire_len, req->addr, true);
 }
