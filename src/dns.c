@@ -20,9 +20,6 @@ typedef struct hsk_dns_raw_rr_s {
   size_t size;
 } hsk_dns_raw_rr_t;
 
-static void
-to_lower(char *name);
-
 static int32_t
 raw_rr_cmp(const void *a, const void *b);
 
@@ -47,7 +44,7 @@ hsk_dns_msg_init(hsk_dns_msg_t *msg) {
   msg->edns.enabled = false;
   msg->edns.version = 0;
   msg->edns.flags = 0;
-  msg->edns.size = 512;
+  msg->edns.size = HSK_DNS_MAX_UDP;
   msg->edns.code = 0;
   msg->edns.rd_len = 0;
   msg->edns.rd = NULL;
@@ -112,7 +109,7 @@ hsk_dns_msg_write(hsk_dns_msg_t *msg, uint8_t **data) {
   if (data) {
     cmp = &cmp_;
     hsk_map_init_str_map(&cmp->map, NULL);
-    cmp->pd = *data;
+    cmp->msg = *data;
   }
 
   flags &= ~(0x0f << 11);
@@ -215,8 +212,8 @@ hsk_dns_msg_truncate(uint8_t *msg, size_t msg_len, size_t max, size_t *len) {
   uint16_t arcount = 0;
 
   hsk_dns_dmp_t dmp;
-  dmp.pd = msg;
-  dmp.pd_len = msg_len;
+  dmp.msg = msg;
+  dmp.msg_len = msg_len;
 
   data += 2;
   data_len -= 2;
@@ -331,8 +328,8 @@ hsk_dns_msg_read(uint8_t **data, size_t *data_len, hsk_dns_msg_t *msg) {
   uint16_t arcount = 0;
 
   hsk_dns_dmp_t dmp;
-  dmp.pd = *data;
-  dmp.pd_len = *data_len;
+  dmp.msg = *data;
+  dmp.msg_len = *data_len;
 
   if (!read_u16be(data, data_len, &id))
     return false;
@@ -757,7 +754,7 @@ hsk_dns_rr_write(hsk_dns_rr_t *rr, uint8_t **data, hsk_dns_cmp_t *cmp) {
     return size;
   }
 
-  // SIZE
+  // Save RD len pos for later.
   uint8_t *pos = NULL;
 
   if (data) {
@@ -766,14 +763,12 @@ hsk_dns_rr_write(hsk_dns_rr_t *rr, uint8_t **data, hsk_dns_cmp_t *cmp) {
   }
 
   size += 2;
-  // /SIZE
 
-  // RD
+  // Write RD.
   int32_t rdlen = hsk_dns_rd_write(rr->rd, rr->type, data, cmp);
   size += rdlen;
-  // /RD
 
-  // Rewrite size.
+  // Write RD len.
   if (pos)
     write_u16be(&pos, rdlen);
 
@@ -2092,70 +2087,6 @@ hsk_dns_txt_free(hsk_dns_txt_t *txt) {
 }
 
 /*
- * Utils
- */
-
-hsk_dns_rr_t *
-hsk_dns_get_rr2(
-  hsk_dns_rrs_t *rrs,
-  char *target,
-  uint8_t type,
-  int32_t *index
-) {
-  char *glue = target;
-
-  int32_t i = 0;
-
-  if (index)
-    i = *index;
-
-  for (; i < rrs->size; i++) {
-    hsk_dns_rr_t *rr = rrs->items[i];
-
-    if (!target) {
-      if (rr->type == type || type == HSK_DNS_ANY) {
-        if (index)
-          *index = i;
-        return rr;
-      }
-      continue;
-    }
-
-    if (rr->type == HSK_DNS_CNAME) {
-      if (hsk_dns_name_cmp(rr->name, glue) == 0) {
-        if (type == HSK_DNS_CNAME || type == HSK_DNS_ANY) {
-          if (index)
-            *index = i;
-          return rr;
-        }
-
-        glue = ((hsk_dns_cname_rd_t *)rr->rd)->target;
-      }
-      continue;
-    }
-
-    if (rr->type == type || type == HSK_DNS_ANY) {
-      if (hsk_dns_name_cmp(rr->name, glue) == 0) {
-        if (index)
-          *index = i;
-        return rr;
-      }
-      continue;
-    }
-  }
-
-  if (index)
-    *index = -1;
-
-  return NULL;
-}
-
-hsk_dns_rr_t *
-hsk_dns_get_rr(hsk_dns_rrs_t *rrs, char *target, uint8_t type) {
-  return hsk_dns_get_rr2(rrs, target, type, NULL);
-}
-
-/*
  * Names
  */
 
@@ -2199,16 +2130,15 @@ hsk_dns_name_parse(
         for (j = off; j < off + c; j++) {
           uint8_t b = data[j];
 
-          // This allows for double-dots
-          // too easily in our design.
-          // Do not allow.
-          if (b == 0x2e)
-            return -1;
-
           // Hack because we're
           // using c-strings.
           if (b == 0x00)
             b = 0xff;
+
+          // This allows for double-dots
+          // too easily in our design.
+          if (b == 0x2e)
+            b = 0xfe;
 
           if (name)
             name[noff] = b;
@@ -2246,8 +2176,8 @@ hsk_dns_name_parse(
 
         off = (((int32_t)(c ^ 0xc0)) << 8) | c1;
 
-        data = dmp->pd;
-        data_len = dmp->pd_len;
+        data = dmp->msg;
+        data_len = dmp->msg_len;
 
         break;
       }
@@ -2319,7 +2249,7 @@ hsk_dns_name_serialize(
         if (strcmp(sub, ".") != 0) {
           size_t p = (size_t)hsk_map_get(&cmp->map, sub);
           if (p == 0) {
-            size_t o = (size_t)((data + off) - cmp->pd);
+            size_t o = (size_t)((data + off) - cmp->msg);
             if (o < (2 << 13))
               hsk_map_set(&cmp->map, sub, (void *)o);
           } else {
@@ -2340,9 +2270,13 @@ hsk_dns_name_serialize(
         for (j = begin; j < i; j++) {
           char ch = name[j];
 
-          // Hack.
+          // 0xff -> NUL
           if (ch == -1)
-            ch = 0x00;
+            ch = '\0';
+
+          // 0xfe -> .
+          if (ch == -2)
+            ch = '.';
 
           data[off++] = ch;
         }
@@ -2501,6 +2435,10 @@ hsk_dns_name_sanitize(char *name, char *out) {
     uint8_t c = (uint8_t)*s;
 
     switch (c) {
+      case 0xfe: {
+        c = 0x2e;
+        ; // fall through
+      }
       case 0x28 /*(*/:
       case 0x29 /*)*/:
       case 0x3b /*;*/:
@@ -2598,19 +2536,19 @@ hsk_dns_name_cmp(char *a, char *b) {
 
   int32_t i;
   for (i = 0; i < len; i++) {
-    char ai = a[i];
-    char bi = b[i];
+    char x = a[i];
+    char y = b[i];
 
-    if (ai >= 0x41 && ai <= 0x5a)
-      ai |= 0x61 - 0x41;
+    if (x >= 0x41 && x <= 0x5a)
+      x |= 0x20;
 
-    if (bi >= 0x41 && bi <= 0x5a)
-      bi |= 0x61 - 0x41;
+    if (y >= 0x41 && y <= 0x5a)
+      y |= 0x20;
 
-    if (ai < bi)
+    if (x < y)
       return -1;
 
-    if (ai > bi)
+    if (x > y)
       return 1;
   }
 
@@ -2938,43 +2876,6 @@ hsk_dns_label_is_smimea(char *name) {
 }
 
 /*
- * Iterator
- */
-
-void
-hsk_dns_iter_init(
-  hsk_dns_iter_t *it,
-  hsk_dns_rrs_t *rrs,
-  char *target,
-  uint8_t type
-) {
-  it->rrs = rrs;
-  it->target = target;
-  it->type = type;
-  it->index = 0;
-}
-
-hsk_dns_rr_t *
-hsk_dns_iter_next(hsk_dns_iter_t *it) {
-  if (it->index == -1)
-    return NULL;
-
-  hsk_dns_rr_t *rr = hsk_dns_get_rr2(it->rrs, it->target, it->type, &it->index);
-
-  if (!rr) {
-    it->index = -1;
-    return NULL;
-  }
-
-  if (it->target)
-    it->target = rr->name;
-
-  it->index += 1;
-
-  return rr;
-}
-
-/*
  * DNSSEC
  */
 
@@ -3014,7 +2915,7 @@ hsk_dns_rrsig_tbs(hsk_dns_rrsig_rd_t *rrsig, uint8_t **data, size_t *data_len) {
   uint8_t *signature = rrsig->signature;
   size_t signature_len = rrsig->signature_len;
 
-  to_lower(rrsig->signer_name);
+  hsk_to_lower(rrsig->signer_name);
   rrsig->signature = NULL;
   rrsig->signature_len = 0;
 
@@ -3049,7 +2950,7 @@ hsk_dns_dnskey_create(char *zone, uint8_t *priv, bool ksk) {
   }
 
   strcpy(key->name, zone);
-  to_lower(key->name);
+  hsk_to_lower(key->name);
   key->type = HSK_DNS_DNSKEY;
   key->class = HSK_DNS_IN;
   key->ttl = 10800;
@@ -3092,7 +2993,7 @@ hsk_dns_ds_create(hsk_dns_rr_t *key) {
   }
 
   strcpy(ds->name, key->name);
-  to_lower(ds->name);
+  hsk_to_lower(ds->name);
   ds->type = HSK_DNS_DS;
   ds->class = key->class;
   ds->ttl = key->ttl;
@@ -3187,14 +3088,14 @@ hsk_dns_sign_rrset(hsk_dns_rrs_t *rrset, hsk_dns_rr_t *key, uint8_t *priv) {
   }
 
   strcpy(sig->name, rrset->items[0]->name);
-  to_lower(sig->name);
+  hsk_to_lower(sig->name);
   sig->type = HSK_DNS_RRSIG;
   sig->class = key->class;
   sig->ttl = key->ttl;
 
   rrsig->key_tag = key_tag;
   strcpy(rrsig->signer_name, key->name);
-  to_lower(rrsig->signer_name);
+  hsk_to_lower(rrsig->signer_name);
   rrsig->algorithm = dnskey->algorithm;
   rrsig->inception = hsk_now() - (14 * 24 * 60 * 60);
   rrsig->expiration = hsk_now() + (14 * 24 * 60 * 60);
@@ -3218,11 +3119,6 @@ hsk_dns_sign_rrsig(hsk_dns_rrs_t *rrset, hsk_dns_rr_t *sig, uint8_t *priv) {
   if (!priv)
     return false;
 
-  uint8_t *sigbuf = malloc(64);
-
-  if (!sigbuf)
-    return false;
-
   hsk_dns_rrsig_rd_t *rrsig = (hsk_dns_rrsig_rd_t *)sig->rd;
 
   rrsig->orig_ttl = rrset->items[0]->ttl;
@@ -3234,10 +3130,10 @@ hsk_dns_sign_rrsig(hsk_dns_rrs_t *rrset, hsk_dns_rr_t *sig, uint8_t *priv) {
   uint8_t hash[32];
 
   // Hash with sha256.
-  if (!hsk_dns_sighash(rrset, sig, hash)) {
-    free(sigbuf);
+  if (!hsk_dns_sighash(rrset, sig, hash))
     return false;
-  }
+
+  uint8_t *sigbuf = malloc(64);
 
   // Sign with secp256r1.
   if (!hsk_ecc_sign(priv, hash, sigbuf)) {
@@ -3282,36 +3178,36 @@ hsk_dns_sighash(hsk_dns_rrs_t *rrset, hsk_dns_rr_t *sig, uint8_t *hash) {
     if (!rr)
       goto fail;
 
-    to_lower(rr->name);
+    hsk_to_lower(rr->name);
 
     rr->ttl = rrsig->orig_ttl;
 
     switch (rr->type) {
       case HSK_DNS_NS:
-        to_lower(((hsk_dns_ns_rd_t *)rr->rd)->ns);
+        hsk_to_lower(((hsk_dns_ns_rd_t *)rr->rd)->ns);
         break;
       case HSK_DNS_CNAME:
-        to_lower(((hsk_dns_cname_rd_t *)rr->rd)->target);
+        hsk_to_lower(((hsk_dns_cname_rd_t *)rr->rd)->target);
         break;
       case HSK_DNS_SOA:
-        to_lower(((hsk_dns_soa_rd_t *)rr->rd)->ns);
-        to_lower(((hsk_dns_soa_rd_t *)rr->rd)->mbox);
+        hsk_to_lower(((hsk_dns_soa_rd_t *)rr->rd)->ns);
+        hsk_to_lower(((hsk_dns_soa_rd_t *)rr->rd)->mbox);
         break;
       case HSK_DNS_PTR:
-        to_lower(((hsk_dns_ptr_rd_t *)rr->rd)->ptr);
+        hsk_to_lower(((hsk_dns_ptr_rd_t *)rr->rd)->ptr);
         break;
       case HSK_DNS_MX:
-        to_lower(((hsk_dns_mx_rd_t *)rr->rd)->mx);
+        hsk_to_lower(((hsk_dns_mx_rd_t *)rr->rd)->mx);
         break;
       case HSK_DNS_SIG:
       case HSK_DNS_RRSIG:
-        to_lower(((hsk_dns_rrsig_rd_t *)rr->rd)->signer_name);
+        hsk_to_lower(((hsk_dns_rrsig_rd_t *)rr->rd)->signer_name);
         break;
       case HSK_DNS_SRV:
-        to_lower(((hsk_dns_srv_rd_t *)rr->rd)->target);
+        hsk_to_lower(((hsk_dns_srv_rd_t *)rr->rd)->target);
         break;
       case HSK_DNS_DNAME:
-        to_lower(((hsk_dns_dname_rd_t *)rr->rd)->target);
+        hsk_to_lower(((hsk_dns_dname_rd_t *)rr->rd)->target);
         break;
     }
 
@@ -3437,19 +3333,6 @@ hsk_dns_rrs_clean(hsk_dns_rrs_t *rrs, uint16_t type) {
 /*
  * Helpers
  */
-
-static void
-to_lower(char *name) {
-  assert(name);
-
-  char *s = name;
-
-  while (*s) {
-    if (*s >= 'A' && *s <= 'Z')
-      *s += ' ';
-    s += 1;
-  }
-}
 
 static int32_t
 raw_rr_cmp(const void *a, const void *b) {

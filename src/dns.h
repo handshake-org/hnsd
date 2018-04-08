@@ -191,20 +191,13 @@ typedef struct {
 } hsk_dns_nsec_rd_t;
 
 typedef struct {
-  hsk_dns_rrs_t *rrs;
-  char *target;
-  uint8_t type;
-  int32_t index;
-} hsk_dns_iter_t;
-
-typedef struct {
   hsk_map_t map;
-  uint8_t *pd;
+  uint8_t *msg;
 } hsk_dns_cmp_t;
 
 typedef struct {
-  uint8_t *pd;
-  size_t pd_len;
+  uint8_t *msg;
+  size_t msg_len;
 } hsk_dns_dmp_t;
 
 // Constants
@@ -212,6 +205,7 @@ typedef struct {
 #define HSK_DNS_MAX_LABEL 63
 #define HSK_DNS_MAX_SANITIZED 1009
 #define HSK_DNS_MAX_LABELS 128
+#define HSK_DNS_MAX_UDP 512
 
 // Opcodes
 #define HSK_DNS_QUERY 0
@@ -349,7 +343,7 @@ typedef struct {
 #define HSK_DNS_CH 3
 #define HSK_DNS_HS 4
 #define HSK_DNS_NONE 254
-#define HSK_DNS_ANY 255
+// #define HSK_DNS_ANY 255
 
 // EDNS flags
 #define HSK_DNS_DO (1 << 15) // DNSSEC OK
@@ -370,9 +364,9 @@ typedef struct {
 #define HSK_DNS_OPT_CHAIN 13 // Chain
 #define HSK_DNS_OPT_KEYTAG 14 // Key Tag
 #define HSK_DNS_OPT_DEVICEID 26946 // Device ID
-#define HSK_DNS_OPT_LOCAL 65001 // Beginning of range reserved for local/experimental use
-#define HSK_DNS_OPT_LOCALSTART 65001 // Beginning of range reserved for local/experimental use
-#define HSK_DNS_OPT_LOCALEND 65534 // End of range reserved for local/experimental use
+#define HSK_DNS_OPT_LOCAL 65001 // Beginning of local/experimental use
+#define HSK_DNS_OPT_LOCALSTART 65001 // Beginning of local/experimental use
+#define HSK_DNS_OPT_LOCALEND 65534 // End of local/experimental use
 
 void
 hsk_dns_msg_init(hsk_dns_msg_t *msg);
@@ -576,17 +570,6 @@ hsk_dns_txt_alloc(void);
 void
 hsk_dns_txt_free(hsk_dns_txt_t *txt);
 
-hsk_dns_rr_t *
-hsk_dns_get_rr2(
-  hsk_dns_rrs_t *rrs,
-  char *target,
-  uint8_t type,
-  int32_t *index
-);
-
-hsk_dns_rr_t *
-hsk_dns_get_rr(hsk_dns_rrs_t *rrs, char *target, uint8_t type);
-
 int32_t
 hsk_dns_name_parse(
   uint8_t **data_,
@@ -686,17 +669,6 @@ hsk_dns_label_decode_smimea(char *name, uint8_t *hash);
 
 bool
 hsk_dns_label_is_smimea(char *name);
-
-void
-hsk_dns_iter_init(
-  hsk_dns_iter_t *it,
-  hsk_dns_rrs_t *rrs,
-  char *target,
-  uint8_t type
-);
-
-hsk_dns_rr_t *
-hsk_dns_iter_next(hsk_dns_iter_t *it);
 
 /*
  * DNSSEC

@@ -28,4 +28,7 @@ hsk_hex_decode_size(char *);
 
 bool
 hsk_hex_decode(char *, uint8_t *);
+
+void
+hsk_to_lower(char *name);
 #endif

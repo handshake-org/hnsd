@@ -151,3 +151,16 @@ hsk_hex_decode(char *str, uint8_t *data) {
 
   return true;
 }
+
+void
+hsk_to_lower(char *name) {
+  assert(name);
+
+  char *s = name;
+
+  while (*s) {
+    if (*s >= 'A' && *s <= 'Z')
+      *s += ' ';
+    s += 1;
+  }
+}

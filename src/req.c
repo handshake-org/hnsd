@@ -85,12 +85,7 @@ hsk_dns_req_create(uint8_t *data, size_t data_len, struct sockaddr *addr) {
   hsk_dns_label_get(qs->name, -1, req->tld);
 
   // Lowercase.
-  char *s = req->tld;
-  while (*s) {
-    if (*s >= 'A' && *s <= 'Z')
-      *s += ' ';
-    s += 1;
-  }
+  hsk_to_lower(req->tld);
 
   // Reference.
   req->ns = NULL;
@@ -104,8 +99,8 @@ hsk_dns_req_create(uint8_t *data, size_t data_len, struct sockaddr *addr) {
   req->rd = (msg->flags & HSK_DNS_RD) != 0;
   req->cd = (msg->flags & HSK_DNS_CD) != 0;
   req->edns = msg->edns.enabled;
-  req->max_size = 512;
-  if (msg->edns.enabled && msg->edns.size >= 512)
+  req->max_size = HSK_DNS_MAX_UDP;
+  if (msg->edns.enabled && msg->edns.size >= HSK_DNS_MAX_UDP)
     req->max_size = msg->edns.size;
   req->dnssec = (msg->edns.flags & HSK_DNS_DO) != 0;
 
