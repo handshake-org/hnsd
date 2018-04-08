@@ -225,4 +225,7 @@ hsk_resource_to_servfail(
   uint8_t **wire,
   size_t *wire_len
 );
+
+bool
+hsk_resource_is_ptr(char *name);
 #endif

@@ -2515,13 +2515,16 @@ ip_read(uint8_t *data, uint8_t *ip) {
   uint8_t left = 16 - (start + len);
 
   // Front half.
-  memcpy(ip, &data[1], start);
+  if (ip)
+    memcpy(ip, &data[1], start);
 
   // Fill in the missing section.
-  memset(&ip[start], 0x00, len);
+  if (ip)
+    memset(&ip[start], 0x00, len);
 
   // Back half.
-  memcpy(&ip[start + len], &data[1 + start], left);
+  if (ip)
+    memcpy(&ip[start + len], &data[1 + start], left);
 
   return true;
 }
@@ -2568,11 +2571,15 @@ b32_to_ip(char *str, uint8_t *ip, uint16_t *family) {
     0x00, 0x00, 0xff, 0xff
   };
 
-  if (memcmp(ip, (void *)&mapped[0], 12) == 0) {
-    memcpy(&ip[0], &ip[12], 4);
-    *family = HSK_INET4;
-  } else {
-    *family = HSK_INET6;
+  if (ip) {
+    if (memcmp(ip, (void *)&mapped[0], 12) == 0) {
+      memcpy(&ip[0], &ip[12], 4);
+      if (family)
+        *family = HSK_INET4;
+    } else {
+      if (family)
+        *family = HSK_INET6;
+    }
   }
 
   return true;
@@ -2623,4 +2630,9 @@ target_to_dns(hsk_target_t *target, char *name, char *host) {
   }
 
   return false;
+}
+
+bool
+hsk_resource_is_ptr(char *name) {
+  return pointer_to_ip(name, NULL, NULL);
 }

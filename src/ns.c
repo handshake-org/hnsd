@@ -12,6 +12,7 @@
 #include <netinet/in.h>
 
 #include "addr.h"
+#include "cache.h"
 #include "constants.h"
 #include "dns.h"
 #include "ec.h"
@@ -98,6 +99,7 @@ hsk_ns_init(hsk_ns_t *ns, uv_loop_t *loop, hsk_pool_t *pool) {
   ns->ip = NULL;
   ns->socket.data = (void *)ns;
   ns->ec = ec;
+  hsk_cache_init(&ns->cache);
   memset(ns->key_, 0x00, sizeof(ns->key_));
   ns->key = NULL;
   memset(ns->pubkey, 0x00, sizeof(ns->pubkey));
@@ -119,6 +121,8 @@ hsk_ns_uninit(hsk_ns_t *ns) {
     hsk_ec_free(ns->ec);
     ns->ec = NULL;
   }
+
+  hsk_cache_uninit(&ns->cache);
 }
 
 bool
@@ -292,6 +296,20 @@ hsk_ns_onrecv(
   uint8_t *wire;
   size_t wire_len;
 
+  // Hit cache first.
+  if (hsk_cache_get_req(&ns->cache, req, &wire, &wire_len)) {
+    if (!hsk_sig0_sign_tc(ns->ec, ns->key, &wire, &wire_len, req->max_size)) {
+      hsk_ns_log(ns, "could not sign/truncate response\n");
+      goto fail;
+    }
+
+    hsk_ns_log(ns, "sending cached msg (%d): %d\n", req->id, wire_len);
+
+    hsk_ns_send(ns, wire, wire_len, addr, true);
+
+    goto done;
+  }
+
   // Requesting a lookup.
   if (req->labels > 0) {
     req->ns = (void *)ns;
@@ -326,6 +344,8 @@ hsk_ns_onrecv(
     hsk_ns_log(ns, "could not create root soa\n");
     goto fail;
   }
+
+  hsk_cache_insert_req(&ns->cache, req, wire, wire_len);
 
   if (!hsk_sig0_sign_tc(ns->ec, ns->key, &wire, &wire_len, req->max_size)) {
     hsk_ns_log(ns, "could not sign/truncate response\n");
@@ -414,6 +434,8 @@ hsk_ns_respond(
   }
 
   if (result) {
+    hsk_cache_insert_req(&ns->cache, req, wire, wire_len);
+
     if (!hsk_sig0_sign_tc(ns->ec, ns->key, &wire, &wire_len, req->max_size)) {
       hsk_ns_log(ns, "could not sign/truncate response\n");
       result = false;

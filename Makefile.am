@@ -60,7 +60,8 @@ EXTRA_DIST = README.md \
 PROGS = hnsd
 noinst_PROGRAMS = $(PROGS)
 
-hnsd_SOURCES = src/daemon.c \
+hnsd_SOURCES = src/cache.c  \
+               src/daemon.c \
                src/ns.c     \
                src/rs.c
 

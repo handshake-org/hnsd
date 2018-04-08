@@ -6,6 +6,7 @@
 #include <stdbool.h>
 #include "uv.h"
 
+#include "cache.h"
 #include "ec.h"
 #include "pool.h"
 
@@ -26,6 +27,7 @@ typedef struct {
   hsk_addr_t *ip;
   uv_udp_t socket;
   hsk_ec_t *ec;
+  hsk_cache_t cache;
   uint8_t key_[32];
   uint8_t *key;
   uint8_t pubkey[33];
