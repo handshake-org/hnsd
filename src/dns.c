@@ -420,11 +420,8 @@ hsk_dns_msg_read(uint8_t **data, size_t *data_len, hsk_dns_msg_t *msg) {
     if (rr->type == HSK_DNS_OPT) {
       hsk_dns_opt_rd_t *opt = (hsk_dns_opt_rd_t *)rr->rd;
 
-      if (msg->edns.enabled) {
-        free(rr->rd);
-        free(rr);
-        continue;
-      }
+      if (msg->edns.rd)
+        free(msg->edns.rd);
 
       msg->edns.enabled = true;
       msg->edns.code = (rr->ttl >> 24) & 0xff;
