@@ -42,7 +42,7 @@ void
 hsk_cache_free(hsk_cache_t *c);
 
 bool
-hsk_cache_insert(
+hsk_cache_insert_data(
   hsk_cache_t *c,
   char *name,
   uint16_t type,
@@ -51,15 +51,10 @@ hsk_cache_insert(
 );
 
 bool
-hsk_cache_insert_req(
-  hsk_cache_t *c,
-  hsk_dns_req_t *req,
-  uint8_t *wire,
-  size_t wire_len
-);
+hsk_cache_insert(hsk_cache_t *c, hsk_dns_req_t *req, hsk_dns_msg_t *msg);
 
 bool
-hsk_cache_get(
+hsk_cache_get_data(
   hsk_cache_t *c,
   char *name,
   uint16_t type,
@@ -67,13 +62,8 @@ hsk_cache_get(
   size_t *wire_len
 );
 
-bool
-hsk_cache_get_req(
-  hsk_cache_t *c,
-  hsk_dns_req_t *req,
-  uint8_t **wire,
-  size_t *wire_len
-);
+hsk_dns_msg_t *
+hsk_cache_get(hsk_cache_t *c, hsk_dns_req_t *req);
 
 void
 hsk_cache_key_init(hsk_cache_key_t *ck);

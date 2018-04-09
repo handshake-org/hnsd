@@ -10,8 +10,10 @@
 #include "addr.h"
 #include "constants.h"
 #include "dns.h"
+#include "ec.h"
 #include "error.h"
 #include "req.h"
+#include "sig0.h"
 #include "utils.h"
 
 void
@@ -143,4 +145,116 @@ hsk_dns_req_print(hsk_dns_req_t *req, char *prefix) {
   printf("%s  dnssec=%d\n", prefix, (int32_t)req->dnssec);
   printf("%s  tld=%s\n", prefix, req->tld);
   printf("%s  addr=%s\n", prefix, addr);
+}
+
+bool
+hsk_dns_msg_finalize(
+  hsk_dns_msg_t **res,
+  hsk_dns_req_t *req,
+  hsk_ec_t *ec,
+  uint8_t *key,
+  uint8_t **wire,
+  size_t *wire_len
+) {
+  assert(res && req && ec && wire && wire_len);
+
+  hsk_dns_msg_t *msg = *res;
+
+  *res = NULL;
+  *wire = NULL;
+  *wire_len = 0;
+
+  // Reset ID & flags.
+  msg->id = req->id;
+  msg->flags |= HSK_DNS_QR;
+
+  if (req->rd)
+    msg->flags |= HSK_DNS_RD;
+
+  if (req->cd)
+    msg->flags |= HSK_DNS_CD;
+
+  // Reset EDNS stuff.
+  msg->edns.enabled = false;
+  msg->edns.version = 0;
+  msg->edns.flags = 0;
+  msg->edns.size = 512;
+  msg->edns.code = 0;
+  msg->edns.rd_len = 0;
+
+  if (msg->edns.rd) {
+    free(msg->edns.rd);
+    msg->edns.rd = NULL;
+  }
+
+  if (req->edns) {
+    msg->edns.enabled = true;
+    msg->edns.size = 4096;
+    if (req->dnssec)
+      msg->edns.flags |= HSK_DNS_DO;
+  }
+
+  // Reset question.
+  hsk_dns_rrs_uninit(&msg->qd);
+
+  hsk_dns_qs_t *qs = hsk_dns_qs_alloc();
+
+  if (!qs) {
+    hsk_dns_msg_free(msg);
+    return NULL;
+  }
+
+  qs->type = req->type;
+  hsk_dns_rr_set_name(qs, req->name);
+
+  hsk_dns_rrs_push(&msg->qd, qs);
+
+  // Remove RRSIGs if they didn't ask for them.
+  if (!req->dnssec) {
+    if (!hsk_dns_msg_clean(msg, req->type)) {
+      hsk_dns_msg_free(msg);
+      return false;
+    }
+  }
+
+  // Reserialize.
+  uint8_t *data = NULL;
+  size_t data_len = 0;
+
+  if (!hsk_dns_msg_encode(msg, &data, &data_len)) {
+    hsk_dns_msg_free(msg);
+    return false;
+  }
+
+  assert(data);
+
+  hsk_dns_msg_free(msg);
+
+  // Truncate.
+  size_t max = req->max_size;
+
+  if (key)
+    max -= HSK_SIG0_RR_SIZE;
+
+  if (!hsk_dns_msg_truncate(data, data_len, max, &data_len)) {
+    free(data);
+    return false;
+  }
+
+  // Sign.
+  uint8_t *out = NULL;
+  size_t out_len = 0;
+
+  if (!hsk_sig0_sign(ec, key, data, data_len, &out, &out_len)) {
+    free(data);
+    return false;
+  }
+
+  assert(out);
+  free(data);
+
+  *wire = out;
+  *wire_len = out_len;
+
+  return true;
 }

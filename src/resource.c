@@ -1820,54 +1820,20 @@ hsk_resource_to_glue(hsk_resource_t *res, hsk_dns_rrs_t *an) {
   return true;
 }
 
-bool
-hsk_resource_to_dns(
-  hsk_resource_t *rs,
-  uint16_t id,
-  char *fqdn,
-  uint16_t type,
-  bool edns,
-  bool dnssec,
-  uint8_t **wire,
-  size_t *wire_len
-) {
-  int32_t labels = hsk_dns_label_count(fqdn);
+hsk_dns_msg_t *
+hsk_resource_to_dns(hsk_resource_t *rs, char *name, uint16_t type) {
+  int32_t labels = hsk_dns_label_count(name);
 
   if (labels == 0)
-    return false;
-
-  char name[HSK_DNS_MAX_LABEL + 1];
-  bool ret;
-
-  hsk_dns_label_get(fqdn, -1, name);
+    return NULL;
 
   hsk_dns_msg_t *msg = hsk_dns_msg_alloc();
 
   if (!msg)
-    return false;
+    return NULL;
 
-  msg->id = id;
   msg->flags |= HSK_DNS_QR;
   msg->flags |= HSK_DNS_AD;
-
-  if (edns) {
-    msg->edns.enabled = true;
-    msg->edns.size = 4096;
-    if (dnssec)
-      msg->edns.flags |= HSK_DNS_DO;
-  }
-
-  hsk_dns_qs_t *qs = hsk_dns_qs_alloc();
-
-  if (!qs) {
-    hsk_dns_msg_free(msg);
-    return false;
-  }
-
-  qs->type = type;
-  hsk_dns_rr_set_name(qs, fqdn);
-
-  hsk_dns_rrs_push(&msg->qd, qs);
 
   hsk_dns_rrs_t *an = &msg->an;
   hsk_dns_rrs_t *ns = &msg->ns;
@@ -1894,7 +1860,7 @@ hsk_resource_to_dns(
       }
 
       if (!match)
-        goto done;
+        return msg;
 
       uint16_t rrtype = HSK_DNS_A;
 
@@ -1907,11 +1873,11 @@ hsk_resource_to_dns(
 
       if (!rr) {
         hsk_dns_msg_free(msg);
-        return false;
+        return NULL;
       }
 
       rr->ttl = rs->ttl;
-      hsk_dns_rr_set_name(rr, fqdn);
+      hsk_dns_rr_set_name(rr, name);
 
       if (family == HSK_INET4) {
         hsk_dns_a_rd_t *rd = rr->rd;
@@ -1923,10 +1889,9 @@ hsk_resource_to_dns(
 
       hsk_dns_rrs_push(an, rr);
 
-      if (dnssec)
-        hsk_dnssec_sign(ar, rrtype);
+      hsk_dnssec_sign(ar, rrtype);
 
-      goto done;
+      return msg;
     }
   }
 
@@ -1941,8 +1906,7 @@ hsk_resource_to_dns(
         if (is_srv) {
           hsk_resource_to_srv(rs, name, protocol, service, an);
           hsk_resource_to_srvip(rs, name, protocol, service, ar);
-          if (dnssec)
-            hsk_dnssec_sign(an, HSK_DNS_SRV);
+          hsk_dnssec_sign(an, HSK_DNS_SRV);
         }
 
         break;
@@ -1954,8 +1918,7 @@ hsk_resource_to_dns(
 
         if (is_tlsa) {
           hsk_resource_to_tlsa(rs, name, protocol, port, an);
-          if (dnssec)
-            hsk_dnssec_sign(an, HSK_DNS_TLSA);
+          hsk_dnssec_sign(an, HSK_DNS_TLSA);
         }
 
         break;
@@ -1966,8 +1929,7 @@ hsk_resource_to_dns(
 
         if (is_smimea) {
           hsk_resource_to_smimea(rs, name, hash, an);
-          if (dnssec)
-            hsk_dnssec_sign(an, HSK_DNS_SMIMEA);
+          hsk_dnssec_sign(an, HSK_DNS_SMIMEA);
         }
 
         break;
@@ -1976,98 +1938,86 @@ hsk_resource_to_dns(
 
     if (an->size > 0) {
       msg->flags |= HSK_DNS_AA;
-      goto done;
+      return msg;
     }
   }
+
+  char tld[HSK_DNS_MAX_LABEL + 1];
+
+  hsk_dns_label_get(name, -1, tld);
 
   // Referral.
   if (labels > 1) {
     if (hsk_resource_has(rs, HSK_NS)) {
-      hsk_resource_to_ns(rs, name, ns);
-      hsk_resource_to_nsip(rs, name, ar);
+      hsk_resource_to_ns(rs, tld, ns);
+      hsk_resource_to_nsip(rs, tld, ar);
       hsk_resource_to_glue(rs, ar);
-      if (dnssec) {
-        hsk_dnssec_sign(ns, HSK_DNS_NS);
-        hsk_resource_to_ds(rs, name, ns);
-        hsk_dnssec_sign(ns, HSK_DNS_DS);
-      }
+      hsk_dnssec_sign(ns, HSK_DNS_NS);
+      hsk_resource_to_ds(rs, tld, ns);
+      hsk_dnssec_sign(ns, HSK_DNS_DS);
     } else if (hsk_resource_has(rs, HSK_DELEGATE)) {
       hsk_resource_to_dname(rs, name, an);
       hsk_resource_to_glue(rs, ar);
-      if (dnssec)
-        hsk_dnssec_sign(an, HSK_DNS_DNAME);
+      hsk_dnssec_sign(an, HSK_DNS_DNAME);
     }
 
-    goto done;
+    return msg;
   }
 
   switch (type) {
     case HSK_DNS_A:
       hsk_resource_to_a(rs, name, an);
-      if (dnssec)
-        hsk_dnssec_sign(an, HSK_DNS_A);
+      hsk_dnssec_sign(an, HSK_DNS_A);
       break;
     case HSK_DNS_AAAA:
       hsk_resource_to_aaaa(rs, name, an);
-      if (dnssec)
-        hsk_dnssec_sign(an, HSK_DNS_AAAA);
+      hsk_dnssec_sign(an, HSK_DNS_AAAA);
       break;
     case HSK_DNS_CNAME:
       hsk_resource_to_cname(rs, name, an);
-      if (dnssec)
-        hsk_dnssec_sign(an, HSK_DNS_CNAME);
+      hsk_dnssec_sign(an, HSK_DNS_CNAME);
       break;
     case HSK_DNS_DNAME:
       hsk_resource_to_dname(rs, name, an);
-      if (dnssec)
-        hsk_dnssec_sign(an, HSK_DNS_DNAME);
+      hsk_dnssec_sign(an, HSK_DNS_DNAME);
       break;
     case HSK_DNS_NS:
       hsk_resource_to_ns(rs, name, ns);
       hsk_resource_to_nsip(rs, name, ar);
-      if (dnssec)
-        hsk_dnssec_sign(ns, HSK_DNS_NS);
+      hsk_dnssec_sign(ns, HSK_DNS_NS);
       break;
     case HSK_DNS_MX:
       hsk_resource_to_mx(rs, name, an);
       hsk_resource_to_mxip(rs, name, ar);
-      if (dnssec)
-        hsk_dnssec_sign(an, HSK_DNS_MX);
+      hsk_dnssec_sign(an, HSK_DNS_MX);
       break;
     case HSK_DNS_TXT:
       hsk_resource_to_txt(rs, name, an);
-      if (dnssec)
-        hsk_dnssec_sign(an, HSK_DNS_TXT);
+      hsk_dnssec_sign(an, HSK_DNS_TXT);
       break;
     case HSK_DNS_LOC:
       hsk_resource_to_loc(rs, name, an);
-      if (dnssec)
-        hsk_dnssec_sign(an, HSK_DNS_LOC);
+      hsk_dnssec_sign(an, HSK_DNS_LOC);
       break;
     case HSK_DNS_DS:
       hsk_resource_to_ds(rs, name, an);
-      if (dnssec)
-        hsk_dnssec_sign(an, HSK_DNS_DS);
+      hsk_dnssec_sign(an, HSK_DNS_DS);
       break;
     case HSK_DNS_SSHFP:
       hsk_resource_to_sshfp(rs, name, an);
-      if (dnssec)
-        hsk_dnssec_sign(an, HSK_DNS_SSHFP);
+      hsk_dnssec_sign(an, HSK_DNS_SSHFP);
       break;
     case HSK_DNS_OPENPGPKEY:
       hsk_resource_to_openpgpkey(rs, name, an);
-      if (dnssec)
-        hsk_dnssec_sign(an, HSK_DNS_OPENPGPKEY);
+      hsk_dnssec_sign(an, HSK_DNS_OPENPGPKEY);
       break;
     case HSK_DNS_URI:
       hsk_resource_to_uri(rs, name, an);
-      if (dnssec)
-        hsk_dnssec_sign(an, HSK_DNS_URI);
+      hsk_dnssec_sign(an, HSK_DNS_URI);
       break;
     case HSK_DNS_RP:
       hsk_resource_to_rp(rs, name, an);
-      if (dnssec)
-        hsk_dnssec_sign(an, HSK_DNS_RP);
+      hsk_dnssec_sign(an, HSK_DNS_RP);
       break;
   }
 
@@ -2078,27 +2028,19 @@ hsk_resource_to_dns(
     if (hsk_resource_has(rs, HSK_CANONICAL)) {
       msg->flags |= HSK_DNS_AA;
       hsk_resource_to_cname(rs, name, an);
-      if (dnssec)
-        hsk_dnssec_sign(an, HSK_DNS_CNAME);
+      hsk_dnssec_sign(an, HSK_DNS_CNAME);
     } else if (hsk_resource_has(rs, HSK_NS)) {
-      hsk_resource_to_ns(rs, name, ns);
-      hsk_resource_to_nsip(rs, name, ar);
-      if (dnssec) {
-        hsk_dnssec_sign(ns, HSK_DNS_NS);
-        hsk_resource_to_ds(rs, name, ns);
-        hsk_dnssec_sign(ns, HSK_DNS_DS);
-      }
+      hsk_resource_to_ns(rs, tld, ns);
+      hsk_resource_to_nsip(rs, tld, ar);
+      hsk_dnssec_sign(ns, HSK_DNS_NS);
+      hsk_resource_to_ds(rs, tld, ns);
+      hsk_dnssec_sign(ns, HSK_DNS_DS);
     }
   }
 
   hsk_resource_to_glue(rs, ar);
 
-done:
-  ret = hsk_dns_msg_encode(msg, wire, wire_len);
-
-  hsk_dns_msg_free(msg);
-
-  return ret;
+  return msg;
 }
 
 static bool
@@ -2110,11 +2052,11 @@ hsk_resource_root_to_soa(hsk_dns_rrs_t *an) {
 
   rr->ttl = 86400;
 
-  // hsk_dns_rr_set_name(rr, ".");
+  hsk_dns_rr_set_name(rr, ".");
 
   hsk_dns_soa_rd_t *rd = rr->rd;
-  // strcpy(rd->ns, ".");
-  // strcpy(rd->mbox, ".");
+  strcpy(rd->ns, ".");
+  strcpy(rd->mbox, ".");
 
   rd->serial = (uint32_t)hsk_now();
   rd->refresh = 1800;
@@ -2135,10 +2077,10 @@ hsk_resource_root_to_ns(hsk_dns_rrs_t *an) {
     return false;
 
   rr->ttl = 518400;
-  // hsk_dns_rr_set_name(rr, ".");
+  hsk_dns_rr_set_name(rr, ".");
 
-  // hsk_dns_ns_rd_t *rd = rr->rd;
-  // strcpy(rd->ns, ".");
+  hsk_dns_ns_rd_t *rd = rr->rd;
+  strcpy(rd->ns, ".");
 
   hsk_dns_rrs_push(an, rr);
 
@@ -2159,7 +2101,7 @@ hsk_resource_root_to_a(hsk_dns_rrs_t *an, hsk_addr_t *addr) {
 
   rr->ttl = 518400;
 
-  // hsk_dns_rr_set_name(rr, ".");
+  hsk_dns_rr_set_name(rr, ".");
 
   hsk_dns_a_rd_t *rd = rr->rd;
 
@@ -2184,7 +2126,7 @@ hsk_resource_root_to_aaaa(hsk_dns_rrs_t *an, hsk_addr_t *addr) {
 
   rr->ttl = 518400;
 
-  // hsk_dns_rr_set_name(rr, ".");
+  hsk_dns_rr_set_name(rr, ".");
 
   hsk_dns_aaaa_rd_t *rd = rr->rd;
 
@@ -2225,46 +2167,16 @@ hsk_resource_root_to_ds(hsk_dns_rrs_t *an) {
   return true;
 }
 
-bool
-hsk_resource_root(
-  uint16_t id,
-  uint16_t type,
-  bool edns,
-  bool dnssec,
-  hsk_addr_t *addr,
-  uint8_t **wire,
-  size_t *wire_len
-) {
-  bool ret;
-
+hsk_dns_msg_t *
+hsk_resource_root(uint16_t type, hsk_addr_t *addr) {
   hsk_dns_msg_t *msg = hsk_dns_msg_alloc();
 
   if (!msg)
-    return false;
+    return NULL;
 
-  msg->id = id;
   msg->flags |= HSK_DNS_QR;
   msg->flags |= HSK_DNS_AD;
   msg->flags |= HSK_DNS_AA;
-
-  if (edns) {
-    msg->edns.enabled = true;
-    msg->edns.size = 4096;
-    if (dnssec)
-      msg->edns.flags |= HSK_DNS_DO;
-  }
-
-  hsk_dns_qs_t *qs = hsk_dns_qs_alloc();
-
-  if (!qs) {
-    hsk_dns_msg_free(msg);
-    return false;
-  }
-
-  qs->type = type;
-  // hsk_dns_rr_set_name(qs, ".");
-
-  hsk_dns_rrs_push(&msg->qd, qs);
 
   hsk_dns_rrs_t *an = &msg->an;
   hsk_dns_rrs_t *ns = &msg->ns;
@@ -2275,173 +2187,88 @@ hsk_resource_root(
     case HSK_DNS_NS:
       hsk_resource_root_to_ns(an);
 
-      if (dnssec)
-        hsk_dnssec_sign(an, HSK_DNS_NS);
+      hsk_dnssec_sign(an, HSK_DNS_NS);
 
       if (hsk_addr_is_ip4(addr)) {
         hsk_resource_root_to_a(ar, addr);
-        if (dnssec)
-          hsk_dnssec_sign(ar, HSK_DNS_A);
+        hsk_dnssec_sign(ar, HSK_DNS_A);
       }
 
       if (hsk_addr_is_ip6(addr)) {
         hsk_resource_root_to_aaaa(ar, addr);
-        if (dnssec)
-          hsk_dnssec_sign(ar, HSK_DNS_AAAA);
+        hsk_dnssec_sign(ar, HSK_DNS_AAAA);
       }
 
       break;
     case HSK_DNS_SOA:
       hsk_resource_root_to_soa(an);
 
-      if (dnssec)
-        hsk_dnssec_sign(an, HSK_DNS_SOA);
+      hsk_dnssec_sign(an, HSK_DNS_SOA);
 
       hsk_resource_root_to_ns(ns);
 
-      if (dnssec)
-        hsk_dnssec_sign(ns, HSK_DNS_NS);
+      hsk_dnssec_sign(ns, HSK_DNS_NS);
 
       if (hsk_addr_is_ip4(addr)) {
         hsk_resource_root_to_a(ar, addr);
-        if (dnssec)
-          hsk_dnssec_sign(ar, HSK_DNS_A);
+        hsk_dnssec_sign(ar, HSK_DNS_A);
       }
 
       if (hsk_addr_is_ip6(addr)) {
         hsk_resource_root_to_aaaa(ar, addr);
-        if (dnssec)
-          hsk_dnssec_sign(ar, HSK_DNS_AAAA);
+        hsk_dnssec_sign(ar, HSK_DNS_AAAA);
       }
 
       break;
     case HSK_DNS_DNSKEY:
       hsk_resource_root_to_dnskey(an);
-      if (dnssec)
-        hsk_dnssec_sign(an, HSK_DNS_DNSKEY);
+      hsk_dnssec_sign(an, HSK_DNS_DNSKEY);
       break;
     case HSK_DNS_DS:
       hsk_resource_root_to_ds(an);
-      if (dnssec)
-        hsk_dnssec_sign(an, HSK_DNS_DS);
+      hsk_dnssec_sign(an, HSK_DNS_DS);
       break;
     default:
       hsk_resource_root_to_soa(ns);
-      if (dnssec)
-        hsk_dnssec_sign(ns, HSK_DNS_SOA);
+      hsk_dnssec_sign(ns, HSK_DNS_SOA);
       break;
   }
 
-  ret = hsk_dns_msg_encode(msg, wire, wire_len);
-
-  hsk_dns_msg_free(msg);
-
-  return ret;
+  return msg;
 }
 
-bool
-hsk_resource_to_nx(
-  uint16_t id,
-  char *fqdn,
-  uint16_t type,
-  bool edns,
-  bool dnssec,
-  uint8_t **wire,
-  size_t *wire_len
-) {
-  bool ret;
-
+hsk_dns_msg_t *
+hsk_resource_to_nx(void) {
   hsk_dns_msg_t *msg = hsk_dns_msg_alloc();
 
   if (!msg)
-    return false;
+    return NULL;
 
-  msg->id = id;
   msg->code = HSK_DNS_NXDOMAIN;
   msg->flags |= HSK_DNS_QR;
   msg->flags |= HSK_DNS_AD;
   msg->flags |= HSK_DNS_AA;
 
-  if (edns) {
-    msg->edns.enabled = true;
-    msg->edns.size = 4096;
-    if (dnssec)
-      msg->edns.flags |= HSK_DNS_DO;
-  }
-
-  hsk_dns_qs_t *qs = hsk_dns_qs_alloc();
-
-  if (!qs) {
-    hsk_dns_msg_free(msg);
-    return false;
-  }
-
-  qs->type = type;
-  hsk_dns_rr_set_name(qs, fqdn);
-
-  hsk_dns_rrs_push(&msg->qd, qs);
-
-  hsk_dns_rrs_t *an = &msg->an;
   hsk_dns_rrs_t *ns = &msg->ns;
-  hsk_dns_rrs_t *ar = &msg->ar;
 
   hsk_resource_root_to_soa(ns);
 
-  if (dnssec)
-    hsk_dnssec_sign(ns, HSK_DNS_SOA);
+  hsk_dnssec_sign(ns, HSK_DNS_SOA);
 
-  ret = hsk_dns_msg_encode(msg, wire, wire_len);
-
-  hsk_dns_msg_free(msg);
-
-  return ret;
+  return msg;
 }
 
-bool
-hsk_resource_to_servfail(
-  uint16_t id,
-  char *fqdn,
-  uint16_t type,
-  bool edns,
-  bool dnssec,
-  uint8_t **wire,
-  size_t *wire_len
-) {
-  bool ret;
-
+hsk_dns_msg_t *
+hsk_resource_to_servfail(void) {
   hsk_dns_msg_t *msg = hsk_dns_msg_alloc();
 
   if (!msg)
-    return false;
+    return NULL;
 
-  msg->id = id;
   msg->code = HSK_DNS_SERVFAIL;
   msg->flags |= HSK_DNS_QR;
 
-  if (edns) {
-    msg->edns.enabled = true;
-    msg->edns.size = 4096;
-    if (dnssec)
-      msg->edns.flags |= HSK_DNS_DO;
-  }
-
-  hsk_dns_qs_t *qs = hsk_dns_qs_alloc();
-
-  if (!qs) {
-    hsk_dns_msg_free(msg);
-    return false;
-  }
-
-  qs->type = type;
-  hsk_dns_rr_set_name(qs, fqdn);
-
-  hsk_dns_rrs_push(&msg->qd, qs);
-
-  ret = hsk_dns_msg_encode(msg, wire, wire_len);
-
-  hsk_dns_msg_free(msg);
-
-  return ret;
+  return msg;
 }
 
 /*

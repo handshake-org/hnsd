@@ -292,14 +292,16 @@ hsk_ns_onrecv(
 
   hsk_dns_req_print(req, "ns: ");
 
-  bool result;
-  uint8_t *wire;
-  size_t wire_len;
+  uint8_t *wire = NULL;
+  size_t wire_len = 0;
+  hsk_dns_msg_t *msg = NULL;
 
   // Hit cache first.
-  if (hsk_cache_get_req(&ns->cache, req, &wire, &wire_len)) {
-    if (!hsk_sig0_sign_tc(ns->ec, ns->key, &wire, &wire_len, req->max_size)) {
-      hsk_ns_log(ns, "could not sign/truncate response\n");
+  msg = hsk_cache_get(&ns->cache, req);
+
+  if (msg) {
+    if (!hsk_dns_msg_finalize(&msg, req, ns->ec, ns->key, &wire, &wire_len)) {
+      hsk_ns_log(ns, "could not reply\n");
       goto fail;
     }
 
@@ -330,25 +332,17 @@ hsk_ns_onrecv(
   }
 
   // Querying the root zone.
-  result = hsk_resource_root(
-    req->id,
-    req->type,
-    req->edns,
-    req->dnssec,
-    ns->ip,
-    &wire,
-    &wire_len
-  );
+  msg = hsk_resource_root(req->type, ns->ip);
 
-  if (!result) {
+  if (!msg) {
     hsk_ns_log(ns, "could not create root soa\n");
     goto fail;
   }
 
-  hsk_cache_insert_req(&ns->cache, req, wire, wire_len);
+  hsk_cache_insert(&ns->cache, req, msg);
 
-  if (!hsk_sig0_sign_tc(ns->ec, ns->key, &wire, &wire_len, req->max_size)) {
-    hsk_ns_log(ns, "could not sign/truncate response\n");
+  if (!hsk_dns_msg_finalize(&msg, req, ns->ec, ns->key, &wire, &wire_len)) {
+    hsk_ns_log(ns, "could not reply\n");
     goto fail;
   }
 
@@ -359,18 +353,16 @@ hsk_ns_onrecv(
   goto done;
 
 fail:
-  result = hsk_resource_to_servfail(
-    req->id,
-    req->name,
-    req->type,
-    req->edns,
-    req->dnssec,
-    &wire,
-    &wire_len
-  );
+  assert(!msg);
+  msg = hsk_resource_to_servfail();
 
-  if (!result) {
+  if (!msg) {
     hsk_ns_log(ns, "failed creating servfail\n");
+    goto done;
+  }
+
+  if (!hsk_dns_msg_finalize(&msg, req, ns->ec, ns->key, &wire, &wire_len)) {
+    hsk_ns_log(ns, "could not reply\n");
     goto done;
   }
 
@@ -390,72 +382,51 @@ hsk_ns_respond(
   int32_t status,
   hsk_resource_t *res
 ) {
-  bool result;
-  uint8_t *wire;
-  size_t wire_len;
+  hsk_dns_msg_t *msg = NULL;
+  uint8_t *wire = NULL;
+  size_t wire_len = 0;
 
   if (status != HSK_SUCCESS) {
     // Pool resolve error.
-    result = false;
     hsk_ns_log(ns, "resolve response error: %d\n", status);
   } else if (!res) {
     // Doesn't exist.
-    result = hsk_resource_to_nx(
-      req->id,
-      req->name,
-      req->type,
-      req->edns,
-      req->dnssec,
-      &wire,
-      &wire_len
-    );
+    msg = hsk_resource_to_nx();
 
-    if (!result)
-      hsk_ns_log(ns, "could not create nx response\n");
+    if (!msg)
+      hsk_ns_log(ns, "could not create nx response (%d)\n", req->id);
     else
-      hsk_ns_log(ns, "sending nxdomain (%d): %d\n", req->id, wire_len);
+      hsk_ns_log(ns, "sending nxdomain (%d)\n", req->id);
   } else {
     // Exists!
-    result = hsk_resource_to_dns(
-      res,
-      req->id,
-      req->name,
-      req->type,
-      req->edns,
-      req->dnssec,
-      &wire,
-      &wire_len
-    );
+    msg = hsk_resource_to_dns(res, req->name, req->type);
 
-    if (!result)
-      hsk_ns_log(ns, "could not create dns response\n");
+    if (!msg)
+      hsk_ns_log(ns, "could not create dns response (%d)\n", req->id);
     else
-      hsk_ns_log(ns, "sending msg (%d): %d\n", req->id, wire_len);
+      hsk_ns_log(ns, "sending msg (%d)\n", req->id);
   }
 
-  if (result) {
-    hsk_cache_insert_req(&ns->cache, req, wire, wire_len);
+  if (msg) {
+    hsk_cache_insert(&ns->cache, req, msg);
 
-    if (!hsk_sig0_sign_tc(ns->ec, ns->key, &wire, &wire_len, req->max_size)) {
-      hsk_ns_log(ns, "could not sign/truncate response\n");
-      result = false;
+    if (!hsk_dns_msg_finalize(&msg, req, ns->ec, ns->key, &wire, &wire_len)) {
+      assert(!msg && !wire);
+      hsk_ns_log(ns, "could not finalize\n");
     }
   }
 
-  if (!result) {
+  if (!wire) {
     // Send SERVFAIL in case of error.
-    result = hsk_resource_to_servfail(
-      req->id,
-      req->name,
-      req->type,
-      req->edns,
-      req->dnssec,
-      &wire,
-      &wire_len
-    );
+    msg = hsk_resource_to_servfail();
 
-    if (!result) {
+    if (!msg) {
       hsk_ns_log(ns, "could not create servfail response\n");
+      return;
+    }
+
+    if (!hsk_dns_msg_finalize(&msg, req, ns->ec, ns->key, &wire, &wire_len)) {
+      hsk_ns_log(ns, "could not create servfail\n");
       return;
     }
 

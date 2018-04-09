@@ -9,6 +9,7 @@
 #include <netinet/in.h>
 
 #include "dns.h"
+#include "ec.h"
 
 typedef struct {
   // Reference.
@@ -51,4 +52,14 @@ hsk_dns_req_create(uint8_t *data, size_t data_len, struct sockaddr *addr);
 
 void
 hsk_dns_req_print(hsk_dns_req_t *req, char *prefix);
+
+bool
+hsk_dns_msg_finalize(
+  hsk_dns_msg_t **res,
+  hsk_dns_req_t *req,
+  hsk_ec_t *ec,
+  uint8_t *key,
+  uint8_t **wire,
+  size_t *wire_len
+);
 #endif

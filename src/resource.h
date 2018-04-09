@@ -27,6 +27,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include "addr.h"
+#include "dns.h"
 
 // Records
 typedef struct hsk_record_s {
@@ -181,50 +182,17 @@ hsk_resource_get(hsk_resource_t *res, uint8_t type);
 bool
 hsk_resource_has(hsk_resource_t *res, uint8_t type);
 
-bool
-hsk_resource_to_dns(
-  hsk_resource_t *rs,
-  uint16_t id,
-  char *fqdn,
-  uint16_t type,
-  bool edns,
-  bool dnssec,
-  uint8_t **wire,
-  size_t *wire_len
-);
+hsk_dns_msg_t *
+hsk_resource_to_dns(hsk_resource_t *rs, char *fqdn, uint16_t type);
 
-bool
-hsk_resource_root(
-  uint16_t id,
-  uint16_t type,
-  bool edns,
-  bool dnssec,
-  hsk_addr_t *addr,
-  uint8_t **wire,
-  size_t *wire_len
-);
+hsk_dns_msg_t *
+hsk_resource_root(uint16_t type, hsk_addr_t *addr);
 
-bool
-hsk_resource_to_nx(
-  uint16_t id,
-  char *fqdn,
-  uint16_t type,
-  bool edns,
-  bool dnssec,
-  uint8_t **wire,
-  size_t *wire_len
-);
+hsk_dns_msg_t *
+hsk_resource_to_nx(void);
 
-bool
-hsk_resource_to_servfail(
-  uint16_t id,
-  char *fqdn,
-  uint16_t type,
-  bool edns,
-  bool dnssec,
-  uint8_t **wire,
-  size_t *wire_len
-);
+hsk_dns_msg_t *
+hsk_resource_to_servfail(void);
 
 bool
 hsk_resource_is_ptr(char *name);

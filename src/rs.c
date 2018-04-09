@@ -390,9 +390,9 @@ hsk_rs_onrecv(
   hsk_dns_req_t *req = hsk_dns_req_create(data, data_len, addr);
 
   int32_t rc;
-  bool result;
-  uint8_t *wire;
-  size_t wire_len;
+  uint8_t *wire = NULL;
+  size_t wire_len = 0;
+  hsk_dns_msg_t *msg = NULL;
 
   if (!req) {
     hsk_rs_log(ns, "failed processing dns request\n");
@@ -418,18 +418,15 @@ hsk_rs_onrecv(
 
   hsk_rs_log(ns, "unbound error: %s\n", ub_strerror(rc));
 
-  result = hsk_resource_to_servfail(
-    req->id,
-    req->name,
-    req->type,
-    req->edns,
-    req->dnssec,
-    &wire,
-    &wire_len
-  );
+  msg = hsk_resource_to_servfail();
 
-  if (!result) {
+  if (!msg) {
     hsk_rs_log(ns, "could not create servfail\n");
+    goto done;
+  }
+
+  if (!hsk_dns_msg_finalize(&msg, req, ns->ec, ns->key, &wire, &wire_len)) {
+    hsk_rs_log(ns, "could not finalize msg\n");
     goto done;
   }
 
@@ -447,9 +444,8 @@ hsk_rs_respond(
   struct ub_result *result
 ) {
   hsk_dns_msg_t *msg = NULL;
-  uint8_t *wire;
-  size_t wire_len;
-  bool ok;
+  uint8_t *wire = NULL;
+  size_t wire_len = 0;
 
   if (status != 0) {
     hsk_rs_log(ns, "unbound error: %s\n", ub_strerror(status));
@@ -474,35 +470,20 @@ hsk_rs_respond(
     goto fail;
   }
 
-  // Set to stub's request ID.
-  msg->id = req->id;
-
   // "Clean" the packet.
   msg->flags = 0;
   msg->opcode = HSK_DNS_QUERY;
   msg->code = result->rcode;
-  msg->flags |= HSK_DNS_QR;
-  if (req->rd)
-    msg->flags |= HSK_DNS_RD;
   msg->flags |= HSK_DNS_RA;
 
-  // Remove EDNS stuff.
-  msg->edns.enabled = false;
-  msg->edns.version = 0;
-  msg->edns.flags = 0;
-  msg->edns.size = 512;
-  msg->edns.code = 0;
-  msg->edns.rd_len = 0;
+  if (req->dnssec)
+    msg->edns.flags |= HSK_DNS_DO;
 
-  if (msg->edns.rd) {
-    free(msg->edns.rd);
-    msg->edns.rd = NULL;
-  }
+  if (result->secure && !result->bogus)
+    msg->flags |= HSK_DNS_AD;
 
-  // Remove all RRSIGs: stub resolvers don't
-  // need them and they take up space.
-  if (!hsk_dns_msg_clean(msg, req->type))
-    goto fail;
+  // Make sure we remove sigs.
+  req->dnssec = false;
 
   // Verify and remove SIG0 from
   // our authoritative server.
@@ -515,49 +496,23 @@ hsk_rs_respond(
     }
   }
 
-  // Handle EDNS and DNSSEC flags.
-  if (req->edns) {
-    msg->edns.enabled = true;
-    msg->edns.size = 4096;
-
-    if (req->dnssec)
-      msg->edns.flags |= HSK_DNS_DO;
-  }
-
-  if (result->secure && !result->bogus)
-    msg->flags |= HSK_DNS_AD;
-
-  // Reserialize once we're done.
-  if (!hsk_dns_msg_encode(msg, &wire, &wire_len)) {
-    hsk_rs_log(ns, "could not serialize response\n");
+  if (!hsk_dns_msg_finalize(&msg, req, ns->ec, ns->key, &wire, &wire_len)) {
+    hsk_rs_log(ns, "could not finalize msg\n");
     goto fail;
   }
-
-  if (!hsk_sig0_sign_tc(ns->ec, ns->key, &wire, &wire_len, req->max_size)) {
-    hsk_rs_log(ns, "could not sign/truncate response\n");
-    goto fail;
-  }
-
-  hsk_dns_msg_free(msg);
 
   goto done;
 
 fail:
-  if (msg)
-    hsk_dns_msg_free(msg);
+  msg = hsk_resource_to_servfail();
 
-  ok = hsk_resource_to_servfail(
-    req->id,
-    req->name,
-    req->type,
-    req->edns,
-    req->dnssec,
-    &wire,
-    &wire_len
-  );
-
-  if (!ok) {
+  if (!msg) {
     hsk_rs_log(ns, "could not create servfail\n");
+    return;
+  }
+
+  if (!hsk_dns_msg_finalize(&msg, req, ns->ec, ns->key, &wire, &wire_len)) {
+    hsk_rs_log(ns, "could not finalize msg\n");
     return;
   }
 

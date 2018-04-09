@@ -57,7 +57,7 @@ hsk_cache_log(hsk_cache_t *c, const char *fmt, ...) {
 }
 
 bool
-hsk_cache_insert(
+hsk_cache_insert_data(
   hsk_cache_t *c,
   char *name,
   uint16_t type,
@@ -96,15 +96,7 @@ hsk_cache_insert(
 
   memcpy(&item->key, &ck, sizeof(hsk_cache_key_t));
 
-  item->msg = malloc(wire_len);
-
-  if (!item->msg) {
-    free(item);
-    return false;
-  }
-
-  memcpy(item->msg, wire, wire_len);
-
+  item->msg = wire;
   item->msg_len = wire_len;
   item->time = hsk_now();
 
@@ -118,16 +110,16 @@ hsk_cache_insert(
 }
 
 bool
-hsk_cache_insert_req(
-  hsk_cache_t *c,
-  hsk_dns_req_t *req,
-  uint8_t *wire,
-  size_t wire_len
-) {
-  if (!req->dnssec)
-    return true;
+hsk_cache_insert(hsk_cache_t *c, hsk_dns_req_t *req, hsk_dns_msg_t *msg) {
+  uint8_t *wire;
+  size_t wire_len;
 
-  if (!hsk_cache_insert(c, req->name, req->type, wire, wire_len)) {
+  if (!hsk_dns_msg_encode(msg, &wire, &wire_len)) {
+    hsk_cache_log(c, "could not encode cache\n");
+    return false;
+  }
+
+  if (!hsk_cache_insert_data(c, req->name, req->type, wire, wire_len)) {
     hsk_cache_log(c, "could not insert cache\n");
     return false;
   }
@@ -136,7 +128,7 @@ hsk_cache_insert_req(
 }
 
 bool
-hsk_cache_get(
+hsk_cache_get_data(
   hsk_cache_t *c,
   char *name,
   uint16_t type,
@@ -168,60 +160,21 @@ hsk_cache_get(
   return true;
 }
 
-bool
-hsk_cache_get_req(
-  hsk_cache_t *c,
-  hsk_dns_req_t *req,
-  uint8_t **wire,
-  size_t *wire_len
-) {
+hsk_dns_msg_t *
+hsk_cache_get(hsk_cache_t *c, hsk_dns_req_t *req) {
   uint8_t *data;
   size_t data_len;
   hsk_dns_msg_t *msg;
 
-  if (!hsk_cache_get(c, req->name, req->type, &data, &data_len))
-    return false;
+  if (!hsk_cache_get_data(c, req->name, req->type, &data, &data_len))
+    return NULL;
 
   if (!hsk_dns_msg_decode(data, data_len, &msg)) {
     hsk_cache_log(c, "could not deserialize cached item\n");
-    return false;
+    return NULL;
   }
 
-  msg->id = req->id;
-
-  if (!req->edns) {
-    msg->edns.enabled = false;
-    msg->edns.version = 0;
-    msg->edns.flags = 0;
-    msg->edns.size = 512;
-    msg->edns.code = 0;
-    msg->edns.rd_len = 0;
-
-    if (msg->edns.rd) {
-      free(msg->edns.rd);
-      msg->edns.rd = NULL;
-    }
-  }
-
-  if (!req->dnssec) {
-    if (!hsk_dns_msg_clean(msg, req->type)) {
-      hsk_dns_msg_free(msg);
-      return false;
-    }
-  }
-
-  if (!hsk_dns_msg_encode(msg, &data, &data_len)) {
-    hsk_cache_log(c, "could reserialize cached item\n");
-    hsk_dns_msg_free(msg);
-    return false;
-  }
-
-  hsk_dns_msg_free(msg);
-
-  *wire = data;
-  *wire_len = data_len;
-
-  return true;
+  return msg;
 }
 
 void
