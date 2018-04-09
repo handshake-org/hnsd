@@ -22,7 +22,6 @@
 #include "resource.h"
 #include "req.h"
 #include "rs.h"
-#include "sig0.h"
 #include "utils.h"
 #include "uv.h"
 

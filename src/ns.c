@@ -21,7 +21,6 @@
 #include "ns.h"
 #include "pool.h"
 #include "req.h"
-#include "sig0.h"
 #include "uv.h"
 
 /*
