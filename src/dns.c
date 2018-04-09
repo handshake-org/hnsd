@@ -372,10 +372,8 @@ hsk_dns_msg_read(uint8_t **data, size_t *data_len, hsk_dns_msg_t *msg) {
   }
 
   for (i = 0; i < ancount; i++) {
-    if (msg->flags & HSK_DNS_TC) {
-      if (*data_len == 0)
-        break;
-    }
+    if (*data_len == 0)
+      break;
 
     hsk_dns_rr_t *rr = hsk_dns_rr_alloc();
 
@@ -389,10 +387,8 @@ hsk_dns_msg_read(uint8_t **data, size_t *data_len, hsk_dns_msg_t *msg) {
   }
 
   for (i = 0; i < nscount; i++) {
-    if (msg->flags & HSK_DNS_TC) {
-      if (*data_len == 0)
-        break;
-    }
+    if (*data_len == 0)
+      break;
 
     hsk_dns_rr_t *rr = hsk_dns_rr_alloc();
 
