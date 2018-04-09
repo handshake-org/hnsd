@@ -114,7 +114,7 @@ on port 53 -- this requires root access on OSX, and some hackery on Linux.
 
 #### OSX
 
-1. Open "System Preferences" on the panel/dock/whateveritis.
+1. Open "System Preferences" on the panel/dock.
 2. Select "Network".
 3. Select "Advanced".
 4. Select "DNS".
