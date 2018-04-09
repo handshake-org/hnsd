@@ -476,15 +476,21 @@ hsk_rs_respond(
   msg->code = result->rcode;
   msg->flags |= HSK_DNS_RA;
 
-  if (req->dnssec)
-    msg->edns.flags |= HSK_DNS_DO;
-
   if (result->secure && !result->bogus)
     msg->flags |= HSK_DNS_AD;
 
-  // Make sure we remove sigs.
-  req->dnssec = false;
+  // Strip out the sigs no matter what.
+  // Stub resolvers don't need them
+  // and they take up a lot of space.
+  if (req->dnssec) {
+    if (!hsk_dns_msg_clean(msg, req->type)) {
+      hsk_rs_log(ns, "could not finalize msg\n");
+      hsk_dns_msg_free(msg);
+      goto fail;
+    }
+  }
 
+  // Finalize and sign if key is available.
   if (!hsk_dns_msg_finalize(&msg, req, ns->ec, ns->key, &wire, &wire_len)) {
     hsk_rs_log(ns, "could not finalize msg\n");
     goto fail;
