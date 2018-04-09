@@ -63,7 +63,7 @@ need to be requested every 6 hours (the duration of name trie update interval
 at the consensus layer). This substantially reduces load for full nodes who are
 willing to serve proofs as a public service.
 
-## Build/Runtime Deps
+## Dependencies
 
 ### Build
 
