@@ -76,7 +76,7 @@ hsk_cache_insert_data(
 
   if (cache) {
     if (hsk_now() < cache->time + 6 * 60 * 60)
-      return false;
+      return true;
 
     hsk_map_del(&c->map, &ck);
     hsk_cache_item_free(cache);

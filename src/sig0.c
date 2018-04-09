@@ -211,10 +211,10 @@ hsk_sig0_sign(
   uint32_t now = (uint32_t)hsk_now();
 
   // expiration
-  set_u32be(&rd[8], now + 6 * 60);
+  set_u32be(&rd[8], now + 6 * 60 * 60);
 
   // inception
-  set_u32be(&rd[12], now - 6 * 60);
+  set_u32be(&rd[12], now - 6 * 60 * 60);
 
   // key_tag
   set_u16be(&rd[16], 0);

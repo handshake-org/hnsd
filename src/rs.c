@@ -485,17 +485,6 @@ hsk_rs_respond(
   // Make sure we remove sigs.
   req->dnssec = false;
 
-  // Verify and remove SIG0 from
-  // our authoritative server.
-  if (req->labels <= 1 && msg->ar.size > 0) {
-    hsk_dns_rr_t *rr = msg->ar.items[msg->ar.size - 1];
-
-    if (rr->type == HSK_DNS_SIG) {
-      hsk_dns_rrs_pop(&msg->ar);
-      hsk_dns_rr_free(rr);
-    }
-  }
-
   if (!hsk_dns_msg_finalize(&msg, req, ns->ec, ns->key, &wire, &wire_len)) {
     hsk_rs_log(ns, "could not finalize msg\n");
     goto fail;
