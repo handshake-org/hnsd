@@ -254,13 +254,7 @@ hsk_cache_key_set(hsk_cache_key_t *ck, char *name, uint16_t type) {
       ref = false;
       break;
     case 2:
-      if (type == HSK_DNS_ANY
-          || type == HSK_DNS_A
-          || type == HSK_DNS_AAAA) {
-        ref = !hsk_resource_is_ptr(name);
-      } else {
-        ref = true;
-      }
+      ref = !hsk_resource_is_ptr(name);
       break;
     case 3:
       switch (type) {
