@@ -1,6 +1,7 @@
 # hnsd
 
-SPV resolver daemon for the Handshake network.
+SPV resolver daemon for the [Handshake] network. Written in C for
+speed/size/embedability.
 
 ## Architecture
 
@@ -20,6 +21,7 @@ looks something like this.
 stub resolver
   -> +rd request
   -> recursive server
+  -> libunbound
   -> +nord request
   -> authoritative server
   -> spv node
@@ -36,6 +38,7 @@ peer
   -> authoritative server
   -> translated dns response
   -> recursive server
+  -> libunbound
   -> dns response
   -> stub resolver
 ```
@@ -45,9 +48,30 @@ peer
 This daemon currently stores no data, and uses about 12mb of memory when
 operating with a full DNS cache.
 
+This architecture works well being that there's two layers of caching between
+the final resolution and the p2p layer (which entails the production of
+slightly expensive-to-compute proofs). The recursive resolver leverages
+libunbound's built-in cache, however, there is also a cache for the
+authoritative server.
+
+This is atypical when compared to a standard RFC 1035 nameserver which simply
+holds a zonefile in memory and serves it. All current ICANN-based root zone
+servers are RFC 1035 nameservers (this goes some way to explaining why ICANN
+hasn't "opened up" the root zone completely yet). We differ in that our root
+zonefile is a blockchain. With caching for the root server, new proofs only
+need to be requested every 6 hours (the duration of name trie update interval
+at the consensus layer). This substantially reduces load for full nodes who are
+willing to serve proofs as a public service.
+
 ## Build/Runtime Deps
 
-- libunbound >= 1.7.0
+### Build
+
+- [libuv] >= 1.19.2 (included)
+
+### Build/Runtime
+
+- [libunbound] >= 1.7.0
 
 hnsd will recursively build and statically link to `uv`, which is included in
 the source repo.
@@ -165,3 +189,7 @@ $ hnsd [options]
 -h, --help
   Help message.
 ```
+
+[Handshake]: https://handshake.org
+[libuv]: https://github.com/libuv/libuv
+[libunbound]: https://github.com/NLnetLabs/unbound
