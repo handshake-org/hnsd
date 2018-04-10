@@ -276,10 +276,9 @@ hsk_cache_key_set(hsk_cache_key_t *ck, char *name, uint16_t type) {
         }
       }
       break;
-    default: {
+    default:
       ref = true;
       break;
-    }
   }
 
   if (ref)
