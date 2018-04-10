@@ -1950,8 +1950,6 @@ hsk_resource_root_to_dnskey(hsk_dns_rrs_t *an) {
 static bool
 hsk_resource_root_to_ds(hsk_dns_rrs_t *an) {
   hsk_dns_rr_t *ds = hsk_dnssec_get_ds();
-  assert(ds);
-
   hsk_dns_rr_t *rr = hsk_dns_rr_clone(ds);
 
   if (!rr)
