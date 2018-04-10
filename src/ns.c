@@ -390,6 +390,16 @@ hsk_ns_respond(
     hsk_ns_log(ns, "resolve response error: %d\n", status);
   } else if (!res) {
     // Doesn't exist.
+    //
+    // We should also be giving an NSEC proof
+    // here, but I don't think it's possible
+    // with the current construction.
+    //
+    // I imagine this would only be possible
+    // if NSEC3 begins to support BLAKE2b for
+    // name hashing. Even then, it's still
+    // not possible for SPV nodes since they
+    // can't arbitrarily iterate over the trie.
     msg = hsk_resource_to_nx();
 
     if (!msg)
