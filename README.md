@@ -1,6 +1,6 @@
 # hnsd
 
-SPV resolver daemon for the [Handshake] network. Written in C for
+SPV resolver daemon for the [Handshake][hsk] network. Written in C for
 speed/size/embedability.
 
 ## Architecture
@@ -190,6 +190,6 @@ $ hnsd [options]
   Help message.
 ```
 
-[Handshake]: https://handshake.org
+[hsk]: https://handshake.org
 [libuv]: https://github.com/libuv/libuv
 [libunbound]: https://github.com/NLnetLabs/unbound
