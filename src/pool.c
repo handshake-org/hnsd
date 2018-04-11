@@ -1242,7 +1242,8 @@ hsk_peer_handle_pong(hsk_peer_t *peer, hsk_pong_msg_t *msg) {
   hsk_peer_log(peer, "received pong\n");
 
   int64_t now = hsk_now();
-  if (hsk_now() >= peer->last_ping) {
+
+  if (now >= peer->last_ping) {
     int64_t min = now - peer->last_ping;
     peer->last_pong = now;
     if (!peer->min_ping)

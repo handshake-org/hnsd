@@ -11,6 +11,8 @@
 #include <arpa/inet.h>
 #include <netinet/in.h>
 #include <getopt.h>
+#include <sys/types.h>
+#include <unistd.h>
 
 #include "hsk.h"
 #include "pool.h"
@@ -57,6 +59,48 @@ hsk_options_init(hsk_options_t *opt) {
 }
 
 static void
+set_logfile(char *logfile) {
+  assert(logfile);
+  freopen(logfile, "a", stdout);
+  freopen(logfile, "a", stderr);
+}
+
+static bool
+daemonize(char *logfile) {
+#ifdef __linux
+  if (getppid() == 1)
+    return true;
+#endif
+
+  int pid = fork();
+
+  if (pid == -1)
+    return false;
+
+  if (pid > 0) {
+    _exit(0);
+    return false;
+  }
+
+#ifdef __linux
+  setsid();
+#endif
+
+  fprintf(stderr, "PID: %d\n", getpid());
+
+  freopen("/dev/null", "r", stdin);
+
+  if (logfile) {
+    set_logfile(logfile);
+  } else {
+    freopen("/dev/null", "w", stdout);
+    freopen("/dev/null", "w", stderr);
+  }
+
+  return true;
+}
+
+static void
 help(int32_t r) {
   fprintf(stderr,
     "\n"
@@ -87,9 +131,15 @@ help(int32_t r) {
     "    Identity key for signing DNS responses as well as P2P messages.\n"
     "\n"
     "  -s, --seeds <seed1,seed2,...>\n"
-    "    Extra seeds to connect to on P2P network.\n"
+    "    Extra seeds to connect to on the P2P network.\n"
     "    Example:\n"
     "      -s aorsxa4ylaacshipyjkfbvzfkh3jhh4yowtoqdt64nzemqtiw2whk@127.0.0.1\n"
+    "\n"
+    "  -l, --log-file <filename>\n"
+    "    Redirect output to a log file.\n"
+    "\n"
+    "  -d, --daemonize\n"
+    "    Fork and background the process.\n"
     "\n"
     "  -h, --help\n"
     "    This help message.\n"
@@ -101,7 +151,7 @@ help(int32_t r) {
 
 static void
 parse_arg(int argc, char **argv, hsk_options_t *opt) {
-  const static char *optstring = "c:n:r:i:u:p:k:s:h";
+  const static char *optstring = "c:n:r:i:u:p:k:s:l:dh";
 
   const static struct option longopts[] = {
     { "config", required_argument, NULL, 'c' },
@@ -112,11 +162,15 @@ parse_arg(int argc, char **argv, hsk_options_t *opt) {
     { "pool-size", required_argument, NULL, 'p' },
     { "identity-key", required_argument, NULL, 'k' },
     { "seeds", required_argument, NULL, 's' },
+    { "log-file", required_argument, NULL, 'l' },
+    { "daemonize", no_argument, NULL, 'd' },
     { "help", no_argument, NULL, 'h' }
   };
 
   int longopt_idx = -1;
   bool has_ip = false;
+  char *logfile = NULL;
+  bool background = false;
 
   optind = 1;
 
@@ -190,6 +244,9 @@ parse_arg(int argc, char **argv, hsk_options_t *opt) {
       }
 
       case 's': {
+        if (opt->seeds)
+          free(opt->seeds);
+
         opt->seeds = strdup(optarg);
 
         if (!opt->seeds) {
@@ -198,6 +255,26 @@ parse_arg(int argc, char **argv, hsk_options_t *opt) {
           return;
         }
 
+        break;
+      }
+
+      case 'l': {
+        if (logfile)
+          free(logfile);
+
+        logfile = strdup(optarg);
+
+        if (!logfile) {
+          printf("ENOMEM\n");
+          exit(1);
+          return;
+        }
+
+        break;
+      }
+
+      case 'd': {
+        background = true;
         break;
       }
 
@@ -212,6 +289,14 @@ parse_arg(int argc, char **argv, hsk_options_t *opt) {
 
   if (!has_ip)
     hsk_sa_copy(opt->ns_ip, opt->ns_host);
+
+  if (background)
+    daemonize(logfile);
+  else if (logfile)
+    set_logfile(logfile);
+
+  if (logfile)
+    free(logfile);
 }
 
 static bool
