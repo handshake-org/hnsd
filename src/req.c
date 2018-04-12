@@ -204,8 +204,8 @@ hsk_dns_msg_finalize(
     return NULL;
   }
 
-  qs->type = req->type;
   hsk_dns_rr_set_name(qs, req->name);
+  qs->type = req->type;
 
   hsk_dns_rrs_push(&msg->qd, qs);
 
@@ -239,6 +239,12 @@ hsk_dns_msg_finalize(
   if (!hsk_dns_msg_truncate(data, data_len, max, &data_len)) {
     free(data);
     return false;
+  }
+
+  if (!key) {
+    *wire = data;
+    *wire_len = data_len;
+    return true;
   }
 
   // Sign.
