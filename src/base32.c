@@ -135,7 +135,7 @@ hsk_base32_decode2(const int8_t *table, char *str, uint8_t *out, bool unpad) {
   size_t len = strlen(str);
 
   for (; i < len; i++) {
-    char ch = str[i];
+    uint8_t ch = (uint8_t)str[i];
     char v = (ch & 0x80) ? -1 : table[ch];
 
     if (v == -1) {

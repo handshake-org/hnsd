@@ -449,7 +449,7 @@ hsk_brontide_recv_act_three(hsk_brontide_t *b, uint8_t *act3) {
   uint8_t *s1 = &act3[1];
   uint8_t *p1 = &act3[34];
 
-  uint8_t *s2 = &act3[50];
+  uint8_t *s2 = NULL;
   uint8_t *p2 = &act3[50];
 
   uint8_t remote_pub[33];
@@ -468,7 +468,7 @@ hsk_brontide_recv_act_three(hsk_brontide_t *b, uint8_t *act3) {
   assert(hsk_ec_ecdh(b->ec, b->remote_static, b->local_ephemeral, se));
   hsk_brontide_mix_key(b, se);
 
-  hsk_brontide_decrypt(b, NULL, NULL, 0, p2);
+  hsk_brontide_decrypt(b, s2, NULL, 0, p2);
 
   if (!hsk_cs_verify(&b->cs, p2))
     return false;
@@ -599,6 +599,8 @@ hsk_brontide_on_read(hsk_brontide_t *b, uint8_t *data, size_t data_len) {
   assert(b->msg);
 
   while (b->msg_pos + data_len >= b->msg_len) {
+    assert(b->msg_pos < b->msg_len);
+
     size_t need = b->msg_len - b->msg_pos;
 
     memcpy(&b->msg[b->msg_pos], data, need);

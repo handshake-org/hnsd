@@ -34,7 +34,7 @@ to_nibbles(uint8_t *data, size_t data_len, uint8_t *nib, size_t nib_len) {
   return true;
 }
 
-static int32_t
+static bool
 decompress(uint8_t *data, size_t data_len, uint8_t **dec, size_t *dec_len) {
   if (data_len == 0) {
     *dec = NULL;

@@ -291,7 +291,7 @@ hsk_map_resize(hsk_map_t *map, uint32_t new_n_buckets) {
       if (__hsk_iseither(map->flags, j) == 0) {
         uint32_t new_mask = new_n_buckets - 1;
         void *key = map->keys[j];
-        void *val;
+        void *val = NULL;
 
         if (map->is_map)
           val = map->vals[j];

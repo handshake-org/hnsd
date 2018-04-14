@@ -1073,43 +1073,33 @@ hsk_dns_rd_uninit(void *rd, uint16_t type) {
 
   switch (type) {
     case HSK_DNS_SOA: {
-      hsk_dns_soa_rd_t *r = (hsk_dns_soa_rd_t *)rd;
       break;
     }
     case HSK_DNS_A: {
-      hsk_dns_a_rd_t *r = (hsk_dns_a_rd_t *)rd;
       break;
     }
     case HSK_DNS_AAAA: {
-      hsk_dns_aaaa_rd_t *r = (hsk_dns_aaaa_rd_t *)rd;
       break;
     }
     case HSK_DNS_LOC: {
-      hsk_dns_loc_rd_t *r = (hsk_dns_loc_rd_t *)rd;
       break;
     }
     case HSK_DNS_CNAME: {
-      hsk_dns_cname_rd_t *r = (hsk_dns_cname_rd_t *)rd;
       break;
     }
     case HSK_DNS_DNAME: {
-      hsk_dns_dname_rd_t *r = (hsk_dns_dname_rd_t *)rd;
       break;
     }
     case HSK_DNS_NS: {
-      hsk_dns_ns_rd_t *r = (hsk_dns_ns_rd_t *)rd;
       break;
     }
     case HSK_DNS_MX: {
-      hsk_dns_mx_rd_t *r = (hsk_dns_mx_rd_t *)rd;
       break;
     }
     case HSK_DNS_PTR: {
-      hsk_dns_ptr_rd_t *r = (hsk_dns_ptr_rd_t *)rd;
       break;
     }
     case HSK_DNS_SRV: {
-      hsk_dns_srv_rd_t *r = (hsk_dns_srv_rd_t *)rd;
       break;
     }
     case HSK_DNS_TXT: {
@@ -1173,11 +1163,9 @@ hsk_dns_rd_uninit(void *rd, uint16_t type) {
       break;
     }
     case HSK_DNS_URI: {
-      hsk_dns_uri_rd_t *r = (hsk_dns_uri_rd_t *)rd;
       break;
     }
     case HSK_DNS_RP: {
-      hsk_dns_rp_rd_t *r = (hsk_dns_rp_rd_t *)rd;
       break;
     }
     case HSK_DNS_NSEC: {

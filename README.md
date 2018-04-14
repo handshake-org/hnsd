@@ -37,8 +37,8 @@ peer
   -> spv node
   -> authoritative server
   -> translated dns response
-  -> recursive server
   -> libunbound
+  -> recursive server
   -> dns response
   -> stub resolver
 ```

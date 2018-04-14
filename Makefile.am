@@ -1,6 +1,6 @@
-# AUTOMAKE_OPTIONS = foreign
-# CFLAGS = -Wall -std=gnu11 -O2
-# LDFLAGS =
+AUTOMAKE_OPTIONS = foreign
+CFLAGS = -Wall -std=gnu11 -O2
+LDFLAGS =
 
 SUBDIRS = uv
 
@@ -37,6 +37,7 @@ libhsk_la_SOURCES = src/addr.c                   \
                     src/dnssec.c                 \
                     src/ecc.c                    \
                     src/ec.c                     \
+                    src/error.c                  \
                     src/hash.c                   \
                     src/header.c                 \
                     src/map.c                    \

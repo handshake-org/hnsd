@@ -56,7 +56,7 @@ hsk_resource_str_read(
   char *str,
   size_t limit
 ) {
-  uint8_t size;
+  uint8_t size = 0;
   uint8_t *chunk;
 
   if (!read_u8(data, data_len, &size))
@@ -291,7 +291,7 @@ hsk_magnet_record_read(
   if (!hsk_resource_str_read(data, data_len, st, rec->nid, 32))
     return false;
 
-  uint8_t size;
+  uint8_t size = 0;
   if (!read_u8(data, data_len, &size))
     return false;
 
@@ -315,7 +315,7 @@ hsk_ds_record_read(
   if (*data_len < 5)
     return false;
 
-  uint8_t size;
+  uint8_t size = 0;
   read_u16(data, data_len, &rec->key_tag);
   read_u8(data, data_len, &rec->algorithm);
   read_u8(data, data_len, &rec->digest_type);
@@ -345,7 +345,7 @@ hsk_tls_record_read(
   if (*data_len < 6)
     return false;
 
-  uint8_t size;
+  uint8_t size = 0;
   read_u16(data, data_len, &rec->port);
   read_u8(data, data_len, &rec->usage);
   read_u8(data, data_len, &rec->selector);
@@ -376,7 +376,7 @@ hsk_smime_record_read(
   if (*data_len < 4)
     return false;
 
-  uint8_t size;
+  uint8_t size = 0;
   read_u8(data, data_len, &rec->usage);
   read_u8(data, data_len, &rec->selector);
   read_u8(data, data_len, &rec->matching_type);
@@ -402,7 +402,7 @@ hsk_ssh_record_read(
   if (*data_len < 3)
     return false;
 
-  uint8_t size;
+  uint8_t size = 0;
   read_u8(data, data_len, &rec->algorithm);
   read_u8(data, data_len, &rec->digest_type);
   read_u8(data, data_len, &size);
@@ -427,7 +427,7 @@ hsk_pgp_record_read(
   if (*data_len < 2)
     return false;
 
-  uint16_t size;
+  uint16_t size = 0;
   read_u16(data, data_len, &size);
 
   if (size > 512)
@@ -460,7 +460,7 @@ hsk_addr_record_read(
       if (!hsk_resource_str_read(data, data_len, st, rec->currency, 32))
         return false;
 
-      uint8_t size;
+      uint8_t size = 0;
 
       if (!read_u8(data, data_len, &size))
         return false;
@@ -523,7 +523,7 @@ hsk_extra_record_read(
   size_t *data_len,
   hsk_extra_record_t *rec
 ) {
-  uint16_t size;
+  uint16_t size = 0;
 
   if (!read_u16(data, data_len, &size))
     return false;
@@ -961,7 +961,7 @@ hsk_resource_decode(uint8_t *data, size_t data_len, hsk_resource_t **resource) {
 
   res->ttl = ((uint32_t)field) << 6;
 
-  uint8_t st_size;
+  uint8_t st_size = 0;
   if (!read_u8(&data, &data_len, &st_size))
     goto fail;
 
@@ -969,7 +969,7 @@ hsk_resource_decode(uint8_t *data, size_t data_len, hsk_resource_t **resource) {
 
   // Read the symbol table.
   for (i = 0; i < st_size; i++) {
-    uint8_t size;
+    uint8_t size = 0;
 
     if (!read_u8(&data, &data_len, &size))
       goto fail;
@@ -2381,11 +2381,11 @@ ip_to_b32(hsk_target_t *target, char *dst) {
   uint8_t ip[16];
 
   if (target->type == HSK_INET4) {
-    memset(ip + 0, 0x00, 10);
-    memset(ip + 10, 0xff, 2);
-    memcpy(ip + 12, target->inet4, 4);
+    memset(&ip[0], 0x00, 10);
+    memset(&ip[10], 0xff, 2);
+    memcpy(&ip[12], target->inet4, 4);
   } else {
-    memcpy(ip, target->inet6, 16);
+    memcpy(&ip[0], target->inet6, 16);
   }
 
   uint8_t data[17];
@@ -2412,13 +2412,13 @@ b32_to_ip(char *str, uint8_t *ip, uint16_t *family) {
   if (!ip_read(data, ip))
     return false;
 
-  static const uint8_t mapped[12] = {
-    0x00, 0x00, 0x00, 0x00,
-    0x00, 0x00, 0x00, 0x00,
-    0x00, 0x00, 0xff, 0xff
-  };
-
   if (ip) {
+    static const uint8_t mapped[12] = {
+      0x00, 0x00, 0x00, 0x00,
+      0x00, 0x00, 0x00, 0x00,
+      0x00, 0x00, 0xff, 0xff
+    };
+
     if (memcmp(ip, (void *)&mapped[0], 12) == 0) {
       memcpy(&ip[0], &ip[12], 4);
       if (family)

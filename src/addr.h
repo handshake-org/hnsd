@@ -9,10 +9,10 @@
 #include <arpa/inet.h>
 #include <netinet/in.h>
 
-// INET6_ADDRSTRLEN = 46
-// 46 + 5 + 1 + 2 = 54 - long enough for [ipv6]:port
-// 54 + 53  + 1 = 108 - long enough for pubkey@[ipv6]:port
-#define HSK_MAX_HOST 109
+// INET6_ADDRSTRLEN = 65
+// 65 + 5 + 1 + 2 = 73 - long enough for [ipv6]:port
+// 73 + 53  + 1 = 127 - long enough for pubkey@[ipv6]:port
+#define HSK_MAX_HOST 128
 
 typedef struct hsk_addr_s {
   uint8_t type;

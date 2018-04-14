@@ -354,7 +354,7 @@ hsk_header_hash_pre(hsk_header_t *hdr, uint8_t *hash) {
   hsk_hash_blake2b(raw, size, hash);
 }
 
-int32_t
+void
 hsk_header_hash_sol(hsk_header_t *hdr, uint8_t *hash) {
   int32_t size = (int32_t)hdr->sol_size << 2;
   uint8_t raw[size];
@@ -367,7 +367,7 @@ hsk_header_verify_pow(hsk_header_t *hdr) {
   uint8_t target[32];
 
   if (!hsk_pow_to_target(hdr->bits, target))
-    return HSK_NEGTARGET;
+    return HSK_ENEGTARGET;
 
   int32_t size = ((int32_t)hdr->sol_size) << 2;
 
@@ -378,7 +378,7 @@ hsk_header_verify_pow(hsk_header_t *hdr) {
   hsk_hash_blake2b(raw, size, hash);
 
   if (memcmp(hash, target, 32) > 0)
-    return HSK_HIGHHASH;
+    return HSK_EHIGHHASH;
 
   hsk_cuckoo_t ctx;
 
@@ -421,15 +421,15 @@ hsk_header_print(hsk_header_t *hdr, char *prefix) {
 
   printf("%sheader\n", prefix);
   printf("%s  hash=%s\n", prefix, hash);
-  printf("%s  height=%d\n", prefix, hdr->height);
+  printf("%s  height=%u\n", prefix, hdr->height);
   printf("%s  work=%s\n", prefix, work);
-  printf("%s  version=%d\n", prefix, hdr->version);
+  printf("%s  version=%u\n", prefix, hdr->version);
   printf("%s  prev_block=%s\n", prefix, prev_block);
   printf("%s  merkle_root=%s\n", prefix, merkle_root);
   printf("%s  witness_root=%s\n", prefix, witness_root);
   printf("%s  trie_root=%s\n", prefix, trie_root);
-  printf("%s  time=%d\n", prefix, hdr->time);
-  printf("%s  bits=%d\n", prefix, hdr->bits);
+  printf("%s  time=%u\n", prefix, (uint32_t)hdr->time);
+  printf("%s  bits=%u\n", prefix, hdr->bits);
   printf("%s  nonce=%s\n", prefix, nonce);
-  printf("%s  sol_size=%d\n", prefix, hdr->sol_size);
+  printf("%s  sol_size=%u\n", prefix, hdr->sol_size);
 }

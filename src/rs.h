@@ -22,7 +22,7 @@ typedef struct {
   hsk_ec_t *ec;
   char config_[256];
   char *config;
-  struct sockaddr_storage stub_ss;
+  struct sockaddr_storage stub_;
   struct sockaddr *stub;
   uint8_t key_[32];
   uint8_t *key;

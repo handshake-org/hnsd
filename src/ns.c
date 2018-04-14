@@ -159,8 +159,8 @@ hsk_ns_set_key(hsk_ns_t *ns, uint8_t *key) {
   if (!hsk_ec_create_pubkey(ns->ec, key, ns->pubkey))
     return false;
 
-  memcpy(ns->key_, key, 32);
-  ns->key = ns->key_;
+  memcpy(&ns->key_[0], key, 32);
+  ns->key = &ns->key_[0];
 
   return true;
 }
@@ -304,7 +304,7 @@ hsk_ns_onrecv(
       goto fail;
     }
 
-    hsk_ns_log(ns, "sending cached msg (%d): %d\n", req->id, wire_len);
+    hsk_ns_log(ns, "sending cached msg (%u): %u\n", req->id, wire_len);
 
     hsk_ns_send(ns, wire, wire_len, addr, true);
 
@@ -323,7 +323,7 @@ hsk_ns_onrecv(
     );
 
     if (rc != HSK_SUCCESS) {
-      hsk_ns_log(ns, "pool resolve error: %d\n", rc);
+      hsk_ns_log(ns, "pool resolve error: %s\n", hsk_strerror(rc));
       goto fail;
     }
 
@@ -345,7 +345,7 @@ hsk_ns_onrecv(
     goto fail;
   }
 
-  hsk_ns_log(ns, "sending root soa (%d): %d\n", req->id, wire_len);
+  hsk_ns_log(ns, "sending root soa (%u): %u\n", req->id, wire_len);
 
   hsk_ns_send(ns, wire, wire_len, addr, true);
 
@@ -353,6 +353,7 @@ hsk_ns_onrecv(
 
 fail:
   assert(!msg);
+
   msg = hsk_resource_to_servfail();
 
   if (!msg) {
@@ -365,7 +366,7 @@ fail:
     goto done;
   }
 
-  hsk_ns_log(ns, "sending servfail (%d): %d\n", req->id, wire_len);
+  hsk_ns_log(ns, "sending servfail (%u): %u\n", req->id, wire_len);
 
   hsk_ns_send(ns, wire, wire_len, addr, true);
 
@@ -387,7 +388,7 @@ hsk_ns_respond(
 
   if (status != HSK_SUCCESS) {
     // Pool resolve error.
-    hsk_ns_log(ns, "resolve response error: %d\n", status);
+    hsk_ns_log(ns, "resolve response error: %s\n", hsk_strerror(status));
   } else if (!res) {
     // Doesn't exist.
     //
@@ -403,17 +404,17 @@ hsk_ns_respond(
     msg = hsk_resource_to_nx();
 
     if (!msg)
-      hsk_ns_log(ns, "could not create nx response (%d)\n", req->id);
+      hsk_ns_log(ns, "could not create nx response (%u)\n", req->id);
     else
-      hsk_ns_log(ns, "sending nxdomain (%d)\n", req->id);
+      hsk_ns_log(ns, "sending nxdomain (%u)\n", req->id);
   } else {
     // Exists!
     msg = hsk_resource_to_dns(res, req->name, req->type);
 
     if (!msg)
-      hsk_ns_log(ns, "could not create dns response (%d)\n", req->id);
+      hsk_ns_log(ns, "could not create dns response (%u)\n", req->id);
     else
-      hsk_ns_log(ns, "sending msg (%d)\n", req->id);
+      hsk_ns_log(ns, "sending msg (%u)\n", req->id);
   }
 
   if (msg) {
@@ -427,6 +428,8 @@ hsk_ns_respond(
 
   if (!wire) {
     // Send SERVFAIL in case of error.
+    assert(!msg);
+
     msg = hsk_resource_to_servfail();
 
     if (!msg) {
@@ -439,7 +442,7 @@ hsk_ns_respond(
       return;
     }
 
-    hsk_ns_log(ns, "sending servfail (%d): %d\n", req->id, wire_len);
+    hsk_ns_log(ns, "sending servfail (%u): %u\n", req->id, wire_len);
   }
 
   hsk_ns_send(ns, wire, wire_len, req->addr, true);
@@ -478,13 +481,13 @@ hsk_ns_send(
   req->data = (void *)sd;
 
   uv_buf_t bufs[] = {
-    { .base = data, .len = data_len }
+    { .base = (char *)data, .len = data_len }
   };
 
   int status = uv_udp_send(req, &ns->socket, bufs, 1, addr, after_send);
 
   if (status != 0) {
-    hsk_ns_log(ns, "failed sending: %d\n", status);
+    hsk_ns_log(ns, "failed sending: %s\n", uv_strerror(status));
     rc = HSK_EFAILURE;
     goto fail;
   }
@@ -561,15 +564,13 @@ after_recv(
   }
 
   // No more data to read.
-  if (nread == 0 && addr == NULL) {
-    hsk_ns_log(ns, "udp nodata\n");
+  // Happens after every msg?
+  if (nread == 0 && addr == NULL)
     return;
-  }
 
-  if (addr == NULL) {
-    hsk_ns_log(ns, "udp noaddr\n");
+  // Never seems to happen on its own.
+  if (addr == NULL)
     return;
-  }
 
   hsk_ns_onrecv(
     ns,
@@ -582,7 +583,7 @@ after_recv(
 
 static void
 after_close(uv_handle_t *handle) {
-  hsk_ns_t *ns = (hsk_ns_t *)handle->data;
+  // hsk_ns_t *ns = (hsk_ns_t *)handle->data;
   // assert(ns);
   // handle->data = NULL;
   // ns->bound = false;

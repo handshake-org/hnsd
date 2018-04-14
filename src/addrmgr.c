@@ -28,19 +28,6 @@
 #define HSK_MAX(x, y) (((x) > (y)) ? (x) : (y))
 #define HSK_MIN(x, y) (((x) < (y)) ? (x) : (y))
 
-static const uint8_t hsk_ipv6_mapped[] = {
-  0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-  0x00, 0x00, 0x00, 0x00, 0xff, 0xff
-};
-
-static bool
-hsk_ip_type(uint8_t *ip) {
-  if (memcmp(ip, hsk_ipv6_mapped, 12) == 0)
-    return AF_INET;
-
-  return AF_INET6;
-}
-
 static bool
 hsk_addrman_is_stale(hsk_addrman_t *am, hsk_addrentry_t *);
 

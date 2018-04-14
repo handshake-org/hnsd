@@ -82,7 +82,7 @@ hsk_header_hash(hsk_header_t *hdr, uint8_t *hash);
 void
 hsk_header_hash_pre(hsk_header_t *hdr, uint8_t *hash);
 
-int32_t
+void
 hsk_header_hash_sol(hsk_header_t *hdr, uint8_t *hash);
 
 int32_t

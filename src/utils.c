@@ -181,7 +181,7 @@ hsk_hex_decode(char *str, uint8_t *data) {
   char *s;
 
   int32_t p = 0;
-  uint8_t w;
+  uint8_t w = 0;
 
   for (i = 0, s = str; *s; i++, s++) {
     int32_t n = to_nibble(*s);

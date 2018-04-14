@@ -148,7 +148,7 @@ hsk_chain_free(hsk_chain_t *chain) {
 
 static void
 hsk_chain_log(hsk_chain_t *chain, const char *fmt, ...) {
-  printf("chain (%d): ", chain->height);
+  printf("chain (%u): ", (uint32_t)chain->height);
 
   va_list args;
   va_start(args, fmt);
@@ -529,7 +529,7 @@ hsk_chain_add(hsk_chain_t *chain, hsk_header_t *h) {
   rc = hsk_header_verify_pow(hdr);
 
   if (rc != HSK_SUCCESS) {
-    hsk_chain_log(chain, "  rejected: pow error %d\n", rc);
+    hsk_chain_log(chain, "  rejected: pow error: %s\n", hsk_strerror(rc));
     goto fail;
   }
 
@@ -637,7 +637,7 @@ hsk_chain_insert(hsk_chain_t *chain, hsk_header_t *hdr, hsk_header_t *prev) {
     chain->tip = hdr;
 
     hsk_chain_log(chain, "  added to main chain\n");
-    hsk_chain_log(chain, "  new height: %d\n", chain->height);
+    hsk_chain_log(chain, "  new height: %u\n", (uint32_t)chain->height);
 
     hsk_chain_maybe_sync(chain);
   }

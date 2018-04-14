@@ -56,6 +56,12 @@ hsk_cache_log(hsk_cache_t *c, const char *fmt, ...) {
   va_end(args);
 }
 
+static void
+hsk_cache_prune(hsk_cache_t *c) {
+  assert(c);
+  hsk_map_clear(&c->map);
+}
+
 bool
 hsk_cache_insert_data(
   hsk_cache_t *c,
@@ -84,10 +90,8 @@ hsk_cache_insert_data(
     cache = NULL;
   }
 
-  if (c->map.size >= HSK_CACHE_LIMIT) {
-    // hsk_cache_prune(c);
-    return false;
-  }
+  if (c->map.size >= HSK_CACHE_LIMIT)
+    hsk_cache_prune(c);
 
   hsk_cache_item_t *item = hsk_cache_item_alloc();
 
@@ -168,6 +172,8 @@ hsk_cache_get(hsk_cache_t *c, hsk_dns_req_t *req) {
 
   if (!hsk_cache_get_data(c, req->name, req->type, &data, &data_len))
     return NULL;
+
+  hsk_cache_log(c, "cache hit for: %s\n", req->name);
 
   if (!hsk_dns_msg_decode(data, data_len, &msg)) {
     hsk_cache_log(c, "could not deserialize cached item\n");

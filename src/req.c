@@ -137,7 +137,7 @@ hsk_dns_req_print(hsk_dns_req_t *req, char *prefix) {
 
   printf("%squery\n", prefix);
   printf("%s  id=%d\n", prefix, req->id);
-  printf("%s  labels=%d\n", prefix, req->labels);
+  printf("%s  labels=%u\n", prefix, (uint32_t)req->labels);
   printf("%s  name=%s\n", prefix, req->name);
   printf("%s  type=%d\n", prefix, req->type);
   printf("%s  class=%d\n", prefix, req->class);

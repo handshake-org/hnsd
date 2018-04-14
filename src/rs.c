@@ -107,7 +107,7 @@ hsk_rs_init(hsk_rs_t *ns, uv_loop_t *loop, struct sockaddr *stub) {
   ns->ec = ec;
   memset(ns->config_, 0x00, sizeof(ns->config_));
   ns->config = NULL;
-  ns->stub = (struct sockaddr *)&ns->stub_ss;
+  ns->stub = (struct sockaddr *)&ns->stub_;
   assert(hsk_sa_from_string(ns->stub, "127.0.0.1", HSK_NS_PORT));
   memset(ns->key_, 0x00, sizeof(ns->key_));
   ns->key = NULL;
@@ -171,8 +171,8 @@ hsk_rs_set_config(hsk_rs_t *ns, char *config) {
   if (size > 255)
     return false;
 
-  memcpy(ns->config_, config, size + 1);
-  ns->config = ns->config_;
+  memcpy(&ns->config_[0], config, size + 1);
+  ns->config = &ns->config_[0];
 
   return true;
 }
@@ -191,8 +191,8 @@ hsk_rs_set_key(hsk_rs_t *ns, uint8_t *key) {
   if (!hsk_ec_create_pubkey(ns->ec, key, ns->pubkey))
     return false;
 
-  memcpy(ns->key_, key, 32);
-  ns->key = ns->key_;
+  memcpy(&ns->key_[0], key, 32);
+  ns->key = &ns->key_[0];
 
   return true;
 }
@@ -453,7 +453,7 @@ hsk_rs_respond(
 
   hsk_rs_log(ns, "received answer for: %s\n", req->name);
   hsk_rs_log(ns, "  canonname: %s\n", result->canonname);
-  hsk_rs_log(ns, "  rcode: %d\n", result->rcode);
+  hsk_rs_log(ns, "  rcode: %u\n", result->rcode);
   hsk_rs_log(ns, "  havedata: %d\n", result->havedata);
   hsk_rs_log(ns, "  nxdomain: %d\n", result->nxdomain);
   hsk_rs_log(ns, "  secure: %d\n", result->secure);
@@ -498,6 +498,8 @@ hsk_rs_respond(
   goto done;
 
 fail:
+  assert(!msg);
+
   msg = hsk_resource_to_servfail();
 
   if (!msg) {
@@ -547,13 +549,13 @@ hsk_rs_send(
   req->data = (void *)sd;
 
   uv_buf_t bufs[] = {
-    { .base = data, .len = data_len }
+    { .base = (char *)data, .len = data_len }
   };
 
   int status = uv_udp_send(req, &ns->socket, bufs, 1, addr, after_send);
 
   if (status != 0) {
-    hsk_rs_log(ns, "failed sending: %d\n", status);
+    hsk_rs_log(ns, "failed sending: %s\n", uv_strerror(status));
     rc = HSK_EFAILURE;
     goto fail;
   }
@@ -606,7 +608,7 @@ after_send(uv_udp_send_t *req, int status) {
     return;
 
   if (status != 0) {
-    hsk_rs_log(ns, "send error: %d\n", status);
+    hsk_rs_log(ns, "send error: %s\n", uv_strerror(status));
     return;
   }
 }
@@ -630,15 +632,13 @@ after_recv(
   }
 
   // No more data to read.
-  if (nread == 0 && addr == NULL) {
-    hsk_rs_log(ns, "udp nodata\n");
+  // Happens after every msg?
+  if (nread == 0 && addr == NULL)
     return;
-  }
 
-  if (addr == NULL) {
-    hsk_rs_log(ns, "udp noaddr\n");
+  // Never seems to happen on its own.
+  if (addr == NULL)
     return;
-  }
 
   hsk_rs_onrecv(
     ns,
@@ -670,7 +670,7 @@ after_resolve(void *data, int32_t status, struct ub_result *result) {
 
 static void
 after_close(uv_handle_t *handle) {
-  hsk_rs_t *ns = (hsk_rs_t *)handle->data;
+  // hsk_rs_t *ns = (hsk_rs_t *)handle->data;
   // assert(ns);
   // handle->data = NULL;
   // ns->bound = false;

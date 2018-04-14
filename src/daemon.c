@@ -436,21 +436,21 @@ main(int argc, char **argv) {
   rc = hsk_pool_open(pool);
 
   if (rc != HSK_SUCCESS) {
-    fprintf(stderr, "failed opening pool: %d\n", rc);
+    fprintf(stderr, "failed opening pool: %s\n", hsk_strerror(rc));
     goto done;
   }
 
   rc = hsk_ns_open(ns, opt.ns_host);
 
   if (rc != HSK_SUCCESS) {
-    fprintf(stderr, "failed opening ns: %d\n", rc);
+    fprintf(stderr, "failed opening ns: %s\n", hsk_strerror(rc));
     goto done;
   }
 
   rc = hsk_rs_open(rs, opt.rs_host);
 
   if (rc != HSK_SUCCESS) {
-    fprintf(stderr, "failed opening rns: %d\n", rc);
+    fprintf(stderr, "failed opening rns: %s\n", hsk_strerror(rc));
     goto done;
   }
 
@@ -459,7 +459,7 @@ main(int argc, char **argv) {
   rc = uv_run(loop, UV_RUN_DEFAULT);
 
   if (rc != 0) {
-    fprintf(stderr, "failed running event loop: %d\n", rc);
+    fprintf(stderr, "failed running event loop: %s\n", uv_strerror(rc));
     rc = HSK_EFAILURE;
     goto done;
   }

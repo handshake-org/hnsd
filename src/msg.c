@@ -59,7 +59,7 @@ hsk_version_msg_write(hsk_version_msg_t *msg, uint8_t **data) {
   s += write_u64(data, msg->nonce);
   size_t size = strlen(msg->agent);
   s += write_u8(data, size);
-  s += write_bytes(data, msg->agent, size);
+  s += write_bytes(data, (uint8_t *)msg->agent, size);
   s += write_u32(data, msg->height);
   s += write_u8(data, msg->no_relay ? 1 : 0);
   return s;
@@ -78,10 +78,10 @@ hsk_version_msg_print(hsk_version_msg_t *msg, char *prefix) {
 
   printf("%sversion msg\n", prefix);
   printf("%s  version=%d\n", prefix, msg->version);
-  printf("%s  services=%d\n", prefix, msg->services);
-  printf("%s  time=%d\n", prefix, msg->time);
+  printf("%s  services=%lu\n", prefix, msg->services);
+  printf("%s  time=%lu\n", prefix, msg->time);
   printf("%s  remote=%s\n", prefix, remote);
-  printf("%s  nonce=%d\n", prefix, msg->nonce);
+  printf("%s  nonce=%lu\n", prefix, msg->nonce);
   printf("%s  agent=%s\n", prefix, msg->agent);
   printf("%s  height=%d\n", prefix, msg->height);
   printf("%s  no_relay=%d\n", prefix, (int32_t)msg->no_relay);
