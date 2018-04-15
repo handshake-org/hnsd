@@ -14,7 +14,7 @@
 #include "proof.h"
 
 static bool
-to_nibbles(uint8_t *data, size_t data_len, uint8_t *nib, size_t nib_len) {
+to_nibbles(const uint8_t *data, size_t data_len, uint8_t *nib, size_t nib_len) {
   size_t l = data_len * 2 + 1;
 
   if (nib_len < l)
@@ -35,7 +35,12 @@ to_nibbles(uint8_t *data, size_t data_len, uint8_t *nib, size_t nib_len) {
 }
 
 static bool
-decompress(uint8_t *data, size_t data_len, uint8_t **dec, size_t *dec_len) {
+decompress(
+  const uint8_t *data,
+  size_t data_len,
+  uint8_t **dec,
+  size_t *dec_len
+) {
   if (data_len == 0) {
     *dec = NULL;
     *dec_len = 0;
@@ -71,7 +76,7 @@ decompress(uint8_t *data, size_t data_len, uint8_t **dec, size_t *dec_len) {
 }
 
 void
-hsk_node_init(uint8_t type, hsk_node_t *node) {
+hsk_node_init(hsk_node_t *node, uint8_t type) {
   switch (type) {
     case HSK_NULLNODE: {
       break;
@@ -114,7 +119,7 @@ hsk_node_init(uint8_t type, hsk_node_t *node) {
 }
 
 bool
-hsk_node_alloc(uint8_t type, hsk_node_t **node) {
+hsk_node_alloc(hsk_node_t **node, uint8_t type) {
   *node = NULL;
 
   switch (type) {
@@ -155,7 +160,7 @@ hsk_node_alloc(uint8_t type, hsk_node_t **node) {
     }
   }
 
-  hsk_node_init(type, *node);
+  hsk_node_init(*node, type);
 
   return true;
 }
@@ -225,7 +230,7 @@ hsk_node_read(uint8_t **data, size_t *data_len, hsk_node_t **node) {
   if (!read_u8(data, data_len, &type))
     return false;
 
-  if (!hsk_node_alloc(type, node))
+  if (!hsk_node_alloc(node, type))
     return false;
 
   switch (type) {
@@ -289,12 +294,12 @@ fail:
 }
 
 bool
-hsk_node_decode(uint8_t *data, size_t data_len, hsk_node_t **node) {
-  return hsk_node_read(&data, &data_len, node);
+hsk_node_decode(const uint8_t *data, size_t data_len, hsk_node_t **node) {
+  return hsk_node_read((uint8_t **)&data, &data_len, node);
 }
 
 static bool
-starts_with(uint8_t *kk, size_t kl, uint8_t *nk, size_t nkl) {
+starts_with(const uint8_t *kk, size_t kl, const uint8_t *nk, size_t nkl) {
   if (kl < nkl)
     return false;
 
@@ -375,9 +380,9 @@ next_child(hsk_node_t **node, uint8_t **kk, size_t *kl) {
 
 int32_t
 hsk_proof_verify(
-  uint8_t *root,
-  uint8_t *key,
-  hsk_raw_node_t *nodes,
+  const uint8_t *root,
+  const uint8_t *key,
+  const hsk_raw_node_t *nodes,
   bool *exists,
   uint8_t **data,
   size_t *data_len
@@ -406,7 +411,7 @@ hsk_proof_verify(
 
   hsk_raw_node_t *c;
 
-  for (c = nodes; c; c = c->next) {
+  for (c = (hsk_raw_node_t *)nodes; c; c = c->next) {
     hsk_hash_blake2b(c->data, c->data_len, hash);
 
     if (memcmp(hash, expect, 32) != 0) {

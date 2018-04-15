@@ -35,8 +35,8 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-typedef uint32_t (*hsk_map_hash_func)(void *key);
-typedef bool (*hsk_map_equal_func)(void *a, void *b);
+typedef uint32_t (*hsk_map_hash_func)(const void *key);
+typedef bool (*hsk_map_equal_func)(const void *a, const void *b);
 typedef void (*hsk_map_free_func)(void *ptr);
 
 typedef struct hsk_map_s {
@@ -200,7 +200,7 @@ void
 hsk_map_reset(hsk_map_t *map);
 
 uint32_t
-hsk_map_lookup(hsk_map_t *map, void *key);
+hsk_map_lookup(const hsk_map_t *map, const void *key);
 
 int32_t
 hsk_map_resize(hsk_map_t *map, uint32_t new_n_buckets);
@@ -218,35 +218,40 @@ bool
 hsk_map_set(hsk_map_t *map, void *key, void *value);
 
 void *
-hsk_map_get(hsk_map_t *map, void *key);
+hsk_map_get(const hsk_map_t *map, const void *key);
 
 bool
-hsk_map_has(hsk_map_t *map, void *key);
+hsk_map_has(const hsk_map_t *map, const void *key);
 
 bool
-hsk_map_del(hsk_map_t *map, void *key);
+hsk_map_del(hsk_map_t *map, const void *key);
 
 uint32_t
-hsk_map_hash_str(void *key);
+hsk_map_hash_str(const void *key);
 
 bool
-hsk_map_equal_str(void *a, void *b);
+hsk_map_equal_str(const void *a, const void *b);
 
 uint32_t
-hsk_map_hash_int(void *key);
+hsk_map_hash_int(const void *key);
 
 bool
-hsk_map_equal_int(void *a, void *b);
+hsk_map_equal_int(const void *a, const void *b);
 
 uint32_t
-hsk_map_hash_hash(void *key);
+hsk_map_hash_hash(const void *key);
 
 bool
-hsk_map_equal_hash(void *a, void *b);
+hsk_map_equal_hash(const void *a, const void *b);
 
 uint32_t
-hsk_map_murmur3(uint8_t *data, size_t data_len, uint32_t seed);
+hsk_map_murmur3(const uint8_t *data, size_t data_len, uint32_t seed);
 
 uint32_t
-hsk_map_tweak3(uint8_t *data, size_t data_len, uint32_t n, uint32_t tweak);
+hsk_map_tweak3(
+  const uint8_t *data,
+  size_t data_len,
+  uint32_t n,
+  uint32_t tweak
+);
 #endif

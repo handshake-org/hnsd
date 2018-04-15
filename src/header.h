@@ -32,43 +32,43 @@ hsk_header_t *
 hsk_header_alloc(void);
 
 hsk_header_t *
-hsk_header_clone(hsk_header_t *hdr);
+hsk_header_clone(const hsk_header_t *hdr);
 
 bool
 hsk_pow_to_target(uint32_t bits, uint8_t *target);
 
 bool
-hsk_pow_to_bits(uint8_t *target, uint32_t *bits);
+hsk_pow_to_bits(const uint8_t *target, uint32_t *bits);
 
 bool
-hsk_header_get_proof(hsk_header_t *hdr, uint8_t *proof);
+hsk_header_get_proof(const hsk_header_t *hdr, uint8_t *proof);
 
 bool
-hsk_header_calc_work(hsk_header_t *hdr, hsk_header_t *prev);
+hsk_header_calc_work(hsk_header_t *hdr, const hsk_header_t *prev);
 
 bool
 hsk_header_read(uint8_t **data, size_t *data_len, hsk_header_t *hdr);
 
 bool
-hsk_header_decode(uint8_t *data, size_t data_len, hsk_header_t *hdr);
+hsk_header_decode(const uint8_t *data, size_t data_len, hsk_header_t *hdr);
 
 int32_t
-hsk_header_write(hsk_header_t *hdr, uint8_t **data);
+hsk_header_write(const hsk_header_t *hdr, uint8_t **data);
 
 int32_t
-hsk_header_size(hsk_header_t *hdr);
+hsk_header_size(const hsk_header_t *hdr);
 
 int32_t
-hsk_header_encode(hsk_header_t *hdr, uint8_t *data);
+hsk_header_encode(const hsk_header_t *hdr, uint8_t *data);
 
 int32_t
-hsk_header_write_pre(hsk_header_t *hdr, uint8_t **data);
+hsk_header_write_pre(const hsk_header_t *hdr, uint8_t **data);
 
 int32_t
-hsk_header_size_pre(hsk_header_t *hdr);
+hsk_header_size_pre(const hsk_header_t *hdr);
 
 int32_t
-hsk_header_encode_pre(hsk_header_t *hdr, uint8_t *data);
+hsk_header_encode_pre(const hsk_header_t *hdr, uint8_t *data);
 
 bool
 hsk_header_equal(hsk_header_t *a, hsk_header_t *b);
@@ -80,14 +80,14 @@ void
 hsk_header_hash(hsk_header_t *hdr, uint8_t *hash);
 
 void
-hsk_header_hash_pre(hsk_header_t *hdr, uint8_t *hash);
+hsk_header_hash_pre(const hsk_header_t *hdr, uint8_t *hash);
 
 void
-hsk_header_hash_sol(hsk_header_t *hdr, uint8_t *hash);
+hsk_header_hash_sol(const hsk_header_t *hdr, uint8_t *hash);
 
 int32_t
-hsk_header_verify_pow(hsk_header_t *hdr);
+hsk_header_verify_pow(const hsk_header_t *hdr);
 
 void
-hsk_header_print(hsk_header_t *hdr, char *prefix);
+hsk_header_print(hsk_header_t *hdr, const char *prefix);
 #endif

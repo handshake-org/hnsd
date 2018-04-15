@@ -14,7 +14,7 @@
 #include "utils.h"
 
 bool
-hsk_sig0_has_sig(uint8_t *wire, size_t wire_len) {
+hsk_sig0_has_sig(const uint8_t *wire, size_t wire_len) {
   if (wire_len < HSK_SIG0_RR_SIZE + 12)
     return false;
 
@@ -23,7 +23,7 @@ hsk_sig0_has_sig(uint8_t *wire, size_t wire_len) {
   if (arcount < 1)
     return false;
 
-  uint8_t *rr = &wire[wire_len - HSK_SIG0_RR_SIZE];
+  const uint8_t *rr = &wire[wire_len - HSK_SIG0_RR_SIZE];
 
   // Name should be `.`.
   if (rr[0] != 0)
@@ -33,7 +33,7 @@ hsk_sig0_has_sig(uint8_t *wire, size_t wire_len) {
   uint16_t class = get_u16be(&rr[3]);
   uint32_t ttl = get_u32be(&rr[5]);
   uint16_t size = get_u16be(&rr[9]);
-  uint8_t *rd = &rr[11];
+  const uint8_t *rd = &rr[11];
 
   // Type
   if (type != HSK_SIG0_TYPE)
@@ -61,12 +61,17 @@ hsk_sig0_has_sig(uint8_t *wire, size_t wire_len) {
 }
 
 bool
-hsk_sig0_get_sig(uint8_t *wire, size_t wire_len, uint8_t *sig, uint16_t *tag) {
+hsk_sig0_get_sig(
+  const uint8_t *wire,
+  size_t wire_len,
+  uint8_t *sig,
+  uint16_t *tag
+) {
   if (!hsk_sig0_has_sig(wire, wire_len))
     return false;
 
-  uint8_t *rr = &wire[wire_len - HSK_SIG0_RR_SIZE];
-  uint8_t *rd = &rr[11];
+  const uint8_t *rr = &wire[wire_len - HSK_SIG0_RR_SIZE];
+  const uint8_t *rd = &rr[11];
 
   uint16_t type_covered = get_u16be(&rd[0]);
   uint8_t algorithm = get_u8(&rd[2]);
@@ -114,13 +119,13 @@ hsk_sig0_get_sig(uint8_t *wire, size_t wire_len, uint8_t *sig, uint16_t *tag) {
 }
 
 bool
-hsk_sig0_sighash(uint8_t *wire, size_t wire_len, uint8_t *hash) {
+hsk_sig0_sighash(const uint8_t *wire, size_t wire_len, uint8_t *hash) {
   if (!hsk_sig0_has_sig(wire, wire_len))
     return false;
 
   uint16_t arcount = get_u16be(&wire[10]);
-  uint8_t *rr = &wire[wire_len - HSK_SIG0_RR_SIZE];
-  uint8_t *rd = &rr[11];
+  const uint8_t *rr = &wire[wire_len - HSK_SIG0_RR_SIZE];
+  const uint8_t *rd = &rr[11];
 
   // Decrement arcount.
   uint8_t count[2];
@@ -146,9 +151,9 @@ hsk_sig0_sighash(uint8_t *wire, size_t wire_len, uint8_t *hash) {
 
 bool
 hsk_sig0_sign(
-  hsk_ec_t *ec,
-  uint8_t *key,
-  uint8_t *wire,
+  const hsk_ec_t *ec,
+  const uint8_t *key,
+  const uint8_t *wire,
   size_t wire_len,
   uint8_t **out,
   size_t *out_len
@@ -248,9 +253,9 @@ hsk_sig0_sign(
 
 bool
 hsk_sig0_verify(
-  hsk_ec_t *ec,
-  uint8_t *pubkey,
-  uint8_t *wire,
+  const hsk_ec_t *ec,
+  const uint8_t *pubkey,
+  const uint8_t *wire,
   size_t wire_len
 ) {
   uint8_t sig[64];

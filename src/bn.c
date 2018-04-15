@@ -50,7 +50,7 @@ hsk_bn_from_int(hsk_bn_t *n, HSK_BN_DTYPE_TMP i) {
 }
 
 int
-hsk_bn_to_int(hsk_bn_t *n) {
+hsk_bn_to_int(const hsk_bn_t *n) {
   HSK_BN_REQUIRE(n, "n is null");
 
   int ret = 0;
@@ -73,7 +73,7 @@ hsk_bn_to_int(hsk_bn_t *n) {
 }
 
 void
-hsk_bn_from_string(hsk_bn_t *n, char *str, int nbytes) {
+hsk_bn_from_string(hsk_bn_t *n, const char *str, int nbytes) {
   HSK_BN_REQUIRE(n, "n is null");
   HSK_BN_REQUIRE(str, "str is null");
   HSK_BN_REQUIRE(nbytes > 0, "nbytes must be positive");
@@ -109,7 +109,7 @@ hsk_bn_from_string(hsk_bn_t *n, char *str, int nbytes) {
 }
 
 void
-hsk_bn_to_string(hsk_bn_t *n, char *str, int nbytes) {
+hsk_bn_to_string(const hsk_bn_t *n, char *str, int nbytes) {
   HSK_BN_REQUIRE(n, "n is null");
   HSK_BN_REQUIRE(str, "str is null");
   HSK_BN_REQUIRE(nbytes > 0, "nbytes must be positive");
@@ -152,7 +152,7 @@ hsk_bn_to_string(hsk_bn_t *n, char *str, int nbytes) {
 }
 
 void
-hsk_bn_from_array(hsk_bn_t *n, unsigned char *array, size_t size) {
+hsk_bn_from_array(hsk_bn_t *n, const unsigned char *array, size_t size) {
   HSK_BN_REQUIRE(n, "n is null");
   HSK_BN_REQUIRE(array, "array is null");
 
@@ -177,7 +177,7 @@ hsk_bn_from_array(hsk_bn_t *n, unsigned char *array, size_t size) {
 }
 
 void
-hsk_bn_to_array(hsk_bn_t *n, unsigned char *array, size_t size) {
+hsk_bn_to_array(const hsk_bn_t *n, unsigned char *array, size_t size) {
   HSK_BN_REQUIRE(n, "n is null");
   HSK_BN_REQUIRE(array, "array is null");
 
@@ -251,7 +251,7 @@ hsk_bn_inc(hsk_bn_t *n) {
 }
 
 void
-hsk_bn_add(hsk_bn_t *a, hsk_bn_t *b, hsk_bn_t *c) {
+hsk_bn_add(const hsk_bn_t *a, const hsk_bn_t *b, hsk_bn_t *c) {
   HSK_BN_REQUIRE(a, "a is null");
   HSK_BN_REQUIRE(b, "b is null");
   HSK_BN_REQUIRE(c, "c is null");
@@ -268,7 +268,7 @@ hsk_bn_add(hsk_bn_t *a, hsk_bn_t *b, hsk_bn_t *c) {
 }
 
 void
-hsk_bn_sub(hsk_bn_t *a, hsk_bn_t *b, hsk_bn_t *c) {
+hsk_bn_sub(const hsk_bn_t *a, const hsk_bn_t *b, hsk_bn_t *c) {
   HSK_BN_REQUIRE(a, "a is null");
   HSK_BN_REQUIRE(b, "b is null");
   HSK_BN_REQUIRE(c, "c is null");
@@ -293,7 +293,7 @@ hsk_bn_sub(hsk_bn_t *a, hsk_bn_t *b, hsk_bn_t *c) {
 }
 
 void
-hsk_bn_mul(hsk_bn_t *a, hsk_bn_t *b, hsk_bn_t *c) {
+hsk_bn_mul(const hsk_bn_t *a, const hsk_bn_t *b, hsk_bn_t *c) {
   HSK_BN_REQUIRE(a, "a is null");
   HSK_BN_REQUIRE(b, "b is null");
   HSK_BN_REQUIRE(c, "c is null");
@@ -328,7 +328,7 @@ hsk_bn_mul(hsk_bn_t *a, hsk_bn_t *b, hsk_bn_t *c) {
 }
 
 void
-hsk_bn_div(hsk_bn_t *a, hsk_bn_t *b, hsk_bn_t *c) {
+hsk_bn_div(const hsk_bn_t *a, const hsk_bn_t *b, hsk_bn_t *c) {
   HSK_BN_REQUIRE(a, "a is null");
   HSK_BN_REQUIRE(b, "b is null");
   HSK_BN_REQUIRE(c, "c is null");
@@ -448,7 +448,7 @@ hsk_bn_rshift(hsk_bn_t *a, hsk_bn_t *b, int nbits) {
 }
 
 void
-hsk_bn_mod(hsk_bn_t *a, hsk_bn_t *b, hsk_bn_t *c) {
+hsk_bn_mod(const hsk_bn_t *a, const hsk_bn_t *b, hsk_bn_t *c) {
   // mod(a, b) = a - ((a / b) * b)
   // example:
   //   mod(8, 3) = 8 - ((8 / 3) * 3) = 2
@@ -469,7 +469,7 @@ hsk_bn_mod(hsk_bn_t *a, hsk_bn_t *b, hsk_bn_t *c) {
 }
 
 void
-hsk_bn_and(hsk_bn_t *a, hsk_bn_t *b, hsk_bn_t *c) {
+hsk_bn_and(const hsk_bn_t *a, const hsk_bn_t *b, hsk_bn_t *c) {
   HSK_BN_REQUIRE(a, "a is null");
   HSK_BN_REQUIRE(b, "b is null");
   HSK_BN_REQUIRE(c, "c is null");
@@ -480,7 +480,7 @@ hsk_bn_and(hsk_bn_t *a, hsk_bn_t *b, hsk_bn_t *c) {
 }
 
 void
-hsk_bn_or(hsk_bn_t *a, hsk_bn_t *b, hsk_bn_t *c) {
+hsk_bn_or(const hsk_bn_t *a, const hsk_bn_t *b, hsk_bn_t *c) {
   HSK_BN_REQUIRE(a, "a is null");
   HSK_BN_REQUIRE(b, "b is null");
   HSK_BN_REQUIRE(c, "c is null");
@@ -491,7 +491,7 @@ hsk_bn_or(hsk_bn_t *a, hsk_bn_t *b, hsk_bn_t *c) {
 }
 
 void
-hsk_bn_xor(hsk_bn_t *a, hsk_bn_t *b, hsk_bn_t *c) {
+hsk_bn_xor(const hsk_bn_t *a, const hsk_bn_t *b, hsk_bn_t *c) {
   HSK_BN_REQUIRE(a, "a is null");
   HSK_BN_REQUIRE(b, "b is null");
   HSK_BN_REQUIRE(c, "c is null");
@@ -502,7 +502,7 @@ hsk_bn_xor(hsk_bn_t *a, hsk_bn_t *b, hsk_bn_t *c) {
 }
 
 int
-hsk_bn_cmp(hsk_bn_t *a, hsk_bn_t *b) {
+hsk_bn_cmp(const hsk_bn_t *a, const hsk_bn_t *b) {
   HSK_BN_REQUIRE(a, "a is null");
   HSK_BN_REQUIRE(b, "b is null");
 
@@ -523,7 +523,7 @@ hsk_bn_cmp(hsk_bn_t *a, hsk_bn_t *b) {
 }
 
 int
-hsk_bn_is_zero(hsk_bn_t *n) {
+hsk_bn_is_zero(const hsk_bn_t *n) {
   HSK_BN_REQUIRE(n, "n is null");
 
   int i;
@@ -536,7 +536,7 @@ hsk_bn_is_zero(hsk_bn_t *n) {
 }
 
 void
-hsk_bn_pow(hsk_bn_t *a, hsk_bn_t *b, hsk_bn_t *c) {
+hsk_bn_pow(const hsk_bn_t *a, hsk_bn_t *b, hsk_bn_t *c) {
   HSK_BN_REQUIRE(a, "a is null");
   HSK_BN_REQUIRE(b, "b is null");
   HSK_BN_REQUIRE(c, "c is null");
@@ -575,7 +575,7 @@ hsk_bn_pow(hsk_bn_t *a, hsk_bn_t *b, hsk_bn_t *c) {
 }
 
 void
-hsk_bn_assign(hsk_bn_t *dst, hsk_bn_t *src) {
+hsk_bn_assign(hsk_bn_t *dst, const hsk_bn_t *src) {
   HSK_BN_REQUIRE(dst, "dst is null");
   HSK_BN_REQUIRE(src, "src is null");
 

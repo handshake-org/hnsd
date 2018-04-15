@@ -58,8 +58,8 @@ hsk_cuckoo_init(
 
 int32_t
 hsk_cuckoo_sipkey(
-  hsk_cuckoo_t *ctx,
-  uint8_t *hdr,
+  const hsk_cuckoo_t *ctx,
+  const uint8_t *hdr,
   size_t hdr_len,
   uint8_t *key
 ) {
@@ -77,8 +77,8 @@ hsk_cuckoo_sipkey(
 
 uint32_t
 hsk_cuckoo_sipnode(
-  hsk_cuckoo_t *ctx,
-  uint8_t *key,
+  const hsk_cuckoo_t *ctx,
+  const uint8_t *key,
   uint32_t nonce,
   int32_t uorv
 ) {
@@ -98,7 +98,11 @@ hsk_cuckoo_sipnode(
 }
 
 int32_t
-hsk_cuckoo_verify(hsk_cuckoo_t *ctx, uint8_t *key, uint32_t *nonces) {
+hsk_cuckoo_verify(
+  const hsk_cuckoo_t *ctx,
+  const uint8_t *key,
+  const uint32_t *nonces
+) {
   if (ctx == NULL || key == NULL || nonces == NULL)
     return HSK_EBADARGS;
 
@@ -163,10 +167,10 @@ hsk_cuckoo_verify(hsk_cuckoo_t *ctx, uint8_t *key, uint32_t *nonces) {
 
 int32_t
 hsk_cuckoo_verify_header(
-  hsk_cuckoo_t *ctx,
-  uint8_t *hdr,
+  const hsk_cuckoo_t *ctx,
+  const uint8_t *hdr,
   size_t hdr_len,
-  uint32_t *sol,
+  const uint32_t *sol,
   size_t sol_size
 ) {
   if (ctx == NULL || hdr == NULL || sol == NULL)

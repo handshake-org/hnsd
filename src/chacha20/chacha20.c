@@ -55,11 +55,11 @@ hsk_chacha20_setup(
   hsk_chacha20_ctx *ctx,
   const uint8_t *key,
   size_t length,
-  uint8_t *nonce,
-  uint8_t iv_size
+  const uint8_t *nonce,
+  uint8_t nonce_size
 ) {
   hsk_chacha20_keysetup(ctx, key, length);
-  hsk_chacha20_ivsetup(ctx, nonce, iv_size);
+  hsk_chacha20_ivsetup(ctx, nonce, nonce_size);
 }
 
 void
@@ -87,14 +87,18 @@ hsk_chacha20_keysetup(
   ctx->schedule[12] = 0;
 
   ctx->available = 0;
-  ctx->iv_size = 8;
+  ctx->nonce_size = 8;
 }
 
 void
-hsk_chacha20_ivsetup(hsk_chacha20_ctx *ctx, uint8_t *nonce, uint8_t iv_size) {
+hsk_chacha20_ivsetup(
+  hsk_chacha20_ctx *ctx,
+  const uint8_t *nonce,
+  uint8_t nonce_size
+) {
   ctx->schedule[12] = 0;
 
-  if (iv_size == 8) {
+  if (nonce_size == 8) {
     ctx->schedule[13] = 0;
     ctx->schedule[14] = READLE(nonce + 0);
     ctx->schedule[15] = READLE(nonce + 4);
@@ -104,12 +108,12 @@ hsk_chacha20_ivsetup(hsk_chacha20_ctx *ctx, uint8_t *nonce, uint8_t iv_size) {
     ctx->schedule[15] = READLE(nonce + 8);
   }
 
-  ctx->iv_size = iv_size;
+  ctx->nonce_size = nonce_size;
 }
 
 void
 hsk_chacha20_counter_set(hsk_chacha20_ctx *ctx, uint64_t counter) {
-  if (ctx->iv_size == 8) {
+  if (ctx->nonce_size == 8) {
     ctx->schedule[12] = counter & UINT32_C(0xFFFFFFFF);
     ctx->schedule[13] = counter >> 32;
   } else {
@@ -120,7 +124,7 @@ hsk_chacha20_counter_set(hsk_chacha20_ctx *ctx, uint64_t counter) {
 
 uint64_t
 hsk_chacha20_counter_get(hsk_chacha20_ctx *ctx) {
-  if (ctx->iv_size == 8)
+  if (ctx->nonce_size == 8)
     return ((uint64_t)ctx->schedule[13] << 32) | ctx->schedule[12];
 
   return (uint64_t)ctx->schedule[12];
@@ -150,7 +154,7 @@ hsk_chacha20_block(hsk_chacha20_ctx *ctx, uint32_t output[16]) {
   }
 
   if (!++nonce[0]) {
-    if (ctx->iv_size == 8)
+    if (ctx->nonce_size == 8)
       nonce[1]++;
   }
 }

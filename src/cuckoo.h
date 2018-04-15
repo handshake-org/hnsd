@@ -14,23 +14,43 @@ typedef struct {
 } hsk_cuckoo_t;
 
 int32_t
-hsk_cuckoo_init(hsk_cuckoo_t *ctx, int32_t bits, int32_t size, int32_t ease, bool legacy);
+hsk_cuckoo_init(
+  hsk_cuckoo_t *ctx,
+  int32_t bits,
+  int32_t size,
+  int32_t ease,
+  bool legacy
+);
 
 int32_t
-hsk_cuckoo_sipkey(hsk_cuckoo_t *ctx, uint8_t *hdr, size_t hdr_len, uint8_t *key);
+hsk_cuckoo_sipkey(
+  const hsk_cuckoo_t *ctx,
+  const uint8_t *hdr,
+  size_t hdr_len,
+  uint8_t *key
+);
 
 uint32_t
-hsk_cuckoo_sipnode(hsk_cuckoo_t *ctx, uint8_t *key, uint32_t nonce, int32_t uorv);
+hsk_cuckoo_sipnode(
+  const hsk_cuckoo_t *ctx,
+  const uint8_t *key,
+  uint32_t nonce,
+  int32_t uorv
+);
 
 int32_t
-hsk_cuckoo_verify(hsk_cuckoo_t *ctx, uint8_t *key, uint32_t *nonces);
+hsk_cuckoo_verify(
+  const hsk_cuckoo_t *ctx,
+  const uint8_t *key,
+  const uint32_t *nonces
+);
 
 int32_t
 hsk_cuckoo_verify_header(
-  hsk_cuckoo_t *ctx,
-  uint8_t *hdr,
+  const hsk_cuckoo_t *ctx,
+  const uint8_t *hdr,
   size_t hdr_len,
-  uint32_t *sol,
+  const uint32_t *sol,
   size_t sol_size
 );
 #endif

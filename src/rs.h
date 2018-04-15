@@ -38,25 +38,25 @@ typedef struct {
  */
 
 int32_t
-hsk_rs_init(hsk_rs_t *ns, uv_loop_t *loop, struct sockaddr *stub);
+hsk_rs_init(hsk_rs_t *ns, const uv_loop_t *loop, const struct sockaddr *stub);
 
 void
 hsk_rs_uninit(hsk_rs_t *ns);
 
 bool
-hsk_rs_set_config(hsk_rs_t *ns, char *config);
+hsk_rs_set_config(hsk_rs_t *ns, const char *config);
 
 bool
-hsk_rs_set_key(hsk_rs_t *ns, uint8_t *key);
+hsk_rs_set_key(hsk_rs_t *ns, const uint8_t *key);
 
 int32_t
-hsk_rs_open(hsk_rs_t *ns, struct sockaddr *addr);
+hsk_rs_open(hsk_rs_t *ns, const struct sockaddr *addr);
 
 int32_t
 hsk_rs_close(hsk_rs_t *ns);
 
 hsk_rs_t *
-hsk_rs_alloc(uv_loop_t *loop, struct sockaddr *stub);
+hsk_rs_alloc(const uv_loop_t *loop, const struct sockaddr *stub);
 
 void
 hsk_rs_free(hsk_rs_t *ns);

@@ -34,57 +34,56 @@ typedef struct {
 } hsk_send_data_t;
 
 /*
- * Templates
+ * Prototypes
  */
 
 static void
-hsk_ns_log(hsk_ns_t *, const char *, ...);
+hsk_ns_log(hsk_ns_t *ns, const char *fmt, ...);
 
 static void
 after_resolve(
-  char *,
-  int32_t,
-  bool,
-  uint8_t *,
-  size_t,
-  void *
+  const char *name,
+  int32_t status,
+  bool exists,
+  const uint8_t *data,
+  size_t data_len,
+  const void *arg
 );
 
-static int32_t
+int32_t
 hsk_ns_send(
-  hsk_ns_t *,
-  uint8_t *,
-  size_t,
-  struct sockaddr *,
-  bool
+  hsk_ns_t *ns,
+  uint8_t *data,
+  size_t data_len,
+  const struct sockaddr *addr,
+  bool should_free
 );
 
 static void
 alloc_buffer(uv_handle_t *handle, size_t size, uv_buf_t *buf);
 
 static void
-after_send(uv_udp_send_t *, int);
+after_send(uv_udp_send_t *req, int status);
 
 static void
 after_recv(
-  uv_udp_t *,
-  ssize_t,
-  const uv_buf_t *,
-  const struct sockaddr *,
-  unsigned
+  uv_udp_t *socket,
+  ssize_t nread,
+  const uv_buf_t *buf,
+  const struct sockaddr *addr,
+  unsigned flags
 );
 
-
 static void
-after_close(uv_handle_t *);
+after_close(uv_handle_t *handle);
 
 /*
  * Root Nameserver
  */
 
 int32_t
-hsk_ns_init(hsk_ns_t *ns, uv_loop_t *loop, hsk_pool_t *pool) {
-  if (!ns || !pool)
+hsk_ns_init(hsk_ns_t *ns, const uv_loop_t *loop, const hsk_pool_t *pool) {
+  if (!ns || !loop || !pool)
     return HSK_EBADARGS;
 
   hsk_ec_t *ec = hsk_ec_alloc();
@@ -92,8 +91,8 @@ hsk_ns_init(hsk_ns_t *ns, uv_loop_t *loop, hsk_pool_t *pool) {
   if (!ec)
     return HSK_ENOMEM;
 
-  ns->loop = loop;
-  ns->pool = pool;
+  ns->loop = (uv_loop_t *)loop;
+  ns->pool = (hsk_pool_t *)pool;
   hsk_addr_init(&ns->ip_);
   ns->ip = NULL;
   ns->socket.data = (void *)ns;
@@ -125,7 +124,7 @@ hsk_ns_uninit(hsk_ns_t *ns) {
 }
 
 bool
-hsk_ns_set_ip(hsk_ns_t *ns, struct sockaddr *addr) {
+hsk_ns_set_ip(hsk_ns_t *ns, const struct sockaddr *addr) {
   assert(ns);
 
   if (!addr) {
@@ -146,7 +145,7 @@ hsk_ns_set_ip(hsk_ns_t *ns, struct sockaddr *addr) {
 }
 
 bool
-hsk_ns_set_key(hsk_ns_t *ns, uint8_t *key) {
+hsk_ns_set_key(hsk_ns_t *ns, const uint8_t *key) {
   assert(ns);
 
   if (!key) {
@@ -166,7 +165,7 @@ hsk_ns_set_key(hsk_ns_t *ns, uint8_t *key) {
 }
 
 int32_t
-hsk_ns_open(hsk_ns_t *ns, struct sockaddr *addr) {
+hsk_ns_open(hsk_ns_t *ns, const struct sockaddr *addr) {
   if (!ns || !addr)
     return HSK_EBADARGS;
 
@@ -226,7 +225,7 @@ hsk_ns_close(hsk_ns_t *ns) {
 }
 
 hsk_ns_t *
-hsk_ns_alloc(uv_loop_t *loop, hsk_pool_t *pool) {
+hsk_ns_alloc(const uv_loop_t *loop, const hsk_pool_t *pool) {
   hsk_ns_t *ns = malloc(sizeof(hsk_ns_t));
 
   if (!ns)
@@ -277,9 +276,9 @@ hsk_ns_log(hsk_ns_t *ns, const char *fmt, ...) {
 static void
 hsk_ns_onrecv(
   hsk_ns_t *ns,
-  uint8_t *data,
+  const uint8_t *data,
   size_t data_len,
-  struct sockaddr *addr,
+  const struct sockaddr *addr,
   uint32_t flags
 ) {
   hsk_dns_req_t *req = hsk_dns_req_create(data, data_len, addr);
@@ -378,9 +377,9 @@ done:
 static void
 hsk_ns_respond(
   hsk_ns_t *ns,
-  hsk_dns_req_t *req,
+  const hsk_dns_req_t *req,
   int32_t status,
-  hsk_resource_t *res
+  const hsk_resource_t *res
 ) {
   hsk_dns_msg_t *msg = NULL;
   uint8_t *wire = NULL;
@@ -453,7 +452,7 @@ hsk_ns_send(
   hsk_ns_t *ns,
   uint8_t *data,
   size_t data_len,
-  struct sockaddr *addr,
+  const struct sockaddr *addr,
   bool should_free
 ) {
   int32_t rc = HSK_SUCCESS;
@@ -592,12 +591,12 @@ after_close(uv_handle_t *handle) {
 
 static void
 after_resolve(
-  char *name,
+  const char *name,
   int32_t status,
   bool exists,
-  uint8_t *data,
+  const uint8_t *data,
   size_t data_len,
-  void *arg
+  const void *arg
 ) {
   hsk_dns_req_t *req = (hsk_dns_req_t *)arg;
   hsk_ns_t *ns = (hsk_ns_t *)req->ns;

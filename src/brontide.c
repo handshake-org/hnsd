@@ -61,14 +61,14 @@ hsk_cs_update(hsk_cs_t *cs) {
 }
 
 void
-hsk_cs_init_key(hsk_cs_t *cs, uint8_t *key) {
+hsk_cs_init_key(hsk_cs_t *cs, const uint8_t *key) {
   memcpy(cs->secret_key, key, 32);
   cs->nonce = 0;
   hsk_cs_update(cs);
 }
 
 void
-hsk_cs_init_saltkey(hsk_cs_t *cs, uint8_t *salt, uint8_t *key) {
+hsk_cs_init_saltkey(hsk_cs_t *cs, const uint8_t *salt, const uint8_t *key) {
   memcpy(cs->salt, salt, 32);
   hsk_cs_init_key(cs, key);
 }
@@ -84,7 +84,7 @@ hsk_cs_rotate_key(hsk_cs_t *cs) {
 
   memcpy(cs->salt, h1, 32);
 
-  uint8_t *next_key = h2;
+  uint8_t *next_key = &h2[0];
 
   hsk_cs_init_key(cs, next_key);
 }
@@ -92,8 +92,8 @@ hsk_cs_rotate_key(hsk_cs_t *cs) {
 void
 hsk_cs_encrypt(
   hsk_cs_t *cs,
-  uint8_t *ad,
-  uint8_t *in,
+  const uint8_t *ad,
+  const uint8_t *in,
   uint8_t *out,
   size_t len
 ) {
@@ -115,8 +115,8 @@ hsk_cs_encrypt(
 void
 hsk_cs_decrypt(
   hsk_cs_t *cs,
-  uint8_t *ad,
-  uint8_t *in,
+  const uint8_t *ad,
+  const uint8_t *in,
   uint8_t *out,
   size_t len
 ) {
@@ -136,7 +136,7 @@ hsk_cs_decrypt(
 }
 
 bool
-hsk_cs_verify(hsk_cs_t *cs, uint8_t *tag) {
+hsk_cs_verify(const hsk_cs_t *cs, const uint8_t *tag) {
   return hsk_aead_verify(cs->tag, tag);
 }
 
@@ -145,7 +145,7 @@ hsk_cs_verify(hsk_cs_t *cs, uint8_t *tag) {
  */
 
 void
-hsk_brontide_init(hsk_brontide_t *b, hsk_ec_t *ec) {
+hsk_brontide_init(hsk_brontide_t *b, const hsk_ec_t *ec) {
   assert(b && ec);
 
   // Cipher State
@@ -157,7 +157,7 @@ hsk_brontide_init(hsk_brontide_t *b, hsk_ec_t *ec) {
   memset(b->handshake_digest, 0, 32);
 
   // Handshake State
-  b->ec = ec;
+  b->ec = (hsk_ec_t *)ec;
   b->initiator = false;
   memset(b->local_static, 0, 32);
   memset(b->local_ephemeral, 0, 32);
@@ -217,9 +217,9 @@ hsk_brontide_init_sym(hsk_brontide_t *b, const char *proto_name) {
 }
 
 void
-hsk_brontide_mix_key(hsk_brontide_t *b, uint8_t *in) {
+hsk_brontide_mix_key(hsk_brontide_t *b, const uint8_t *in) {
   uint8_t *info = NULL;
-  uint8_t *secret = in;
+  const uint8_t *secret = in;
   uint8_t *salt = b->chaining_key;
 
   hsk_hash_hkdf(secret, 32, salt, 32, info, 0, b->chaining_key, b->temp_key);
@@ -230,9 +230,9 @@ hsk_brontide_mix_key(hsk_brontide_t *b, uint8_t *in) {
 static void
 hsk_brontide__mix_hash(
   hsk_brontide_t *b,
-  uint8_t *data,
+  const uint8_t *data,
   size_t data_len,
-  uint8_t *tag,
+  const uint8_t *tag,
   uint8_t *hash
 ) {
   hsk_sha256_ctx ctx;
@@ -247,12 +247,17 @@ hsk_brontide__mix_hash(
 }
 
 void
-hsk_brontide_mix_hash(hsk_brontide_t *b, uint8_t *data, size_t data_len) {
+hsk_brontide_mix_hash(hsk_brontide_t *b, const uint8_t *data, size_t data_len) {
   hsk_brontide__mix_hash(b, data, data_len, NULL, b->handshake_digest);
 }
 
 void
-hsk_brontide_encrypt(hsk_brontide_t *b, uint8_t *in, uint8_t *out, size_t len) {
+hsk_brontide_encrypt(
+  hsk_brontide_t *b,
+  const uint8_t *in,
+  uint8_t *out,
+  size_t len
+) {
   hsk_cs_encrypt(&b->cs, b->handshake_digest, in, out, len);
   hsk_brontide__mix_hash(b, out, len, b->cs.tag, b->handshake_digest);
 }
@@ -260,10 +265,10 @@ hsk_brontide_encrypt(hsk_brontide_t *b, uint8_t *in, uint8_t *out, size_t len) {
 void
 hsk_brontide_decrypt(
   hsk_brontide_t *b,
-  uint8_t *in,
+  const uint8_t *in,
   uint8_t *out,
   size_t len,
-  uint8_t *tag
+  const uint8_t *tag
 ) {
   assert(tag);
   uint8_t h[32];
@@ -277,8 +282,8 @@ hsk_brontide_init_state(
   hsk_brontide_t *b,
   bool initiator,
   const char *prologue,
-  uint8_t *local_pub,
-  uint8_t *remote_pub
+  const uint8_t *local_pub,
+  const uint8_t *remote_pub
 ) {
   b->initiator = initiator;
   memcpy(b->local_static, local_pub, 32);
@@ -289,7 +294,7 @@ hsk_brontide_init_state(
     memset(b->remote_static, 0, 33);
 
   hsk_brontide_init_sym(b, brontide_protocol_name);
-  hsk_brontide_mix_hash(b, (uint8_t *)prologue, strlen(prologue));
+  hsk_brontide_mix_hash(b, (const uint8_t *)prologue, strlen(prologue));
 
   if (initiator) {
     assert(remote_pub);
@@ -305,8 +310,8 @@ void
 hsk_brontide_init_brontide(
   hsk_brontide_t *b,
   bool initiator,
-  uint8_t *local_pub,
-  uint8_t *remote_pub
+  const uint8_t *local_pub,
+  const uint8_t *remote_pub
 ) {
   hsk_brontide_init_state(
     b,
@@ -343,12 +348,12 @@ hsk_brontide_gen_act_one(hsk_brontide_t *b, uint8_t *act1) {
 }
 
 bool
-hsk_brontide_recv_act_one(hsk_brontide_t *b, uint8_t *act1) {
+hsk_brontide_recv_act_one(hsk_brontide_t *b, const uint8_t *act1) {
   if (act1[0] != BRONTIDE_VERSION)
     return false;
 
-  uint8_t *e = &act1[1];
-  uint8_t *p = &act1[34];
+  const uint8_t *e = &act1[1];
+  const uint8_t *p = &act1[34];
 
   if (!hsk_ec_verify_pubkey(b->ec, e))
     return false;
@@ -391,12 +396,12 @@ hsk_brontide_gen_act_two(hsk_brontide_t *b, uint8_t *act2) {
 }
 
 bool
-hsk_brontide_recv_act_two(hsk_brontide_t *b, uint8_t *act2) {
+hsk_brontide_recv_act_two(hsk_brontide_t *b, const uint8_t *act2) {
   if (act2[0] != BRONTIDE_VERSION)
     return false;
 
-  uint8_t *e = &act2[1];
-  uint8_t *p = &act2[34];
+  const uint8_t *e = &act2[1];
+  const uint8_t *p = &act2[34];
 
   if (!hsk_ec_verify_pubkey(b->ec, e))
     return false;
@@ -442,15 +447,15 @@ hsk_brontide_gen_act_three(hsk_brontide_t *b, uint8_t *act3) {
 }
 
 bool
-hsk_brontide_recv_act_three(hsk_brontide_t *b, uint8_t *act3) {
+hsk_brontide_recv_act_three(hsk_brontide_t *b, const uint8_t *act3) {
   if (act3[0] != BRONTIDE_VERSION)
     return false;
 
-  uint8_t *s1 = &act3[1];
-  uint8_t *p1 = &act3[34];
+  const uint8_t *s1 = &act3[1];
+  const uint8_t *p1 = &act3[34];
 
-  uint8_t *s2 = NULL;
-  uint8_t *p2 = &act3[50];
+  const uint8_t *s2 = NULL;
+  const uint8_t *p2 = &act3[50];
 
   uint8_t remote_pub[33];
   hsk_brontide_decrypt(b, s1, remote_pub, 33, p1);
@@ -486,26 +491,30 @@ hsk_brontide_split(hsk_brontide_t *b) {
   hsk_hash_hkdf(NULL, 0, b->chaining_key, 32, NULL, 0, h1, h2);
 
   if (b->initiator) {
-    uint8_t *send_key = h1;
+    uint8_t *send_key = &h1[0];
     hsk_cs_init_saltkey(&b->send_cipher, b->chaining_key, send_key);
-    uint8_t *recv_key = h2;
+    uint8_t *recv_key = &h2[0];
     hsk_cs_init_saltkey(&b->recv_cipher, b->chaining_key, recv_key);
   } else {
-    uint8_t *recv_key = h1;
+    uint8_t *recv_key = &h1[0];
     hsk_cs_init_saltkey(&b->recv_cipher, b->chaining_key, recv_key);
-    uint8_t *send_key = h2;
+    uint8_t *send_key = &h2[0];
     hsk_cs_init_saltkey(&b->send_cipher, b->chaining_key, send_key);
   }
 }
 
 int32_t
-hsk_brontide_accept(hsk_brontide_t *b, uint8_t *our_key) {
+hsk_brontide_accept(hsk_brontide_t *b, const uint8_t *our_key) {
   hsk_brontide_init_brontide(b, false, our_key, NULL);
   return hsk_brontide_on_connect(b);
 }
 
 int32_t
-hsk_brontide_connect(hsk_brontide_t *b, uint8_t *our_key, uint8_t *their_key) {
+hsk_brontide_connect(
+  hsk_brontide_t *b,
+  const uint8_t *our_key,
+  const uint8_t *their_key
+) {
   hsk_brontide_init_brontide(b, true, our_key, their_key);
   return HSK_SUCCESS;
 }
@@ -592,7 +601,7 @@ done:
 }
 
 int32_t
-hsk_brontide_on_read(hsk_brontide_t *b, uint8_t *data, size_t data_len) {
+hsk_brontide_on_read(hsk_brontide_t *b, const uint8_t *data, size_t data_len) {
   if (b->state == BRONTIDE_ACT_NONE)
     return HSK_SUCCESS;
 

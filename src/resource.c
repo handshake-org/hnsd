@@ -28,31 +28,31 @@ static const uint8_t hsk_zero_inet6[16] = {
 };
 
 static void
-ip_size(uint8_t *ip, size_t *s, size_t *l);
+ip_size(const uint8_t *ip, size_t *s, size_t *l);
 
 static size_t
-ip_write(uint8_t *ip, uint8_t *data);
+ip_write(const uint8_t *ip, uint8_t *data);
 
 static bool
-ip_read(uint8_t *data, uint8_t *ip);
+ip_read(const uint8_t *data, uint8_t *ip);
 
 static void
-ip_to_b32(hsk_target_t *target, char *dst);
+ip_to_b32(const hsk_target_t *target, char *dst);
 
 static bool
-b32_to_ip(char *str, uint8_t *ip, uint16_t *family);
+b32_to_ip(const char *str, uint8_t *ip, uint16_t *family);
 
 static bool
-pointer_to_ip(char *name, uint8_t *ip, uint16_t *family);
+pointer_to_ip(const char *name, uint8_t *ip, uint16_t *family);
 
 static bool
-target_to_dns(hsk_target_t *target, char *name, char *host);
+target_to_dns(const hsk_target_t *target, const char *name, char *host);
 
 bool
 hsk_resource_str_read(
   uint8_t **data,
   size_t *data_len,
-  hsk_symbol_table_t *st,
+  const hsk_symbol_table_t *st,
   char *str,
   size_t limit
 ) {
@@ -128,7 +128,7 @@ hsk_resource_target_read(
   uint8_t **data,
   size_t *data_len,
   uint8_t type,
-  hsk_symbol_table_t *st,
+  const hsk_symbol_table_t *st,
   hsk_target_t *target
 ) {
   target->type = type;
@@ -182,7 +182,7 @@ bool
 hsk_resource_host_read(
   uint8_t **data,
   size_t *data_len,
-  hsk_symbol_table_t *st,
+  const hsk_symbol_table_t *st,
   hsk_target_t *target
 ) {
   uint8_t type;
@@ -217,7 +217,7 @@ bool
 hsk_host_record_read(
   uint8_t **data,
   size_t *data_len,
-  hsk_symbol_table_t *st,
+  const hsk_symbol_table_t *st,
   hsk_host_record_t *rec
 ) {
   return hsk_resource_host_read(data, data_len, st, &rec->target);
@@ -227,7 +227,7 @@ bool
 hsk_txt_record_read(
   uint8_t **data,
   size_t *data_len,
-  hsk_symbol_table_t *st,
+  const hsk_symbol_table_t *st,
   hsk_txt_record_t *rec
 ) {
   return hsk_resource_str_read(data, data_len, st, rec->text, 255);
@@ -237,7 +237,7 @@ bool
 hsk_service_record_read(
   uint8_t **data,
   size_t *data_len,
-  hsk_symbol_table_t *st,
+  const hsk_symbol_table_t *st,
   hsk_service_record_t *rec
 ) {
   if (!hsk_resource_str_read(data, data_len, st, rec->service, 32))
@@ -285,7 +285,7 @@ bool
 hsk_magnet_record_read(
   uint8_t **data,
   size_t *data_len,
-  hsk_symbol_table_t *st,
+  const hsk_symbol_table_t *st,
   hsk_magnet_record_t *rec
 ) {
   if (!hsk_resource_str_read(data, data_len, st, rec->nid, 32))
@@ -336,7 +336,7 @@ bool
 hsk_tls_record_read(
   uint8_t **data,
   size_t *data_len,
-  hsk_symbol_table_t *st,
+  const hsk_symbol_table_t *st,
   hsk_tls_record_t *rec
 ) {
   if (!hsk_resource_str_read(data, data_len, st, rec->protocol, 32))
@@ -367,7 +367,7 @@ bool
 hsk_smime_record_read(
   uint8_t **data,
   size_t *data_len,
-  hsk_symbol_table_t *st,
+  const hsk_symbol_table_t *st,
   hsk_smime_record_t *rec
 ) {
   if (!read_bytes(data, data_len, rec->hash, 28))
@@ -445,7 +445,7 @@ bool
 hsk_addr_record_read(
   uint8_t **data,
   size_t *data_len,
-  hsk_symbol_table_t *st,
+  const hsk_symbol_table_t *st,
   hsk_addr_record_t *rec
 ) {
   uint8_t ctype;
@@ -838,7 +838,7 @@ hsk_record_read(
   uint8_t **data,
   size_t *data_len,
   uint8_t type,
-  hsk_symbol_table_t *st,
+  const hsk_symbol_table_t *st,
   hsk_record_t **res
 ) {
   hsk_record_t *r = hsk_record_alloc(type);
@@ -935,7 +935,12 @@ hsk_record_read(
 }
 
 bool
-hsk_resource_decode(uint8_t *data, size_t data_len, hsk_resource_t **resource) {
+hsk_resource_decode(
+  const uint8_t *data,
+  size_t data_len,
+  hsk_resource_t **resource
+) {
+  uint8_t *dat = (uint8_t *)data;
   hsk_symbol_table_t st;
   st.size = 0;
 
@@ -949,20 +954,20 @@ hsk_resource_decode(uint8_t *data, size_t data_len, hsk_resource_t **resource) {
   res->record_count = 0;
   memset(res->records, 0, sizeof(hsk_record_t *));
 
-  if (!read_u8(&data, &data_len, &res->version))
+  if (!read_u8(&dat, &data_len, &res->version))
     goto fail;
 
   if (res->version != 0)
     goto fail;
 
   uint16_t field;
-  if (!read_u16(&data, &data_len, &field))
+  if (!read_u16(&dat, &data_len, &field))
     goto fail;
 
   res->ttl = ((uint32_t)field) << 6;
 
   uint8_t st_size = 0;
-  if (!read_u8(&data, &data_len, &st_size))
+  if (!read_u8(&dat, &data_len, &st_size))
     goto fail;
 
   int32_t i;
@@ -971,10 +976,10 @@ hsk_resource_decode(uint8_t *data, size_t data_len, hsk_resource_t **resource) {
   for (i = 0; i < st_size; i++) {
     uint8_t size = 0;
 
-    if (!read_u8(&data, &data_len, &size))
+    if (!read_u8(&dat, &data_len, &size))
       goto fail;
 
-    if (!slice_ascii(&data, &data_len, &st.strings[i], size))
+    if (!slice_ascii(&dat, &data_len, &st.strings[i], size))
       goto fail;
 
     st.sizes[i] = size;
@@ -988,9 +993,9 @@ hsk_resource_decode(uint8_t *data, size_t data_len, hsk_resource_t **resource) {
 
     uint8_t type;
 
-    read_u8(&data, &data_len, &type);
+    read_u8(&dat, &data_len, &type);
 
-    if (!hsk_record_read(&data, &data_len, type, &st, &res->records[i]))
+    if (!hsk_record_read(&dat, &data_len, type, &st, &res->records[i]))
       goto fail;
   }
 
@@ -1005,8 +1010,8 @@ fail:
   return false;
 }
 
-hsk_record_t *
-hsk_resource_get(hsk_resource_t *res, uint8_t type) {
+const hsk_record_t *
+hsk_resource_get(const hsk_resource_t *res, uint8_t type) {
   int32_t i;
   for (i = 0; i < res->record_count; i++) {
     hsk_record_t *rec = res->records[i];
@@ -1017,12 +1022,16 @@ hsk_resource_get(hsk_resource_t *res, uint8_t type) {
 }
 
 bool
-hsk_resource_has(hsk_resource_t *res, uint8_t type) {
+hsk_resource_has(const hsk_resource_t *res, uint8_t type) {
   return hsk_resource_get(res, type) != NULL;
 }
 
 static bool
-hsk_resource_to_a(hsk_resource_t *res, char *name, hsk_dns_rrs_t *an) {
+hsk_resource_to_a(
+  const hsk_resource_t *res,
+  const char *name,
+  hsk_dns_rrs_t *an
+) {
   int32_t i;
 
   for (i = 0; i < res->record_count; i++) {
@@ -1052,7 +1061,11 @@ hsk_resource_to_a(hsk_resource_t *res, char *name, hsk_dns_rrs_t *an) {
 }
 
 static bool
-hsk_resource_to_aaaa(hsk_resource_t *res, char *name, hsk_dns_rrs_t *an) {
+hsk_resource_to_aaaa(
+  const hsk_resource_t *res,
+  const char *name,
+  hsk_dns_rrs_t *an
+) {
   int32_t i;
 
   for (i = 0; i < res->record_count; i++) {
@@ -1082,7 +1095,11 @@ hsk_resource_to_aaaa(hsk_resource_t *res, char *name, hsk_dns_rrs_t *an) {
 }
 
 static bool
-hsk_resource_to_cname(hsk_resource_t *res, char *name, hsk_dns_rrs_t *an) {
+hsk_resource_to_cname(
+  const hsk_resource_t *res,
+  const char *name,
+  hsk_dns_rrs_t *an
+) {
   int32_t i;
   char cname[HSK_DNS_MAX_NAME + 1];
 
@@ -1119,7 +1136,11 @@ hsk_resource_to_cname(hsk_resource_t *res, char *name, hsk_dns_rrs_t *an) {
 }
 
 static bool
-hsk_resource_to_dname(hsk_resource_t *res, char *name, hsk_dns_rrs_t *an) {
+hsk_resource_to_dname(
+  const hsk_resource_t *res,
+  const char *name,
+  hsk_dns_rrs_t *an
+) {
   int32_t i;
   char dname[HSK_DNS_MAX_NAME + 1];
 
@@ -1156,7 +1177,11 @@ hsk_resource_to_dname(hsk_resource_t *res, char *name, hsk_dns_rrs_t *an) {
 }
 
 static bool
-hsk_resource_to_ns(hsk_resource_t *res, char *name, hsk_dns_rrs_t *an) {
+hsk_resource_to_ns(
+  const hsk_resource_t *res,
+  const char *name,
+  hsk_dns_rrs_t *an
+) {
   int32_t i;
   char nsname[HSK_DNS_MAX_NAME + 1];
 
@@ -1190,7 +1215,11 @@ hsk_resource_to_ns(hsk_resource_t *res, char *name, hsk_dns_rrs_t *an) {
 }
 
 static bool
-hsk_resource_to_nsip(hsk_resource_t *res, char *name, hsk_dns_rrs_t *ar) {
+hsk_resource_to_nsip(
+  const hsk_resource_t *res,
+  const char *name,
+  hsk_dns_rrs_t *ar
+) {
   int32_t i;
   char ptr[HSK_DNS_MAX_NAME + 1];
 
@@ -1238,10 +1267,10 @@ hsk_resource_to_nsip(hsk_resource_t *res, char *name, hsk_dns_rrs_t *ar) {
 
 static bool
 hsk_resource_to_srvip(
-  hsk_resource_t *res,
-  char *name,
-  char *protocol,
-  char *service,
+  const hsk_resource_t *res,
+  const char *name,
+  const char *protocol,
+  const char *service,
   hsk_dns_rrs_t *ar
 ) {
   int32_t i;
@@ -1296,7 +1325,11 @@ hsk_resource_to_srvip(
 }
 
 static bool
-hsk_resource_to_mx(hsk_resource_t *res, char *name, hsk_dns_rrs_t *an) {
+hsk_resource_to_mx(
+  const hsk_resource_t *res,
+  const char *name,
+  hsk_dns_rrs_t *an
+) {
   int32_t i;
   char mx[HSK_DNS_MAX_NAME + 1];
 
@@ -1336,16 +1369,20 @@ hsk_resource_to_mx(hsk_resource_t *res, char *name, hsk_dns_rrs_t *an) {
 }
 
 static bool
-hsk_resource_to_mxip(hsk_resource_t *res, char *name, hsk_dns_rrs_t *an) {
+hsk_resource_to_mxip(
+  const hsk_resource_t *res,
+  const char *name,
+  hsk_dns_rrs_t *an
+) {
   return hsk_resource_to_srvip(res, name, "tcp", "smtp", an);
 }
 
 static bool
 hsk_resource_to_srv(
-  hsk_resource_t *res,
-  char *name,
-  char *protocol,
-  char *service,
+  const hsk_resource_t *res,
+  const char *name,
+  const char *protocol,
+  const char *service,
   hsk_dns_rrs_t *an
 ) {
   int32_t i;
@@ -1391,7 +1428,11 @@ hsk_resource_to_srv(
 }
 
 static bool
-hsk_resource_to_txt(hsk_resource_t *res, char *name, hsk_dns_rrs_t *an) {
+hsk_resource_to_txt(
+  const hsk_resource_t *res,
+  const char *name,
+  hsk_dns_rrs_t *an
+) {
   hsk_dns_rr_t *rr = hsk_dns_rr_create(HSK_DNS_TXT);
 
   if (!rr)
@@ -1430,7 +1471,11 @@ hsk_resource_to_txt(hsk_resource_t *res, char *name, hsk_dns_rrs_t *an) {
 }
 
 static bool
-hsk_resource_to_loc(hsk_resource_t *res, char *name, hsk_dns_rrs_t *an) {
+hsk_resource_to_loc(
+  const hsk_resource_t *res,
+  const char *name,
+  hsk_dns_rrs_t *an
+) {
   int32_t i;
 
   for (i = 0; i < res->record_count; i++) {
@@ -1466,7 +1511,11 @@ hsk_resource_to_loc(hsk_resource_t *res, char *name, hsk_dns_rrs_t *an) {
 }
 
 static bool
-hsk_resource_to_ds(hsk_resource_t *res, char *name, hsk_dns_rrs_t *an) {
+hsk_resource_to_ds(
+  const hsk_resource_t *res,
+  const char *name,
+  hsk_dns_rrs_t *an
+) {
   int32_t i;
 
   for (i = 0; i < res->record_count; i++) {
@@ -1509,9 +1558,9 @@ hsk_resource_to_ds(hsk_resource_t *res, char *name, hsk_dns_rrs_t *an) {
 
 static bool
 hsk_resource_to_tlsa(
-  hsk_resource_t *res,
-  char *name,
-  char *protocol,
+  const hsk_resource_t *res,
+  const char *name,
+  const char *protocol,
   uint16_t port,
   hsk_dns_rrs_t *an
 ) {
@@ -1563,9 +1612,9 @@ hsk_resource_to_tlsa(
 
 static bool
 hsk_resource_to_smimea(
-  hsk_resource_t *res,
-  char *name,
-  uint8_t *hash,
+  const hsk_resource_t *res,
+  const char *name,
+  const uint8_t *hash,
   hsk_dns_rrs_t *an
 ) {
   int32_t i;
@@ -1612,7 +1661,11 @@ hsk_resource_to_smimea(
 }
 
 static bool
-hsk_resource_to_sshfp(hsk_resource_t *res, char *name, hsk_dns_rrs_t *an) {
+hsk_resource_to_sshfp(
+  const hsk_resource_t *res,
+  const char *name,
+  hsk_dns_rrs_t *an
+) {
   int32_t i;
 
   for (i = 0; i < res->record_count; i++) {
@@ -1653,7 +1706,11 @@ hsk_resource_to_sshfp(hsk_resource_t *res, char *name, hsk_dns_rrs_t *an) {
 }
 
 static bool
-hsk_resource_to_openpgpkey(hsk_resource_t *res, char *name, hsk_dns_rrs_t *an) {
+hsk_resource_to_openpgpkey(
+  const hsk_resource_t *res,
+  const char *name,
+  hsk_dns_rrs_t *an
+) {
   int32_t i;
 
   for (i = 0; i < res->record_count; i++) {
@@ -1691,7 +1748,11 @@ hsk_resource_to_openpgpkey(hsk_resource_t *res, char *name, hsk_dns_rrs_t *an) {
 }
 
 static bool
-hsk_resource_to_uri(hsk_resource_t *res, char *name, hsk_dns_rrs_t *an) {
+hsk_resource_to_uri(
+  const hsk_resource_t *res,
+  const char *name,
+  hsk_dns_rrs_t *an
+) {
   int32_t i;
 
   for (i = 0; i < res->record_count; i++) {
@@ -1727,7 +1788,11 @@ hsk_resource_to_uri(hsk_resource_t *res, char *name, hsk_dns_rrs_t *an) {
 }
 
 static bool
-hsk_resource_to_rp(hsk_resource_t *res, char *name, hsk_dns_rrs_t *an) {
+hsk_resource_to_rp(
+  const hsk_resource_t *res,
+  const char *name,
+  hsk_dns_rrs_t *an
+) {
   int32_t i;
 
   for (i = 0; i < res->record_count; i++) {
@@ -1758,7 +1823,7 @@ hsk_resource_to_rp(hsk_resource_t *res, char *name, hsk_dns_rrs_t *an) {
 }
 
 static bool
-hsk_resource_to_glue(hsk_resource_t *res, hsk_dns_rrs_t *an) {
+hsk_resource_to_glue(const hsk_resource_t *res, hsk_dns_rrs_t *an) {
   int32_t i;
 
   for (i = 0; i < res->record_count; i++) {
@@ -1877,11 +1942,11 @@ hsk_resource_root_to_ns(hsk_dns_rrs_t *an) {
 }
 
 static bool
-hsk_resource_root_to_a(hsk_dns_rrs_t *an, hsk_addr_t *addr) {
+hsk_resource_root_to_a(hsk_dns_rrs_t *an, const hsk_addr_t *addr) {
   if (!addr || !hsk_addr_is_ip4(addr))
     return true;
 
-  uint8_t *ip = hsk_addr_get_ip(addr);
+  const uint8_t *ip = hsk_addr_get_ip(addr);
 
   hsk_dns_rr_t *rr = hsk_dns_rr_create(HSK_DNS_A);
 
@@ -1902,11 +1967,11 @@ hsk_resource_root_to_a(hsk_dns_rrs_t *an, hsk_addr_t *addr) {
 }
 
 static bool
-hsk_resource_root_to_aaaa(hsk_dns_rrs_t *an, hsk_addr_t *addr) {
+hsk_resource_root_to_aaaa(hsk_dns_rrs_t *an, const hsk_addr_t *addr) {
   if (!addr || !hsk_addr_is_ip6(addr))
     return true;
 
-  uint8_t *ip = hsk_addr_get_ip(addr);
+  const uint8_t *ip = hsk_addr_get_ip(addr);
 
   hsk_dns_rr_t *rr = hsk_dns_rr_create(HSK_DNS_AAAA);
 
@@ -1928,7 +1993,7 @@ hsk_resource_root_to_aaaa(hsk_dns_rrs_t *an, hsk_addr_t *addr) {
 
 static bool
 hsk_resource_root_to_dnskey(hsk_dns_rrs_t *an) {
-  hsk_dns_rr_t *ksk = hsk_dnssec_get_ksk();
+  const hsk_dns_rr_t *ksk = hsk_dnssec_get_ksk();
   hsk_dns_rr_t *ksk_rr = hsk_dns_rr_clone(ksk);
 
   if (!ksk_rr)
@@ -1936,7 +2001,7 @@ hsk_resource_root_to_dnskey(hsk_dns_rrs_t *an) {
 
   hsk_dns_rrs_push(an, ksk_rr);
 
-  hsk_dns_rr_t *zsk = hsk_dnssec_get_zsk();
+  const hsk_dns_rr_t *zsk = hsk_dnssec_get_zsk();
   hsk_dns_rr_t *zsk_rr = hsk_dns_rr_clone(zsk);
 
   if (!zsk_rr)
@@ -1949,7 +2014,7 @@ hsk_resource_root_to_dnskey(hsk_dns_rrs_t *an) {
 
 static bool
 hsk_resource_root_to_ds(hsk_dns_rrs_t *an) {
-  hsk_dns_rr_t *ds = hsk_dnssec_get_ds();
+  const hsk_dns_rr_t *ds = hsk_dnssec_get_ds();
   hsk_dns_rr_t *rr = hsk_dns_rr_clone(ds);
 
   if (!rr)
@@ -1961,7 +2026,7 @@ hsk_resource_root_to_ds(hsk_dns_rrs_t *an) {
 }
 
 hsk_dns_msg_t *
-hsk_resource_to_dns(hsk_resource_t *rs, char *name, uint16_t type) {
+hsk_resource_to_dns(const hsk_resource_t *rs, const char *name, uint16_t type) {
   int32_t labels = hsk_dns_label_count(name);
 
   if (labels == 0)
@@ -2195,7 +2260,7 @@ hsk_resource_to_dns(hsk_resource_t *rs, char *name, uint16_t type) {
 }
 
 hsk_dns_msg_t *
-hsk_resource_root(uint16_t type, hsk_addr_t *addr) {
+hsk_resource_root(uint16_t type, const hsk_addr_t *addr) {
   hsk_dns_msg_t *msg = hsk_dns_msg_alloc();
 
   if (!msg)
@@ -2296,7 +2361,7 @@ hsk_resource_to_servfail(void) {
  */
 
 static void
-ip_size(uint8_t *ip, size_t *s, size_t *l) {
+ip_size(const uint8_t *ip, size_t *s, size_t *l) {
   bool out = true;
   int32_t last = 0;
   int32_t i = 0;
@@ -2338,7 +2403,7 @@ ip_size(uint8_t *ip, size_t *s, size_t *l) {
 }
 
 static size_t
-ip_write(uint8_t *ip, uint8_t *data) {
+ip_write(const uint8_t *ip, uint8_t *data) {
   size_t start, len;
   ip_size(ip, &start, &len);
   uint8_t left = 16 - (start + len);
@@ -2350,7 +2415,7 @@ ip_write(uint8_t *ip, uint8_t *data) {
 }
 
 static bool
-ip_read(uint8_t *data, uint8_t *ip) {
+ip_read(const uint8_t *data, uint8_t *ip) {
   uint8_t field = data[0];
 
   uint8_t start = field >> 4;
@@ -2377,7 +2442,7 @@ ip_read(uint8_t *data, uint8_t *ip) {
 }
 
 static void
-ip_to_b32(hsk_target_t *target, char *dst) {
+ip_to_b32(const hsk_target_t *target, char *dst) {
   uint8_t ip[16];
 
   if (target->type == HSK_INET4) {
@@ -2400,7 +2465,7 @@ ip_to_b32(hsk_target_t *target, char *dst) {
 }
 
 static bool
-b32_to_ip(char *str, uint8_t *ip, uint16_t *family) {
+b32_to_ip(const char *str, uint8_t *ip, uint16_t *family) {
   size_t size = hsk_base32_decode_hex_size(str);
 
   if (size == 0 || size > 17)
@@ -2433,7 +2498,7 @@ b32_to_ip(char *str, uint8_t *ip, uint16_t *family) {
 }
 
 static bool
-pointer_to_ip(char *name, uint8_t *ip, uint16_t *family) {
+pointer_to_ip(const char *name, uint8_t *ip, uint16_t *family) {
   char label[HSK_DNS_MAX_LABEL + 1];
   size_t len = hsk_dns_label_get(name, 0, label);
 
@@ -2444,7 +2509,7 @@ pointer_to_ip(char *name, uint8_t *ip, uint16_t *family) {
 }
 
 static bool
-target_to_dns(hsk_target_t *target, char *name, char *host) {
+target_to_dns(const hsk_target_t *target, const char *name, char *host) {
   if (target->type == HSK_NAME || target->type == HSK_GLUE) {
     if (!hsk_dns_name_verify(target->name))
       return false;
@@ -2480,6 +2545,6 @@ target_to_dns(hsk_target_t *target, char *name, char *host) {
 }
 
 bool
-hsk_resource_is_ptr(char *name) {
+hsk_resource_is_ptr(const char *name) {
   return pointer_to_ip(name, NULL, NULL);
 }

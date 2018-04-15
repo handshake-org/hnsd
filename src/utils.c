@@ -125,7 +125,7 @@ hsk_hex_encode_size(size_t data_len) {
 }
 
 bool
-hsk_hex_encode(uint8_t *data, size_t data_len, char *str) {
+hsk_hex_encode(const uint8_t *data, size_t data_len, char *str) {
   if (data == NULL && data_len != 0)
     return false;
 
@@ -158,22 +158,22 @@ hsk_hex_encode(uint8_t *data, size_t data_len, char *str) {
   return true;
 }
 
-char *
-hsk_hex_encode32(uint8_t *data) {
+const char *
+hsk_hex_encode32(const uint8_t *data) {
   static char str[65];
   assert(hsk_hex_encode(data, 32, str));
   return str;
 }
 
 size_t
-hsk_hex_decode_size(char *str) {
+hsk_hex_decode_size(const char *str) {
   if (str == NULL)
     return 0;
   return strlen(str) >> 1;
 }
 
 bool
-hsk_hex_decode(char *str, uint8_t *data) {
+hsk_hex_decode(const char *str, uint8_t *data) {
   if (str == NULL)
     return true;
 
@@ -183,7 +183,7 @@ hsk_hex_decode(char *str, uint8_t *data) {
   int32_t p = 0;
   uint8_t w = 0;
 
-  for (i = 0, s = str; *s; i++, s++) {
+  for (i = 0, s = (char *)str; *s; i++, s++) {
     int32_t n = to_nibble(*s);
 
     if (n == -1)

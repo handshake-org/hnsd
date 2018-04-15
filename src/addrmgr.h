@@ -38,13 +38,13 @@ typedef struct hsk_addrman_s {
 } hsk_addrman_t;
 
 int32_t
-hsk_addrman_init(hsk_addrman_t *am, hsk_timedata_t *td);
+hsk_addrman_init(hsk_addrman_t *am, const hsk_timedata_t *td);
 
 void
 hsk_addrman_uninit(hsk_addrman_t *am);
 
 hsk_addrman_t *
-hsk_addrman_alloc(hsk_timedata_t *td);
+hsk_addrman_alloc(const hsk_timedata_t *td);
 
 void
 hsk_addrman_free(hsk_addrman_t *am);
@@ -52,51 +52,68 @@ hsk_addrman_free(hsk_addrman_t *am);
 hsk_addrentry_t *
 hsk_addrman_alloc_entry(hsk_addrman_t *am, bool *alloc);
 
-hsk_addrentry_t *
-hsk_addrman_get(hsk_addrman_t *am, hsk_addr_t *addr);
+const hsk_addrentry_t *
+hsk_addrman_get(const hsk_addrman_t *am, const hsk_addr_t *addr);
 
 bool
-hsk_addrman_add_entry(hsk_addrman_t *am, hsk_netaddr_t *na, bool src);
+hsk_addrman_add_entry(hsk_addrman_t *am, const hsk_netaddr_t *na, bool src);
 
 bool
-hsk_addrman_add_addr(hsk_addrman_t *am, hsk_addr_t *addr);
+hsk_addrman_add_addr(hsk_addrman_t *am, const hsk_addr_t *addr);
 
 bool
-hsk_addrman_add_na(hsk_addrman_t *am, hsk_netaddr_t *na);
+hsk_addrman_add_na(hsk_addrman_t *am, const hsk_netaddr_t *na);
 
 bool
-hsk_addrman_add_sa(hsk_addrman_t *am, struct sockaddr *sa);
+hsk_addrman_add_sa(hsk_addrman_t *am, const struct sockaddr *sa);
 
 bool
-hsk_addrman_add_ip(hsk_addrman_t *am, int32_t af, uint8_t *ip, uint16_t port);
+hsk_addrman_add_ip(
+  hsk_addrman_t *am,
+  int32_t af,
+  const uint8_t *ip,
+  uint16_t port
+);
 
 bool
-hsk_addrman_remove_addr(hsk_addrman_t *am, hsk_addr_t *addr);
+hsk_addrman_remove_addr(hsk_addrman_t *am, const hsk_addr_t *addr);
 
 bool
-hsk_addrman_mark_attempt(hsk_addrman_t *am, hsk_addr_t *addr);
+hsk_addrman_mark_attempt(hsk_addrman_t *am, const hsk_addr_t *addr);
 
 bool
-hsk_addrman_mark_success(hsk_addrman_t *am, hsk_addr_t *addr);
+hsk_addrman_mark_success(hsk_addrman_t *am, const hsk_addr_t *addr);
 
 bool
-hsk_addrman_mark_ack(hsk_addrman_t *am, hsk_addr_t *addr, uint64_t services);
+hsk_addrman_mark_ack(
+  hsk_addrman_t *am,
+  const hsk_addr_t *addr,
+  uint64_t services
+);
 
 void
 hsk_addrman_clear_banned(hsk_addrman_t *am);
 
 bool
-hsk_addrman_add_ban(hsk_addrman_t *am, hsk_addr_t *addr);
+hsk_addrman_add_ban(hsk_addrman_t *am, const hsk_addr_t *addr);
 
 bool
-hsk_addrman_is_banned(hsk_addrman_t *am, hsk_addr_t *addr);
+hsk_addrman_is_banned(hsk_addrman_t *am, const hsk_addr_t *addr);
 
-hsk_addrentry_t *
-hsk_addrman_pick(hsk_addrman_t *am, hsk_map_t *map);
-
-bool
-hsk_addrman_pick_addr(hsk_addrman_t *am, hsk_map_t *map, hsk_addr_t *addr);
+const hsk_addrentry_t *
+hsk_addrman_pick(hsk_addrman_t *am, const hsk_map_t *map);
 
 bool
-hsk_addrman_pick_sa(hsk_addrman_t *am, hsk_map_t *map, struct sockaddr *sa);
+hsk_addrman_pick_addr(
+  hsk_addrman_t *am,
+  const hsk_map_t *map,
+  hsk_addr_t *addr
+);
+
+bool
+hsk_addrman_pick_sa(
+  hsk_addrman_t *am,
+  const hsk_map_t *map,
+  struct sockaddr *sa
+);
 #endif

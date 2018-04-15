@@ -18,7 +18,7 @@ hsk_ec_alloc(void) {
 }
 
 hsk_ec_t *
-hsk_ec_clone(hsk_ec_t *ec) {
+hsk_ec_clone(const hsk_ec_t *ec) {
   assert(ec);
   return hsk_secp256k1_context_clone(ec);
 }
@@ -30,26 +30,26 @@ hsk_ec_free(hsk_ec_t *ec) {
 }
 
 bool
-hsk_ec_randomize(hsk_ec_t *ec, uint8_t *seed) {
+hsk_ec_randomize(hsk_ec_t *ec, const uint8_t *seed) {
   assert(ec && seed);
   return hsk_secp256k1_context_randomize(ec, seed) != 0;
 }
 
 bool
-hsk_ec_verify_privkey(hsk_ec_t *ec, uint8_t *key) {
+hsk_ec_verify_privkey(const hsk_ec_t *ec, const uint8_t *key) {
   assert(ec && key);
   return hsk_secp256k1_ec_seckey_verify(ec, key) != 0;
 }
 
 bool
-hsk_ec_verify_pubkey(hsk_ec_t *ec, uint8_t *key) {
+hsk_ec_verify_pubkey(const hsk_ec_t *ec, const uint8_t *key) {
   assert(ec && key);
   hsk_secp256k1_pubkey pub;
   return hsk_secp256k1_ec_pubkey_parse(ec, &pub, key, 33) != 0;
 }
 
 bool
-hsk_ec_create_privkey(hsk_ec_t *ec, uint8_t *key) {
+hsk_ec_create_privkey(const hsk_ec_t *ec, uint8_t *key) {
   assert(ec && key);
 
   memset(key, 0, 32);
@@ -70,7 +70,7 @@ hsk_ec_create_privkey(hsk_ec_t *ec, uint8_t *key) {
 }
 
 bool
-hsk_ec_create_pubkey(hsk_ec_t *ec, uint8_t *key, uint8_t *pubkey) {
+hsk_ec_create_pubkey(const hsk_ec_t *ec, const uint8_t *key, uint8_t *pubkey) {
   assert(ec && key && pubkey);
 
   hsk_secp256k1_pubkey pub;
@@ -91,9 +91,9 @@ hsk_ec_create_pubkey(hsk_ec_t *ec, uint8_t *key, uint8_t *pubkey) {
 
 bool
 hsk_ec_sign_msg(
-  hsk_ec_t *ec,
-  uint8_t *key,
-  uint8_t *msg,
+  const hsk_ec_t *ec,
+  const uint8_t *key,
+  const uint8_t *msg,
   uint8_t *sig,
   int32_t *rec
 ) {
@@ -122,10 +122,10 @@ hsk_ec_sign_msg(
 
 bool
 hsk_ec_verify_msg(
-  hsk_ec_t *ec,
-  uint8_t *pubkey,
-  uint8_t *msg,
-  uint8_t *sig
+  const hsk_ec_t *ec,
+  const uint8_t *pubkey,
+  const uint8_t *msg,
+  const uint8_t *sig
 ) {
   assert(ec && pubkey && msg && sig);
 
@@ -147,9 +147,9 @@ hsk_ec_verify_msg(
 
 bool
 hsk_ec_recover(
-  hsk_ec_t *ec,
-  uint8_t *msg,
-  uint8_t *sig,
+  const hsk_ec_t *ec,
+  const uint8_t *msg,
+  const uint8_t *sig,
   int32_t rec,
   uint8_t *pubkey
 ) {
@@ -178,11 +178,11 @@ hsk_ec_recover(
 
 bool
 hsk_ec_verify_hash(
-  hsk_ec_t *ec,
-  uint8_t *msg,
-  uint8_t *sig,
+  const hsk_ec_t *ec,
+  const uint8_t *msg,
+  const uint8_t *sig,
   int32_t rec,
-  uint8_t *keyhash
+  const uint8_t *keyhash
 ) {
   assert(ec && msg && sig && keyhash);
 
@@ -197,7 +197,12 @@ hsk_ec_verify_hash(
 }
 
 bool
-hsk_ec_ecdh(hsk_ec_t *ec, uint8_t *pubkey, uint8_t *key, uint8_t *result) {
+hsk_ec_ecdh(
+  const hsk_ec_t *ec,
+  const uint8_t *pubkey,
+  const uint8_t *key,
+  uint8_t *result
+) {
   assert(ec && pubkey && key && result);
 
   hsk_secp256k1_pubkey pub;

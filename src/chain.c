@@ -19,17 +19,21 @@
 #include "utils.h"
 
 /*
- * Templates
+ * Prototypes
  */
 
 static int32_t
-hsk_chain_init_genesis(hsk_chain_t *);
+hsk_chain_init_genesis(hsk_chain_t *chain);
 
 static int32_t
-hsk_chain_insert(hsk_chain_t *, hsk_header_t *, hsk_header_t *);
+hsk_chain_insert(
+  hsk_chain_t *chain,
+  hsk_header_t *hdr,
+  const hsk_header_t *prev
+);
 
 static void
-hsk_chain_maybe_sync(hsk_chain_t *);
+hsk_chain_maybe_sync(hsk_chain_t *chain);
 
 /*
  * Helpers
@@ -54,7 +58,7 @@ qsort_cmp(const void *a, const void *b) {
  */
 
 int32_t
-hsk_chain_init(hsk_chain_t *chain, hsk_timedata_t *td) {
+hsk_chain_init(hsk_chain_t *chain, const hsk_timedata_t *td) {
   if (!chain || !td)
     return HSK_EBADARGS;
 
@@ -62,7 +66,7 @@ hsk_chain_init(hsk_chain_t *chain, hsk_timedata_t *td) {
   chain->tip = NULL;
   chain->genesis = NULL;
   chain->synced = false;
-  chain->td = td;
+  chain->td = (hsk_timedata_t *)td;
 
   hsk_map_init_hash_map(&chain->hashes, free);
   hsk_map_init_int_map(&chain->heights, NULL);
@@ -123,7 +127,7 @@ hsk_chain_uninit(hsk_chain_t *chain) {
 }
 
 hsk_chain_t *
-hsk_chain_alloc(hsk_timedata_t *td) {
+hsk_chain_alloc(const hsk_timedata_t *td) {
   hsk_chain_t *chain = malloc(sizeof(hsk_chain_t));
 
   if (!chain)
@@ -147,7 +151,7 @@ hsk_chain_free(hsk_chain_t *chain) {
 }
 
 static void
-hsk_chain_log(hsk_chain_t *chain, const char *fmt, ...) {
+hsk_chain_log(const hsk_chain_t *chain, const char *fmt, ...) {
   printf("chain (%u): ", (uint32_t)chain->height);
 
   va_list args;
@@ -157,32 +161,32 @@ hsk_chain_log(hsk_chain_t *chain, const char *fmt, ...) {
 }
 
 bool
-hsk_chain_has(hsk_chain_t *chain, uint8_t *hash) {
+hsk_chain_has(const hsk_chain_t *chain, const uint8_t *hash) {
   return hsk_map_has(&chain->hashes, hash);
 }
 
 hsk_header_t *
-hsk_chain_get(hsk_chain_t *chain, uint8_t *hash) {
+hsk_chain_get(const hsk_chain_t *chain, const uint8_t *hash) {
   return hsk_map_get(&chain->hashes, hash);
 }
 
 hsk_header_t *
-hsk_chain_get_by_height(hsk_chain_t *chain, int32_t height) {
+hsk_chain_get_by_height(const hsk_chain_t *chain, const int32_t height) {
   return hsk_map_get(&chain->heights, &height);
 }
 
 bool
-hsk_chain_has_orphan(hsk_chain_t *chain, uint8_t *hash) {
+hsk_chain_has_orphan(const hsk_chain_t *chain, const uint8_t *hash) {
   return hsk_map_has(&chain->orphans, hash);
 }
 
 hsk_header_t *
-hsk_chain_get_orphan(hsk_chain_t *chain, uint8_t *hash) {
+hsk_chain_get_orphan(const hsk_chain_t *chain, const uint8_t *hash) {
   return hsk_map_get(&chain->orphans, hash);
 }
 
 static hsk_header_t *
-hsk_chain_resolve_orphan(hsk_chain_t *chain, uint8_t *hash) {
+hsk_chain_resolve_orphan(hsk_chain_t *chain, const uint8_t *hash) {
   hsk_header_t *orphan = hsk_map_get(&chain->prevs, hash);
 
   if (!orphan)
@@ -195,20 +199,26 @@ hsk_chain_resolve_orphan(hsk_chain_t *chain, uint8_t *hash) {
 }
 
 hsk_header_t *
-hsk_chain_get_ancestor(hsk_chain_t *chain, hsk_header_t *hdr, int32_t height) {
+hsk_chain_get_ancestor(
+  const hsk_chain_t *chain,
+  const hsk_header_t *hdr,
+  int32_t height
+) {
   assert(height >= 0);
   assert(height <= hdr->height);
 
-  while (hdr->height != height) {
-    hdr = (hsk_header_t *)hsk_map_get(&chain->hashes, hdr->prev_block);
-    assert(hdr);
+  hsk_header_t *h = (hsk_header_t *)hdr;
+
+  while (h->height != height) {
+    h = hsk_map_get(&chain->hashes, h->prev_block);
+    assert(h);
   }
 
-  return hdr;
+  return h;
 }
 
 static bool
-hsk_chain_has_work(hsk_chain_t *chain) {
+hsk_chain_has_work(const hsk_chain_t *chain) {
   return memcmp(chain->tip->work, HSK_CHAINWORK, 32) >= 0;
 }
 
@@ -241,12 +251,12 @@ hsk_chain_maybe_sync(hsk_chain_t *chain) {
 }
 
 bool
-hsk_chain_synced(hsk_chain_t *chain) {
+hsk_chain_synced(const hsk_chain_t *chain) {
   return chain->synced;
 }
 
 void
-hsk_chain_get_locator(hsk_chain_t *chain, hsk_getheaders_msg_t *msg) {
+hsk_chain_get_locator(const hsk_chain_t *chain, hsk_getheaders_msg_t *msg) {
   assert(chain && msg);
 
   int32_t i = 0;
@@ -280,7 +290,7 @@ hsk_chain_get_locator(hsk_chain_t *chain, hsk_getheaders_msg_t *msg) {
 }
 
 static int64_t
-hsk_chain_get_mtp(hsk_chain_t *chain, hsk_header_t *prev) {
+hsk_chain_get_mtp(const hsk_chain_t *chain, const hsk_header_t *prev) {
   assert(chain);
 
   if (!prev)
@@ -303,7 +313,7 @@ hsk_chain_get_mtp(hsk_chain_t *chain, hsk_header_t *prev) {
 }
 
 static uint32_t
-hsk_chain_retarget(hsk_chain_t *chain, hsk_header_t *prev) {
+hsk_chain_retarget(const hsk_chain_t *chain, const hsk_header_t *prev) {
   assert(chain);
 
   uint32_t bits = HSK_BITS;
@@ -319,7 +329,7 @@ hsk_chain_retarget(hsk_chain_t *chain, hsk_header_t *prev) {
   hsk_bn_t target_bn;
   hsk_bn_init(&target_bn);
 
-  hsk_header_t *last = prev;
+  hsk_header_t *last = (hsk_header_t *)prev;
   hsk_header_t *first = last;
   int32_t i;
 
@@ -377,7 +387,11 @@ hsk_chain_retarget(hsk_chain_t *chain, hsk_header_t *prev) {
 }
 
 static uint32_t
-hsk_chain_get_target(hsk_chain_t *chain, int64_t time, hsk_header_t *prev) {
+hsk_chain_get_target(
+  const hsk_chain_t *chain,
+  int64_t time,
+  const hsk_header_t *prev
+) {
   assert(chain);
 
   // Genesis
@@ -400,7 +414,7 @@ hsk_chain_get_target(hsk_chain_t *chain, int64_t time, hsk_header_t *prev) {
 
 static hsk_header_t *
 hsk_chain_find_fork(
-  hsk_chain_t *chain,
+  const hsk_chain_t *chain,
   hsk_header_t *fork,
   hsk_header_t *longer
 ) {
@@ -490,7 +504,7 @@ hsk_chain_reorganize(hsk_chain_t *chain, hsk_header_t *competitor) {
 }
 
 int32_t
-hsk_chain_add(hsk_chain_t *chain, hsk_header_t *h) {
+hsk_chain_add(hsk_chain_t *chain, const hsk_header_t *h) {
   if (!chain || !h)
     return HSK_EBADARGS;
 
@@ -592,7 +606,11 @@ fail:
 }
 
 static int32_t
-hsk_chain_insert(hsk_chain_t *chain, hsk_header_t *hdr, hsk_header_t *prev) {
+hsk_chain_insert(
+  hsk_chain_t *chain,
+  hsk_header_t *hdr,
+  const hsk_header_t *prev
+) {
   uint8_t *hash = hsk_header_cache(hdr);
   int64_t mtp = hsk_chain_get_mtp(chain, prev);
 

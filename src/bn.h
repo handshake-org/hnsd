@@ -63,51 +63,51 @@ void
 hsk_bn_from_int(hsk_bn_t *n, HSK_BN_DTYPE_TMP i);
 
 int
-hsk_bn_to_int(hsk_bn_t *n);
+hsk_bn_to_int(const hsk_bn_t *n);
 
 void
-hsk_bn_from_string(hsk_bn_t *n, char *str, int nbytes);
+hsk_bn_from_string(hsk_bn_t *n, const char *str, int nbytes);
 
 void
-hsk_bn_to_string(hsk_bn_t *n, char *str, int maxsize);
+hsk_bn_to_string(const hsk_bn_t *n, char *str, int maxsize);
 
 void
-hsk_bn_from_array(hsk_bn_t *n, unsigned char *array, size_t size);
+hsk_bn_from_array(hsk_bn_t *n, const unsigned char *array, size_t size);
 
 void
-hsk_bn_to_array(hsk_bn_t *n, unsigned char *array, size_t size);
+hsk_bn_to_array(const hsk_bn_t *n, unsigned char *array, size_t size);
 
 /*
  * Basic arithmetic operations
  */
 
 void
-hsk_bn_add(hsk_bn_t *a, hsk_bn_t *b, hsk_bn_t *c); // c = a + b
+hsk_bn_add(const hsk_bn_t *a, const hsk_bn_t *b, hsk_bn_t *c); // c = a + b
 
 void
-hsk_bn_sub(hsk_bn_t *a, hsk_bn_t *b, hsk_bn_t *c); // c = a - b
+hsk_bn_sub(const hsk_bn_t *a, const hsk_bn_t *b, hsk_bn_t *c); // c = a - b
 
 void
-hsk_bn_mul(hsk_bn_t *a, hsk_bn_t *b, hsk_bn_t *c); // c = a * b
+hsk_bn_mul(const hsk_bn_t *a, const hsk_bn_t *b, hsk_bn_t *c); // c = a * b
 
 void
-hsk_bn_div(hsk_bn_t *a, hsk_bn_t *b, hsk_bn_t *c); // c = a / b
+hsk_bn_div(const hsk_bn_t *a, const hsk_bn_t *b, hsk_bn_t *c); // c = a / b
 
 void
-hsk_bn_mod(hsk_bn_t *a, hsk_bn_t *b, hsk_bn_t *c); // c = a % b
+hsk_bn_mod(const hsk_bn_t *a, const hsk_bn_t *b, hsk_bn_t *c); // c = a % b
 
 /*
  * Bitwise operations
  */
 
 void
-hsk_bn_and(hsk_bn_t *a, hsk_bn_t *b, hsk_bn_t *c); // c = a & b
+hsk_bn_and(const hsk_bn_t *a, const hsk_bn_t *b, hsk_bn_t *c); // c = a & b
 
 void
-hsk_bn_or(hsk_bn_t *a, hsk_bn_t *b, hsk_bn_t *c); // c = a | b
+hsk_bn_or(const hsk_bn_t *a, const hsk_bn_t *b, hsk_bn_t *c); // c = a | b
 
 void
-hsk_bn_xor(hsk_bn_t *a, hsk_bn_t *b, hsk_bn_t *c); // c = a ^ b
+hsk_bn_xor(const hsk_bn_t *a, const hsk_bn_t *b, hsk_bn_t *c); // c = a ^ b
 
 void
 hsk_bn_lshift(hsk_bn_t *a, hsk_bn_t *b, int nbits); // b = a << nbits
@@ -120,10 +120,10 @@ hsk_bn_rshift(hsk_bn_t *a, hsk_bn_t *b, int nbits); // b = a >> nbits
  */
 
 int
-hsk_bn_cmp(hsk_bn_t *a, hsk_bn_t *b);
+hsk_bn_cmp(const hsk_bn_t *a, const hsk_bn_t *b);
 
 int
-hsk_bn_is_zero(hsk_bn_t *n);
+hsk_bn_is_zero(const hsk_bn_t *n);
 
 void
 hsk_bn_neg(hsk_bn_t *n);
@@ -136,9 +136,9 @@ hsk_bn_dec(hsk_bn_t *n);
 
 // Calculate a^b -- e.g. 2^10 => 1024
 void
-hsk_bn_pow(hsk_bn_t *a, hsk_bn_t *b, hsk_bn_t *c);
+hsk_bn_pow(const hsk_bn_t *a, hsk_bn_t *b, hsk_bn_t *c);
 
 void
-hsk_bn_assign(hsk_bn_t *dst, hsk_bn_t *src);
+hsk_bn_assign(hsk_bn_t *dst, const hsk_bn_t *src);
 
 #endif

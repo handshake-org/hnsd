@@ -66,11 +66,8 @@ hsk_version_msg_write(hsk_version_msg_t *msg, uint8_t **data) {
 }
 
 void
-hsk_version_msg_print(hsk_version_msg_t *msg, char *prefix) {
+hsk_version_msg_print(const hsk_version_msg_t *msg, const char *prefix) {
   assert(msg);
-
-  if (!prefix)
-    prefix = "";
 
   char remote[HSK_MAX_HOST];
 
@@ -93,7 +90,7 @@ hsk_verack_msg_read(uint8_t **data, size_t *data_len, hsk_verack_msg_t *msg) {
 }
 
 int32_t
-hsk_verack_msg_write(hsk_verack_msg_t *msg, uint8_t **data) {
+hsk_verack_msg_write(const hsk_verack_msg_t *msg, uint8_t **data) {
   return 0;
 }
 
@@ -105,7 +102,7 @@ hsk_ping_msg_read(uint8_t **data, size_t *data_len, hsk_ping_msg_t *msg) {
 }
 
 int32_t
-hsk_ping_msg_write(hsk_ping_msg_t *msg, uint8_t **data) {
+hsk_ping_msg_write(const hsk_ping_msg_t *msg, uint8_t **data) {
   int32_t s = 0;
   s += write_u64(data, msg->nonce);
   return s;
@@ -119,7 +116,7 @@ hsk_pong_msg_read(uint8_t **data, size_t *data_len, hsk_pong_msg_t *msg) {
 }
 
 int32_t
-hsk_pong_msg_write(hsk_pong_msg_t *msg, uint8_t **data) {
+hsk_pong_msg_write(const hsk_pong_msg_t *msg, uint8_t **data) {
   int32_t s = 0;
   s += write_u64(data, msg->nonce);
   return s;
@@ -131,7 +128,7 @@ hsk_getaddr_msg_read(uint8_t **data, size_t *data_len, hsk_getaddr_msg_t *msg) {
 }
 
 int32_t
-hsk_getaddr_msg_write(hsk_getaddr_msg_t *msg, uint8_t **data) {
+hsk_getaddr_msg_write(const hsk_getaddr_msg_t *msg, uint8_t **data) {
   return 0;
 }
 
@@ -154,7 +151,7 @@ hsk_addr_msg_read(uint8_t **data, size_t *data_len, hsk_addr_msg_t *msg) {
 }
 
 int32_t
-hsk_addr_msg_write(hsk_addr_msg_t *msg, uint8_t **data) {
+hsk_addr_msg_write(const hsk_addr_msg_t *msg, uint8_t **data) {
   int32_t s = 0;
 
   s += write_varsize(data, msg->addr_count);
@@ -189,7 +186,7 @@ hsk_getheaders_msg_read(uint8_t **data, size_t *data_len, hsk_getheaders_msg_t *
 }
 
 int32_t
-hsk_getheaders_msg_write(hsk_getheaders_msg_t *msg, uint8_t **data) {
+hsk_getheaders_msg_write(const hsk_getheaders_msg_t *msg, uint8_t **data) {
   int32_t s = 0;
 
   s += write_varsize(data, msg->hash_count);
@@ -245,7 +242,7 @@ fail: ;
 }
 
 int32_t
-hsk_headers_msg_write(hsk_headers_msg_t *msg, uint8_t **data) {
+hsk_headers_msg_write(const hsk_headers_msg_t *msg, uint8_t **data) {
   int32_t s = 0;
 
   s += write_varsize(data, msg->header_count);
@@ -259,17 +256,25 @@ hsk_headers_msg_write(hsk_headers_msg_t *msg, uint8_t **data) {
 }
 
 bool
-hsk_sendheaders_msg_read(uint8_t **data, size_t *data_len, hsk_sendheaders_msg_t *msg) {
+hsk_sendheaders_msg_read(
+  uint8_t **data,
+  size_t *data_len,
+  hsk_sendheaders_msg_t *msg
+) {
   return true;
 }
 
 int32_t
-hsk_sendheaders_msg_write(hsk_sendheaders_msg_t *msg, uint8_t **data) {
+hsk_sendheaders_msg_write(const hsk_sendheaders_msg_t *msg, uint8_t **data) {
   return 0;
 }
 
 bool
-hsk_getproof_msg_read(uint8_t **data, size_t *data_len, hsk_getproof_msg_t *msg) {
+hsk_getproof_msg_read(
+  uint8_t **data,
+  size_t *data_len,
+  hsk_getproof_msg_t *msg
+) {
   if (!read_bytes(data, data_len, msg->root, 32))
     return false;
 
@@ -280,7 +285,7 @@ hsk_getproof_msg_read(uint8_t **data, size_t *data_len, hsk_getproof_msg_t *msg)
 }
 
 int32_t
-hsk_getproof_msg_write(hsk_getproof_msg_t *msg, uint8_t **data) {
+hsk_getproof_msg_write(const hsk_getproof_msg_t *msg, uint8_t **data) {
   int32_t s = 0;
   s += write_bytes(data, msg->root, 32);
   s += write_bytes(data, msg->key, 32);
@@ -327,7 +332,7 @@ fail:
 }
 
 int32_t
-hsk_proof_msg_write(hsk_proof_msg_t *msg, uint8_t **data) {
+hsk_proof_msg_write(const hsk_proof_msg_t *msg, uint8_t **data) {
   int32_t s = 0;
 
   s += write_bytes(data, msg->root, 32);
@@ -342,7 +347,7 @@ hsk_proof_msg_write(hsk_proof_msg_t *msg, uint8_t **data) {
 }
 
 uint8_t
-hsk_msg_cmd(char *cmd) {
+hsk_msg_cmd(const char *cmd) {
   if (strcmp(cmd, "version") == 0)
     return HSK_MSG_VERSION;
 
@@ -682,7 +687,7 @@ hsk_msg_read(uint8_t **data, size_t *data_len, hsk_msg_t *msg) {
 }
 
 int32_t
-hsk_msg_write(hsk_msg_t *msg, uint8_t **data) {
+hsk_msg_write(const hsk_msg_t *msg, uint8_t **data) {
   switch (msg->cmd) {
     case HSK_MSG_VERSION: {
       return hsk_version_msg_write((hsk_version_msg_t *)msg, data);
@@ -724,16 +729,16 @@ hsk_msg_write(hsk_msg_t *msg, uint8_t **data) {
 }
 
 bool
-hsk_msg_decode(uint8_t *data, size_t data_len, hsk_msg_t *msg) {
-  return hsk_msg_read(&data, &data_len, msg);
+hsk_msg_decode(const uint8_t *data, size_t data_len, hsk_msg_t *msg) {
+  return hsk_msg_read((uint8_t **)&data, &data_len, msg);
 }
 
 int32_t
-hsk_msg_encode(hsk_msg_t *msg, uint8_t *data) {
+hsk_msg_encode(const hsk_msg_t *msg, uint8_t *data) {
   return hsk_msg_write(msg, &data);
 }
 
 int32_t
-hsk_msg_size(hsk_msg_t *msg) {
+hsk_msg_size(const hsk_msg_t *msg) {
   return hsk_msg_write(msg, NULL);
 }

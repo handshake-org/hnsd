@@ -1,5 +1,5 @@
 AUTOMAKE_OPTIONS = foreign
-CFLAGS = -Wall -std=gnu11 -O2
+CFLAGS = -Wall -Wno-unused-function -std=gnu11 -O2
 LDFLAGS =
 
 SUBDIRS = uv

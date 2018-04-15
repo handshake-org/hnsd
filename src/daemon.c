@@ -59,14 +59,14 @@ hsk_options_init(hsk_options_t *opt) {
 }
 
 static void
-set_logfile(char *logfile) {
+set_logfile(const char *logfile) {
   assert(logfile);
   freopen(logfile, "a", stdout);
   freopen(logfile, "a", stderr);
 }
 
 static bool
-daemonize(char *logfile) {
+daemonize(const char *logfile) {
 #ifdef __linux
   if (getppid() == 1)
     return true;
@@ -300,7 +300,7 @@ parse_arg(int argc, char **argv, hsk_options_t *opt) {
 }
 
 static bool
-print_identity(uint8_t *key) {
+print_identity(const uint8_t *key) {
   hsk_ec_t *ec = hsk_ec_alloc();
 
   if (!ec)

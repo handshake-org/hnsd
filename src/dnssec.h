@@ -16,13 +16,13 @@ static const uint8_t hsk_dnssec_zsk[] = ""
   "\x54\x27\x6f\xf8\x60\x4a\x34\x94\xc5\xc7\x6d\x66\x51\xf1\x4b\x28"
   "\x9c\x72\x53\xba\x63\x6b\xe4\xbf\xd7\x96\x93\x08\xf4\x8d\xa4\x7d";
 
-hsk_dns_rr_t *
+const hsk_dns_rr_t *
 hsk_dnssec_get_ksk(void);
 
-hsk_dns_rr_t *
+const hsk_dns_rr_t *
 hsk_dnssec_get_zsk(void);
 
-hsk_dns_rr_t *
+const hsk_dns_rr_t *
 hsk_dnssec_get_ds(void);
 
 bool

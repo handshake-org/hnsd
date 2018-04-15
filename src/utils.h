@@ -35,16 +35,16 @@ size_t
 hsk_hex_encode_size(size_t data_len);
 
 char *
-hsk_hex_encode(uint8_t *data, size_t data_len, char *str);
+hsk_hex_encode(const uint8_t *data, size_t data_len, char *str);
 
-char *
-hsk_hex_encode32(uint8_t *data);
+const char *
+hsk_hex_encode32(const uint8_t *data);
 
 size_t
-hsk_hex_decode_size(char *str);
+hsk_hex_decode_size(const char *str);
 
 bool
-hsk_hex_decode(char *str, uint8_t *data);
+hsk_hex_decode(const char *str, uint8_t *data);
 
 void
 hsk_to_lower(char *name);

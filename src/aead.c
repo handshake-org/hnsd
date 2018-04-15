@@ -25,7 +25,7 @@ hsk_aead_init(hsk_aead_t *aead) {
 }
 
 void
-hsk_aead_setup(hsk_aead_t *aead, uint8_t *key, uint8_t *iv) {
+hsk_aead_setup(hsk_aead_t *aead, const uint8_t *key, const uint8_t *iv) {
   memset(aead->poly_key, 0, 32);
 
   if (key)
@@ -53,14 +53,19 @@ hsk_aead_setup(hsk_aead_t *aead, uint8_t *key, uint8_t *iv) {
 }
 
 void
-hsk_aead_aad(hsk_aead_t *aead, uint8_t *aad, size_t len) {
+hsk_aead_aad(hsk_aead_t *aead, const uint8_t *aad, size_t len) {
   assert(!aead->has_cipher);
   hsk_poly1305_update(&aead->poly, aad, len);
   aead->aad_len += len;
 }
 
 void
-hsk_aead_encrypt(hsk_aead_t *aead, uint8_t *in, uint8_t *out, size_t len) {
+hsk_aead_encrypt(
+  hsk_aead_t *aead,
+  const uint8_t *in,
+  uint8_t *out,
+  size_t len
+) {
   if (!aead->has_cipher)
     hsk_aead_pad16(aead, aead->aad_len);
 
@@ -72,7 +77,12 @@ hsk_aead_encrypt(hsk_aead_t *aead, uint8_t *in, uint8_t *out, size_t len) {
 }
 
 void
-hsk_aead_decrypt(hsk_aead_t *aead, uint8_t *in, uint8_t *out, size_t len) {
+hsk_aead_decrypt(
+  hsk_aead_t *aead,
+  const uint8_t *in,
+  uint8_t *out,
+  size_t len
+) {
   if (!aead->has_cipher)
     hsk_aead_pad16(aead, aead->aad_len);
 
@@ -84,7 +94,7 @@ hsk_aead_decrypt(hsk_aead_t *aead, uint8_t *in, uint8_t *out, size_t len) {
 }
 
 void
-hsk_aead_auth(hsk_aead_t *aead, uint8_t *in, size_t len) {
+hsk_aead_auth(hsk_aead_t *aead, const uint8_t *in, size_t len) {
   if (!aead->has_cipher)
     hsk_aead_pad16(aead, aead->aad_len);
 
@@ -125,6 +135,6 @@ hsk_aead_pad16(hsk_aead_t *aead, size_t size) {
 }
 
 bool
-hsk_aead_verify(uint8_t *mac1, uint8_t *mac2) {
+hsk_aead_verify(const uint8_t *mac1, const uint8_t *mac2) {
   return hsk_poly1305_verify(mac1, mac2) != 0;
 }

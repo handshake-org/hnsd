@@ -57,13 +57,13 @@ hsk_ecc_make_key(
 
 int
 hsk_ecc_make_pubkey(
-  uint8_t private_key[HSK_ECC_BYTES],
+  const uint8_t private_key[HSK_ECC_BYTES],
   uint8_t public_key[HSK_ECC_BYTES * 2]
 );
 
 int
 hsk_ecc_make_pubkey_compressed(
-  uint8_t private_key[HSK_ECC_BYTES],
+  const uint8_t private_key[HSK_ECC_BYTES],
   uint8_t public_key[HSK_ECC_BYTES + 1]
 );
 

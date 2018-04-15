@@ -36,7 +36,7 @@ typedef struct {
 } hsk_send_data_t;
 
 /*
- * Templates
+ * Prototypes
  */
 
 static void
@@ -44,43 +44,43 @@ hsk_rs_log(hsk_rs_t *ns, const char *fmt, ...);
 
 static int32_t
 hsk_rs_send(
-  hsk_rs_t *,
-  uint8_t *,
-  size_t,
-  struct sockaddr *,
-  bool
+  hsk_rs_t *ns,
+  uint8_t *data,
+  size_t data_len,
+  const struct sockaddr *addr,
+  bool should_free
 );
 
 static void
-alloc_buffer(uv_handle_t *, size_t, uv_buf_t *);
+alloc_buffer(uv_handle_t *handle, size_t size, uv_buf_t *buf);
 
 static void
-after_send(uv_udp_send_t *, int);
+after_send(uv_udp_send_t *req, int status);
 
 static void
 after_recv(
-  uv_udp_t *,
-  ssize_t,
-  const uv_buf_t *,
-  const struct sockaddr *,
-  unsigned
+  uv_udp_t *socket,
+  ssize_t nread,
+  const uv_buf_t *buf,
+  const struct sockaddr *addr,
+  unsigned flags
 );
 
 static void
-after_poll(uv_poll_t *, int, int);
+after_poll(uv_poll_t *handle, int status, int events);
 
 static void
-after_resolve(void *, int32_t, struct ub_result *);
+after_resolve(void *data, int32_t status, struct ub_result *result);
 
 static void
-after_close(uv_handle_t *);
+after_close(uv_handle_t *handle);
 
 /*
  * Recursive NS
  */
 
 int32_t
-hsk_rs_init(hsk_rs_t *ns, uv_loop_t *loop, struct sockaddr *stub) {
+hsk_rs_init(hsk_rs_t *ns, const uv_loop_t *loop, const struct sockaddr *stub) {
   if (!ns || !loop)
     return HSK_EBADARGS;
 
@@ -100,7 +100,7 @@ hsk_rs_init(hsk_rs_t *ns, uv_loop_t *loop, struct sockaddr *stub) {
   if (!ec)
     goto fail;
 
-  ns->loop = loop;
+  ns->loop = (uv_loop_t *)loop;
   ns->ub = ub;
   ns->socket.data = (void *)ns;
   ns->poll.data = (void *)ns;
@@ -157,7 +157,7 @@ hsk_rs_uninit(hsk_rs_t *ns) {
 }
 
 bool
-hsk_rs_set_config(hsk_rs_t *ns, char *config) {
+hsk_rs_set_config(hsk_rs_t *ns, const char *config) {
   assert(ns);
 
   if (!config) {
@@ -178,7 +178,7 @@ hsk_rs_set_config(hsk_rs_t *ns, char *config) {
 }
 
 bool
-hsk_rs_set_key(hsk_rs_t *ns, uint8_t *key) {
+hsk_rs_set_key(hsk_rs_t *ns, const uint8_t *key) {
   assert(ns);
 
   if (!key) {
@@ -251,7 +251,7 @@ hsk_rs_inject_options(hsk_rs_t *ns) {
 }
 
 int32_t
-hsk_rs_open(hsk_rs_t *ns, struct sockaddr *addr) {
+hsk_rs_open(hsk_rs_t *ns, const struct sockaddr *addr) {
   if (!ns || !addr)
     return HSK_EBADARGS;
 
@@ -330,7 +330,7 @@ hsk_rs_close(hsk_rs_t *ns) {
 }
 
 hsk_rs_t *
-hsk_rs_alloc(uv_loop_t *loop, struct sockaddr *stub) {
+hsk_rs_alloc(const uv_loop_t *loop, const struct sockaddr *stub) {
   hsk_rs_t *ns = malloc(sizeof(hsk_rs_t));
 
   if (!ns)
@@ -381,9 +381,9 @@ hsk_rs_log(hsk_rs_t *ns, const char *fmt, ...) {
 static void
 hsk_rs_onrecv(
   hsk_rs_t *ns,
-  uint8_t *data,
+  const uint8_t *data,
   size_t data_len,
-  struct sockaddr *addr,
+  const struct sockaddr *addr,
   uint32_t flags
 ) {
   hsk_dns_req_t *req = hsk_dns_req_create(data, data_len, addr);
@@ -438,9 +438,9 @@ done:
 static void
 hsk_rs_respond(
   hsk_rs_t *ns,
-  hsk_dns_req_t *req,
+  const hsk_dns_req_t *req,
   int32_t status,
-  struct ub_result *result
+  const struct ub_result *result
 ) {
   hsk_dns_msg_t *msg = NULL;
   uint8_t *wire = NULL;
@@ -521,7 +521,7 @@ hsk_rs_send(
   hsk_rs_t *ns,
   uint8_t *data,
   size_t data_len,
-  struct sockaddr *addr,
+  const struct sockaddr *addr,
   bool should_free
 ) {
   int32_t rc = HSK_SUCCESS;

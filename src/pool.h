@@ -33,12 +33,12 @@
  */
 
 typedef void (*hsk_resolve_cb)(
-  char *name,
+  const char *name,
   int32_t status,
   bool exists,
-  uint8_t *data,
+  const uint8_t *data,
   size_t data_len,
-  void *arg
+  const void *arg
 );
 
 typedef struct hsk_name_req_s {
@@ -112,22 +112,22 @@ typedef struct hsk_pool_s {
  */
 
 int32_t
-hsk_pool_init(hsk_pool_t *pool, uv_loop_t *loop);
+hsk_pool_init(hsk_pool_t *pool, const uv_loop_t *loop);
 
 void
 hsk_pool_uninit(hsk_pool_t *pool);
 
 bool
-hsk_pool_set_key(hsk_pool_t *pool, uint8_t *key);
+hsk_pool_set_key(hsk_pool_t *pool, const uint8_t *key);
 
 bool
 hsk_pool_set_size(hsk_pool_t *pool, int32_t max_size);
 
 bool
-hsk_pool_set_seeds(hsk_pool_t *pool, char *seeds);
+hsk_pool_set_seeds(hsk_pool_t *pool, const char *seeds);
 
 hsk_pool_t *
-hsk_pool_alloc(uv_loop_t *loop);
+hsk_pool_alloc(const uv_loop_t *loop);
 
 void
 hsk_pool_free(hsk_pool_t *pool);
@@ -144,8 +144,8 @@ hsk_pool_destroy(hsk_pool_t *pool);
 int32_t
 hsk_pool_resolve(
   hsk_pool_t *pool,
-  char *name,
+  const char *name,
   hsk_resolve_cb callback,
-  void *arg
+  const void *arg
 );
 #endif

@@ -46,7 +46,7 @@ hsk_header_alloc(void) {
 }
 
 hsk_header_t *
-hsk_header_clone(hsk_header_t *hdr) {
+hsk_header_clone(const hsk_header_t *hdr) {
   if (!hdr)
     return NULL;
 
@@ -101,7 +101,7 @@ hsk_pow_to_target(uint32_t bits, uint8_t *target) {
 }
 
 bool
-hsk_pow_to_bits(uint8_t *target, uint32_t *bits) {
+hsk_pow_to_bits(const uint8_t *target, uint32_t *bits) {
   assert(target && bits);
 
   int32_t i;
@@ -149,7 +149,7 @@ hsk_pow_to_bits(uint8_t *target, uint32_t *bits) {
 }
 
 bool
-hsk_header_get_proof(hsk_header_t *hdr, uint8_t *proof) {
+hsk_header_get_proof(const hsk_header_t *hdr, uint8_t *proof) {
   uint8_t target[32];
 
   if (!hsk_pow_to_target(hdr->bits, target))
@@ -172,7 +172,7 @@ hsk_header_get_proof(hsk_header_t *hdr, uint8_t *proof) {
 }
 
 bool
-hsk_header_calc_work(hsk_header_t *hdr, hsk_header_t *prev) {
+hsk_header_calc_work(hsk_header_t *hdr, const hsk_header_t *prev) {
   if (!prev)
     return hsk_header_get_proof(hdr, hdr->work);
 
@@ -210,7 +210,7 @@ read_sol(uint8_t **data, size_t *data_len, uint32_t *sol, uint8_t sol_size) {
 }
 
 static size_t
-write_sol(uint8_t **data, uint32_t *sol, uint8_t sol_size) {
+write_sol(uint8_t **data, const uint32_t *sol, uint8_t sol_size) {
 #ifndef HSK_BIG_ENDIAN
   int32_t size = (int32_t)sol_size << 2;
   return write_bytes(data, (uint8_t *)sol, size);
@@ -223,7 +223,7 @@ write_sol(uint8_t **data, uint32_t *sol, uint8_t sol_size) {
 }
 
 static bool
-encode_sol(uint8_t *data, uint32_t *sol, uint8_t sol_size) {
+encode_sol(uint8_t *data, const uint32_t *sol, uint8_t sol_size) {
   return write_sol(&data, sol, sol_size);
 }
 
@@ -266,12 +266,12 @@ hsk_header_read(uint8_t **data, size_t *data_len, hsk_header_t *hdr) {
 }
 
 bool
-hsk_header_decode(uint8_t *data, size_t data_len, hsk_header_t *hdr) {
-  return hsk_header_read(&data, &data_len, hdr);
+hsk_header_decode(const uint8_t *data, size_t data_len, hsk_header_t *hdr) {
+  return hsk_header_read((uint8_t **)&data, &data_len, hdr);
 }
 
 int32_t
-hsk_header_write(hsk_header_t *hdr, uint8_t **data) {
+hsk_header_write(const hsk_header_t *hdr, uint8_t **data) {
   int32_t s = 0;
   s += write_u32(data, hdr->version);
   s += write_bytes(data, hdr->prev_block, 32);
@@ -287,17 +287,17 @@ hsk_header_write(hsk_header_t *hdr, uint8_t **data) {
 }
 
 int32_t
-hsk_header_size(hsk_header_t *hdr) {
+hsk_header_size(const hsk_header_t *hdr) {
   return hsk_header_write(hdr, NULL);
 }
 
 int32_t
-hsk_encode_header(hsk_header_t *hdr, uint8_t *data) {
+hsk_encode_header(const hsk_header_t *hdr, uint8_t *data) {
   return hsk_header_write(hdr, &data);
 }
 
 int32_t
-hsk_header_write_pre(hsk_header_t *hdr, uint8_t **data) {
+hsk_header_write_pre(const hsk_header_t *hdr, uint8_t **data) {
   int32_t s = 0;
   s += write_u32(data, hdr->version);
   s += write_bytes(data, hdr->prev_block, 32);
@@ -311,12 +311,12 @@ hsk_header_write_pre(hsk_header_t *hdr, uint8_t **data) {
 }
 
 int32_t
-hsk_header_size_pre(hsk_header_t *hdr) {
+hsk_header_size_pre(const hsk_header_t *hdr) {
   return hsk_header_write_pre(hdr, NULL);
 }
 
 int32_t
-hsk_header_encode_pre(hsk_header_t *hdr, uint8_t *data) {
+hsk_header_encode_pre(const hsk_header_t *hdr, uint8_t *data) {
   return hsk_header_write_pre(hdr, &data);
 }
 
@@ -346,7 +346,7 @@ hsk_header_hash(hsk_header_t *hdr, uint8_t *hash) {
 }
 
 void
-hsk_header_hash_pre(hsk_header_t *hdr, uint8_t *hash) {
+hsk_header_hash_pre(const hsk_header_t *hdr, uint8_t *hash) {
   int32_t size = hsk_header_size_pre(hdr);
   uint8_t raw[size];
 
@@ -355,7 +355,7 @@ hsk_header_hash_pre(hsk_header_t *hdr, uint8_t *hash) {
 }
 
 void
-hsk_header_hash_sol(hsk_header_t *hdr, uint8_t *hash) {
+hsk_header_hash_sol(const hsk_header_t *hdr, uint8_t *hash) {
   int32_t size = (int32_t)hdr->sol_size << 2;
   uint8_t raw[size];
   encode_sol(raw, hdr->sol, hdr->sol_size);
@@ -363,7 +363,7 @@ hsk_header_hash_sol(hsk_header_t *hdr, uint8_t *hash) {
 }
 
 int32_t
-hsk_header_verify_pow(hsk_header_t *hdr) {
+hsk_header_verify_pow(const hsk_header_t *hdr) {
   uint8_t target[32];
 
   if (!hsk_pow_to_target(hdr->bits, target))
@@ -397,11 +397,8 @@ hsk_header_verify_pow(hsk_header_t *hdr) {
 }
 
 void
-hsk_header_print(hsk_header_t *hdr, char *prefix) {
+hsk_header_print(hsk_header_t *hdr, const char *prefix) {
   assert(hdr);
-
-  if (!prefix)
-    prefix = "";
 
   char hash[65];
   char work[65];

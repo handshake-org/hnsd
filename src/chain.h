@@ -30,38 +30,42 @@ typedef struct hsk_chain_s {
  */
 
 int32_t
-hsk_chain_init(hsk_chain_t *chain, hsk_timedata_t *td);
+hsk_chain_init(hsk_chain_t *chain, const hsk_timedata_t *td);
 
 void
 hsk_chain_uninit(hsk_chain_t *chain);
 
 hsk_chain_t *
-hsk_chain_alloc(hsk_timedata_t *td);
+hsk_chain_alloc(const hsk_timedata_t *td);
 
 void
 hsk_chain_free(hsk_chain_t *chain);
 
 bool
-hsk_chain_has(hsk_chain_t *chain, uint8_t *hash);
+hsk_chain_has(const hsk_chain_t *chain, const uint8_t *hash);
 
 hsk_header_t *
-hsk_chain_get(hsk_chain_t *chain, uint8_t *hash);
+hsk_chain_get(const hsk_chain_t *chain, const uint8_t *hash);
 
 hsk_header_t *
-hsk_chain_get_by_height(hsk_chain_t *chain, int32_t height);
+hsk_chain_get_by_height(const hsk_chain_t *chain, int32_t height);
 
 bool
-hsk_chain_has_orphan(hsk_chain_t *chain, uint8_t *hash);
+hsk_chain_has_orphan(const hsk_chain_t *chain, const uint8_t *hash);
 
 hsk_header_t *
-hsk_chain_get_orphan(hsk_chain_t *chain, uint8_t *hash);
+hsk_chain_get_orphan(const hsk_chain_t *chain, const uint8_t *hash);
 
 hsk_header_t *
-hsk_chain_get_ancestor(hsk_chain_t *chain, hsk_header_t *hdr, int32_t height);
+hsk_chain_get_ancestor(
+  const hsk_chain_t *chain,
+  const hsk_header_t *hdr,
+  int32_t height
+);
 
 bool
-hsk_chain_synced(hsk_chain_t *chain);
+hsk_chain_synced(const hsk_chain_t *chain);
 
 int32_t
-hsk_chain_add(hsk_chain_t *chain, hsk_header_t *h);
+hsk_chain_add(hsk_chain_t *chain, const hsk_header_t *h);
 #endif

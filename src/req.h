@@ -48,17 +48,21 @@ void
 hsk_dns_req_free(hsk_dns_req_t *req);
 
 hsk_dns_req_t *
-hsk_dns_req_create(uint8_t *data, size_t data_len, struct sockaddr *addr);
+hsk_dns_req_create(
+  const uint8_t *data,
+  size_t data_len,
+  const struct sockaddr *addr
+);
 
 void
-hsk_dns_req_print(hsk_dns_req_t *req, char *prefix);
+hsk_dns_req_print(const hsk_dns_req_t *req, const char *prefix);
 
 bool
 hsk_dns_msg_finalize(
   hsk_dns_msg_t **res,
-  hsk_dns_req_t *req,
-  hsk_ec_t *ec,
-  uint8_t *key,
+  const hsk_dns_req_t *req,
+  const hsk_ec_t *ec,
+  const uint8_t *key,
   uint8_t **wire,
   size_t *wire_len
 );

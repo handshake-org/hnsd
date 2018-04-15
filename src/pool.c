@@ -40,87 +40,96 @@ typedef struct hsk_write_data_s {
 } hsk_write_data_t;
 
 /*
- * Templates
+ * Prototypes
  */
 
 static hsk_peer_t *
-hsk_peer_alloc(hsk_pool_t *);
+hsk_peer_alloc(hsk_pool_t *pool);
 
 static void
-hsk_peer_free(hsk_peer_t *);
+hsk_peer_free(hsk_peer_t *peer);
 
 static void
 hsk_pool_log(hsk_pool_t *pool, const char *fmt, ...);
 
 static int32_t
-hsk_pool_refill(hsk_pool_t *);
+hsk_pool_refill(hsk_pool_t *pool);
 
 static void
-hsk_peer_push(hsk_peer_t *);
+hsk_peer_push(hsk_peer_t *peer);
 
 static int32_t
-hsk_peer_open(hsk_peer_t *, hsk_addr_t *addr);
+hsk_peer_open(hsk_peer_t *peer, const hsk_addr_t *addr);
 
 static int32_t
-hsk_peer_close(hsk_peer_t *);
+hsk_peer_close(hsk_peer_t *peer);
 
 static void
-hsk_peer_log(hsk_peer_t *, const char *, ...);
+hsk_peer_log(hsk_peer_t *peer, const char *fmt, ...);
 
 static void
-hsk_peer_remove(hsk_peer_t *);
+hsk_peer_remove(hsk_peer_t *peer);
 
 static int32_t
-hsk_peer_destroy(hsk_peer_t *);
+hsk_peer_destroy(hsk_peer_t *peer);
 
 static int32_t
-hsk_peer_parse(hsk_peer_t *, uint8_t *, size_t);
+hsk_peer_parse(hsk_peer_t * peer, const uint8_t *msg, size_t msg_len);
 
 static int32_t
-hsk_peer_send_ping(hsk_peer_t *, uint64_t);
+hsk_peer_send_ping(hsk_peer_t *peer, uint64_t nonce);
 
 static int32_t
-hsk_peer_send_getheaders(hsk_peer_t *, uint8_t *);
+hsk_peer_send_getheaders(hsk_peer_t *peer, const uint8_t *stop);
 
 static int32_t
-hsk_peer_send_getproof(hsk_peer_t *, uint8_t *, uint8_t *);
+hsk_peer_send_getproof(
+  hsk_peer_t *,
+  const uint8_t *name_hash,
+  const uint8_t *root
+);
 
 static void
-on_connect(uv_connect_t *, int);
+on_connect(uv_connect_t *conn, int status);
 
 static void
-alloc_buffer(uv_handle_t *, size_t, uv_buf_t *);
+alloc_buffer(uv_handle_t *handle, size_t size, uv_buf_t *buf);
 
 static void
-after_write(uv_write_t *, int);
+after_write(uv_write_t *req, int status);
 
 static void
-after_read(uv_stream_t *, long int, const uv_buf_t *);
+after_read(uv_stream_t *stream, long int nread, const uv_buf_t *buf);
 
 static void
-after_close(uv_handle_t *);
+after_close(uv_handle_t *handle);
 
 static void
-after_timer(uv_timer_t *);
+after_timer(uv_timer_t *timer);
 
 void
 hsk_chain_get_locator(hsk_chain_t *chain, hsk_getheaders_msg_t *msg);
 
 static void
-after_brontide_connect(void *arg);
+after_brontide_connect(const void *arg);
 
 static void
-after_brontide_read(void *arg, uint8_t *data, size_t data_len);
+after_brontide_read(const void *arg, const uint8_t *data, size_t data_len);
 
 static int32_t
-brontide_do_write(void *arg, uint8_t *data, size_t data_len, bool is_heap);
+brontide_do_write(
+  const void *arg,
+  const uint8_t *data,
+  size_t data_len,
+  bool is_heap
+);
 
 /*
  * Pool
  */
 
 int32_t
-hsk_pool_init(hsk_pool_t *pool, uv_loop_t *loop) {
+hsk_pool_init(hsk_pool_t *pool, const uv_loop_t *loop) {
   if (!pool || !loop)
     return HSK_EBADARGS;
 
@@ -135,7 +144,7 @@ hsk_pool_init(hsk_pool_t *pool, uv_loop_t *loop) {
   if (!hsk_ec_create_pubkey(ec, pool->key_, pool->pubkey))
     return HSK_EFAILURE;
 
-  pool->loop = loop;
+  pool->loop = (uv_loop_t *)loop;
   pool->ec = ec;
   pool->key = &pool->key_[0];
   hsk_timedata_init(&pool->td);
@@ -187,7 +196,7 @@ hsk_pool_uninit(hsk_pool_t *pool) {
 }
 
 bool
-hsk_pool_set_key(hsk_pool_t *pool, uint8_t *key) {
+hsk_pool_set_key(hsk_pool_t *pool, const uint8_t *key) {
   assert(pool);
 
   if (!key) {
@@ -219,7 +228,7 @@ hsk_pool_set_size(hsk_pool_t *pool, int32_t max_size) {
 }
 
 bool
-hsk_pool_set_seeds(hsk_pool_t *pool, char *seeds) {
+hsk_pool_set_seeds(hsk_pool_t *pool, const char *seeds) {
   assert(pool);
 
   if (!seeds)
@@ -264,7 +273,7 @@ hsk_pool_set_seeds(hsk_pool_t *pool, char *seeds) {
 }
 
 hsk_pool_t *
-hsk_pool_alloc(uv_loop_t *loop) {
+hsk_pool_alloc(const uv_loop_t *loop) {
   hsk_pool_t *pool = malloc(sizeof(hsk_pool_t));
 
   if (!pool)
@@ -383,7 +392,7 @@ hsk_pool_refill(hsk_pool_t *pool) {
 }
 
 static hsk_peer_t *
-hsk_pool_pick_prover(hsk_pool_t *pool, uint8_t *name_hash) {
+hsk_pool_pick_prover(hsk_pool_t *pool, const uint8_t *name_hash) {
   hsk_peer_t *first_best = pool->head;
   hsk_peer_t *second_best = NULL;
   hsk_peer_t *deterministic = NULL;
@@ -440,9 +449,9 @@ hsk_pool_pick_prover(hsk_pool_t *pool, uint8_t *name_hash) {
 int32_t
 hsk_pool_resolve(
   hsk_pool_t *pool,
-  char *name,
+  const char *name,
   hsk_resolve_cb callback,
-  void *arg
+  const void *arg
 ) {
   hsk_pool_log(pool, "sending proof request for: %s.\n", name);
 
@@ -464,7 +473,7 @@ hsk_pool_resolve(
   memcpy(req->root, root, 32);
 
   req->callback = callback;
-  req->arg = arg;
+  req->arg = (void *)arg;
   req->time = hsk_now();
   req->next = NULL;
 
@@ -855,7 +864,7 @@ hsk_peer_free(hsk_peer_t *peer) {
 }
 
 static int32_t
-hsk_peer_open(hsk_peer_t *peer, hsk_addr_t *addr) {
+hsk_peer_open(hsk_peer_t *peer, const hsk_addr_t *addr) {
   assert(peer && addr);
   assert(peer->pool && peer->loop && peer->state == HSK_STATE_DISCONNECTED);
 
@@ -1088,7 +1097,7 @@ fail:
 }
 
 static int32_t
-hsk_peer_send(hsk_peer_t *peer, hsk_msg_t *msg) {
+hsk_peer_send(hsk_peer_t *peer, const hsk_msg_t *msg) {
   int32_t msg_size = hsk_msg_size(msg);
   assert(msg_size != -1);
 
@@ -1126,7 +1135,7 @@ hsk_peer_send_version(hsk_peer_t *peer) {
   msg.services = HSK_SERVICES;
   msg.time = hsk_timedata_now(&pool->td);
 
-  hsk_addrentry_t *entry = hsk_addrman_get(&pool->am, &peer->addr);
+  const hsk_addrentry_t *entry = hsk_addrman_get(&pool->am, &peer->addr);
 
   if (entry) {
     msg.remote.time = entry->time;
@@ -1175,7 +1184,7 @@ hsk_peer_send_sendheaders(hsk_peer_t *peer) {
 }
 
 static int32_t
-hsk_peer_send_getheaders(hsk_peer_t *peer, uint8_t *stop) {
+hsk_peer_send_getheaders(hsk_peer_t *peer, const uint8_t *stop) {
   hsk_getheaders_msg_t msg = { .cmd = HSK_MSG_GETHEADERS };
 
   hsk_msg_init((hsk_msg_t *)&msg);
@@ -1191,7 +1200,11 @@ hsk_peer_send_getheaders(hsk_peer_t *peer, uint8_t *stop) {
 }
 
 static int32_t
-hsk_peer_send_getproof(hsk_peer_t *peer, uint8_t *name_hash, uint8_t *root) {
+hsk_peer_send_getproof(
+  hsk_peer_t *peer,
+  const uint8_t *name_hash,
+  const uint8_t *root
+) {
   hsk_getproof_msg_t msg = { .cmd = HSK_MSG_GETPROOF };
   hsk_msg_init((hsk_msg_t *)&msg);
 
@@ -1202,7 +1215,7 @@ hsk_peer_send_getproof(hsk_peer_t *peer, uint8_t *name_hash, uint8_t *root) {
 }
 
 static int32_t
-hsk_peer_handle_version(hsk_peer_t *peer, hsk_version_msg_t *msg) {
+hsk_peer_handle_version(hsk_peer_t *peer, const hsk_version_msg_t *msg) {
   hsk_pool_t *pool = (hsk_pool_t *)peer->pool;
 
   hsk_peer_log(peer, "received version: %s (%u)\n", msg->agent, msg->height);
@@ -1215,7 +1228,7 @@ hsk_peer_handle_version(hsk_peer_t *peer, hsk_version_msg_t *msg) {
 }
 
 static int32_t
-hsk_peer_handle_verack(hsk_peer_t *peer, hsk_verack_msg_t *msg) {
+hsk_peer_handle_verack(hsk_peer_t *peer, const hsk_verack_msg_t *msg) {
   peer->version_time = 0;
 
   int32_t rc = hsk_peer_send_sendheaders(peer);
@@ -1227,12 +1240,12 @@ hsk_peer_handle_verack(hsk_peer_t *peer, hsk_verack_msg_t *msg) {
 }
 
 static int32_t
-hsk_peer_handle_ping(hsk_peer_t *peer, hsk_ping_msg_t *msg) {
+hsk_peer_handle_ping(hsk_peer_t *peer, const hsk_ping_msg_t *msg) {
   return hsk_peer_send_pong(peer, msg->nonce);
 }
 
 static int32_t
-hsk_peer_handle_pong(hsk_peer_t *peer, hsk_pong_msg_t *msg) {
+hsk_peer_handle_pong(hsk_peer_t *peer, const hsk_pong_msg_t *msg) {
   if (!peer->challenge) {
     hsk_peer_log(peer, "peer sent an unsolicited pong\n");
     return HSK_SUCCESS;
@@ -1304,7 +1317,7 @@ hsk_peer_handle_addr(hsk_peer_t *peer, hsk_addr_msg_t *msg) {
 }
 
 static int32_t
-hsk_peer_handle_headers(hsk_peer_t *peer, hsk_headers_msg_t *msg) {
+hsk_peer_handle_headers(hsk_peer_t *peer, const hsk_headers_msg_t *msg) {
   hsk_pool_t *pool = (hsk_pool_t *)peer->pool;
 
   hsk_peer_log(peer, "received %u headers\n", msg->header_count);
@@ -1391,7 +1404,7 @@ hsk_peer_handle_headers(hsk_peer_t *peer, hsk_headers_msg_t *msg) {
 }
 
 static int32_t
-hsk_peer_handle_proof(hsk_peer_t *peer, hsk_proof_msg_t *msg) {
+hsk_peer_handle_proof(hsk_peer_t *peer, const hsk_proof_msg_t *msg) {
   hsk_peer_log(peer, "received proof: %s\n", hsk_hex_encode32(msg->key));
 
   hsk_name_req_t *reqs = hsk_map_get(&peer->names, msg->key);
@@ -1455,7 +1468,7 @@ hsk_peer_handle_proof(hsk_peer_t *peer, hsk_proof_msg_t *msg) {
 }
 
 static int32_t
-hsk_peer_handle_msg(hsk_peer_t *peer, hsk_msg_t *msg) {
+hsk_peer_handle_msg(hsk_peer_t *peer, const hsk_msg_t *msg) {
   hsk_peer_log(peer, "handling msg: %s\n", hsk_msg_str(msg->cmd));
 
   switch (msg->cmd) {
@@ -1504,7 +1517,7 @@ hsk_peer_handle_msg(hsk_peer_t *peer, hsk_msg_t *msg) {
 }
 
 static void
-hsk_peer_on_read(hsk_peer_t *peer, uint8_t *data, size_t data_len) {
+hsk_peer_on_read(hsk_peer_t *peer, const uint8_t *data, size_t data_len) {
   if (peer->state != HSK_STATE_HANDSHAKE)
     return;
 
@@ -1523,10 +1536,11 @@ hsk_peer_on_read(hsk_peer_t *peer, uint8_t *data, size_t data_len) {
 }
 
 static int32_t
-hsk_peer_parse_hdr(hsk_peer_t *peer, uint8_t *msg, size_t msg_len) {
+hsk_peer_parse_hdr(hsk_peer_t *peer, const uint8_t *msg, size_t msg_len) {
   uint32_t magic;
+  uint8_t *ms = (uint8_t *)msg;
 
-  if (!read_u32(&msg, &msg_len, &magic)) {
+  if (!read_u32(&ms, &msg_len, &magic)) {
     hsk_peer_log(peer, "invalid header\n");
     return HSK_EENCODING;
   }
@@ -1538,7 +1552,7 @@ hsk_peer_parse_hdr(hsk_peer_t *peer, uint8_t *msg, size_t msg_len) {
 
   uint8_t cmd;
 
-  if (!read_u8(&msg, &msg_len, &cmd)) {
+  if (!read_u8(&ms, &msg_len, &cmd)) {
     hsk_peer_log(peer, "invalid command\n");
     return HSK_EENCODING;
   }
@@ -1547,7 +1561,7 @@ hsk_peer_parse_hdr(hsk_peer_t *peer, uint8_t *msg, size_t msg_len) {
 
   uint32_t size;
 
-  if (!read_u32(&msg, &msg_len, &size)) {
+  if (!read_u32(&ms, &msg_len, &size)) {
     hsk_peer_log(peer, "invalid header: %s\n", str);
     return HSK_EENCODING;
   }
@@ -1557,13 +1571,13 @@ hsk_peer_parse_hdr(hsk_peer_t *peer, uint8_t *msg, size_t msg_len) {
     return HSK_EENCODING;
   }
 
-  msg = realloc(peer->msg, size);
+  uint8_t *slab = realloc(peer->msg, size);
 
-  if (!msg && size != 0)
+  if (!slab && size != 0)
     return HSK_ENOMEM;
 
   peer->msg_hdr = true;
-  peer->msg = msg;
+  peer->msg = slab;
   peer->msg_pos = 0;
   peer->msg_len = size;
   peer->msg_cmd = cmd;
@@ -1575,7 +1589,7 @@ hsk_peer_parse_hdr(hsk_peer_t *peer, uint8_t *msg, size_t msg_len) {
 }
 
 static int32_t
-hsk_peer_parse(hsk_peer_t *peer, uint8_t *msg, size_t msg_len) {
+hsk_peer_parse(hsk_peer_t *peer, const uint8_t *msg, size_t msg_len) {
   if (!peer->msg_hdr)
     return hsk_peer_parse_hdr(peer, msg, msg_len);
 
@@ -1604,14 +1618,14 @@ hsk_peer_parse(hsk_peer_t *peer, uint8_t *msg, size_t msg_len) {
   rc = hsk_peer_handle_msg(peer, m);
   hsk_msg_free(m);
 
-done:
-  msg = realloc(peer->msg, 9);
+done: ;
+  uint8_t *slab = realloc(peer->msg, 9);
 
-  if (!msg)
+  if (!slab)
     return HSK_ENOMEM;
 
   peer->msg_hdr = false;
-  peer->msg = msg;
+  peer->msg = slab;
   peer->msg_pos = 0;
   peer->msg_len = 9;
   peer->msg_cmd = 0;
@@ -1624,7 +1638,7 @@ done:
  */
 
 static void
-on_connect(uv_connect_t *conn, int32_t status) {
+on_connect(uv_connect_t *conn, int status) {
   uv_tcp_t *socket = (uv_tcp_t *)conn->handle;
   free(conn);
 
@@ -1663,7 +1677,7 @@ on_connect(uv_connect_t *conn, int32_t status) {
 }
 
 static void
-after_write(uv_write_t *req, int32_t status) {
+after_write(uv_write_t *req, int status) {
   hsk_write_data_t *wd = (hsk_write_data_t *)req->data;
   hsk_peer_t *peer = wd->peer;
 
@@ -1743,7 +1757,7 @@ after_timer(uv_timer_t *timer) {
 }
 
 static void
-after_brontide_connect(void *arg) {
+after_brontide_connect(const void *arg) {
   hsk_peer_t *peer = (hsk_peer_t *)arg;
   hsk_pool_t *pool = (hsk_pool_t *)peer->pool;
 
@@ -1758,13 +1772,18 @@ after_brontide_connect(void *arg) {
 }
 
 static void
-after_brontide_read(void *arg, uint8_t *data, size_t data_len) {
+after_brontide_read(const void *arg, const uint8_t *data, size_t data_len) {
   hsk_peer_t *peer = (hsk_peer_t *)arg;
   hsk_peer_on_read(peer, data, data_len);
 }
 
 static int32_t
-brontide_do_write(void *arg, uint8_t *data, size_t data_len, bool is_heap) {
+brontide_do_write(
+  const void *arg,
+  const uint8_t *data,
+  size_t data_len,
+  bool is_heap
+) {
   hsk_peer_t *peer = (hsk_peer_t *)arg;
 
   if (!is_heap) {
@@ -1777,5 +1796,5 @@ brontide_do_write(void *arg, uint8_t *data, size_t data_len, bool is_heap) {
     data = buf;
   }
 
-  return hsk_peer_write_raw(peer, data, data_len, true);
+  return hsk_peer_write_raw(peer, (uint8_t *)data, data_len, true);
 }

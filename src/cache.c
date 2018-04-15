@@ -46,7 +46,7 @@ hsk_cache_free(hsk_cache_t *c) {
 }
 
 static void
-hsk_cache_log(hsk_cache_t *c, const char *fmt, ...) {
+hsk_cache_log(const hsk_cache_t *c, const char *fmt, ...) {
   assert(c);
   printf("cache: ");
 
@@ -65,7 +65,7 @@ hsk_cache_prune(hsk_cache_t *c) {
 bool
 hsk_cache_insert_data(
   hsk_cache_t *c,
-  char *name,
+  const char *name,
   uint16_t type,
   uint8_t *wire,
   size_t wire_len
@@ -114,7 +114,11 @@ hsk_cache_insert_data(
 }
 
 bool
-hsk_cache_insert(hsk_cache_t *c, hsk_dns_req_t *req, hsk_dns_msg_t *msg) {
+hsk_cache_insert(
+  hsk_cache_t *c,
+  const hsk_dns_req_t *req,
+  const hsk_dns_msg_t *msg
+) {
   uint8_t *wire;
   size_t wire_len;
 
@@ -134,7 +138,7 @@ hsk_cache_insert(hsk_cache_t *c, hsk_dns_req_t *req, hsk_dns_msg_t *msg) {
 bool
 hsk_cache_get_data(
   hsk_cache_t *c,
-  char *name,
+  const char *name,
   uint16_t type,
   uint8_t **wire,
   size_t *wire_len
@@ -165,7 +169,7 @@ hsk_cache_get_data(
 }
 
 hsk_dns_msg_t *
-hsk_cache_get(hsk_cache_t *c, hsk_dns_req_t *req) {
+hsk_cache_get(hsk_cache_t *c, const hsk_dns_req_t *req) {
   uint8_t *data;
   size_t data_len;
   hsk_dns_msg_t *msg;
@@ -213,14 +217,14 @@ hsk_cache_key_free(hsk_cache_key_t *ck) {
 }
 
 uint32_t
-hsk_cache_key_hash(void *key) {
+hsk_cache_key_hash(const void *key) {
   hsk_cache_key_t *ck = (hsk_cache_key_t *)key;
   assert(ck);
   return hsk_map_tweak3(ck->name, ck->name_len, ck->ref ? 2 : 1, ck->type);
 }
 
 bool
-hsk_cache_key_equal(void *a, void *b) {
+hsk_cache_key_equal(const void *a, const void *b) {
   assert(a && b);
 
   hsk_cache_key_t *x = (hsk_cache_key_t *)a;
@@ -242,7 +246,7 @@ hsk_cache_key_equal(void *a, void *b) {
 }
 
 bool
-hsk_cache_key_set(hsk_cache_key_t *ck, char *name, uint16_t type) {
+hsk_cache_key_set(hsk_cache_key_t *ck, const char *name, uint16_t type) {
   assert(ck);
 
   if (!hsk_dns_name_verify(name))

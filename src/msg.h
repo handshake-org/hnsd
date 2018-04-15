@@ -95,7 +95,7 @@ typedef struct {
 } hsk_proof_msg_t;
 
 uint8_t
-hsk_msg_cmd(char *cmd);
+hsk_msg_cmd(const char *cmd);
 
 const char *
 hsk_msg_str(uint8_t cmd);
@@ -113,14 +113,14 @@ bool
 hsk_msg_read(uint8_t **data, size_t *data_len, hsk_msg_t *msg);
 
 int32_t
-hsk_msg_write(hsk_msg_t *msg, uint8_t **data);
+hsk_msg_write(const hsk_msg_t *msg, uint8_t **data);
 
 bool
-hsk_msg_decode(uint8_t *data, size_t data_len, hsk_msg_t *msg);
+hsk_msg_decode(const uint8_t *data, size_t data_len, hsk_msg_t *msg);
 
 int32_t
-hsk_msg_encode(hsk_msg_t *msg, uint8_t *data);
+hsk_msg_encode(const hsk_msg_t *msg, uint8_t *data);
 
 int32_t
-hsk_msg_size(hsk_msg_t *msg);
+hsk_msg_size(const hsk_msg_t *msg);
 #endif

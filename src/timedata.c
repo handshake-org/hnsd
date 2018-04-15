@@ -95,7 +95,7 @@ hsk_timedata_insert(hsk_timedata_t *td, int64_t sample) {
 }
 
 int32_t
-hsk_timedata_add(hsk_timedata_t *td, hsk_addr_t *addr, int64_t time) {
+hsk_timedata_add(hsk_timedata_t *td, const hsk_addr_t *addr, int64_t time) {
   if (td->sample_len >= HSK_TIMEDATA_LIMIT)
     return HSK_SUCCESS;
 

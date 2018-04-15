@@ -49,9 +49,9 @@ typedef struct {
 
 int32_t
 hsk_proof_verify(
-  uint8_t *root,
-  uint8_t *key,
-  hsk_raw_node_t *nodes,
+  const uint8_t *root,
+  const uint8_t *key,
+  const hsk_raw_node_t *nodes,
   bool *exists,
   uint8_t **data,
   size_t *data_len

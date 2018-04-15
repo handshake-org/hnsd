@@ -31,7 +31,7 @@ void
 hsk_timedata_free(hsk_timedata_t *td);
 
 int32_t
-hsk_timedata_add(hsk_timedata_t *td, hsk_addr_t *addr, int64_t time);
+hsk_timedata_add(hsk_timedata_t *td, const hsk_addr_t *addr, int64_t time);
 
 int64_t
 hsk_timedata_now(hsk_timedata_t *td);

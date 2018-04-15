@@ -208,7 +208,7 @@ hsk_map_reset(hsk_map_t *map) {
 }
 
 uint32_t
-hsk_map_lookup(hsk_map_t *map, void *key) {
+hsk_map_lookup(const hsk_map_t *map, const void *key) {
   if (map->n_buckets == 0)
     return 0;
 
@@ -487,7 +487,7 @@ hsk_map_set(hsk_map_t *map, void *key, void *value) {
 }
 
 void *
-hsk_map_get(hsk_map_t *map, void *key) {
+hsk_map_get(const hsk_map_t *map, const void *key) {
   uint32_t k = hsk_map_lookup(map, key);
 
   if (k == map->n_buckets)
@@ -500,7 +500,7 @@ hsk_map_get(hsk_map_t *map, void *key) {
 }
 
 bool
-hsk_map_has(hsk_map_t *map, void *key) {
+hsk_map_has(const hsk_map_t *map, const void *key) {
   uint32_t k = hsk_map_lookup(map, key);
 
   if (k == map->n_buckets)
@@ -513,7 +513,7 @@ hsk_map_has(hsk_map_t *map, void *key) {
 }
 
 bool
-hsk_map_del(hsk_map_t *map, void *key) {
+hsk_map_del(hsk_map_t *map, const void *key) {
   uint32_t k = hsk_map_lookup(map, key);
 
   if (k == map->n_buckets)
@@ -528,7 +528,7 @@ hsk_map_del(hsk_map_t *map, void *key) {
 }
 
 uint32_t
-hsk_map_hash_str(void *key) {
+hsk_map_hash_str(const void *key) {
   char *s = (char *)key;
 
   uint32_t hash = 5381;
@@ -540,12 +540,12 @@ hsk_map_hash_str(void *key) {
 }
 
 bool
-hsk_map_equal_str(void *a, void *b) {
+hsk_map_equal_str(const void *a, const void *b) {
   return strcmp((const char *)a, (const char *)b) == 0;
 }
 
 uint32_t
-hsk_map_hash_int(void *key) {
+hsk_map_hash_int(const void *key) {
   uint32_t hash = *((uint32_t *)key);
   hash += ~(hash << 15);
   hash ^= (hash >> 10);
@@ -557,23 +557,23 @@ hsk_map_hash_int(void *key) {
 }
 
 bool
-hsk_map_equal_int(void *a, void *b) {
+hsk_map_equal_int(const void *a, const void *b) {
   return *((uint32_t *)a) == *((uint32_t *)b);
 }
 
 uint32_t
-hsk_map_hash_hash(void *key) {
-  uint8_t *data = (uint8_t *)key;
+hsk_map_hash_hash(const void *key) {
+  const uint8_t *data = (const uint8_t *)key;
   return hsk_map_murmur3(data, 32, 0xfba4c795);
 }
 
 bool
-hsk_map_equal_hash(void *a, void *b) {
+hsk_map_equal_hash(const void *a, const void *b) {
   return memcmp(a, b, 32) == 0;
 }
 
 uint32_t
-hsk_map_murmur3(uint8_t *data, size_t data_len, uint32_t seed) {
+hsk_map_murmur3(const uint8_t *data, size_t data_len, uint32_t seed) {
   const uint32_t c1 = 0xcc9e2d51;
   const uint32_t c2 = 0x1b873593;
 
@@ -626,7 +626,12 @@ hsk_map_murmur3(uint8_t *data, size_t data_len, uint32_t seed) {
 }
 
 uint32_t
-hsk_map_tweak3(uint8_t *data, size_t data_len, uint32_t n, uint32_t tweak) {
+hsk_map_tweak3(
+  const uint8_t *data,
+  size_t data_len,
+  uint32_t n,
+  uint32_t tweak
+) {
   uint32_t seed = (n * 0xfba4c795) + tweak;
   return hsk_map_murmur3(data, data_len, seed);
 }

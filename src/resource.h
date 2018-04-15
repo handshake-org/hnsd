@@ -174,19 +174,23 @@ void
 hsk_resource_free(hsk_resource_t *res);
 
 bool
-hsk_resource_decode(uint8_t *data, size_t data_len, hsk_resource_t **res);
+hsk_resource_decode(
+  const uint8_t *data,
+  size_t data_len,
+  hsk_resource_t **res
+);
 
-hsk_record_t *
-hsk_resource_get(hsk_resource_t *res, uint8_t type);
+const hsk_record_t *
+hsk_resource_get(const hsk_resource_t *res, uint8_t type);
 
 bool
-hsk_resource_has(hsk_resource_t *res, uint8_t type);
+hsk_resource_has(const hsk_resource_t *res, uint8_t type);
 
 hsk_dns_msg_t *
-hsk_resource_to_dns(hsk_resource_t *rs, char *fqdn, uint16_t type);
+hsk_resource_to_dns(const hsk_resource_t *rs, const char *name, uint16_t type);
 
 hsk_dns_msg_t *
-hsk_resource_root(uint16_t type, hsk_addr_t *addr);
+hsk_resource_root(uint16_t type, const hsk_addr_t *addr);
 
 hsk_dns_msg_t *
 hsk_resource_to_nx(void);
@@ -195,5 +199,5 @@ hsk_dns_msg_t *
 hsk_resource_to_servfail(void);
 
 bool
-hsk_resource_is_ptr(char *name);
+hsk_resource_is_ptr(const char *name);
 #endif

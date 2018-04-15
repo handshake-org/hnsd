@@ -29,7 +29,7 @@ typedef struct {
   uint32_t schedule[16];
   uint32_t keystream[16];
   size_t available;
-  uint8_t iv_size;
+  uint8_t nonce_size;
 } hsk_chacha20_ctx;
 
 void
@@ -37,15 +37,19 @@ hsk_chacha20_setup(
   hsk_chacha20_ctx *ctx,
   const uint8_t *key,
   size_t length,
-  uint8_t *nonce,
-  uint8_t iv_size
+  const uint8_t *nonce,
+  uint8_t nonce_size
 );
 
 void
 hsk_chacha20_keysetup(hsk_chacha20_ctx *ctx, const uint8_t *key, size_t length);
 
 void
-hsk_chacha20_ivsetup(hsk_chacha20_ctx *ctx, uint8_t *nonce, uint8_t iv_size);
+hsk_chacha20_ivsetup(
+  hsk_chacha20_ctx *ctx,
+  const uint8_t *nonce,
+  uint8_t nonce_size
+);
 
 void
 hsk_chacha20_counter_set(hsk_chacha20_ctx *ctx, uint64_t counter);
