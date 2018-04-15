@@ -20,8 +20,8 @@ to_nibbles(const uint8_t *data, size_t data_len, uint8_t *nib, size_t nib_len) {
   if (nib_len < l)
     return false;
 
-  int32_t j = 0;
-  int32_t i;
+  int j = 0;
+  int i;
 
   for (i = 0; i < data_len; i++) {
     uint8_t b = data[i];
@@ -56,8 +56,8 @@ decompress(
   if (!to_nibbles(data, data_len, nib, nib_len))
     return false;
 
-  int32_t pos = 2;
-  int32_t len = nib_len - 1;
+  int pos = 2;
+  int len = nib_len - 1;
 
   if (*nib & 1)
     pos = 1;
@@ -65,7 +65,7 @@ decompress(
   if (*nib & 2)
     len += 1;
 
-  int32_t i;
+  int i;
   for (i = pos; i < len; i++)
     nib[i - pos] = nib[i];
 
@@ -99,7 +99,7 @@ hsk_node_init(hsk_node_t *node, uint8_t type) {
       hsk_fullnode_t *n = (hsk_fullnode_t *)node;
       n->type = type;
 
-      int32_t i;
+      int i;
       for (i = 0; i < 17; i++)
         n->children[i] = NULL;
 
@@ -196,7 +196,7 @@ hsk_free_node(hsk_node_t *node, bool recurse) {
       hsk_fullnode_t *n = (hsk_fullnode_t *)node;
 
       if (recurse) {
-        int32_t i;
+        int i;
         for (i = 0; i < 17; i++)
           hsk_free_node(n->children[i], recurse);
       }
@@ -266,7 +266,7 @@ hsk_node_read(uint8_t **data, size_t *data_len, hsk_node_t **node) {
     case HSK_FULLNODE: {
       hsk_fullnode_t *n = (hsk_fullnode_t *)*node;
 
-      int32_t i;
+      int i;
       for (i = 0; i < 17; i++) {
         if (!hsk_node_read(data, data_len, &n->children[i]))
           goto fail;
@@ -306,7 +306,7 @@ starts_with(const uint8_t *kk, size_t kl, const uint8_t *nk, size_t nkl) {
   return memcmp(kk, nk, nkl) == 0;
 }
 
-static int32_t
+static int
 next_child(hsk_node_t **node, uint8_t **kk, size_t *kl) {
   while (*kl > 0) {
     if (*node == NULL) {
@@ -340,7 +340,7 @@ next_child(hsk_node_t **node, uint8_t **kk, size_t *kl) {
         hsk_fullnode_t *n = (hsk_fullnode_t *)*node;
         hsk_node_t *nn = n->children[**kk];
 
-        int32_t j;
+        int j;
         for (j = 0; j < 17; j++) {
           if (j != **kk)
             hsk_free_node(n->children[j], true);
@@ -378,7 +378,7 @@ next_child(hsk_node_t **node, uint8_t **kk, size_t *kl) {
   return HSK_SUCCESS;
 }
 
-int32_t
+int
 hsk_proof_verify(
   const uint8_t *root,
   const uint8_t *key,
@@ -404,7 +404,7 @@ hsk_proof_verify(
   hsk_node_t *node = NULL;
 
   // Return code.
-  int32_t rc = 0;
+  int rc = HSK_SUCCESS;
 
   // Nibblify the key.
   assert(to_nibbles(key, 32, kk, 65));

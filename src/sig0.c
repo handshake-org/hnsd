@@ -238,7 +238,7 @@ hsk_sig0_sign(
   }
 
   uint8_t *sig = &rd[19];
-  int32_t rec;
+  int rec;
 
   if (!hsk_ec_sign_msg(ec, key, hash, sig, &rec)) {
     free(o);

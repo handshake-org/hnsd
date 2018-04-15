@@ -503,13 +503,13 @@ hsk_brontide_split(hsk_brontide_t *b) {
   }
 }
 
-int32_t
+int
 hsk_brontide_accept(hsk_brontide_t *b, const uint8_t *our_key) {
   hsk_brontide_init_brontide(b, false, our_key, NULL);
   return hsk_brontide_on_connect(b);
 }
 
-int32_t
+int
 hsk_brontide_connect(
   hsk_brontide_t *b,
   const uint8_t *our_key,
@@ -519,7 +519,7 @@ hsk_brontide_connect(
   return HSK_SUCCESS;
 }
 
-int32_t
+int
 hsk_brontide_on_connect(hsk_brontide_t *b) {
   size_t size;
 
@@ -532,7 +532,7 @@ hsk_brontide_on_connect(hsk_brontide_t *b) {
 
     hsk_brontide_gen_act_one(b, act1);
 
-    int32_t r = b->write_cb(b->write_arg, act1, BRONTIDE_ACT_ONE_SIZE, false);
+    int r = b->write_cb(b->write_arg, act1, BRONTIDE_ACT_ONE_SIZE, false);
 
     if (r != HSK_SUCCESS) {
       hsk_brontide_destroy(b);
@@ -559,11 +559,11 @@ hsk_brontide_on_connect(hsk_brontide_t *b) {
   return HSK_SUCCESS;
 }
 
-int32_t
+int
 hsk_brontide_write(hsk_brontide_t *b, uint8_t *data, size_t data_len) {
   assert(b->write_cb);
 
-  int32_t r = HSK_SUCCESS;
+  int r = HSK_SUCCESS;
 
   if (b->state != BRONTIDE_ACT_DONE)
     goto done;
@@ -600,7 +600,7 @@ done:
   return r;
 }
 
-int32_t
+int
 hsk_brontide_on_read(hsk_brontide_t *b, const uint8_t *data, size_t data_len) {
   if (b->state == BRONTIDE_ACT_NONE)
     return HSK_SUCCESS;
@@ -618,7 +618,7 @@ hsk_brontide_on_read(hsk_brontide_t *b, const uint8_t *data, size_t data_len) {
     data_len -= need;
 
     size_t msg_len;
-    int32_t r = hsk_brontide_parse(b, b->msg, b->msg_len, &msg_len);
+    int r = hsk_brontide_parse(b, b->msg, b->msg_len, &msg_len);
 
     if (r != HSK_SUCCESS) {
       hsk_brontide_destroy(b);
@@ -648,7 +648,7 @@ hsk_brontide_on_read(hsk_brontide_t *b, const uint8_t *data, size_t data_len) {
   return HSK_SUCCESS;
 }
 
-int32_t
+int
 hsk_brontide_parse(
   hsk_brontide_t *b,
   uint8_t *data,
@@ -659,7 +659,7 @@ hsk_brontide_parse(
   assert(b->write_cb);
   assert(b->read_cb);
 
-  int32_t r;
+  int r;
 
   if (b->initiator) {
     switch (b->state) {

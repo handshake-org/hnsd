@@ -65,8 +65,8 @@ hsk_resource_str_read(
   if (!slice_bytes(data, data_len, &chunk, size))
     return false;
 
-  int32_t real_size = 0;
-  int32_t i;
+  int real_size = 0;
+  int i;
 
   for (i = 0; i < size; i++) {
     uint8_t ch = chunk[i];
@@ -823,7 +823,7 @@ hsk_resource_free(hsk_resource_t *res) {
   if (res == NULL)
     return;
 
-  int32_t i;
+  int i;
 
   for (i = 0; i < res->record_count; i++) {
     hsk_record_t *rec = res->records[i];
@@ -970,7 +970,7 @@ hsk_resource_decode(
   if (!read_u8(&dat, &data_len, &st_size))
     goto fail;
 
-  int32_t i;
+  int i;
 
   // Read the symbol table.
   for (i = 0; i < st_size; i++) {
@@ -1012,7 +1012,7 @@ fail:
 
 const hsk_record_t *
 hsk_resource_get(const hsk_resource_t *res, uint8_t type) {
-  int32_t i;
+  int i;
   for (i = 0; i < res->record_count; i++) {
     hsk_record_t *rec = res->records[i];
     if (rec->type == type)
@@ -1032,7 +1032,7 @@ hsk_resource_to_a(
   const char *name,
   hsk_dns_rrs_t *an
 ) {
-  int32_t i;
+  int i;
 
   for (i = 0; i < res->record_count; i++) {
     hsk_record_t *c = res->records[i];
@@ -1066,7 +1066,7 @@ hsk_resource_to_aaaa(
   const char *name,
   hsk_dns_rrs_t *an
 ) {
-  int32_t i;
+  int i;
 
   for (i = 0; i < res->record_count; i++) {
     hsk_record_t *c = res->records[i];
@@ -1100,7 +1100,7 @@ hsk_resource_to_cname(
   const char *name,
   hsk_dns_rrs_t *an
 ) {
-  int32_t i;
+  int i;
   char cname[HSK_DNS_MAX_NAME + 1];
 
   for (i = 0; i < res->record_count; i++) {
@@ -1141,7 +1141,7 @@ hsk_resource_to_dname(
   const char *name,
   hsk_dns_rrs_t *an
 ) {
-  int32_t i;
+  int i;
   char dname[HSK_DNS_MAX_NAME + 1];
 
   for (i = 0; i < res->record_count; i++) {
@@ -1182,7 +1182,7 @@ hsk_resource_to_ns(
   const char *name,
   hsk_dns_rrs_t *an
 ) {
-  int32_t i;
+  int i;
   char nsname[HSK_DNS_MAX_NAME + 1];
 
   for (i = 0; i < res->record_count; i++) {
@@ -1220,7 +1220,7 @@ hsk_resource_to_nsip(
   const char *name,
   hsk_dns_rrs_t *ar
 ) {
-  int32_t i;
+  int i;
   char ptr[HSK_DNS_MAX_NAME + 1];
 
   for (i = 0; i < res->record_count; i++) {
@@ -1273,7 +1273,7 @@ hsk_resource_to_srvip(
   const char *service,
   hsk_dns_rrs_t *ar
 ) {
-  int32_t i;
+  int i;
   char ptr[HSK_DNS_MAX_NAME + 1];
 
   for (i = 0; i < res->record_count; i++) {
@@ -1330,7 +1330,7 @@ hsk_resource_to_mx(
   const char *name,
   hsk_dns_rrs_t *an
 ) {
-  int32_t i;
+  int i;
   char mx[HSK_DNS_MAX_NAME + 1];
 
   for (i = 0; i < res->record_count; i++) {
@@ -1385,7 +1385,7 @@ hsk_resource_to_srv(
   const char *service,
   hsk_dns_rrs_t *an
 ) {
-  int32_t i;
+  int i;
   char host[HSK_DNS_MAX_NAME + 1];
 
   for (i = 0; i < res->record_count; i++) {
@@ -1443,7 +1443,7 @@ hsk_resource_to_txt(
 
   hsk_dns_txt_rd_t *rd = rr->rd;
 
-  int32_t i;
+  int i;
   for (i = 0; i < res->record_count; i++) {
     hsk_record_t *c = res->records[i];
 
@@ -1476,7 +1476,7 @@ hsk_resource_to_loc(
   const char *name,
   hsk_dns_rrs_t *an
 ) {
-  int32_t i;
+  int i;
 
   for (i = 0; i < res->record_count; i++) {
     hsk_record_t *c = res->records[i];
@@ -1516,7 +1516,7 @@ hsk_resource_to_ds(
   const char *name,
   hsk_dns_rrs_t *an
 ) {
-  int32_t i;
+  int i;
 
   for (i = 0; i < res->record_count; i++) {
     hsk_record_t *c = res->records[i];
@@ -1564,7 +1564,7 @@ hsk_resource_to_tlsa(
   uint16_t port,
   hsk_dns_rrs_t *an
 ) {
-  int32_t i;
+  int i;
 
   for (i = 0; i < res->record_count; i++) {
     hsk_record_t *c = res->records[i];
@@ -1617,7 +1617,7 @@ hsk_resource_to_smimea(
   const uint8_t *hash,
   hsk_dns_rrs_t *an
 ) {
-  int32_t i;
+  int i;
 
   for (i = 0; i < res->record_count; i++) {
     hsk_record_t *c = res->records[i];
@@ -1666,7 +1666,7 @@ hsk_resource_to_sshfp(
   const char *name,
   hsk_dns_rrs_t *an
 ) {
-  int32_t i;
+  int i;
 
   for (i = 0; i < res->record_count; i++) {
     hsk_record_t *c = res->records[i];
@@ -1711,7 +1711,7 @@ hsk_resource_to_openpgpkey(
   const char *name,
   hsk_dns_rrs_t *an
 ) {
-  int32_t i;
+  int i;
 
   for (i = 0; i < res->record_count; i++) {
     hsk_record_t *c = res->records[i];
@@ -1753,7 +1753,7 @@ hsk_resource_to_uri(
   const char *name,
   hsk_dns_rrs_t *an
 ) {
-  int32_t i;
+  int i;
 
   for (i = 0; i < res->record_count; i++) {
     hsk_record_t *c = res->records[i];
@@ -1793,7 +1793,7 @@ hsk_resource_to_rp(
   const char *name,
   hsk_dns_rrs_t *an
 ) {
-  int32_t i;
+  int i;
 
   for (i = 0; i < res->record_count; i++) {
     hsk_record_t *c = res->records[i];
@@ -1824,7 +1824,7 @@ hsk_resource_to_rp(
 
 static bool
 hsk_resource_to_glue(const hsk_resource_t *res, hsk_dns_rrs_t *an) {
-  int32_t i;
+  int i;
 
   for (i = 0; i < res->record_count; i++) {
     hsk_record_t *c = res->records[i];
@@ -2027,7 +2027,7 @@ hsk_resource_root_to_ds(hsk_dns_rrs_t *an) {
 
 hsk_dns_msg_t *
 hsk_resource_to_dns(const hsk_resource_t *rs, const char *name, uint16_t type) {
-  int32_t labels = hsk_dns_label_count(name);
+  int labels = hsk_dns_label_count(name);
 
   if (labels == 0)
     return NULL;
@@ -2363,11 +2363,11 @@ hsk_resource_to_servfail(void) {
 static void
 ip_size(const uint8_t *ip, size_t *s, size_t *l) {
   bool out = true;
-  int32_t last = 0;
-  int32_t i = 0;
+  int last = 0;
+  int i = 0;
 
-  int32_t start = 0;
-  int32_t len = 0;
+  int start = 0;
+  int len = 0;
 
   for (; i < 16; i++) {
     uint8_t ch = ip[i];
@@ -2531,7 +2531,7 @@ target_to_dns(const hsk_target_t *target, const char *name, char *host) {
 
     ip_to_b32(target, b32);
 
-    int32_t len = hsk_dns_label_get(name, -1, tld);
+    int len = hsk_dns_label_get(name, -1, tld);
 
     if (len <= 0)
       return false;

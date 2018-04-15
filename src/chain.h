@@ -29,7 +29,7 @@ typedef struct hsk_chain_s {
  * Chain
  */
 
-int32_t
+int
 hsk_chain_init(hsk_chain_t *chain, const hsk_timedata_t *td);
 
 void
@@ -66,6 +66,6 @@ hsk_chain_get_ancestor(
 bool
 hsk_chain_synced(const hsk_chain_t *chain);
 
-int32_t
+int
 hsk_chain_add(hsk_chain_t *chain, const hsk_header_t *h);
 #endif

@@ -44,8 +44,8 @@ static const char *errstrs[] = {
 };
 
 const char *
-hsk_strerror(int32_t code) {
-  if (code > HSK_MAXERROR)
+hsk_strerror(int code) {
+  if (code < 0 || code > HSK_MAXERROR)
     return errstrs[HSK_MAXERROR + 1];
   return errstrs[code];
 }

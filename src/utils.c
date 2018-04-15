@@ -42,16 +42,16 @@ hsk_date(
   uint32_t *sec
 ) {
   // https://stackoverflow.com/questions/7136385
-  int32_t s = (int32_t)now;
-  int32_t z = s / 86400 + 719468;
-  int32_t era = (z >= 0 ? z : z - 146096) / 146097;
-  uint32_t doe = (uint32_t)(z - era * 146097);
-  uint32_t yoe = (doe - doe / 1460 + doe / 36524 - doe / 146096) / 365;
-  int32_t y = (int32_t)yoe + era * 400;
-  uint32_t doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
-  uint32_t mp = (5 * doy + 2) / 153;
-  uint32_t d = doy - (153 * mp + 2) / 5 + 1;
-  uint32_t m = mp + (mp < 10 ? 3 : -9);
+  int s = (int)now;
+  int z = s / 86400 + 719468;
+  int era = (z >= 0 ? z : z - 146096) / 146097;
+  unsigned int doe = (unsigned int)(z - era * 146097);
+  unsigned int yoe = (doe - doe / 1460 + doe / 36524 - doe / 146096) / 365;
+  int y = (int)yoe + era * 400;
+  unsigned int doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+  unsigned int mp = (5 * doy + 2) / 153;
+  unsigned int d = doy - (153 * mp + 2) / 5 + 1;
+  unsigned int m = mp + (mp < 10 ? 3 : -9);
 
   y += (m <= 2);
 
@@ -94,7 +94,7 @@ hsk_nonce(void) {
   return (((uint64_t)hsk_random()) << 32) + hsk_random();
 }
 
-static inline int32_t
+static inline int
 to_nibble(char s) {
   if (s >= '0' && s <= '9')
     return s - '0';
@@ -134,8 +134,8 @@ hsk_hex_encode(const uint8_t *data, size_t data_len, char *str) {
 
   size_t size = data_len << 1;
 
-  int32_t i;
-  int32_t p = 0;
+  int i;
+  int p = 0;
 
   for (i = 0; i < size; i++) {
     char ch;
@@ -177,14 +177,14 @@ hsk_hex_decode(const char *str, uint8_t *data) {
   if (str == NULL)
     return true;
 
-  int32_t i;
+  int i;
   char *s;
 
-  int32_t p = 0;
+  int p = 0;
   uint8_t w = 0;
 
   for (i = 0, s = (char *)str; *s; i++, s++) {
-    int32_t n = to_nibble(*s);
+    int n = to_nibble(*s);
 
     if (n == -1)
       return false;

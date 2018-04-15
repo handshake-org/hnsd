@@ -225,6 +225,6 @@ hsk_netaddr_init(hsk_netaddr_t *addr);
 bool
 hsk_netaddr_read(uint8_t **data, size_t *data_len, hsk_netaddr_t *addr);
 
-int32_t
+int
 hsk_netaddr_write(const hsk_netaddr_t *addr, uint8_t **data);
 #endif

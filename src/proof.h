@@ -47,7 +47,7 @@ typedef struct {
   size_t data_len;
 } hsk_valuenode_t;
 
-int32_t
+int
 hsk_proof_verify(
   const uint8_t *root,
   const uint8_t *key,

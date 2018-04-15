@@ -41,7 +41,7 @@ hsk_ec_sign_msg(
   const uint8_t *key,
   const uint8_t *msg,
   uint8_t *sig,
-  int32_t *rec
+  int *rec
 );
 
 bool
@@ -57,7 +57,7 @@ hsk_ec_recover(
   const hsk_ec_t *ec,
   const uint8_t *msg,
   const uint8_t *sig,
-  int32_t rec,
+  int rec,
   uint8_t *pubkey
 );
 
@@ -66,7 +66,7 @@ hsk_ec_verify_hash(
   const hsk_ec_t *ec,
   const uint8_t *msg,
   const uint8_t *sig,
-  int32_t rec,
+  int rec,
   const uint8_t *keyhash
 );
 

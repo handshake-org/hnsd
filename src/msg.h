@@ -112,15 +112,15 @@ hsk_msg_free(hsk_msg_t *msg);
 bool
 hsk_msg_read(uint8_t **data, size_t *data_len, hsk_msg_t *msg);
 
-int32_t
+int
 hsk_msg_write(const hsk_msg_t *msg, uint8_t **data);
 
 bool
 hsk_msg_decode(const uint8_t *data, size_t data_len, hsk_msg_t *msg);
 
-int32_t
+int
 hsk_msg_encode(const hsk_msg_t *msg, uint8_t *data);
 
-int32_t
+int
 hsk_msg_size(const hsk_msg_t *msg);
 #endif

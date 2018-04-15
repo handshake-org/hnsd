@@ -37,7 +37,7 @@ typedef struct hsk_addrman_s {
   hsk_map_t banned;
 } hsk_addrman_t;
 
-int32_t
+int
 hsk_addrman_init(hsk_addrman_t *am, const hsk_timedata_t *td);
 
 void
@@ -70,7 +70,7 @@ hsk_addrman_add_sa(hsk_addrman_t *am, const struct sockaddr *sa);
 bool
 hsk_addrman_add_ip(
   hsk_addrman_t *am,
-  int32_t af,
+  int af,
   const uint8_t *ip,
   uint16_t port
 );

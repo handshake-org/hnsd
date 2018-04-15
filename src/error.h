@@ -54,6 +54,6 @@
 #define HSK_MAXERROR 33
 
 const char *
-hsk_strerror(int32_t code);
+hsk_strerror(int code);
 
 #endif

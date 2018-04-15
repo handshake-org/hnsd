@@ -49,9 +49,9 @@ hsk_version_msg_read(uint8_t **data, size_t *data_len, hsk_version_msg_t *msg) {
   return true;
 }
 
-int32_t
+int
 hsk_version_msg_write(hsk_version_msg_t *msg, uint8_t **data) {
-  int32_t s = 0;
+  int s = 0;
   s += write_u32(data, msg->version);
   s += write_u64(data, msg->services);
   s += write_u64(data, msg->time);
@@ -81,7 +81,7 @@ hsk_version_msg_print(const hsk_version_msg_t *msg, const char *prefix) {
   printf("%s  nonce=%lu\n", prefix, msg->nonce);
   printf("%s  agent=%s\n", prefix, msg->agent);
   printf("%s  height=%d\n", prefix, msg->height);
-  printf("%s  no_relay=%d\n", prefix, (int32_t)msg->no_relay);
+  printf("%s  no_relay=%d\n", prefix, (int)msg->no_relay);
 }
 
 bool
@@ -89,7 +89,7 @@ hsk_verack_msg_read(uint8_t **data, size_t *data_len, hsk_verack_msg_t *msg) {
   return true;
 }
 
-int32_t
+int
 hsk_verack_msg_write(const hsk_verack_msg_t *msg, uint8_t **data) {
   return 0;
 }
@@ -101,9 +101,9 @@ hsk_ping_msg_read(uint8_t **data, size_t *data_len, hsk_ping_msg_t *msg) {
   return true;
 }
 
-int32_t
+int
 hsk_ping_msg_write(const hsk_ping_msg_t *msg, uint8_t **data) {
-  int32_t s = 0;
+  int s = 0;
   s += write_u64(data, msg->nonce);
   return s;
 }
@@ -115,9 +115,9 @@ hsk_pong_msg_read(uint8_t **data, size_t *data_len, hsk_pong_msg_t *msg) {
   return true;
 }
 
-int32_t
+int
 hsk_pong_msg_write(const hsk_pong_msg_t *msg, uint8_t **data) {
-  int32_t s = 0;
+  int s = 0;
   s += write_u64(data, msg->nonce);
   return s;
 }
@@ -127,7 +127,7 @@ hsk_getaddr_msg_read(uint8_t **data, size_t *data_len, hsk_getaddr_msg_t *msg) {
   return true;
 }
 
-int32_t
+int
 hsk_getaddr_msg_write(const hsk_getaddr_msg_t *msg, uint8_t **data) {
   return 0;
 }
@@ -140,7 +140,7 @@ hsk_addr_msg_read(uint8_t **data, size_t *data_len, hsk_addr_msg_t *msg) {
   if (msg->addr_count > 1000)
     return false;
 
-  int32_t i;
+  int i;
 
   for (i = 0; i < msg->addr_count; i++) {
     if (!hsk_netaddr_read(data, data_len, &msg->addrs[i]))
@@ -150,13 +150,13 @@ hsk_addr_msg_read(uint8_t **data, size_t *data_len, hsk_addr_msg_t *msg) {
   return true;
 }
 
-int32_t
+int
 hsk_addr_msg_write(const hsk_addr_msg_t *msg, uint8_t **data) {
-  int32_t s = 0;
+  int s = 0;
 
   s += write_varsize(data, msg->addr_count);
 
-  int32_t i;
+  int i;
 
   for (i = 0; i < msg->addr_count; i++)
     s += hsk_netaddr_write(&msg->addrs[i], data);
@@ -172,7 +172,7 @@ hsk_getheaders_msg_read(uint8_t **data, size_t *data_len, hsk_getheaders_msg_t *
   if (msg->hash_count > 64)
     return false;
 
-  int32_t i;
+  int i;
 
   for (i = 0; i < msg->hash_count; i++) {
     if (!read_bytes(data, data_len, msg->hashes[i], 32))
@@ -185,13 +185,13 @@ hsk_getheaders_msg_read(uint8_t **data, size_t *data_len, hsk_getheaders_msg_t *
   return true;
 }
 
-int32_t
+int
 hsk_getheaders_msg_write(const hsk_getheaders_msg_t *msg, uint8_t **data) {
-  int32_t s = 0;
+  int s = 0;
 
   s += write_varsize(data, msg->hash_count);
 
-  int32_t i;
+  int i;
 
   for (i = 0; i < msg->hash_count; i++)
     s += write_bytes(data, msg->hashes[i], 32);
@@ -210,7 +210,7 @@ hsk_headers_msg_read(uint8_t **data, size_t *data_len, hsk_headers_msg_t *msg) {
     return false;
 
   hsk_header_t *tail = NULL;
-  int32_t i;
+  int i;
 
   for (i = 0; i < msg->header_count; i++) {
     hsk_header_t *h = hsk_header_alloc();
@@ -241,9 +241,9 @@ fail: ;
   return false;
 }
 
-int32_t
+int
 hsk_headers_msg_write(const hsk_headers_msg_t *msg, uint8_t **data) {
-  int32_t s = 0;
+  int s = 0;
 
   s += write_varsize(data, msg->header_count);
 
@@ -264,7 +264,7 @@ hsk_sendheaders_msg_read(
   return true;
 }
 
-int32_t
+int
 hsk_sendheaders_msg_write(const hsk_sendheaders_msg_t *msg, uint8_t **data) {
   return 0;
 }
@@ -284,9 +284,9 @@ hsk_getproof_msg_read(
   return true;
 }
 
-int32_t
+int
 hsk_getproof_msg_write(const hsk_getproof_msg_t *msg, uint8_t **data) {
-  int32_t s = 0;
+  int s = 0;
   s += write_bytes(data, msg->root, 32);
   s += write_bytes(data, msg->key, 32);
   return s;
@@ -304,7 +304,7 @@ hsk_proof_msg_read(uint8_t **data, size_t *data_len, hsk_proof_msg_t *msg) {
     return false;
 
   hsk_raw_node_t *tail = NULL;
-  int32_t i;
+  int i;
 
   for (i = 0; i < msg->node_count; i++) {
     hsk_raw_node_t *n = hsk_raw_node_alloc();
@@ -331,9 +331,9 @@ fail:
   return false;
 }
 
-int32_t
+int
 hsk_proof_msg_write(const hsk_proof_msg_t *msg, uint8_t **data) {
-  int32_t s = 0;
+  int s = 0;
 
   s += write_bytes(data, msg->root, 32);
   s += write_bytes(data, msg->key, 32);
@@ -471,7 +471,7 @@ hsk_msg_init(hsk_msg_t *msg) {
       hsk_addr_msg_t *m = (hsk_addr_msg_t *)msg;
       m->cmd = HSK_MSG_ADDR;
       m->addr_count = 0;
-      int32_t i;
+      int i;
       for (i = 0; i < 1000; i++)
         hsk_netaddr_init(&m->addrs[i]);
       break;
@@ -479,7 +479,7 @@ hsk_msg_init(hsk_msg_t *msg) {
     case HSK_MSG_GETHEADERS: {
       hsk_getheaders_msg_t *m = (hsk_getheaders_msg_t *)msg;
       m->cmd = HSK_MSG_GETHEADERS;
-      int32_t i;
+      int i;
       for (i = 0; i < 64; i++)
         memset(m->hashes[i], 0, 32);
       memset(m->stop, 0, 32);
@@ -686,7 +686,7 @@ hsk_msg_read(uint8_t **data, size_t *data_len, hsk_msg_t *msg) {
   }
 }
 
-int32_t
+int
 hsk_msg_write(const hsk_msg_t *msg, uint8_t **data) {
   switch (msg->cmd) {
     case HSK_MSG_VERSION: {
@@ -733,12 +733,12 @@ hsk_msg_decode(const uint8_t *data, size_t data_len, hsk_msg_t *msg) {
   return hsk_msg_read((uint8_t **)&data, &data_len, msg);
 }
 
-int32_t
+int
 hsk_msg_encode(const hsk_msg_t *msg, uint8_t *data) {
   return hsk_msg_write(msg, &data);
 }
 
-int32_t
+int
 hsk_msg_size(const hsk_msg_t *msg) {
   return hsk_msg_write(msg, NULL);
 }

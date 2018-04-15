@@ -24,7 +24,7 @@ typedef void (*hsk_brontide_connect_cb)(
   const void *arg
 );
 
-typedef int32_t (*hsk_brontide_write_cb)(
+typedef int (*hsk_brontide_write_cb)(
   const void *arg,
   const uint8_t *data,
   size_t data_len,
@@ -66,7 +66,7 @@ typedef struct hsk_brontide_s {
   hsk_brontide_read_cb read_cb;
   void *read_arg;
 
-  int32_t state;
+  int state;
   bool has_size;
   uint8_t *msg;
   size_t msg_pos;
@@ -186,26 +186,26 @@ hsk_brontide_recv_act_three(hsk_brontide_t *b, const uint8_t *act3);
 void
 hsk_brontide_split(hsk_brontide_t *b);
 
-int32_t
+int
 hsk_brontide_accept(hsk_brontide_t *b, const uint8_t *our_key);
 
-int32_t
+int
 hsk_brontide_connect(
   hsk_brontide_t *b,
   const uint8_t *our_key,
   const uint8_t *their_key
 );
 
-int32_t
+int
 hsk_brontide_on_connect(hsk_brontide_t *b);
 
-int32_t
+int
 hsk_brontide_write(hsk_brontide_t *b, uint8_t *data, size_t data_len);
 
-int32_t
+int
 hsk_brontide_on_read(hsk_brontide_t *b, const uint8_t *data, size_t data_len);
 
-int32_t
+int
 hsk_brontide_parse(
   hsk_brontide_t *b,
   uint8_t *data,

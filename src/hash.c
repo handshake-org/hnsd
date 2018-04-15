@@ -62,7 +62,7 @@ hsk_hash_sha256_hmac(
     key_len = 32;
   }
 
-  int32_t i;
+  int i;
 
   for (i = 0; i < key_len; i++)
     pad[i] = key[i] ^ 0x36;
@@ -122,7 +122,7 @@ hsk_hash_hkdf(
   hsk_hash_sha256_hmac(&buf[32], buf_len - 32, prk, 32, out);
   memcpy(&okm[0], out, 32);
 
-  int32_t i = 1;
+  int i = 1;
   for (; i < 2; i++) {
     memcpy(buf, out, 32);
     buf[buf_len - 1] += 1;

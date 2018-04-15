@@ -22,10 +22,10 @@
  * Prototypes
  */
 
-static int32_t
+static int
 hsk_chain_init_genesis(hsk_chain_t *chain);
 
-static int32_t
+static int
 hsk_chain_insert(
   hsk_chain_t *chain,
   hsk_header_t *hdr,
@@ -39,7 +39,7 @@ hsk_chain_maybe_sync(hsk_chain_t *chain);
  * Helpers
  */
 
-static int32_t
+static int
 qsort_cmp(const void *a, const void *b) {
   int64_t x = *((int64_t *)a);
   int64_t y = *((int64_t *)b);
@@ -57,7 +57,7 @@ qsort_cmp(const void *a, const void *b) {
  * Chain
  */
 
-int32_t
+int
 hsk_chain_init(hsk_chain_t *chain, const hsk_timedata_t *td) {
   if (!chain || !td)
     return HSK_EBADARGS;
@@ -76,7 +76,7 @@ hsk_chain_init(hsk_chain_t *chain, const hsk_timedata_t *td) {
   return hsk_chain_init_genesis(chain);
 }
 
-static int32_t
+static int
 hsk_chain_init_genesis(hsk_chain_t *chain) {
   if (!chain)
     return HSK_EBADARGS;
@@ -171,7 +171,7 @@ hsk_chain_get(const hsk_chain_t *chain, const uint8_t *hash) {
 }
 
 hsk_header_t *
-hsk_chain_get_by_height(const hsk_chain_t *chain, const int32_t height) {
+hsk_chain_get_by_height(const hsk_chain_t *chain, int32_t height) {
   return hsk_map_get(&chain->heights, &height);
 }
 
@@ -259,10 +259,10 @@ void
 hsk_chain_get_locator(const hsk_chain_t *chain, hsk_getheaders_msg_t *msg) {
   assert(chain && msg);
 
-  int32_t i = 0;
+  int i = 0;
   hsk_header_t *tip = chain->tip;
   int32_t height = chain->height;
-  int32_t step = 1;
+  int step = 1;
 
   hsk_header_hash(tip, msg->hashes[i++]);
 
@@ -296,10 +296,10 @@ hsk_chain_get_mtp(const hsk_chain_t *chain, const hsk_header_t *prev) {
   if (!prev)
     return 0;
 
-  int32_t timespan = 11;
+  int timespan = 11;
   int64_t median[11];
   size_t size = 0;
-  int32_t i;
+  int i;
 
   for (i = 0; i < timespan && prev; i++) {
     median[i] = (int64_t)prev->time;
@@ -318,10 +318,10 @@ hsk_chain_retarget(const hsk_chain_t *chain, const hsk_header_t *prev) {
 
   uint32_t bits = HSK_BITS;
   uint8_t *limit = (uint8_t *)HSK_LIMIT;
-  int32_t window = HSK_TARGET_WINDOW;
-  int32_t timespan = HSK_TARGET_TIMESPAN;
-  int32_t min = HSK_MIN_ACTUAL;
-  int32_t max = HSK_MAX_ACTUAL;
+  int window = HSK_TARGET_WINDOW;
+  int timespan = HSK_TARGET_TIMESPAN;
+  int min = HSK_MIN_ACTUAL;
+  int max = HSK_MAX_ACTUAL;
 
   if (!prev)
     return bits;
@@ -331,7 +331,7 @@ hsk_chain_retarget(const hsk_chain_t *chain, const hsk_header_t *prev) {
 
   hsk_header_t *last = (hsk_header_t *)prev;
   hsk_header_t *first = last;
-  int32_t i;
+  int i;
 
   for (i = 0; first && i < window; i++) {
     uint8_t diff[32];
@@ -503,12 +503,12 @@ hsk_chain_reorganize(hsk_chain_t *chain, hsk_header_t *competitor) {
   }
 }
 
-int32_t
+int
 hsk_chain_add(hsk_chain_t *chain, const hsk_header_t *h) {
   if (!chain || !h)
     return HSK_EBADARGS;
 
-  int32_t rc = HSK_SUCCESS;
+  int rc = HSK_SUCCESS;
   hsk_header_t *hdr = hsk_header_clone(h);
 
   if (!hdr) {
@@ -605,7 +605,7 @@ fail:
   return rc;
 }
 
-static int32_t
+static int
 hsk_chain_insert(
   hsk_chain_t *chain,
   hsk_header_t *hdr,

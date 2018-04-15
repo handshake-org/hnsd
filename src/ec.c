@@ -54,7 +54,7 @@ hsk_ec_create_privkey(const hsk_ec_t *ec, uint8_t *key) {
 
   memset(key, 0, 32);
 
-  int32_t i = 0;
+  int i = 0;
 
   while (!hsk_ec_verify_privkey(ec, key)) {
     if (i > 1000)
@@ -95,7 +95,7 @@ hsk_ec_sign_msg(
   const uint8_t *key,
   const uint8_t *msg,
   uint8_t *sig,
-  int32_t *rec
+  int *rec
 ) {
   assert(ec && key && sig);
 
@@ -103,7 +103,7 @@ hsk_ec_sign_msg(
 
   hsk_secp256k1_ecdsa_recoverable_signature s;
 
-  int32_t result = hsk_secp256k1_ecdsa_sign_recoverable(
+  int result = hsk_secp256k1_ecdsa_sign_recoverable(
     ec,
     &s,
     msg,
@@ -150,7 +150,7 @@ hsk_ec_recover(
   const hsk_ec_t *ec,
   const uint8_t *msg,
   const uint8_t *sig,
-  int32_t rec,
+  int rec,
   uint8_t *pubkey
 ) {
   assert(ec && msg && sig && pubkey);
@@ -181,7 +181,7 @@ hsk_ec_verify_hash(
   const hsk_ec_t *ec,
   const uint8_t *msg,
   const uint8_t *sig,
-  int32_t rec,
+  int rec,
   const uint8_t *keyhash
 ) {
   assert(ec && msg && sig && keyhash);

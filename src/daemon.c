@@ -37,7 +37,7 @@ typedef struct hsk_options_s {
   uint8_t identity_key_[32];
   uint8_t *identity_key;
   char *seeds;
-  int32_t pool_size;
+  int pool_size;
 } hsk_options_t;
 
 static void
@@ -101,7 +101,7 @@ daemonize(const char *logfile) {
 }
 
 static void
-help(int32_t r) {
+help(int r) {
   fprintf(stderr,
     "\n"
     "hnsd 0.0.0\n"
@@ -175,7 +175,7 @@ parse_arg(int argc, char **argv, hsk_options_t *opt) {
   optind = 1;
 
   for (;;) {
-    int32_t o = getopt_long(argc, argv, optstring, longopts, &longopt_idx);
+    int o = getopt_long(argc, argv, optstring, longopts, &longopt_idx);
 
     if (o == -1)
       break;
@@ -221,7 +221,7 @@ parse_arg(int argc, char **argv, hsk_options_t *opt) {
       }
 
       case 'p': {
-        int32_t size = atoi(optarg);
+        int size = atoi(optarg);
 
         if (size <= 0 || size > 1000)
           return help(1);
@@ -337,7 +337,7 @@ main(int argc, char **argv) {
 
   parse_arg(argc, argv, &opt);
 
-  int32_t rc = HSK_SUCCESS;
+  int rc = HSK_SUCCESS;
   uv_loop_t *loop = NULL;
   hsk_pool_t *pool = NULL;
   hsk_ns_t *ns = NULL;

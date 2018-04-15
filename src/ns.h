@@ -40,7 +40,7 @@ typedef struct {
  * Root Nameserver
  */
 
-int32_t
+int
 hsk_ns_init(hsk_ns_t *ns, const uv_loop_t *loop, const hsk_pool_t *pool);
 
 void
@@ -52,10 +52,10 @@ hsk_ns_set_ip(hsk_ns_t *ns, const struct sockaddr *addr);
 bool
 hsk_ns_set_key(hsk_ns_t *ns, const uint8_t *key);
 
-int32_t
+int
 hsk_ns_open(hsk_ns_t *ns, const struct sockaddr *addr);
 
-int32_t
+int
 hsk_ns_close(hsk_ns_t *ns);
 
 hsk_ns_t *
@@ -64,6 +64,6 @@ hsk_ns_alloc(const uv_loop_t *loop, const hsk_pool_t *pool);
 void
 hsk_ns_free(hsk_ns_t *ns);
 
-int32_t
+int
 hsk_ns_destroy(hsk_ns_t *ns);
 #endif

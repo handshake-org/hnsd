@@ -38,7 +38,7 @@ static const int8_t TABLE_HEX[] = {
 
 static const uint8_t PADDING[] = { 0, 6, 4, 3, 1 };
 
-static int32_t
+static int
 hsk_base32_encode2(
   const char *charset,
   const uint8_t *data,
@@ -48,10 +48,10 @@ hsk_base32_encode2(
 ) {
   assert(charset);
 
-  int32_t off = 0;
-  int32_t mode = 0;
-  int32_t left = 0;
-  int32_t i;
+  int off = 0;
+  int mode = 0;
+  int left = 0;
+  int i;
 
   for (i = 0; i < data_len; i++) {
     uint8_t ch = data[i];
@@ -123,7 +123,7 @@ hsk_base32_encode2(
   return off;
 }
 
-static int32_t
+static int
 hsk_base32_decode2(
   const int8_t *table,
   const char *str,
@@ -133,10 +133,10 @@ hsk_base32_decode2(
   assert(table);
   assert(str);
 
-  int32_t mode = 0;
-  int32_t left = 0;
-  int32_t j = 0;
-  int32_t i = 0;
+  int mode = 0;
+  int left = 0;
+  int j = 0;
+  int i = 0;
   size_t len = strlen(str);
 
   for (; i < len; i++) {
@@ -257,12 +257,12 @@ hsk_base32_decode2(
   return j;
 }
 
-int32_t
+int
 hsk_base32_encode(const uint8_t *data, size_t data_len, char *out, bool pad) {
   return hsk_base32_encode2(CHARSET, data, data_len, out, pad);
 }
 
-int32_t
+int
 hsk_base32_encode_hex(
   const uint8_t *data,
   size_t data_len,
@@ -272,29 +272,29 @@ hsk_base32_encode_hex(
   return hsk_base32_encode2(CHARSET_HEX, data, data_len, out, pad);
 }
 
-int32_t
+int
 hsk_base32_encode_size(const uint8_t *data, size_t data_len, bool pad) {
   return hsk_base32_encode2(CHARSET, data, data_len, NULL, pad);
 }
 
-int32_t
+int
 hsk_base32_encode_hex_size(const uint8_t *data, size_t data_len, bool pad) {
   return hsk_base32_encode2(CHARSET_HEX, data, data_len, NULL, pad);
 }
 
-int32_t
+int
 hsk_base32_decode(const char *str, uint8_t *out, bool unpad) {
   return hsk_base32_decode2(TABLE, str, out, unpad);
 }
 
-int32_t
+int
 hsk_base32_decode_hex(const char *str, uint8_t *out, bool unpad) {
   return hsk_base32_decode2(TABLE_HEX, str, out, unpad);
 }
 
-int32_t
+int
 hsk_base32_decode_size(const char *str) {
-  int32_t size = hsk_base32_decode2(TABLE, str, NULL, false);
+  int size = hsk_base32_decode2(TABLE, str, NULL, false);
 
   if (size == -1)
     return strlen(str) * 5 / 8;
@@ -302,9 +302,9 @@ hsk_base32_decode_size(const char *str) {
   return size;
 }
 
-int32_t
+int
 hsk_base32_decode_hex_size(const char *str) {
-  int32_t size = hsk_base32_decode2(TABLE_HEX, str, NULL, false);
+  int size = hsk_base32_decode2(TABLE_HEX, str, NULL, false);
 
   if (size == -1)
     return strlen(str) * 5 / 8;

@@ -34,7 +34,7 @@
 
 typedef void (*hsk_resolve_cb)(
   const char *name,
-  int32_t status,
+  int status,
   bool exists,
   const uint8_t *data,
   size_t data_len,
@@ -61,11 +61,11 @@ typedef struct hsk_peer_s {
   char host[HSK_MAX_HOST];
   hsk_addr_t addr;
   uint16_t port;
-  int32_t state;
+  int state;
   uint8_t read_buffer[HSK_BUFFER_SIZE];
-  int32_t headers;
-  int32_t proofs;
-  int32_t height;
+  int headers;
+  int proofs;
+  int height;
   hsk_map_t names;
   int64_t getheaders_time;
   int64_t version_time;
@@ -99,10 +99,10 @@ typedef struct hsk_pool_s {
   hsk_map_t peers;
   hsk_peer_t *head;
   hsk_peer_t *tail;
-  int32_t size;
-  int32_t max_size;
+  int size;
+  int max_size;
   hsk_name_req_t *pending;
-  int32_t pending_count;
+  int pending_count;
   int64_t block_time;
   int64_t getheaders_time;
 } hsk_pool_t;
@@ -111,7 +111,7 @@ typedef struct hsk_pool_s {
  * Pool
  */
 
-int32_t
+int
 hsk_pool_init(hsk_pool_t *pool, const uv_loop_t *loop);
 
 void
@@ -121,7 +121,7 @@ bool
 hsk_pool_set_key(hsk_pool_t *pool, const uint8_t *key);
 
 bool
-hsk_pool_set_size(hsk_pool_t *pool, int32_t max_size);
+hsk_pool_set_size(hsk_pool_t *pool, int max_size);
 
 bool
 hsk_pool_set_seeds(hsk_pool_t *pool, const char *seeds);
@@ -132,16 +132,16 @@ hsk_pool_alloc(const uv_loop_t *loop);
 void
 hsk_pool_free(hsk_pool_t *pool);
 
-int32_t
+int
 hsk_pool_open(hsk_pool_t *pool);
 
-int32_t
+int
 hsk_pool_close(hsk_pool_t *pool);
 
-int32_t
+int
 hsk_pool_destroy(hsk_pool_t *pool);
 
-int32_t
+int
 hsk_pool_resolve(
   hsk_pool_t *pool,
   const char *name,

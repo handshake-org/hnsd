@@ -12,7 +12,7 @@
 #include "timedata.h"
 #include "utils.h"
 
-int32_t
+int
 hsk_timedata_init(hsk_timedata_t *td) {
   if (!td)
     return HSK_EBADARGS;
@@ -62,12 +62,12 @@ hsk_timedata_log(hsk_timedata_t *td, const char *fmt, ...) {
 
 static void
 hsk_timedata_insert(hsk_timedata_t *td, int64_t sample) {
-  int32_t start = 0;
-  int32_t end = td->sample_len - 1;
-  int32_t i = -1;
+  int start = 0;
+  int end = td->sample_len - 1;
+  int i = -1;
 
   while (start <= end) {
-    int32_t pos = (start + end) >> 1;
+    int pos = (start + end) >> 1;
     int64_t cmp = td->samples[pos] - sample;
 
     if (cmp == 0) {
@@ -86,7 +86,7 @@ hsk_timedata_insert(hsk_timedata_t *td, int64_t sample) {
 
   assert(td->sample_len + 1 <= HSK_TIMEDATA_LIMIT);
 
-  int32_t j;
+  int j;
   for (j = i + 1; j < td->sample_len + 1; j++)
     td->samples[j] = td->samples[j - 1];
 
@@ -94,7 +94,7 @@ hsk_timedata_insert(hsk_timedata_t *td, int64_t sample) {
   td->sample_len += 1;
 }
 
-int32_t
+int
 hsk_timedata_add(hsk_timedata_t *td, const hsk_addr_t *addr, int64_t time) {
   if (td->sample_len >= HSK_TIMEDATA_LIMIT)
     return HSK_SUCCESS;
@@ -125,7 +125,7 @@ hsk_timedata_add(hsk_timedata_t *td, const hsk_addr_t *addr, int64_t time) {
     if (median >= 70 * 60) {
       if (!td->checked) {
         bool match = false;
-        int32_t i;
+        int i;
 
         for (i = 0; i < td->sample_len; i++) {
           int64_t offset = td->samples[i];

@@ -52,22 +52,22 @@ hsk_header_read(uint8_t **data, size_t *data_len, hsk_header_t *hdr);
 bool
 hsk_header_decode(const uint8_t *data, size_t data_len, hsk_header_t *hdr);
 
-int32_t
+int
 hsk_header_write(const hsk_header_t *hdr, uint8_t **data);
 
-int32_t
+int
 hsk_header_size(const hsk_header_t *hdr);
 
-int32_t
+int
 hsk_header_encode(const hsk_header_t *hdr, uint8_t *data);
 
-int32_t
+int
 hsk_header_write_pre(const hsk_header_t *hdr, uint8_t **data);
 
-int32_t
+int
 hsk_header_size_pre(const hsk_header_t *hdr);
 
-int32_t
+int
 hsk_header_encode_pre(const hsk_header_t *hdr, uint8_t *data);
 
 bool
@@ -85,7 +85,7 @@ hsk_header_hash_pre(const hsk_header_t *hdr, uint8_t *hash);
 void
 hsk_header_hash_sol(const hsk_header_t *hdr, uint8_t *hash);
 
-int32_t
+int
 hsk_header_verify_pow(const hsk_header_t *hdr);
 
 void

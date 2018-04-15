@@ -377,12 +377,12 @@ hsk_addr_from_string(hsk_addr_t *addr, const char *src, uint16_t port) {
   uint16_t sin_port = port;
 
   if (port && port_s) {
-    int32_t i = 0;
+    int i = 0;
     uint32_t word = 0;
     char *s = port_s;
 
     for (; *s; s++) {
-      int32_t ch = ((int32_t)*s) - 0x30;
+      int ch = ((int)*s) - 0x30;
 
       if (ch < 0 || ch > 9)
         return false;
@@ -974,9 +974,9 @@ hsk_netaddr_read(uint8_t **data, size_t *data_len, hsk_netaddr_t *na) {
   return true;
 }
 
-int32_t
+int
 hsk_netaddr_write(const hsk_netaddr_t *na, uint8_t **data) {
-  int32_t s = 0;
+  int s = 0;
   s += write_u64(data, na->time);
   s += write_u64(data, na->services);
   s += write_u8(data, na->addr.type);

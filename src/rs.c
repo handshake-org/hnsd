@@ -42,7 +42,7 @@ typedef struct {
 static void
 hsk_rs_log(hsk_rs_t *ns, const char *fmt, ...);
 
-static int32_t
+static int
 hsk_rs_send(
   hsk_rs_t *ns,
   uint8_t *data,
@@ -70,7 +70,7 @@ static void
 after_poll(uv_poll_t *handle, int status, int events);
 
 static void
-after_resolve(void *data, int32_t status, struct ub_result *result);
+after_resolve(void *data, int status, struct ub_result *result);
 
 static void
 after_close(uv_handle_t *handle);
@@ -79,7 +79,7 @@ after_close(uv_handle_t *handle);
  * Recursive NS
  */
 
-int32_t
+int
 hsk_rs_init(hsk_rs_t *ns, const uv_loop_t *loop, const struct sockaddr *stub) {
   if (!ns || !loop)
     return HSK_EBADARGS;
@@ -250,7 +250,7 @@ hsk_rs_inject_options(hsk_rs_t *ns) {
   return true;
 }
 
-int32_t
+int
 hsk_rs_open(hsk_rs_t *ns, const struct sockaddr *addr) {
   if (!ns || !addr)
     return HSK_EBADARGS;
@@ -268,7 +268,7 @@ hsk_rs_open(hsk_rs_t *ns, const struct sockaddr *addr) {
 
   ns->bound = true;
 
-  int32_t value = sizeof(ns->read_buffer);
+  int value = sizeof(ns->read_buffer);
 
   if (uv_send_buffer_size((uv_handle_t *)&ns->socket, &value) != 0)
     return HSK_EFAILURE;
@@ -298,7 +298,7 @@ hsk_rs_open(hsk_rs_t *ns, const struct sockaddr *addr) {
   return HSK_SUCCESS;
 }
 
-int32_t
+int
 hsk_rs_close(hsk_rs_t *ns) {
   if (!ns)
     return HSK_EBADARGS;
@@ -353,12 +353,12 @@ hsk_rs_free(hsk_rs_t *ns) {
   free(ns);
 }
 
-int32_t
+int
 hsk_rs_destroy(hsk_rs_t *ns) {
   if (!ns)
     return HSK_EBADARGS;
 
-  int32_t rc = hsk_rs_close(ns);
+  int rc = hsk_rs_close(ns);
 
   if (rc != 0)
     return rc;
@@ -388,7 +388,7 @@ hsk_rs_onrecv(
 ) {
   hsk_dns_req_t *req = hsk_dns_req_create(data, data_len, addr);
 
-  int32_t rc;
+  int rc;
   uint8_t *wire = NULL;
   size_t wire_len = 0;
   hsk_dns_msg_t *msg = NULL;
@@ -439,7 +439,7 @@ static void
 hsk_rs_respond(
   hsk_rs_t *ns,
   const hsk_dns_req_t *req,
-  int32_t status,
+  int status,
   const struct ub_result *result
 ) {
   hsk_dns_msg_t *msg = NULL;
@@ -516,7 +516,7 @@ done:
   hsk_rs_send(ns, wire, wire_len, req->addr, true);
 }
 
-static int32_t
+static int
 hsk_rs_send(
   hsk_rs_t *ns,
   uint8_t *data,
@@ -524,7 +524,7 @@ hsk_rs_send(
   const struct sockaddr *addr,
   bool should_free
 ) {
-  int32_t rc = HSK_SUCCESS;
+  int rc = HSK_SUCCESS;
   hsk_send_data_t *sd = NULL;
   uv_udp_send_t *req = NULL;
 
@@ -661,7 +661,7 @@ after_poll(uv_poll_t *handle, int status, int events) {
 }
 
 static void
-after_resolve(void *data, int32_t status, struct ub_result *result) {
+after_resolve(void *data, int status, struct ub_result *result) {
   hsk_dns_req_t *req = (hsk_dns_req_t *)data;
   hsk_rs_respond((hsk_rs_t *)req->ns, req, status, result);
   hsk_dns_req_free(req);

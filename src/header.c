@@ -86,7 +86,7 @@ hsk_pow_to_target(uint32_t bits, uint8_t *target) {
     shift = (exponent - 3) & 31;
   }
 
-  int32_t i = 31 - shift;
+  int i = 31 - shift;
 
   while (mantissa && i >= 0) {
     target[i--] = (uint8_t)mantissa;
@@ -104,7 +104,7 @@ bool
 hsk_pow_to_bits(const uint8_t *target, uint32_t *bits) {
   assert(target && bits);
 
-  int32_t i;
+  int i;
 
   for (i = 0; i < 32; i++) {
     if (target[i] != 0)
@@ -131,7 +131,7 @@ hsk_pow_to_bits(const uint8_t *target, uint32_t *bits) {
     }
     mantissa <<= 8 * (3 - exponent);
   } else {
-    int32_t shift = exponent - 3;
+    int shift = exponent - 3;
     for (; i < 32 - shift; i++) {
       mantissa <<= 8;
       mantissa |= target[i];
@@ -196,11 +196,11 @@ hsk_header_calc_work(hsk_header_t *hdr, const hsk_header_t *prev) {
 static bool
 read_sol(uint8_t **data, size_t *data_len, uint32_t *sol, uint8_t sol_size) {
 #ifndef HSK_BIG_ENDIAN
-  int32_t size = (int32_t)sol_size << 2;
+  int size = (int)sol_size << 2;
   if (!read_bytes(data, data_len, (uint8_t *)sol, size))
     return false;
 #else
-  int32_t i;
+  int i;
   for (i = 0; i < sol_size; i++) {
     if (!read_u32(data, data_len, sol + i))
       return false;
@@ -212,13 +212,13 @@ read_sol(uint8_t **data, size_t *data_len, uint32_t *sol, uint8_t sol_size) {
 static size_t
 write_sol(uint8_t **data, const uint32_t *sol, uint8_t sol_size) {
 #ifndef HSK_BIG_ENDIAN
-  int32_t size = (int32_t)sol_size << 2;
+  int size = (int)sol_size << 2;
   return write_bytes(data, (uint8_t *)sol, size);
 #else
-  int32_t i;
+  int i;
   for (i = 0; i < sol_size; i++)
     write_u32(data, sol[i]);
-  return (int32_t)sol_size << 2;
+  return (int)sol_size << 2;
 #endif
 }
 
@@ -270,9 +270,9 @@ hsk_header_decode(const uint8_t *data, size_t data_len, hsk_header_t *hdr) {
   return hsk_header_read((uint8_t **)&data, &data_len, hdr);
 }
 
-int32_t
+int
 hsk_header_write(const hsk_header_t *hdr, uint8_t **data) {
-  int32_t s = 0;
+  int s = 0;
   s += write_u32(data, hdr->version);
   s += write_bytes(data, hdr->prev_block, 32);
   s += write_bytes(data, hdr->merkle_root, 32);
@@ -286,19 +286,19 @@ hsk_header_write(const hsk_header_t *hdr, uint8_t **data) {
   return s;
 }
 
-int32_t
+int
 hsk_header_size(const hsk_header_t *hdr) {
   return hsk_header_write(hdr, NULL);
 }
 
-int32_t
+int
 hsk_encode_header(const hsk_header_t *hdr, uint8_t *data) {
   return hsk_header_write(hdr, &data);
 }
 
-int32_t
+int
 hsk_header_write_pre(const hsk_header_t *hdr, uint8_t **data) {
-  int32_t s = 0;
+  int s = 0;
   s += write_u32(data, hdr->version);
   s += write_bytes(data, hdr->prev_block, 32);
   s += write_bytes(data, hdr->merkle_root, 32);
@@ -310,12 +310,12 @@ hsk_header_write_pre(const hsk_header_t *hdr, uint8_t **data) {
   return s;
 }
 
-int32_t
+int
 hsk_header_size_pre(const hsk_header_t *hdr) {
   return hsk_header_write_pre(hdr, NULL);
 }
 
-int32_t
+int
 hsk_header_encode_pre(const hsk_header_t *hdr, uint8_t *data) {
   return hsk_header_write_pre(hdr, &data);
 }
@@ -330,7 +330,7 @@ hsk_header_cache(hsk_header_t *hdr) {
   if (hdr->cache)
     return hdr->hash;
 
-  int32_t size = hsk_header_size(hdr);
+  int size = hsk_header_size(hdr);
   uint8_t raw[size];
 
   hsk_encode_header(hdr, raw);
@@ -347,7 +347,7 @@ hsk_header_hash(hsk_header_t *hdr, uint8_t *hash) {
 
 void
 hsk_header_hash_pre(const hsk_header_t *hdr, uint8_t *hash) {
-  int32_t size = hsk_header_size_pre(hdr);
+  int size = hsk_header_size_pre(hdr);
   uint8_t raw[size];
 
   hsk_header_encode_pre(hdr, raw);
@@ -356,20 +356,20 @@ hsk_header_hash_pre(const hsk_header_t *hdr, uint8_t *hash) {
 
 void
 hsk_header_hash_sol(const hsk_header_t *hdr, uint8_t *hash) {
-  int32_t size = (int32_t)hdr->sol_size << 2;
+  int size = (int)hdr->sol_size << 2;
   uint8_t raw[size];
   encode_sol(raw, hdr->sol, hdr->sol_size);
   hsk_hash_blake2b(raw, size, hash);
 }
 
-int32_t
+int
 hsk_header_verify_pow(const hsk_header_t *hdr) {
   uint8_t target[32];
 
   if (!hsk_pow_to_target(hdr->bits, target))
     return HSK_ENEGTARGET;
 
-  int32_t size = ((int32_t)hdr->sol_size) << 2;
+  int size = ((int)hdr->sol_size) << 2;
 
   uint8_t raw[size];
   encode_sol(raw, hdr->sol, hdr->sol_size);

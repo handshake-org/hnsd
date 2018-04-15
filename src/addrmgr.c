@@ -34,12 +34,12 @@ hsk_addrman_is_stale(const hsk_addrman_t *am, const hsk_addrentry_t *entry);
 static double
 hsk_addrentry_chance(const hsk_addrentry_t *entry, int64_t now);
 
-int32_t
+int
 hsk_addrman_init(hsk_addrman_t *am, const hsk_timedata_t *td) {
   if (!am || !td)
     return HSK_EBADARGS;
 
-  int32_t rc = HSK_SUCCESS;
+  int rc = HSK_SUCCESS;
   hsk_addrentry_t *addrs = NULL;
 
   addrs = (hsk_addrentry_t *)calloc(HSK_ADDR_MAX, sizeof(hsk_addrentry_t));
@@ -102,9 +102,9 @@ hsk_addrman_free(hsk_addrman_t *am) {
 hsk_addrentry_t *
 hsk_addrman_alloc_entry(hsk_addrman_t *am, bool *alloc) {
   if (am->size == HSK_ADDR_MAX) {
-    int32_t i;
+    int i;
     for (i = 0; i < HSK_MIN(am->size, 10); i++) {
-      int32_t index = hsk_random() % am->size;
+      int index = hsk_random() % am->size;
       hsk_addrentry_t *entry = &am->addrs[index];
       if (hsk_addrman_is_stale(am, entry)) {
         hsk_map_del(&am->map, &entry->addr);
@@ -150,8 +150,8 @@ hsk_addrman_add_entry(hsk_addrman_t *am, const hsk_netaddr_t *na, bool src) {
   hsk_addr_to_string(&na->addr, host, HSK_MAX_HOST, HSK_PORT);
 
   if (entry) {
-    int32_t penalty = 2 * 60 * 60;
-    int32_t interval = 24 * 60 * 60;
+    int penalty = 2 * 60 * 60;
+    int interval = 24 * 60 * 60;
     int64_t now = hsk_timedata_now(am->td);
 
     if (!src)
@@ -180,7 +180,7 @@ hsk_addrman_add_entry(hsk_addrman_t *am, const hsk_netaddr_t *na, bool src) {
 
     uint32_t factor = 1;
 
-    int32_t i;
+    int i;
     for (i = 0; i < entry->ref_count; i++)
       factor *= 2;
 
@@ -256,7 +256,7 @@ hsk_addrman_add_sa(hsk_addrman_t *am, const struct sockaddr *sa) {
 bool
 hsk_addrman_add_ip(
   hsk_addrman_t *am,
-  int32_t af,
+  int af,
   const uint8_t *ip,
   uint16_t port
 ) {
@@ -397,7 +397,7 @@ hsk_addrman_search(const hsk_addrman_t *am) {
   double factor = 1;
 
   for (;;) {
-    int32_t i = hsk_random() % am->size;
+    int i = hsk_random() % am->size;
     hsk_addrentry_t *entry = &am->addrs[i];
 
     if (num < factor * hsk_addrentry_chance(entry, now) * (1 << 30))
@@ -412,7 +412,7 @@ hsk_addrman_search(const hsk_addrman_t *am) {
 const hsk_addrentry_t *
 hsk_addrman_pick(hsk_addrman_t *am, const hsk_map_t *map) {
   int64_t now = hsk_timedata_now(am->td);
-  int32_t i;
+  int i;
 
   for (i = 0; i < 100; i++) {
     const hsk_addrentry_t *entry = hsk_addrman_search(am);
@@ -517,7 +517,7 @@ hsk_addrentry_chance(const hsk_addrentry_t *entry, int64_t now) {
     c *= 0.01;
 
   double r = 1;
-  int32_t i;
+  int i;
 
   // c * (0.66 ^ attempts)
   for (i = 0; i < HSK_MIN(entry->attempts, 8); i++)

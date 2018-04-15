@@ -142,8 +142,8 @@ hsk_dns_req_print(const hsk_dns_req_t *req, const char *prefix) {
   printf("%s  name=%s\n", prefix, req->name);
   printf("%s  type=%d\n", prefix, req->type);
   printf("%s  class=%d\n", prefix, req->class);
-  printf("%s  edns=%d\n", prefix, (int32_t)req->edns);
-  printf("%s  dnssec=%d\n", prefix, (int32_t)req->dnssec);
+  printf("%s  edns=%d\n", prefix, (int)req->edns);
+  printf("%s  dnssec=%d\n", prefix, (int)req->dnssec);
   printf("%s  tld=%s\n", prefix, req->tld);
   printf("%s  addr=%s\n", prefix, addr);
 }

@@ -230,7 +230,7 @@ hsk_map_lookup(const hsk_map_t *map, const void *key) {
   return __hsk_iseither(map->flags, i) ? map->n_buckets : i;
 }
 
-int32_t
+int
 hsk_map_resize(hsk_map_t *map, uint32_t new_n_buckets) {
   // This function uses 0.25*n_buckets bytes of working space
   // instead of [sizeof(key_t+val_t)+.25]*n_buckets.
@@ -475,7 +475,7 @@ hsk_map_clear(hsk_map_t *map) {
 
 bool
 hsk_map_set(hsk_map_t *map, void *key, void *value) {
-  int32_t ret;
+  int ret;
   uint32_t k = hsk_map_put(map, key, &ret);
 
   if (ret == -1)
@@ -577,8 +577,8 @@ hsk_map_murmur3(const uint8_t *data, size_t data_len, uint32_t seed) {
   const uint32_t c1 = 0xcc9e2d51;
   const uint32_t c2 = 0x1b873593;
 
-  int32_t tail = data_len - (data_len % 4);
-  int32_t i;
+  int tail = data_len - (data_len % 4);
+  int i;
 
   uint32_t h1 = seed;
   uint32_t k1;

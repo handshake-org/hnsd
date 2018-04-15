@@ -13,16 +13,16 @@ typedef struct {
   bool legacy;
 } hsk_cuckoo_t;
 
-int32_t
+int
 hsk_cuckoo_init(
   hsk_cuckoo_t *ctx,
-  int32_t bits,
-  int32_t size,
-  int32_t ease,
+  int bits,
+  int size,
+  int ease,
   bool legacy
 );
 
-int32_t
+int
 hsk_cuckoo_sipkey(
   const hsk_cuckoo_t *ctx,
   const uint8_t *hdr,
@@ -35,17 +35,17 @@ hsk_cuckoo_sipnode(
   const hsk_cuckoo_t *ctx,
   const uint8_t *key,
   uint32_t nonce,
-  int32_t uorv
+  int uorv
 );
 
-int32_t
+int
 hsk_cuckoo_verify(
   const hsk_cuckoo_t *ctx,
   const uint8_t *key,
   const uint32_t *nonces
 );
 
-int32_t
+int
 hsk_cuckoo_verify_header(
   const hsk_cuckoo_t *ctx,
   const uint8_t *hdr,

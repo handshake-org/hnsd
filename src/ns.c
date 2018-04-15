@@ -43,14 +43,14 @@ hsk_ns_log(hsk_ns_t *ns, const char *fmt, ...);
 static void
 after_resolve(
   const char *name,
-  int32_t status,
+  int status,
   bool exists,
   const uint8_t *data,
   size_t data_len,
   const void *arg
 );
 
-int32_t
+int
 hsk_ns_send(
   hsk_ns_t *ns,
   uint8_t *data,
@@ -81,7 +81,7 @@ after_close(uv_handle_t *handle);
  * Root Nameserver
  */
 
-int32_t
+int
 hsk_ns_init(hsk_ns_t *ns, const uv_loop_t *loop, const hsk_pool_t *pool) {
   if (!ns || !loop || !pool)
     return HSK_EBADARGS;
@@ -164,7 +164,7 @@ hsk_ns_set_key(hsk_ns_t *ns, const uint8_t *key) {
   return true;
 }
 
-int32_t
+int
 hsk_ns_open(hsk_ns_t *ns, const struct sockaddr *addr) {
   if (!ns || !addr)
     return HSK_EBADARGS;
@@ -179,7 +179,7 @@ hsk_ns_open(hsk_ns_t *ns, const struct sockaddr *addr) {
 
   ns->bound = true;
 
-  int32_t value = sizeof(ns->read_buffer);
+  int value = sizeof(ns->read_buffer);
 
   if (uv_send_buffer_size((uv_handle_t *)&ns->socket, &value) != 0)
     return HSK_EFAILURE;
@@ -203,7 +203,7 @@ hsk_ns_open(hsk_ns_t *ns, const struct sockaddr *addr) {
   return HSK_SUCCESS;
 }
 
-int32_t
+int
 hsk_ns_close(hsk_ns_t *ns) {
   if (!ns)
     return HSK_EBADARGS;
@@ -248,12 +248,12 @@ hsk_ns_free(hsk_ns_t *ns) {
   free(ns);
 }
 
-int32_t
+int
 hsk_ns_destroy(hsk_ns_t *ns) {
   if (!ns)
     return HSK_EBADARGS;
 
-  int32_t rc = hsk_ns_close(ns);
+  int rc = hsk_ns_close(ns);
 
   if (rc != 0)
     return rc;
@@ -314,7 +314,7 @@ hsk_ns_onrecv(
   if (req->labels > 0) {
     req->ns = (void *)ns;
 
-    int32_t rc = hsk_pool_resolve(
+    int rc = hsk_pool_resolve(
       ns->pool,
       req->tld,
       after_resolve,
@@ -378,7 +378,7 @@ static void
 hsk_ns_respond(
   hsk_ns_t *ns,
   const hsk_dns_req_t *req,
-  int32_t status,
+  int status,
   const hsk_resource_t *res
 ) {
   hsk_dns_msg_t *msg = NULL;
@@ -447,7 +447,7 @@ hsk_ns_respond(
   hsk_ns_send(ns, wire, wire_len, req->addr, true);
 }
 
-int32_t
+int
 hsk_ns_send(
   hsk_ns_t *ns,
   uint8_t *data,
@@ -455,7 +455,7 @@ hsk_ns_send(
   const struct sockaddr *addr,
   bool should_free
 ) {
-  int32_t rc = HSK_SUCCESS;
+  int rc = HSK_SUCCESS;
   hsk_send_data_t *sd = NULL;
   uv_udp_send_t *req = NULL;
 
@@ -592,7 +592,7 @@ after_close(uv_handle_t *handle) {
 static void
 after_resolve(
   const char *name,
-  int32_t status,
+  int status,
   bool exists,
   const uint8_t *data,
   size_t data_len,

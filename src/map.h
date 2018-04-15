@@ -202,7 +202,7 @@ hsk_map_reset(hsk_map_t *map);
 uint32_t
 hsk_map_lookup(const hsk_map_t *map, const void *key);
 
-int32_t
+int
 hsk_map_resize(hsk_map_t *map, uint32_t new_n_buckets);
 
 uint32_t

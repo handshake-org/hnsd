@@ -255,7 +255,7 @@ hsk_cache_key_set(hsk_cache_key_t *ck, const char *name, uint16_t type) {
   if (hsk_dns_name_dirty(name))
     return false;
 
-  int32_t labels = hsk_dns_label_count(name);
+  int labels = hsk_dns_label_count(name);
   bool ref = false;
 
   switch (labels) {

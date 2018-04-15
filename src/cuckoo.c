@@ -10,12 +10,12 @@
 #include "error.h"
 #include "siphash.h"
 
-int32_t
+int
 hsk_cuckoo_init(
   hsk_cuckoo_t *ctx,
-  int32_t bits,
-  int32_t size,
-  int32_t ease,
+  int bits,
+  int size,
+  int ease,
   bool legacy
 ) {
   if (ctx == NULL)
@@ -56,7 +56,7 @@ hsk_cuckoo_init(
   return HSK_SUCCESS;
 }
 
-int32_t
+int
 hsk_cuckoo_sipkey(
   const hsk_cuckoo_t *ctx,
   const uint8_t *hdr,
@@ -80,7 +80,7 @@ hsk_cuckoo_sipnode(
   const hsk_cuckoo_t *ctx,
   const uint8_t *key,
   uint32_t nonce,
-  int32_t uorv
+  int uorv
 ) {
   assert(ctx != NULL);
   assert(key != NULL);
@@ -97,7 +97,7 @@ hsk_cuckoo_sipnode(
   return (node << 1) | uorv;
 }
 
-int32_t
+int
 hsk_cuckoo_verify(
   const hsk_cuckoo_t *ctx,
   const uint8_t *key,
@@ -111,7 +111,7 @@ hsk_cuckoo_verify(
   uint32_t xor0 = 0;
   uint32_t xor1 = 0;
 
-  for (int32_t n = 0; n < ctx->size; n++) {
+  for (int n = 0; n < ctx->size; n++) {
     if (nonces[n] >= ctx->easiness)
       return HSK_EPOWTOOBIG;
 
@@ -165,7 +165,7 @@ hsk_cuckoo_verify(
   return HSK_EPOWOK;
 }
 
-int32_t
+int
 hsk_cuckoo_verify_header(
   const hsk_cuckoo_t *ctx,
   const uint8_t *hdr,
