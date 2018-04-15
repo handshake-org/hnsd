@@ -84,7 +84,7 @@ hsk_peer_send_getheaders(hsk_peer_t *peer, const uint8_t *stop);
 
 static int
 hsk_peer_send_getproof(
-  hsk_peer_t *,
+  hsk_peer_t *peer,
   const uint8_t *name_hash,
   const uint8_t *root
 );
@@ -507,7 +507,6 @@ hsk_pool_resolve(
   return hsk_peer_send_getproof(peer, req->hash, root);
 }
 
-#if 0
 static void
 hsk_pool_resend(hsk_pool_t *pool) {
   if (!hsk_chain_synced(&pool->chain))
@@ -555,7 +554,6 @@ hsk_pool_resend(hsk_pool_t *pool) {
     hsk_peer_send_getproof(peer, req->hash, root);
   }
 }
-#endif
 
 static void
 hsk_pool_send_getheaders(hsk_pool_t *pool) {
@@ -571,7 +569,6 @@ hsk_pool_send_getheaders(hsk_pool_t *pool) {
   pool->getheaders_time = hsk_now();
 }
 
-#if 0
 static void
 hsk_pool_merge_reqs(hsk_pool_t *pool, hsk_map_t *map) {
   hsk_map_iter_t i;
@@ -622,7 +619,6 @@ hsk_pool_merge_reqs(hsk_pool_t *pool, hsk_map_t *map) {
     pool->pending_count = 0;
   }
 }
-#endif
 
 static void
 hsk_peer_timeout_reqs(hsk_peer_t *peer) {
