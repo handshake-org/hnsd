@@ -73,7 +73,7 @@ hsk_header_encode_pre(const hsk_header_t *hdr, uint8_t *data);
 bool
 hsk_header_equal(hsk_header_t *a, hsk_header_t *b);
 
-uint8_t *
+const uint8_t *
 hsk_header_cache(hsk_header_t *hdr);
 
 void

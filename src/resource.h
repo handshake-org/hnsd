@@ -11,7 +11,7 @@
 #define HSK_DELEGATE 8
 #define HSK_NS 9
 #define HSK_SERVICE 10
-#define HSK_URL 11
+#define HSK_URI 11
 #define HSK_EMAIL 12
 #define HSK_TEXT 13
 #define HSK_LOCATION 14
@@ -58,21 +58,21 @@ typedef hsk_host_record_t hsk_ns_record_t;
 
 typedef struct hsk_service_record_s {
   uint8_t type;
-  char service[33];
-  char protocol[33];
+  char service[256];
+  char protocol[256];
   uint8_t priority;
   uint8_t weight;
   hsk_target_t target;
   uint16_t port;
 } hsk_service_record_t;
 
-// url, email, text
+// uri, email, text
 typedef struct hsk_txt_record_s {
   uint8_t type;
   char text[256];
 } hsk_txt_record_t;
 
-typedef hsk_txt_record_t hsk_url_record_t;
+typedef hsk_txt_record_t hsk_uri_record_t;
 typedef hsk_txt_record_t hsk_email_record_t;
 typedef hsk_txt_record_t hsk_text_record_t;
 
@@ -89,7 +89,7 @@ typedef struct hsk_location_record_s {
 
 typedef struct hsk_magnet_record_s {
   uint8_t type;
-  char nid[33];
+  char nid[256];
   size_t nin_len;
   uint8_t nin[64];
 } hsk_magnet_record_t;
@@ -105,7 +105,7 @@ typedef struct hsk_ds_record_s {
 
 typedef struct hsk_tls_record_s {
   uint8_t type;
-  char protocol[33];
+  char protocol[256];
   uint16_t port;
   uint8_t usage;
   uint8_t selector;
@@ -139,7 +139,7 @@ typedef struct hsk_pgp_record_s {
 
 typedef struct hsk_addr_record_s {
   uint8_t type;
-  char currency[33];
+  char currency[256];
   char address[256];
   uint8_t ctype;
   bool testnet;
@@ -160,11 +160,13 @@ typedef struct hsk_symbol_table_s {
   char *strings[255];
   uint8_t sizes[255];
   uint8_t size;
+  hsk_dns_dmp_t dmp;
 } hsk_symbol_table_t;
 
 // Resource
 typedef struct hsk_resource_s {
   uint8_t version;
+  bool compat;
   uint32_t ttl;
   size_t record_count;
   hsk_record_t *records[255];

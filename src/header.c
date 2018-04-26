@@ -196,7 +196,7 @@ hsk_header_calc_work(hsk_header_t *hdr, const hsk_header_t *prev) {
 static bool
 read_sol(uint8_t **data, size_t *data_len, uint32_t *sol, uint8_t sol_size) {
 #ifndef HSK_BIG_ENDIAN
-  int size = (int)sol_size << 2;
+  int size = ((int)sol_size) << 2;
   if (!read_bytes(data, data_len, (uint8_t *)sol, size))
     return false;
 #else
@@ -212,13 +212,13 @@ read_sol(uint8_t **data, size_t *data_len, uint32_t *sol, uint8_t sol_size) {
 static size_t
 write_sol(uint8_t **data, const uint32_t *sol, uint8_t sol_size) {
 #ifndef HSK_BIG_ENDIAN
-  int size = (int)sol_size << 2;
+  int size = ((int)sol_size) << 2;
   return write_bytes(data, (uint8_t *)sol, size);
 #else
   int i;
   for (i = 0; i < sol_size; i++)
     write_u32(data, sol[i]);
-  return (int)sol_size << 2;
+  return ((int)sol_size) << 2;
 #endif
 }
 
@@ -325,7 +325,7 @@ hsk_header_equal(hsk_header_t *a, hsk_header_t *b) {
   return memcmp(hsk_header_cache(a), hsk_header_cache(b), 32) == 0;
 }
 
-uint8_t *
+const uint8_t *
 hsk_header_cache(hsk_header_t *hdr) {
   if (hdr->cache)
     return hdr->hash;
@@ -356,7 +356,7 @@ hsk_header_hash_pre(const hsk_header_t *hdr, uint8_t *hash) {
 
 void
 hsk_header_hash_sol(const hsk_header_t *hdr, uint8_t *hash) {
-  int size = (int)hdr->sol_size << 2;
+  int size = ((int)hdr->sol_size) << 2;
   uint8_t raw[size];
   encode_sol(raw, hdr->sol, hdr->sol_size);
   hsk_hash_blake2b(raw, size, hash);

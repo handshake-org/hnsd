@@ -689,7 +689,7 @@ hsk_dns_label_is_smimea(const char *name);
  * DNSSEC
  */
 
-int
+long
 hsk_dns_dnskey_keytag(const hsk_dns_dnskey_rd_t *rd);
 
 bool

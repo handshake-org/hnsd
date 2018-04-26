@@ -54,7 +54,7 @@ hsk_addr_is_onion(const hsk_addr_t *addr);
 bool
 hsk_addr_has_key(const hsk_addr_t *addr);
 
-uint16_t
+int
 hsk_addr_get_af(const hsk_addr_t *addr);
 
 uint8_t
@@ -67,7 +67,7 @@ const uint8_t *
 hsk_addr_get_ip(const hsk_addr_t *addr);
 
 bool
-hsk_addr_set_ip(hsk_addr_t *addr, uint16_t af, const uint8_t *ip);
+hsk_addr_set_ip(hsk_addr_t *addr, int af, const uint8_t *ip);
 
 uint16_t
 hsk_addr_get_port(const hsk_addr_t *addr);
@@ -90,7 +90,7 @@ hsk_addr_to_sa(const hsk_addr_t *addr, struct sockaddr *sa);
 bool
 hsk_addr_from_ip(
   hsk_addr_t *addr,
-  uint16_t af,
+  int af,
   const uint8_t *ip,
   uint16_t port
 );
@@ -98,7 +98,7 @@ hsk_addr_from_ip(
 bool
 hsk_addr_to_ip(
   const hsk_addr_t *addr,
-  uint16_t *af,
+  int *af,
   uint8_t *ip,
   uint16_t *port
 );

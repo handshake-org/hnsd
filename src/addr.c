@@ -75,7 +75,7 @@ static const uint8_t hsk_zero_pub[33] = {
 void
 hsk_addr_init(hsk_addr_t *addr) {
   assert(addr);
-  memset(addr, 0, sizeof(hsk_addr_t));
+  memset(addr, 0x00, sizeof(hsk_addr_t));
 }
 
 hsk_addr_t *
@@ -136,7 +136,7 @@ hsk_addr_has_key(const hsk_addr_t *addr) {
   return memcmp(addr->key, (void *)hsk_zero_pub, sizeof(hsk_zero_pub)) != 0;
 }
 
-uint16_t
+int
 hsk_addr_get_af(const hsk_addr_t *addr) {
   assert(addr);
   return hsk_addr_is_mapped(addr) ? AF_INET : AF_INET6;
@@ -164,7 +164,7 @@ hsk_addr_get_ip(const hsk_addr_t *addr) {
 }
 
 bool
-hsk_addr_set_ip(hsk_addr_t *addr, uint16_t af, const uint8_t *ip) {
+hsk_addr_set_ip(hsk_addr_t *addr, int af, const uint8_t *ip) {
   assert(addr && ip);
 
   if (af == AF_INET) {
@@ -240,7 +240,7 @@ bool
 hsk_addr_to_sa(const hsk_addr_t *addr, struct sockaddr *sa) {
   assert(addr && sa);
 
-  uint16_t af = hsk_addr_get_af(addr);
+  int af = hsk_addr_get_af(addr);
 
   if (af == AF_INET) {
     struct sockaddr_in *sai = (struct sockaddr_in *)sa;
@@ -264,7 +264,7 @@ hsk_addr_to_sa(const hsk_addr_t *addr, struct sockaddr *sa) {
 bool
 hsk_addr_from_ip(
   hsk_addr_t *addr,
-  uint16_t af,
+  int af,
   const uint8_t *ip,
   uint16_t port
 ) {
@@ -283,13 +283,13 @@ hsk_addr_from_ip(
 bool
 hsk_addr_to_ip(
   const hsk_addr_t *addr,
-  uint16_t *af,
+  int *af,
   uint8_t *ip,
   uint16_t *port
 ) {
   assert(addr && ip);
 
-  uint16_t family = hsk_addr_get_af(addr);
+  int family = hsk_addr_get_af(addr);
 
   *af = family;
 
@@ -404,6 +404,8 @@ hsk_addr_from_string(hsk_addr_t *addr, const char *src, uint16_t port) {
   uint8_t sin_addr[16];
   uint16_t af;
 
+  memset(&sin_addr[0], 0x00, 16);
+
   if (uv_inet_pton(AF_INET, host, sin_addr) == 0) {
     af = AF_INET;
   } else if (uv_inet_pton(AF_INET6, host, sin_addr) == 0) {
@@ -428,7 +430,7 @@ hsk_addr_to_string(
 ) {
   assert(addr && dst);
 
-  uint16_t af = hsk_addr_get_af(addr);
+  int af = hsk_addr_get_af(addr);
   const uint8_t *ip = hsk_addr_get_ip(addr);
   uint16_t port = addr->port;
 
@@ -494,7 +496,7 @@ bool
 hsk_addr_to_at(const hsk_addr_t *addr, char *dst, size_t dst_len, uint16_t fb) {
   assert(addr && dst);
 
-  uint16_t af = hsk_addr_get_af(addr);
+  int af = hsk_addr_get_af(addr);
   const uint8_t *ip = hsk_addr_get_ip(addr);
   uint16_t port = addr->port;
 

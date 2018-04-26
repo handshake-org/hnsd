@@ -516,7 +516,7 @@ hsk_chain_add(hsk_chain_t *chain, const hsk_header_t *h) {
     goto fail;
   }
 
-  uint8_t *hash = hsk_header_cache(hdr);
+  const uint8_t *hash = hsk_header_cache(hdr);
 
   hsk_chain_log(chain, "adding block: %s\n", hsk_hex_encode32(hash));
 
@@ -611,7 +611,7 @@ hsk_chain_insert(
   hsk_header_t *hdr,
   const hsk_header_t *prev
 ) {
-  uint8_t *hash = hsk_header_cache(hdr);
+  const uint8_t *hash = hsk_header_cache(hdr);
   int64_t mtp = hsk_chain_get_mtp(chain, prev);
 
   if ((int64_t)hdr->time <= mtp) {

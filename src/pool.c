@@ -1324,7 +1324,7 @@ hsk_peer_handle_headers(hsk_peer_t *peer, const hsk_headers_msg_t *msg) {
   if (msg->header_count > 2000)
     return HSK_EFAILURE;
 
-  uint8_t *last = NULL;
+  const uint8_t *last = NULL;
   hsk_header_t *hdr;
 
   for (hdr = msg->headers; hdr; hdr = hdr->next) {
@@ -1381,7 +1381,7 @@ hsk_peer_handle_headers(hsk_peer_t *peer, const hsk_headers_msg_t *msg) {
 
   if (orphan) {
     hsk_header_t *hdr = msg->headers;
-    uint8_t *hash = hsk_header_cache(hdr);
+    const uint8_t *hash = hsk_header_cache(hdr);
     hsk_peer_log(peer, "peer sent orphan: %s\n", hsk_hex_encode32(hash));
     hsk_peer_log(peer, "peer sending orphan locator\n");
     hsk_peer_send_getheaders(peer, NULL);

@@ -80,15 +80,21 @@ hsk_dns_req_create(
   // Grab the first question.
   hsk_dns_qs_t *qs = msg->qd.items[0];
 
+#if 0
   if (qs->class != HSK_DNS_IN)
     goto fail;
 
   // Don't allow dirty names.
   if (hsk_dns_name_dirty(qs->name))
     goto fail;
+#endif
 
   // Check for a TLD.
   hsk_dns_label_get(qs->name, -1, req->tld);
+
+  // Don't allow dirty TLDs.
+  if (hsk_dns_name_dirty(req->tld))
+    goto fail;
 
   // Lowercase.
   hsk_to_lower(req->tld);
@@ -207,6 +213,7 @@ hsk_dns_msg_finalize(
 
   hsk_dns_rr_set_name(qs, req->name);
   qs->type = req->type;
+  qs->class = req->class;
 
   hsk_dns_rrs_push(&msg->qd, qs);
 

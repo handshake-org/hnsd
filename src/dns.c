@@ -2858,7 +2858,7 @@ hsk_dns_label_is_smimea(const char *name) {
  * DNSSEC
  */
 
-int
+long
 hsk_dns_dnskey_keytag(const hsk_dns_dnskey_rd_t *rd) {
   uint8_t *data;
   size_t size;
@@ -2957,7 +2957,7 @@ hsk_dns_ds_create(const hsk_dns_rr_t *key) {
 
   hsk_dns_ds_rd_t *dsrd = ds->rd;
 
-  int key_tag = hsk_dns_dnskey_keytag(dnskey);
+  long key_tag = hsk_dns_dnskey_keytag(dnskey);
 
   if (key_tag == -1) {
     hsk_dns_rr_free(ds);
@@ -3063,7 +3063,7 @@ hsk_dns_sign_rrset(
 
   hsk_dns_rrsig_rd_t *rrsig = sig->rd;
 
-  int key_tag = hsk_dns_dnskey_keytag(dnskey);
+  long key_tag = hsk_dns_dnskey_keytag(dnskey);
 
   if (key_tag == -1) {
     hsk_dns_rr_free(sig);

@@ -206,7 +206,7 @@ int
 hsk_map_resize(hsk_map_t *map, uint32_t new_n_buckets);
 
 uint32_t
-hsk_map_put(hsk_map_t *map, void *key, int *ret);
+hsk_map_put(hsk_map_t *map, const void *key, int *ret);
 
 void
 hsk_map_delete(hsk_map_t *map, uint32_t x);
@@ -215,7 +215,7 @@ void
 hsk_map_clear(hsk_map_t *map);
 
 bool
-hsk_map_set(hsk_map_t *map, void *key, void *value);
+hsk_map_set(hsk_map_t *map, const void *key, void *value);
 
 void *
 hsk_map_get(const hsk_map_t *map, const void *key);

@@ -359,7 +359,7 @@ hsk_map_resize(hsk_map_t *map, uint32_t new_n_buckets) {
 }
 
 uint32_t
-hsk_map_put(hsk_map_t *map, void *key, int *ret) {
+hsk_map_put(hsk_map_t *map, const void *key, int *ret) {
   uint32_t x;
 
   // update the hash table
@@ -423,7 +423,7 @@ hsk_map_put(hsk_map_t *map, void *key, int *ret) {
 
   if (__hsk_isempty(map->flags, x)) {
     // not present at all
-    map->keys[x] = key;
+    map->keys[x] = (void *)key;
     __hsk_set_isboth_false(map->flags, x);
     map->size += 1;
     map->n_occupied += 1;
@@ -431,14 +431,14 @@ hsk_map_put(hsk_map_t *map, void *key, int *ret) {
       *ret = 1;
   } else if (__hsk_isdel(map->flags, x)) {
     // deleted
-    map->keys[x] = key;
+    map->keys[x] = (void *)key;
     __hsk_set_isboth_false(map->flags, x);
     map->size += 1;
     if (ret)
       *ret = 2;
   } else {
     // present and not deleted
-    map->keys[x] = key;
+    map->keys[x] = (void *)key;
     if (ret)
       *ret = 0;
   }
@@ -474,7 +474,7 @@ hsk_map_clear(hsk_map_t *map) {
 }
 
 bool
-hsk_map_set(hsk_map_t *map, void *key, void *value) {
+hsk_map_set(hsk_map_t *map, const void *key, void *value) {
   int ret;
   uint32_t k = hsk_map_put(map, key, &ret);
 

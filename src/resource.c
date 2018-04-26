@@ -28,6 +28,9 @@ static const uint8_t hsk_zero_inet6[16] = {
 };
 
 static void
+to_fqdn(char *name);
+
+static void
 ip_size(const uint8_t *ip, size_t *s, size_t *l);
 
 static size_t
@@ -170,7 +173,7 @@ hsk_resource_target_read(
       return read_bytes(data, data_len, target->onion, 33);
     }
     case HSK_NAME: {
-      return hsk_resource_str_read(data, data_len, st, target->name, 255);
+      return hsk_dns_name_read(data, data_len, &st->dmp, target->name);
     }
     default: {
       return false;
@@ -240,10 +243,16 @@ hsk_service_record_read(
   const hsk_symbol_table_t *st,
   hsk_service_record_t *rec
 ) {
-  if (!hsk_resource_str_read(data, data_len, st, rec->service, 32))
+  if (!hsk_dns_name_read(data, data_len, &st->dmp, rec->service))
     return false;
 
-  if (!hsk_resource_str_read(data, data_len, st, rec->protocol, 32))
+  if (hsk_dns_label_count(rec->service) != 1)
+    return false;
+
+  if (!hsk_dns_name_read(data, data_len, &st->dmp, rec->protocol))
+    return false;
+
+  if (hsk_dns_label_count(rec->protocol) != 1)
     return false;
 
   if (!read_u8(data, data_len, &rec->priority))
@@ -255,7 +264,7 @@ hsk_service_record_read(
   if (!hsk_resource_host_read(data, data_len, st, &rec->target))
     return false;
 
-  if (!read_u16(data, data_len, &rec->port))
+  if (!read_u16be(data, data_len, &rec->port))
     return false;
 
   return true;
@@ -274,9 +283,9 @@ hsk_location_record_read(
   read_u8(data, data_len, &rec->size);
   read_u8(data, data_len, &rec->horiz_pre);
   read_u8(data, data_len, &rec->vert_pre);
-  read_u32(data, data_len, &rec->latitude);
-  read_u32(data, data_len, &rec->longitude);
-  read_u32(data, data_len, &rec->altitude);
+  read_u32be(data, data_len, &rec->latitude);
+  read_u32be(data, data_len, &rec->longitude);
+  read_u32be(data, data_len, &rec->altitude);
 
   return true;
 }
@@ -288,7 +297,10 @@ hsk_magnet_record_read(
   const hsk_symbol_table_t *st,
   hsk_magnet_record_t *rec
 ) {
-  if (!hsk_resource_str_read(data, data_len, st, rec->nid, 32))
+  if (!hsk_dns_name_read(data, data_len, &st->dmp, rec->nid))
+    return false;
+
+  if (hsk_dns_label_count(rec->nid) != 1)
     return false;
 
   uint8_t size = 0;
@@ -316,7 +328,7 @@ hsk_ds_record_read(
     return false;
 
   uint8_t size = 0;
-  read_u16(data, data_len, &rec->key_tag);
+  read_u16be(data, data_len, &rec->key_tag);
   read_u8(data, data_len, &rec->algorithm);
   read_u8(data, data_len, &rec->digest_type);
   read_u8(data, data_len, &size);
@@ -339,14 +351,17 @@ hsk_tls_record_read(
   const hsk_symbol_table_t *st,
   hsk_tls_record_t *rec
 ) {
-  if (!hsk_resource_str_read(data, data_len, st, rec->protocol, 32))
+  if (!hsk_dns_name_read(data, data_len, &st->dmp, rec->protocol))
+    return false;
+
+  if (hsk_dns_label_count(rec->protocol) != 1)
     return false;
 
   if (*data_len < 6)
     return false;
 
   uint8_t size = 0;
-  read_u16(data, data_len, &rec->port);
+  read_u16be(data, data_len, &rec->port);
   read_u8(data, data_len, &rec->usage);
   read_u8(data, data_len, &rec->selector);
   read_u8(data, data_len, &rec->matching_type);
@@ -428,7 +443,7 @@ hsk_pgp_record_read(
     return false;
 
   uint16_t size = 0;
-  read_u16(data, data_len, &size);
+  read_u16be(data, data_len, &size);
 
   if (size > 512)
     return false;
@@ -457,7 +472,10 @@ hsk_addr_record_read(
 
   switch (ctype) {
     case 0: {
-      if (!hsk_resource_str_read(data, data_len, st, rec->currency, 32))
+      if (!hsk_dns_name_read(data, data_len, &st->dmp, rec->currency))
+        return false;
+
+      if (hsk_dns_label_count(rec->currency) != 1)
         return false;
 
       uint8_t size = 0;
@@ -493,14 +511,14 @@ hsk_addr_record_read(
       rec->hash_len = size;
 
       if (ctype == 1)
-        strcpy(rec->currency, "hsk");
+        strcpy(rec->currency, "handshake.");
       else
-        strcpy(rec->currency, "btc");
+        strcpy(rec->currency, "bitcoin.");
 
       break;
     }
     case 3: { // ETH
-      strcpy(rec->currency, "eth");
+      strcpy(rec->currency, "ethereum.");
 
       if (!read_bytes(data, data_len, rec->hash, 20))
         return false;
@@ -525,7 +543,7 @@ hsk_extra_record_read(
 ) {
   uint16_t size = 0;
 
-  if (!read_u16(data, data_len, &size))
+  if (!read_u16be(data, data_len, &size))
     return false;
 
   if (!read_bytes(data, data_len, rec->data, size))
@@ -574,7 +592,7 @@ hsk_record_init(hsk_record_t *r) {
       rec->port = 0;
       break;
     }
-    case HSK_URL:
+    case HSK_URI:
     case HSK_EMAIL:
     case HSK_TEXT: {
       hsk_txt_record_t *rec = (hsk_txt_record_t *)r;
@@ -684,7 +702,7 @@ hsk_record_alloc(uint8_t type) {
       r = (hsk_record_t *)malloc(sizeof(hsk_service_record_t));
       break;
     }
-    case HSK_URL:
+    case HSK_URI:
     case HSK_EMAIL:
     case HSK_TEXT: {
       r = (hsk_record_t *)malloc(sizeof(hsk_txt_record_t));
@@ -763,7 +781,7 @@ hsk_record_free(hsk_record_t *r) {
       free(rec);
       break;
     }
-    case HSK_URL:
+    case HSK_URI:
     case HSK_EMAIL:
     case HSK_TEXT: {
       hsk_txt_record_t *rec = (hsk_txt_record_t *)r;
@@ -870,7 +888,7 @@ hsk_record_read(
       result = hsk_service_record_read(data, data_len, st, rec);
       break;
     }
-    case HSK_URL:
+    case HSK_URI:
     case HSK_EMAIL:
     case HSK_TEXT: {
       hsk_txt_record_t *rec = (hsk_txt_record_t *)r;
@@ -941,8 +959,11 @@ hsk_resource_decode(
   hsk_resource_t **resource
 ) {
   uint8_t *dat = (uint8_t *)data;
+
   hsk_symbol_table_t st;
   st.size = 0;
+  st.dmp.msg = dat;
+  st.dmp.msg_len = data_len;
 
   hsk_resource_t *res = malloc(sizeof(hsk_resource_t));
 
@@ -950,6 +971,7 @@ hsk_resource_decode(
     goto fail;
 
   res->version = 0;
+  res->compat = false;
   res->ttl = 0;
   res->record_count = 0;
   memset(res->records, 0, sizeof(hsk_record_t *));
@@ -961,10 +983,14 @@ hsk_resource_decode(
     goto fail;
 
   uint16_t field;
-  if (!read_u16(&dat, &data_len, &field))
+  if (!read_u16be(&dat, &data_len, &field))
     goto fail;
 
-  res->ttl = ((uint32_t)field) << 6;
+  res->compat = (field & 0x8000) != 0;
+  res->ttl = ((uint32_t)(field & 0x7fff)) << 6;
+
+  if (res->ttl == 0)
+    res->ttl = 1 << 6;
 
   uint8_t st_size = 0;
   if (!read_u8(&dat, &data_len, &st_size))
@@ -1048,8 +1074,8 @@ hsk_resource_to_a(
     if (!rr)
       return false;
 
-    rr->ttl = res->ttl;
     hsk_dns_rr_set_name(rr, name);
+    rr->ttl = res->ttl;
 
     hsk_dns_a_rd_t *rd = rr->rd;
     memcpy(&rd->addr[0], &target->inet4[0], 4);
@@ -1082,8 +1108,8 @@ hsk_resource_to_aaaa(
     if (!rr)
       return false;
 
-    rr->ttl = res->ttl;
     hsk_dns_rr_set_name(rr, name);
+    rr->ttl = res->ttl;
 
     hsk_dns_aaaa_rd_t *rd = rr->rd;
     memcpy(&rd->addr[0], &target->inet6[0], 16);
@@ -1123,8 +1149,8 @@ hsk_resource_to_cname(
     if (!rr)
       return false;
 
-    rr->ttl = res->ttl;
     hsk_dns_rr_set_name(rr, name);
+    rr->ttl = res->ttl;
 
     hsk_dns_cname_rd_t *rd = rr->rd;
     strcpy(rd->target, cname);
@@ -1164,8 +1190,8 @@ hsk_resource_to_dname(
     if (!rr)
       return false;
 
-    rr->ttl = res->ttl;
     hsk_dns_rr_set_name(rr, name);
+    rr->ttl = res->ttl;
 
     hsk_dns_dname_rd_t *rd = rr->rd;
     strcpy(rd->target, dname);
@@ -1202,8 +1228,8 @@ hsk_resource_to_ns(
     if (!rr)
       return false;
 
-    rr->ttl = res->ttl;
     hsk_dns_rr_set_name(rr, name);
+    rr->ttl = res->ttl;
 
     hsk_dns_ns_rd_t *rd = rr->rd;
     strcpy(rd->ns, nsname);
@@ -1248,8 +1274,8 @@ hsk_resource_to_nsip(
     if (!rr)
       return false;
 
-    rr->ttl = res->ttl;
     hsk_dns_rr_set_name(rr, ptr);
+    rr->ttl = res->ttl;
 
     if (rrtype == HSK_DNS_A) {
       hsk_dns_a_rd_t *rd = rr->rd;
@@ -1307,8 +1333,8 @@ hsk_resource_to_srvip(
     if (!rr)
       return false;
 
-    rr->ttl = res->ttl;
     hsk_dns_rr_set_name(rr, ptr);
+    rr->ttl = res->ttl;
 
     if (rrtype == HSK_DNS_A) {
       hsk_dns_a_rd_t *rd = rr->rd;
@@ -1342,8 +1368,8 @@ hsk_resource_to_mx(
     hsk_service_record_t *rec = (hsk_service_record_t *)c;
     hsk_target_t *target = &rec->target;
 
-    if (strcmp(rec->service, "smtp") != 0
-        || strcmp(rec->protocol, "tcp") != 0) {
+    if (strcasecmp(rec->service, "smtp.") != 0
+        || strcasecmp(rec->protocol, "tcp.") != 0) {
       continue;
     }
 
@@ -1355,8 +1381,8 @@ hsk_resource_to_mx(
     if (!rr)
       return false;
 
-    rr->ttl = res->ttl;
     hsk_dns_rr_set_name(rr, name);
+    rr->ttl = res->ttl;
 
     hsk_dns_mx_rd_t *rd = rr->rd;
     rd->preference = rec->priority;
@@ -1374,7 +1400,7 @@ hsk_resource_to_mxip(
   const char *name,
   hsk_dns_rrs_t *an
 ) {
-  return hsk_resource_to_srvip(res, name, "tcp", "smtp", an);
+  return hsk_resource_to_srvip(res, name, "tcp.", "smtp.", an);
 }
 
 static bool
@@ -1411,8 +1437,8 @@ hsk_resource_to_srv(
     if (!rr)
       return false;
 
-    rr->ttl = res->ttl;
     hsk_dns_rr_set_name(rr, name);
+    rr->ttl = res->ttl;
 
     hsk_dns_srv_rd_t *rd = rr->rd;
 
@@ -1433,17 +1459,8 @@ hsk_resource_to_txt(
   const char *name,
   hsk_dns_rrs_t *an
 ) {
-  hsk_dns_rr_t *rr = hsk_dns_rr_create(HSK_DNS_TXT);
-
-  if (!rr)
-    return false;
-
-  rr->ttl = res->ttl;
-  hsk_dns_rr_set_name(rr, name);
-
-  hsk_dns_txt_rd_t *rd = rr->rd;
-
   int i;
+
   for (i = 0; i < res->record_count; i++) {
     hsk_record_t *c = res->records[i];
 
@@ -1452,10 +1469,22 @@ hsk_resource_to_txt(
 
     hsk_text_record_t *rec = (hsk_text_record_t *)c;
 
+    hsk_dns_rr_t *rr = hsk_dns_rr_create(HSK_DNS_TXT);
+
+    if (!rr)
+      return false;
+
+    rr->ttl = res->ttl;
+    hsk_dns_rr_set_name(rr, name);
+
+    hsk_dns_txt_rd_t *rd = rr->rd;
+
     hsk_dns_txt_t *txt = hsk_dns_txt_alloc();
 
-    if (!txt)
+    if (!txt) {
+      hsk_dns_rr_free(rr);
       return false;
+    }
 
     txt->data_len = strlen(rec->text);
     assert(txt->data_len <= 255);
@@ -1463,9 +1492,9 @@ hsk_resource_to_txt(
     memcpy(&txt->data[0], rec->text, txt->data_len);
 
     hsk_dns_txts_push(&rd->txts, txt);
-  }
 
-  hsk_dns_rrs_push(an, rr);
+    hsk_dns_rrs_push(an, rr);
+  }
 
   return true;
 }
@@ -1491,8 +1520,8 @@ hsk_resource_to_loc(
     if (!rr)
       return false;
 
-    rr->ttl = res->ttl;
     hsk_dns_rr_set_name(rr, name);
+    rr->ttl = res->ttl;
 
     hsk_dns_loc_rd_t *rd = rr->rd;
 
@@ -1531,8 +1560,8 @@ hsk_resource_to_ds(
     if (!rr)
       return false;
 
-    rr->ttl = res->ttl;
     hsk_dns_rr_set_name(rr, name);
+    rr->ttl = res->ttl;
 
     hsk_dns_ds_rd_t *rd = rr->rd;
 
@@ -1585,8 +1614,8 @@ hsk_resource_to_tlsa(
     if (!rr)
       return false;
 
-    rr->ttl = res->ttl;
     hsk_dns_rr_set_name(rr, name);
+    rr->ttl = res->ttl;
 
     hsk_dns_tlsa_rd_t *rd = rr->rd;
 
@@ -1635,8 +1664,8 @@ hsk_resource_to_smimea(
     if (!rr)
       return false;
 
-    rr->ttl = res->ttl;
     hsk_dns_rr_set_name(rr, name);
+    rr->ttl = res->ttl;
 
     hsk_dns_smimea_rd_t *rd = rr->rd;
 
@@ -1681,8 +1710,8 @@ hsk_resource_to_sshfp(
     if (!rr)
       return false;
 
-    rr->ttl = res->ttl;
     hsk_dns_rr_set_name(rr, name);
+    rr->ttl = res->ttl;
 
     hsk_dns_sshfp_rd_t *rd = rr->rd;
 
@@ -1726,8 +1755,8 @@ hsk_resource_to_openpgpkey(
     if (!rr)
       return false;
 
-    rr->ttl = res->ttl;
     hsk_dns_rr_set_name(rr, name);
+    rr->ttl = res->ttl;
 
     hsk_dns_openpgpkey_rd_t *rd = rr->rd;
     rd->pubkey_len = rec->pubkey_len;
@@ -1758,18 +1787,18 @@ hsk_resource_to_uri(
   for (i = 0; i < res->record_count; i++) {
     hsk_record_t *c = res->records[i];
 
-    if (c->type != HSK_URL)
+    if (c->type != HSK_URI)
       continue;
 
-    hsk_url_record_t *rec = (hsk_url_record_t *)c;
+    hsk_uri_record_t *rec = (hsk_uri_record_t *)c;
 
     hsk_dns_rr_t *rr = hsk_dns_rr_create(HSK_DNS_URI);
 
     if (!rr)
       return false;
 
-    rr->ttl = res->ttl;
     hsk_dns_rr_set_name(rr, name);
+    rr->ttl = res->ttl;
 
     hsk_dns_uri_rd_t *rd = rr->rd;
 
@@ -1784,6 +1813,107 @@ hsk_resource_to_uri(
     hsk_dns_rrs_push(an, rr);
   }
 
+  char nid[HSK_DNS_MAX_LABEL + 1];
+  char nin[HSK_DNS_MAX_NAME + 1];
+
+  for (i = 0; i < res->record_count; i++) {
+    hsk_record_t *c = res->records[i];
+
+    if (c->type != HSK_MAGNET)
+      continue;
+
+    hsk_magnet_record_t *rec = (hsk_magnet_record_t *)c;
+
+    size_t nid_len = hsk_dns_label_get(rec->nid, 0, nid);
+    hsk_to_lower(nid);
+
+    size_t len = 16 + nid_len + rec->nin_len * 2;
+
+    if (len + 1 > 255)
+      continue;
+
+    hsk_dns_rr_t *rr = hsk_dns_rr_create(HSK_DNS_URI);
+
+    if (!rr)
+      return false;
+
+    hsk_dns_rr_set_name(rr, name);
+    rr->ttl = res->ttl;
+
+    assert(rec->nin_len <= 64);
+    hsk_hex_encode(rec->nin, rec->nin_len, nin);
+
+    hsk_dns_uri_rd_t *rd = rr->rd;
+
+    rd->priority = 0;
+    rd->weight = 0;
+    rd->data_len = len;
+
+    assert(rd->data_len <= 255);
+
+    sprintf((char *)rd->data, "magnet:?xt=urn:%s:%s", nid, nin);
+
+    hsk_dns_rrs_push(an, rr);
+  }
+
+  char *currency = &nid[0];
+  char *addr = &nin[0];
+
+  for (i = 0; i < res->record_count; i++) {
+    hsk_record_t *c = res->records[i];
+
+    if (c->type != HSK_ADDR)
+      continue;
+
+    hsk_addr_record_t *rec = (hsk_addr_record_t *)c;
+
+    if (rec->ctype != 0 && rec->ctype != 3)
+      continue;
+
+    size_t currency_len = hsk_dns_label_get(rec->currency, 0, currency);
+    hsk_to_lower(currency);
+
+    size_t addr_len = 0;
+
+    if (rec->ctype == 0) {
+      addr_len = strlen(rec->address);
+      memcpy(addr, rec->address, addr_len);
+    } else if (rec->ctype == 3) {
+      assert(rec->hash_len <= 64);
+      addr_len = 2 + rec->hash_len * 2;
+      addr[0] = '0';
+      addr[1] = 'x';
+      hsk_hex_encode(rec->hash, rec->hash_len, &addr[2]);
+    } else {
+      assert(0);
+    }
+
+    size_t len = currency_len + 1 + addr_len;
+
+    if (len + 1 > 255)
+      continue;
+
+    hsk_dns_rr_t *rr = hsk_dns_rr_create(HSK_DNS_URI);
+
+    if (!rr)
+      return false;
+
+    hsk_dns_rr_set_name(rr, name);
+    rr->ttl = res->ttl;
+
+    hsk_dns_uri_rd_t *rd = rr->rd;
+
+    rd->priority = 0;
+    rd->weight = 0;
+    rd->data_len = len;
+
+    assert(rd->data_len <= 255);
+
+    sprintf((char *)rd->data, "%s:%s", currency, addr);
+
+    hsk_dns_rrs_push(an, rr);
+  }
+
   return true;
 }
 
@@ -1793,6 +1923,7 @@ hsk_resource_to_rp(
   const char *name,
   hsk_dns_rrs_t *an
 ) {
+  char mbox[HSK_DNS_MAX_NAME + 2];
   int i;
 
   for (i = 0; i < res->record_count; i++) {
@@ -1803,17 +1934,25 @@ hsk_resource_to_rp(
 
     hsk_email_record_t *rec = (hsk_email_record_t *)c;
 
+    if (strlen(rec->text) > 63)
+      continue;
+
+    sprintf(mbox, "%s.", rec->text);
+
+    if (!hsk_dns_name_verify(mbox))
+      continue;
+
     hsk_dns_rr_t *rr = hsk_dns_rr_create(HSK_DNS_RP);
 
     if (!rr)
       return false;
 
-    rr->ttl = res->ttl;
     hsk_dns_rr_set_name(rr, name);
+    rr->ttl = res->ttl;
 
     hsk_dns_rp_rd_t *rd = rr->rd;
 
-    strcpy(rd->mbox, rec->text);
+    strcpy(rd->mbox, mbox);
     strcpy(rd->txt, ".");
 
     hsk_dns_rrs_push(an, rr);
@@ -1857,8 +1996,8 @@ hsk_resource_to_glue(const hsk_resource_t *res, hsk_dns_rrs_t *an) {
       if (!rr)
         return false;
 
-      rr->ttl = res->ttl;
       hsk_dns_rr_set_name(rr, target->name);
+      rr->ttl = res->ttl;
 
       hsk_dns_a_rd_t *rd = rr->rd;
       memcpy(&rd->addr[0], &target->inet4[0], 4);
@@ -1872,8 +2011,8 @@ hsk_resource_to_glue(const hsk_resource_t *res, hsk_dns_rrs_t *an) {
       if (!rr)
         return false;
 
-      rr->ttl = res->ttl;
       hsk_dns_rr_set_name(rr, target->name);
+      rr->ttl = res->ttl;
 
       hsk_dns_aaaa_rd_t *rd = rr->rd;
       memcpy(&rd->addr[0], &target->inet6[0], 16);
@@ -2027,6 +2166,8 @@ hsk_resource_root_to_ds(hsk_dns_rrs_t *an) {
 
 hsk_dns_msg_t *
 hsk_resource_to_dns(const hsk_resource_t *rs, const char *name, uint16_t type) {
+  assert(hsk_dns_name_is_fqdn(name));
+
   int labels = hsk_dns_label_count(name);
 
   if (labels == 0)
@@ -2107,11 +2248,13 @@ hsk_resource_to_dns(const hsk_resource_t *rs, const char *name, uint16_t type) {
   if (labels == 3) {
     switch (type) {
       case HSK_DNS_SRV: {
-        char protocol[HSK_DNS_MAX_LABEL + 1];
-        char service[HSK_DNS_MAX_LABEL + 1];
+        char protocol[HSK_DNS_MAX_LABEL + 2];
+        char service[HSK_DNS_MAX_LABEL + 2];
         bool is_srv = hsk_dns_label_decode_srv(name, protocol, service);
 
         if (is_srv) {
+          to_fqdn(protocol);
+          to_fqdn(service);
           hsk_resource_to_srv(rs, name, protocol, service, an);
           hsk_resource_to_srvip(rs, name, protocol, service, ar);
           hsk_dnssec_sign_zsk(an, HSK_DNS_SRV);
@@ -2120,11 +2263,12 @@ hsk_resource_to_dns(const hsk_resource_t *rs, const char *name, uint16_t type) {
         break;
       }
       case HSK_DNS_TLSA: {
-        char protocol[HSK_DNS_MAX_LABEL + 1];
+        char protocol[HSK_DNS_MAX_LABEL + 2];
         uint16_t port;
         bool is_tlsa = hsk_dns_label_decode_tlsa(name, protocol, &port);
 
         if (is_tlsa) {
+          to_fqdn(protocol);
           hsk_resource_to_tlsa(rs, name, protocol, port, an);
           hsk_dnssec_sign_zsk(an, HSK_DNS_TLSA);
         }
@@ -2154,7 +2298,7 @@ hsk_resource_to_dns(const hsk_resource_t *rs, const char *name, uint16_t type) {
   if (labels > 1) {
     char tld[HSK_DNS_MAX_LABEL + 1];
 
-    hsk_dns_label_get(name, -1, tld);
+    hsk_dns_label_from(name, -1, tld);
 
     if (hsk_resource_has(rs, HSK_NS)) {
       hsk_resource_to_ns(rs, tld, ns);
@@ -2361,6 +2505,14 @@ hsk_resource_to_servfail(void) {
  */
 
 static void
+to_fqdn(char *name) {
+  size_t len = strlen(name);
+  assert(len <= 63);
+  name[len] = '.';
+  name[len + 1] = '\0';
+}
+
+static void
 ip_size(const uint8_t *ip, size_t *s, size_t *l) {
   bool out = true;
   int last = 0;
@@ -2511,17 +2663,8 @@ pointer_to_ip(const char *name, uint8_t *ip, uint16_t *family) {
 static bool
 target_to_dns(const hsk_target_t *target, const char *name, char *host) {
   if (target->type == HSK_NAME || target->type == HSK_GLUE) {
-    if (!hsk_dns_name_verify(target->name))
-      return false;
-
-    if (hsk_dns_name_dirty(target->name))
-      return false;
-
-    if (hsk_dns_name_is_fqdn(target->name))
-      strcpy(host, target->name);
-    else
-      sprintf(host, "%s.", target->name);
-
+    assert(hsk_dns_name_is_fqdn(target->name));
+    strcpy(host, target->name);
     return true;
   }
 
