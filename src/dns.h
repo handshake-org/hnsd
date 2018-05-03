@@ -206,6 +206,9 @@ typedef struct {
 #define HSK_DNS_MAX_SANITIZED 1009
 #define HSK_DNS_MAX_LABELS 128
 #define HSK_DNS_MAX_UDP 512
+#define HSK_DNS_STD_EDNS 1280
+#define HSK_DNS_MAX_EDNS 4096
+#define HSK_DNS_MAX_TCP 65535
 
 // Opcodes
 #define HSK_DNS_QUERY 0

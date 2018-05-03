@@ -116,8 +116,11 @@ hsk_dns_req_create(
   req->ad = (msg->flags & HSK_DNS_AD) != 0;
   req->edns = msg->edns.enabled;
   req->max_size = HSK_DNS_MAX_UDP;
-  if (msg->edns.enabled && msg->edns.size >= HSK_DNS_MAX_UDP)
+  if (msg->edns.enabled && msg->edns.size >= HSK_DNS_MAX_UDP) {
     req->max_size = msg->edns.size;
+    if (req->max_size > HSK_DNS_MAX_EDNS)
+      req->max_size = HSK_DNS_MAX_EDNS;
+  }
   req->dnssec = (msg->edns.flags & HSK_DNS_DO) != 0;
 
   // Sender address.
@@ -189,7 +192,7 @@ hsk_dns_msg_finalize(
   msg->edns.enabled = false;
   msg->edns.version = 0;
   msg->edns.flags = 0;
-  msg->edns.size = 512;
+  msg->edns.size = HSK_DNS_MAX_UDP;
   msg->edns.code = 0;
   msg->edns.rd_len = 0;
 
@@ -200,7 +203,7 @@ hsk_dns_msg_finalize(
 
   if (req->edns) {
     msg->edns.enabled = true;
-    msg->edns.size = 4096;
+    msg->edns.size = HSK_DNS_MAX_EDNS;
     if (req->dnssec)
       msg->edns.flags |= HSK_DNS_DO;
   }
