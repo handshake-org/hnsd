@@ -1962,12 +1962,55 @@ hsk_resource_to_rp(
 }
 
 static bool
-hsk_resource_to_glue(const hsk_resource_t *res, hsk_dns_rrs_t *an) {
+hsk_resource_to_glue(
+  const hsk_resource_t *res,
+  hsk_dns_rrs_t *an,
+  uint16_t rrtype
+) {
   int i;
 
   for (i = 0; i < res->record_count; i++) {
     hsk_record_t *c = res->records[i];
     hsk_target_t *target;
+
+    switch (c->type) {
+      case HSK_CANONICAL: {
+        if (rrtype != HSK_DNS_CNAME)
+          continue;
+
+        break;
+      }
+      case HSK_DELEGATE: {
+        if (rrtype != HSK_DNS_DNAME)
+          continue;
+
+        break;
+      }
+      case HSK_NS: {
+        if (rrtype != HSK_DNS_NS)
+          continue;
+
+        break;
+      }
+      case HSK_SERVICE: {
+        if (rrtype != HSK_DNS_SRV && rrtype != HSK_DNS_MX)
+          continue;
+
+        if (rrtype == HSK_DNS_MX) {
+          hsk_service_record_t *rec = (hsk_service_record_t *)c;
+
+          if (strcasecmp(rec->service, "smtp.") != 0
+              || strcasecmp(rec->protocol, "tcp.") != 0) {
+            continue;
+          }
+        }
+
+        break;
+      }
+      default: {
+        continue;
+      }
+    }
 
     switch (c->type) {
       case HSK_CANONICAL:
@@ -2255,7 +2298,10 @@ hsk_resource_to_dns(const hsk_resource_t *rs, const char *name, uint16_t type) {
           to_fqdn(service);
           hsk_resource_to_srv(rs, name, protocol, service, an);
           hsk_resource_to_srvip(rs, name, protocol, service, ar);
+          hsk_resource_to_glue(rs, ar, HSK_DNS_SRV);
           hsk_dnssec_sign_zsk(an, HSK_DNS_SRV);
+          hsk_dnssec_sign_zsk(ar, HSK_DNS_A);
+          hsk_dnssec_sign_zsk(ar, HSK_DNS_AAAA);
         }
 
         break;
@@ -2300,15 +2346,22 @@ hsk_resource_to_dns(const hsk_resource_t *rs, const char *name, uint16_t type) {
 
     if (hsk_resource_has(rs, HSK_NS)) {
       hsk_resource_to_ns(rs, tld, ns);
-      hsk_resource_to_nsip(rs, tld, ar);
-      hsk_resource_to_glue(rs, ar);
-      hsk_dnssec_sign_zsk(ns, HSK_DNS_NS);
       hsk_resource_to_ds(rs, tld, ns);
-      hsk_dnssec_sign_zsk(ns, HSK_DNS_DS);
+      hsk_resource_to_nsip(rs, tld, ar);
+      hsk_resource_to_glue(rs, ar, HSK_DNS_NS);
+      if (!hsk_resource_has(rs, HSK_DS)) {
+        hsk_dnssec_sign_zsk(ns, HSK_DNS_NS);
+        hsk_dnssec_sign_zsk(ar, HSK_DNS_A);
+        hsk_dnssec_sign_zsk(ar, HSK_DNS_AAAA);
+      } else {
+        hsk_dnssec_sign_zsk(ns, HSK_DNS_DS);
+      }
     } else if (hsk_resource_has(rs, HSK_DELEGATE)) {
       hsk_resource_to_dname(rs, name, an);
-      hsk_resource_to_glue(rs, ar);
+      hsk_resource_to_glue(rs, ar, HSK_DNS_DNAME);
       hsk_dnssec_sign_zsk(an, HSK_DNS_DNAME);
+      hsk_dnssec_sign_zsk(ar, HSK_DNS_A);
+      hsk_dnssec_sign_zsk(ar, HSK_DNS_AAAA);
     } else {
       // Needs SOA.
       hsk_resource_root_to_soa(ns);
@@ -2329,21 +2382,33 @@ hsk_resource_to_dns(const hsk_resource_t *rs, const char *name, uint16_t type) {
       break;
     case HSK_DNS_CNAME:
       hsk_resource_to_cname(rs, name, an);
+      hsk_resource_to_glue(rs, ar, HSK_DNS_CNAME);
       hsk_dnssec_sign_zsk(an, HSK_DNS_CNAME);
+      hsk_dnssec_sign_zsk(ar, HSK_DNS_A);
+      hsk_dnssec_sign_zsk(ar, HSK_DNS_AAAA);
       break;
     case HSK_DNS_DNAME:
       hsk_resource_to_dname(rs, name, an);
+      hsk_resource_to_glue(rs, ar, HSK_DNS_DNAME);
       hsk_dnssec_sign_zsk(an, HSK_DNS_DNAME);
+      hsk_dnssec_sign_zsk(ar, HSK_DNS_A);
+      hsk_dnssec_sign_zsk(ar, HSK_DNS_AAAA);
       break;
     case HSK_DNS_NS:
       hsk_resource_to_ns(rs, name, ns);
+      hsk_resource_to_glue(rs, ar, HSK_DNS_NS);
       hsk_resource_to_nsip(rs, name, ar);
       hsk_dnssec_sign_zsk(ns, HSK_DNS_NS);
+      hsk_dnssec_sign_zsk(ar, HSK_DNS_A);
+      hsk_dnssec_sign_zsk(ar, HSK_DNS_AAAA);
       break;
     case HSK_DNS_MX:
       hsk_resource_to_mx(rs, name, an);
       hsk_resource_to_mxip(rs, name, ar);
+      hsk_resource_to_glue(rs, ar, HSK_DNS_MX);
       hsk_dnssec_sign_zsk(an, HSK_DNS_MX);
+      hsk_dnssec_sign_zsk(ar, HSK_DNS_A);
+      hsk_dnssec_sign_zsk(ar, HSK_DNS_AAAA);
       break;
     case HSK_DNS_TXT:
       hsk_resource_to_txt(rs, name, an);
@@ -2382,21 +2447,28 @@ hsk_resource_to_dns(const hsk_resource_t *rs, const char *name, uint16_t type) {
     if (hsk_resource_has(rs, HSK_CANONICAL)) {
       msg->flags |= HSK_DNS_AA;
       hsk_resource_to_cname(rs, name, an);
+      hsk_resource_to_glue(rs, ar, HSK_DNS_CNAME);
       hsk_dnssec_sign_zsk(an, HSK_DNS_CNAME);
+      hsk_dnssec_sign_zsk(ar, HSK_DNS_A);
+      hsk_dnssec_sign_zsk(ar, HSK_DNS_AAAA);
     } else if (hsk_resource_has(rs, HSK_NS)) {
       hsk_resource_to_ns(rs, name, ns);
-      hsk_resource_to_nsip(rs, name, ar);
-      hsk_dnssec_sign_zsk(ns, HSK_DNS_NS);
       hsk_resource_to_ds(rs, name, ns);
-      hsk_dnssec_sign_zsk(ns, HSK_DNS_DS);
+      hsk_resource_to_nsip(rs, name, ar);
+      hsk_resource_to_glue(rs, ar, HSK_DNS_NS);
+      if (!hsk_resource_has(rs, HSK_DS)) {
+        hsk_dnssec_sign_zsk(ns, HSK_DNS_NS);
+        hsk_dnssec_sign_zsk(ar, HSK_DNS_A);
+        hsk_dnssec_sign_zsk(ar, HSK_DNS_AAAA);
+      } else {
+        hsk_dnssec_sign_zsk(ns, HSK_DNS_DS);
+      }
     } else {
       // Needs SOA.
       hsk_resource_root_to_soa(ns);
       hsk_dnssec_sign_zsk(ns, HSK_DNS_SOA);
     }
   }
-
-  hsk_resource_to_glue(rs, ar);
 
   return msg;
 }
