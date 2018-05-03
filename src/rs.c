@@ -402,6 +402,11 @@ hsk_rs_onrecv(
 
   req->ns = (void *)ns;
 
+  if (req->type == HSK_DNS_ANY) {
+    msg = hsk_resource_to_notimp();
+    goto fail;
+  }
+
   rc = ub_resolve_async(
     ns->ub,
     req->name,
@@ -419,6 +424,7 @@ hsk_rs_onrecv(
 
   msg = hsk_resource_to_servfail();
 
+fail:
   if (!msg) {
     hsk_rs_log(ns, "could not create servfail\n");
     goto done;

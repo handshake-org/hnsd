@@ -200,6 +200,9 @@ hsk_resource_to_nx(void);
 hsk_dns_msg_t *
 hsk_resource_to_servfail(void);
 
+hsk_dns_msg_t *
+hsk_resource_to_notimp(void);
+
 bool
 hsk_resource_is_ptr(const char *name);
 #endif
