@@ -2178,8 +2178,6 @@ hsk_resource_to_dns(const hsk_resource_t *rs, const char *name, uint16_t type) {
   if (!msg)
     return NULL;
 
-  msg->flags |= HSK_DNS_AD;
-
   hsk_dns_rrs_t *an = &msg->an;
   hsk_dns_rrs_t *ns = &msg->ns;
   hsk_dns_rrs_t *ar = &msg->ar;
@@ -2410,7 +2408,6 @@ hsk_resource_root(uint16_t type, const hsk_addr_t *addr) {
   if (!msg)
     return NULL;
 
-  msg->flags |= HSK_DNS_AD;
   msg->flags |= HSK_DNS_AA;
 
   hsk_dns_rrs_t *an = &msg->an;
@@ -2477,7 +2474,6 @@ hsk_resource_to_nx(void) {
     return NULL;
 
   msg->code = HSK_DNS_NXDOMAIN;
-  msg->flags |= HSK_DNS_AD;
   msg->flags |= HSK_DNS_AA;
 
   hsk_dns_rrs_t *ns = &msg->ns;

@@ -23,6 +23,7 @@ typedef struct {
   uint16_t class;
   bool rd;
   bool cd;
+  bool ad;
   bool edns;
   size_t max_size;
   bool dnssec;

@@ -3287,13 +3287,14 @@ hsk_dns_rrs_clean(hsk_dns_rrs_t *rrs, uint16_t type) {
     hsk_dns_rr_t *rr = rrs->items[i];
 
     switch (rr->type) {
-      case HSK_DNS_RRSIG:
-      case HSK_DNS_DNSKEY:
       case HSK_DNS_DS:
+      case HSK_DNS_DLV:
+      case HSK_DNS_DNSKEY:
+      case HSK_DNS_RRSIG:
+      case HSK_DNS_NXT:
+      case HSK_DNS_NSEC:
       case HSK_DNS_NSEC3:
       case HSK_DNS_NSEC3PARAM:
-      case HSK_DNS_NSEC:
-      case HSK_DNS_NXT:
         if (type != rr->type) {
           hsk_dns_rr_free(rr);
           rrs->items[i] = NULL;

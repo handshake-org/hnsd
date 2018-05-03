@@ -25,6 +25,9 @@ hsk_dns_req_init(hsk_dns_req_t *req) {
   memset(req->name, 0x00, sizeof(req->name));
   req->type = 0;
   req->class = 0;
+  req->rd = false;
+  req->cd = false;
+  req->ad = false;
   req->edns = false;
   req->dnssec = false;
   memset(req->tld, 0x00, sizeof(req->tld));
@@ -110,6 +113,7 @@ hsk_dns_req_create(
   req->class = qs->class;
   req->rd = (msg->flags & HSK_DNS_RD) != 0;
   req->cd = (msg->flags & HSK_DNS_CD) != 0;
+  req->ad = (msg->flags & HSK_DNS_AD) != 0;
   req->edns = msg->edns.enabled;
   req->max_size = HSK_DNS_MAX_UDP;
   if (msg->edns.enabled && msg->edns.size >= HSK_DNS_MAX_UDP)
@@ -219,9 +223,12 @@ hsk_dns_msg_finalize(
 
   // Remove RRSIGs if they didn't ask for them.
   if (!req->dnssec) {
-    if (!hsk_dns_msg_clean(msg, req->type)) {
-      hsk_dns_msg_free(msg);
-      return false;
+    // If we're recursive, and the query was ANY, do not remove.
+    if (!(msg->flags & HSK_DNS_RA) || req->type != HSK_DNS_ANY) {
+      if (!hsk_dns_msg_clean(msg, req->type)) {
+        hsk_dns_msg_free(msg);
+        return false;
+      }
     }
   }
 
