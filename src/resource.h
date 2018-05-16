@@ -133,6 +133,7 @@ typedef struct hsk_ssh_record_s {
 } hsk_ssh_record_t;
 
 typedef struct hsk_pgp_record_s {
+  uint8_t hash[28];
   size_t pubkey_len;
   uint8_t pubkey[512];
 } hsk_pgp_record_t;

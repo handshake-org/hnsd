@@ -220,7 +220,10 @@ uint32_t
 hsk_cache_key_hash(const void *key) {
   hsk_cache_key_t *ck = (hsk_cache_key_t *)key;
   assert(ck);
-  return hsk_map_tweak3(ck->name, ck->name_len, ck->ref ? 2 : 1, ck->type);
+  // Ignore type if referral.
+  if (ck->ref)
+    return hsk_map_tweak3(ck->name, ck->name_len, 2, 1);
+  return hsk_map_tweak3(ck->name, ck->name_len, 1, ck->type);
 }
 
 bool
@@ -233,8 +236,11 @@ hsk_cache_key_equal(const void *a, const void *b) {
   if (x->ref != y->ref)
     return false;
 
-  if (x->type != y->type)
-    return false;
+  // Ignore type if referral.
+  if (!x->ref) {
+    if (x->type != y->type)
+      return false;
+  }
 
   if (x->name_len != y->name_len)
     return false;
@@ -278,6 +284,10 @@ hsk_cache_key_set(hsk_cache_key_t *ck, const char *name, uint16_t type) {
         }
         case HSK_DNS_SMIMEA: {
           ref = !hsk_dns_label_is_smimea(name);
+          break;
+        }
+        case HSK_DNS_OPENPGPKEY: {
+          ref = !hsk_dns_label_is_openpgpkey(name);
           break;
         }
         default: {

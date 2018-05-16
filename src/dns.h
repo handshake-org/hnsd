@@ -688,6 +688,12 @@ hsk_dns_label_decode_smimea(const char *name, uint8_t *hash);
 bool
 hsk_dns_label_is_smimea(const char *name);
 
+bool
+hsk_dns_label_decode_openpgpkey(const char *name, uint8_t *hash);
+
+bool
+hsk_dns_label_is_openpgpkey(const char *name);
+
 /*
  * DNSSEC
  */

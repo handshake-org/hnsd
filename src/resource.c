@@ -439,11 +439,13 @@ hsk_pgp_record_read(
   size_t *data_len,
   hsk_pgp_record_t *rec
 ) {
-  if (*data_len < 2)
+  if (!read_bytes(data, data_len, rec->hash, 28))
     return false;
 
-  uint16_t size = 0;
-  read_u16be(data, data_len, &size);
+  uint16_t size;
+
+  if (!read_u16be(data, data_len, &size))
+    return false;
 
   if (size > 512)
     return false;
@@ -1738,6 +1740,7 @@ static bool
 hsk_resource_to_openpgpkey(
   const hsk_resource_t *res,
   const char *name,
+  const uint8_t *hash,
   hsk_dns_rrs_t *an
 ) {
   int i;
@@ -1749,6 +1752,9 @@ hsk_resource_to_openpgpkey(
       continue;
 
     hsk_pgp_record_t *rec = (hsk_pgp_record_t *)c;
+
+    if (memcmp(hash, rec->hash, 28) != 0)
+      continue;
 
     hsk_dns_rr_t *rr = hsk_dns_rr_create(HSK_DNS_OPENPGPKEY);
 
@@ -2328,6 +2334,17 @@ hsk_resource_to_dns(const hsk_resource_t *rs, const char *name, uint16_t type) {
 
         break;
       }
+      case HSK_DNS_OPENPGPKEY: {
+        uint8_t hash[28];
+        bool is_openpgpkey = hsk_dns_label_decode_openpgpkey(name, hash);
+
+        if (is_openpgpkey) {
+          hsk_resource_to_openpgpkey(rs, name, hash, an);
+          hsk_dnssec_sign_zsk(an, HSK_DNS_OPENPGPKEY);
+        }
+
+        break;
+      }
     }
 
     if (an->size > 0) {
@@ -2416,10 +2433,6 @@ hsk_resource_to_dns(const hsk_resource_t *rs, const char *name, uint16_t type) {
     case HSK_DNS_SSHFP:
       hsk_resource_to_sshfp(rs, name, an);
       hsk_dnssec_sign_zsk(an, HSK_DNS_SSHFP);
-      break;
-    case HSK_DNS_OPENPGPKEY:
-      hsk_resource_to_openpgpkey(rs, name, an);
-      hsk_dnssec_sign_zsk(an, HSK_DNS_OPENPGPKEY);
       break;
     case HSK_DNS_URI:
       hsk_resource_to_uri(rs, name, an);

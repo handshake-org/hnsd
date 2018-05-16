@@ -2813,8 +2813,8 @@ hsk_dns_label_is_tlsa(const char *name) {
   return hsk_dns_label_decode_tlsa(name, NULL, NULL);
 }
 
-bool
-hsk_dns_label_decode_smimea(const char *name, uint8_t *hash) {
+static bool
+hsk_dns_label_decode_dane(const char *tag, const char *name, uint8_t *hash) {
   int count = hsk_dns_label_count(name);
 
   if (count < 3)
@@ -2829,29 +2829,46 @@ hsk_dns_label_decode_smimea(const char *name, uint8_t *hash) {
 
   len = hsk_dns_label_get2(name, labels, count, 1, label);
 
-  if (len != 7)
+  if (len < 2)
     return false;
 
-  if (strcasecmp(label, "_smimea") != 0)
+  if (strcasecmp(label, tag) != 0)
     return false;
 
   len = hsk_dns_label_get2(name, labels, count, 0, label);
 
-  if (len != 57)
+  if (len != 56)
     return false;
 
-  if (label[0] != '_')
-    return false;
-
-  if (!hsk_hex_decode(&label[1], hash))
+  if (!hsk_hex_decode(&label[0], hash))
     return false;
 
   return true;
 }
 
+static bool
+hsk_dns_label_is_dane(const char *tag, const char *name) {
+  return hsk_dns_label_decode_dane(tag, name, NULL);
+}
+
+bool
+hsk_dns_label_decode_smimea(const char *name, uint8_t *hash) {
+  return hsk_dns_label_decode_dane("_smimecert", name, hash);
+}
+
 bool
 hsk_dns_label_is_smimea(const char *name) {
-  return hsk_dns_label_decode_smimea(name, NULL);
+  return hsk_dns_label_is_dane("_smimecert", name);
+}
+
+bool
+hsk_dns_label_decode_openpgpkey(const char *name, uint8_t *hash) {
+  return hsk_dns_label_decode_dane("_openpgpkey", name, hash);
+}
+
+bool
+hsk_dns_label_is_openpgpkey(const char *name) {
+  return hsk_dns_label_is_dane("_openpgpkey", name);
 }
 
 /*
@@ -3121,6 +3138,9 @@ hsk_dns_sign_rrsig(
     return false;
 
   uint8_t *sigbuf = malloc(64);
+
+  if (!sigbuf)
+    return false;
 
   // Sign with secp256r1.
   if (!hsk_ecc_sign(priv, hash, sigbuf)) {
