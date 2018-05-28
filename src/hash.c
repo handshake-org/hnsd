@@ -9,6 +9,7 @@
 #include "blake2b.h"
 #include "hash.h"
 #include "sha256.h"
+#include "sha3.h"
 #include "utils.h"
 
 void
@@ -18,6 +19,40 @@ hsk_hash_blake2b(const uint8_t *data, size_t data_len, uint8_t *hash) {
   assert(hsk_blake2b_init(&ctx, 32) == 0);
   hsk_blake2b_update(&ctx, data, data_len);
   assert(hsk_blake2b_final(&ctx, hash, 32) == 0);
+}
+
+void
+hsk_hash_blake160(const uint8_t *data, size_t data_len, uint8_t *hash) {
+  assert(hash != NULL);
+  hsk_blake2b_ctx ctx;
+  assert(hsk_blake2b_init(&ctx, 20) == 0);
+  hsk_blake2b_update(&ctx, data, data_len);
+  assert(hsk_blake2b_final(&ctx, hash, 20) == 0);
+}
+
+void
+hsk_hash_sha3(const uint8_t *data, size_t data_len, uint8_t *hash) {
+  assert(hash != NULL);
+  hsk_sha3_ctx ctx;
+  hsk_sha3_256_init(&ctx);
+  hsk_sha3_update(&ctx, data, data_len);
+  hsk_sha3_final(&ctx, hash);
+}
+
+void
+hsk_hash_name(const char *name, uint8_t *hash) {
+  assert(name && hash);
+  static uint8_t out[32];
+  hsk_hash_sha3((uint8_t *)name, strlen(name), out);
+  hsk_hash_blake160(out, 32, hash);
+}
+
+void
+hsk_hash_name_r(const char *name, uint8_t *hash) {
+  assert(name && hash);
+  uint8_t out[32];
+  hsk_hash_sha3((uint8_t *)name, strlen(name), out);
+  hsk_hash_blake160(out, 32, hash);
 }
 
 void

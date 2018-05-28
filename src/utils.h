@@ -40,6 +40,9 @@ hsk_hex_encode(const uint8_t *data, size_t data_len, char *str);
 const char *
 hsk_hex_encode32(const uint8_t *data);
 
+const char *
+hsk_hex_encode20(const uint8_t *data);
+
 size_t
 hsk_hex_decode_size(const char *str);
 

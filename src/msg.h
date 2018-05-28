@@ -83,15 +83,14 @@ typedef struct {
 typedef struct {
   uint8_t cmd;
   uint8_t root[32];
-  uint8_t key[32];
+  uint8_t key[20];
 } hsk_getproof_msg_t;
 
 typedef struct {
   uint8_t cmd;
   uint8_t root[32];
-  uint8_t key[32];
-  size_t node_count;
-  hsk_raw_node_t *nodes;
+  uint8_t key[20];
+  hsk_proof_t proof;
 } hsk_proof_msg_t;
 
 uint8_t

@@ -140,6 +140,12 @@ void
 hsk_map_init_hash_set(hsk_map_t *map);
 
 void
+hsk_map_init_hash160_map(hsk_map_t *map, hsk_map_free_func free_func);
+
+void
+hsk_map_init_hash160_set(hsk_map_t *map);
+
+void
 hsk_map_init_str_map(hsk_map_t *map, hsk_map_free_func free_func);
 
 void
@@ -180,6 +186,12 @@ hsk_map_alloc_hash_map(hsk_map_free_func free_func);
 
 hsk_map_t *
 hsk_map_alloc_hash_set(void);
+
+hsk_map_t *
+hsk_map_alloc_hash160_map(hsk_map_free_func free_func);
+
+hsk_map_t *
+hsk_map_alloc_hash160_set(void);
 
 hsk_map_t *
 hsk_map_alloc_str_map(hsk_map_free_func free_func);
@@ -243,6 +255,12 @@ hsk_map_hash_hash(const void *key);
 
 bool
 hsk_map_equal_hash(const void *a, const void *b);
+
+uint32_t
+hsk_map_hash_hash160(const void *key);
+
+bool
+hsk_map_equal_hash160(const void *a, const void *b);
 
 uint32_t
 hsk_map_murmur3(const uint8_t *data, size_t data_len, uint32_t seed);

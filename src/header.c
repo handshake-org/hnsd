@@ -23,7 +23,7 @@ hsk_header_init(hsk_header_t *hdr) {
   memset(hdr->prev_block, 0, 32);
   memset(hdr->merkle_root, 0, 32);
   memset(hdr->witness_root, 0, 32);
-  memset(hdr->trie_root, 0, 32);
+  memset(hdr->name_root, 0, 32);
   hdr->time = 0;
   hdr->bits = 0;
   memset(hdr->nonce, 0, 20);
@@ -241,7 +241,7 @@ hsk_header_read(uint8_t **data, size_t *data_len, hsk_header_t *hdr) {
   if (!read_bytes(data, data_len, hdr->witness_root, 32))
     return false;
 
-  if (!read_bytes(data, data_len, hdr->trie_root, 32))
+  if (!read_bytes(data, data_len, hdr->name_root, 32))
     return false;
 
   if (!read_u64(data, data_len, &hdr->time))
@@ -277,7 +277,7 @@ hsk_header_write(const hsk_header_t *hdr, uint8_t **data) {
   s += write_bytes(data, hdr->prev_block, 32);
   s += write_bytes(data, hdr->merkle_root, 32);
   s += write_bytes(data, hdr->witness_root, 32);
-  s += write_bytes(data, hdr->trie_root, 32);
+  s += write_bytes(data, hdr->name_root, 32);
   s += write_u64(data, hdr->time);
   s += write_u32(data, hdr->bits);
   s += write_bytes(data, hdr->nonce, 20);
@@ -303,7 +303,7 @@ hsk_header_write_pre(const hsk_header_t *hdr, uint8_t **data) {
   s += write_bytes(data, hdr->prev_block, 32);
   s += write_bytes(data, hdr->merkle_root, 32);
   s += write_bytes(data, hdr->witness_root, 32);
-  s += write_bytes(data, hdr->trie_root, 32);
+  s += write_bytes(data, hdr->name_root, 32);
   s += write_u64(data, hdr->time);
   s += write_u32(data, hdr->bits);
   s += write_bytes(data, hdr->nonce, 20);
@@ -405,7 +405,7 @@ hsk_header_print(hsk_header_t *hdr, const char *prefix) {
   char prev_block[65];
   char merkle_root[65];
   char witness_root[65];
-  char trie_root[65];
+  char name_root[65];
   char nonce[41];
 
   assert(hsk_hex_encode(hsk_header_cache(hdr), 32, hash));
@@ -413,7 +413,7 @@ hsk_header_print(hsk_header_t *hdr, const char *prefix) {
   assert(hsk_hex_encode(hdr->prev_block, 32, prev_block));
   assert(hsk_hex_encode(hdr->merkle_root, 32, merkle_root));
   assert(hsk_hex_encode(hdr->witness_root, 32, witness_root));
-  assert(hsk_hex_encode(hdr->trie_root, 32, trie_root));
+  assert(hsk_hex_encode(hdr->name_root, 32, name_root));
   assert(hsk_hex_encode(hdr->nonce, 20, nonce));
 
   printf("%sheader\n", prefix);
@@ -424,7 +424,7 @@ hsk_header_print(hsk_header_t *hdr, const char *prefix) {
   printf("%s  prev_block=%s\n", prefix, prev_block);
   printf("%s  merkle_root=%s\n", prefix, merkle_root);
   printf("%s  witness_root=%s\n", prefix, witness_root);
-  printf("%s  trie_root=%s\n", prefix, trie_root);
+  printf("%s  name_root=%s\n", prefix, name_root);
   printf("%s  time=%u\n", prefix, (uint32_t)hdr->time);
   printf("%s  bits=%u\n", prefix, hdr->bits);
   printf("%s  nonce=%s\n", prefix, nonce);

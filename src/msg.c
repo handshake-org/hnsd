@@ -278,7 +278,7 @@ hsk_getproof_msg_read(
   if (!read_bytes(data, data_len, msg->root, 32))
     return false;
 
-  if (!read_bytes(data, data_len, msg->key, 32))
+  if (!read_bytes(data, data_len, msg->key, 20))
     return false;
 
   return true;
@@ -288,7 +288,7 @@ int
 hsk_getproof_msg_write(const hsk_getproof_msg_t *msg, uint8_t **data) {
   int s = 0;
   s += write_bytes(data, msg->root, 32);
-  s += write_bytes(data, msg->key, 32);
+  s += write_bytes(data, msg->key, 20);
   return s;
 }
 
@@ -297,38 +297,13 @@ hsk_proof_msg_read(uint8_t **data, size_t *data_len, hsk_proof_msg_t *msg) {
   if (!read_bytes(data, data_len, msg->root, 32))
     return false;
 
-  if (!read_bytes(data, data_len, msg->key, 32))
+  if (!read_bytes(data, data_len, msg->key, 20))
     return false;
 
-  if (!read_varsize(data, data_len, &msg->node_count))
+  if (!hsk_proof_read(data, data_len, &msg->proof))
     return false;
-
-  hsk_raw_node_t *tail = NULL;
-  int i;
-
-  for (i = 0; i < msg->node_count; i++) {
-    hsk_raw_node_t *n = hsk_raw_node_alloc();
-
-    if (n == NULL)
-      goto fail;
-
-    if (!alloc_varbytes(data, data_len, &n->data, &n->data_len))
-      goto fail;
-
-    if (msg->nodes == NULL)
-      msg->nodes = n;
-
-    if (tail)
-      tail->next = n;
-
-    tail = n;
-  }
 
   return true;
-
-fail:
-  hsk_raw_node_free_list(msg->nodes);
-  return false;
 }
 
 int
@@ -336,12 +311,8 @@ hsk_proof_msg_write(const hsk_proof_msg_t *msg, uint8_t **data) {
   int s = 0;
 
   s += write_bytes(data, msg->root, 32);
-  s += write_bytes(data, msg->key, 32);
-  s += write_varsize(data, msg->node_count);
-
-  hsk_raw_node_t *c;
-  for (c = msg->nodes; c; c = c->next)
-    s += write_varbytes(data, c->data, c->data_len);
+  s += write_bytes(data, msg->key, 20);
+  // XXX
 
   return s;
 }
@@ -501,15 +472,15 @@ hsk_msg_init(hsk_msg_t *msg) {
       hsk_getproof_msg_t *m = (hsk_getproof_msg_t *)msg;
       m->cmd = HSK_MSG_GETPROOF;
       memset(m->root, 0, 32);
-      memset(m->key, 0, 32);
+      memset(m->key, 0, 20);
       break;
     }
     case HSK_MSG_PROOF: {
       hsk_proof_msg_t *m = (hsk_proof_msg_t *)msg;
       m->cmd = HSK_MSG_PROOF;
       memset(m->root, 0, 32);
-      memset(m->key, 0, 32);
-      m->nodes = NULL;
+      memset(m->key, 0, 20);
+      hsk_proof_init(&m->proof);
       break;
     }
   }
@@ -637,7 +608,7 @@ hsk_msg_free(hsk_msg_t *msg) {
     }
     case HSK_MSG_PROOF: {
       hsk_proof_msg_t *m = (hsk_proof_msg_t *)msg;
-      hsk_raw_node_free_list(m->nodes);
+      hsk_proof_uninit(&m->proof);
       free(m);
       break;
     }

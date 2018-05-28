@@ -82,6 +82,16 @@ hsk_map_init_hash_set(hsk_map_t *map) {
 }
 
 void
+hsk_map_init_hash160_map(hsk_map_t *map, hsk_map_free_func free_func) {
+  hsk_map_init_map(map, hsk_map_hash_hash160, hsk_map_equal_hash160, free_func);
+}
+
+void
+hsk_map_init_hash160_set(hsk_map_t *map) {
+  hsk_map_init_set(map, hsk_map_hash_hash160, hsk_map_equal_hash160);
+}
+
+void
 hsk_map_init_str_map(hsk_map_t *map, hsk_map_free_func free_func) {
   hsk_map_init_map(map, hsk_map_hash_str, hsk_map_equal_str, free_func);
 }
@@ -165,6 +175,20 @@ hsk_map_alloc_hash_map(hsk_map_free_func free_func) {
 hsk_map_t *
 hsk_map_alloc_hash_set(void) {
   return hsk_map_alloc_set(hsk_map_hash_hash, hsk_map_equal_hash);
+}
+
+hsk_map_t *
+hsk_map_alloc_hash160_map(hsk_map_free_func free_func) {
+  return hsk_map_alloc_map(
+    hsk_map_hash_hash160,
+    hsk_map_equal_hash160,
+    free_func
+  );
+}
+
+hsk_map_t *
+hsk_map_alloc_hash160_set(void) {
+  return hsk_map_alloc_set(hsk_map_hash_hash160, hsk_map_equal_hash160);
 }
 
 hsk_map_t *
@@ -570,6 +594,17 @@ hsk_map_hash_hash(const void *key) {
 bool
 hsk_map_equal_hash(const void *a, const void *b) {
   return memcmp(a, b, 32) == 0;
+}
+
+uint32_t
+hsk_map_hash_hash160(const void *key) {
+  const uint8_t *data = (const uint8_t *)key;
+  return hsk_map_murmur3(data, 20, 0xfba4c795);
+}
+
+bool
+hsk_map_equal_hash160(const void *a, const void *b) {
+  return memcmp(a, b, 20) == 0;
 }
 
 uint32_t

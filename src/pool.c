@@ -460,7 +460,7 @@ hsk_pool_resolve(
     return HSK_ETIMEOUT;
   }
 
-  uint8_t *root = pool->chain.tip->trie_root;
+  uint8_t *root = pool->chain.tip->name_root;
   hsk_name_req_t *req = malloc(sizeof(hsk_name_req_t));
 
   if (!req)
@@ -468,7 +468,7 @@ hsk_pool_resolve(
 
   strcpy(req->name, name);
 
-  hsk_hash_blake2b((uint8_t *)name, strlen(name), req->hash);
+  hsk_hash_name(name, req->hash);
 
   memcpy(req->root, root, 32);
 
@@ -512,7 +512,7 @@ hsk_pool_resend(hsk_pool_t *pool) {
   if (!hsk_chain_synced(&pool->chain))
     return;
 
-  uint8_t *root = pool->chain.tip->trie_root;
+  uint8_t *root = pool->chain.tip->name_root;
   hsk_name_req_t *req = pool->pending;
 
   if (!req)
@@ -788,7 +788,7 @@ hsk_peer_init(hsk_peer_t *peer, hsk_pool_t *pool) {
   peer->headers = 0;
   peer->proofs = 0;
   peer->height = 0;
-  hsk_map_init_hash_map(&peer->names, free);
+  hsk_map_init_hash160_map(&peer->names, free);
   peer->getheaders_time = 0;
   peer->version_time = 0;
   peer->last_ping = 0;
@@ -1204,7 +1204,7 @@ hsk_peer_send_getproof(
   hsk_getproof_msg_t msg = { .cmd = HSK_MSG_GETPROOF };
   hsk_msg_init((hsk_msg_t *)&msg);
 
-  memcpy(msg.key, name_hash, 32);
+  memcpy(msg.key, name_hash, 20);
   memcpy(msg.root, root, 32);
 
   return hsk_peer_send(peer, (hsk_msg_t *)&msg);
@@ -1401,14 +1401,14 @@ hsk_peer_handle_headers(hsk_peer_t *peer, const hsk_headers_msg_t *msg) {
 
 static int
 hsk_peer_handle_proof(hsk_peer_t *peer, const hsk_proof_msg_t *msg) {
-  hsk_peer_log(peer, "received proof: %s\n", hsk_hex_encode32(msg->key));
+  hsk_peer_log(peer, "received proof: %s\n", hsk_hex_encode20(msg->key));
 
   hsk_name_req_t *reqs = hsk_map_get(&peer->names, msg->key);
 
   if (!reqs) {
     hsk_peer_log(peer,
       "received unsolicited proof: %s\n",
-      hsk_hex_encode32(msg->key));
+      hsk_hex_encode20(msg->key));
     return HSK_EBADARGS;
   }
 
@@ -1426,7 +1426,7 @@ hsk_peer_handle_proof(hsk_peer_t *peer, const hsk_proof_msg_t *msg) {
   int rc = hsk_proof_verify(
     msg->root,
     msg->key,
-    msg->nodes,
+    &msg->proof,
     &exists,
     &data,
     &data_len

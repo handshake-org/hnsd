@@ -165,6 +165,13 @@ hsk_hex_encode32(const uint8_t *data) {
   return str;
 }
 
+const char *
+hsk_hex_encode20(const uint8_t *data) {
+  static char str[41];
+  assert(hsk_hex_encode(data, 20, str));
+  return str;
+}
+
 size_t
 hsk_hex_decode_size(const char *str) {
   if (str == NULL)
