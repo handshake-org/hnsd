@@ -27,12 +27,11 @@
 #define hsk_sha3_max_permutation_size 25
 #define hsk_sha3_max_rate_in_qwords 24
 
-typedef struct hsk_sha3_ctx
-{
-	uint64_t hash[hsk_sha3_max_permutation_size];
-	uint64_t message[hsk_sha3_max_rate_in_qwords];
-	unsigned rest;
-	unsigned block_size;
+typedef struct hsk_sha3_ctx {
+  uint64_t hash[hsk_sha3_max_permutation_size];
+  uint64_t message[hsk_sha3_max_rate_in_qwords];
+  unsigned rest;
+  unsigned block_size;
 } hsk_sha3_ctx;
 
 void hsk_sha3_224_init(hsk_sha3_ctx *ctx);
