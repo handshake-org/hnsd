@@ -2941,6 +2941,7 @@ hsk_dns_dnskey_create(const char *zone, const uint8_t *priv, bool ksk) {
   }
 
   if (!hsk_ecc_make_pubkey(priv, pubkey)) {
+    free(pubkey);
     hsk_dns_rr_free(key);
     return NULL;
   }
