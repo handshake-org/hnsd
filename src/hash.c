@@ -42,17 +42,7 @@ hsk_hash_sha3(const uint8_t *data, size_t data_len, uint8_t *hash) {
 void
 hsk_hash_name(const char *name, uint8_t *hash) {
   assert(name && hash);
-  static uint8_t out[32];
-  hsk_hash_sha3((uint8_t *)name, strlen(name), out);
-  hsk_hash_blake160(out, 32, hash);
-}
-
-void
-hsk_hash_name_r(const char *name, uint8_t *hash) {
-  assert(name && hash);
-  uint8_t out[32];
-  hsk_hash_sha3((uint8_t *)name, strlen(name), out);
-  hsk_hash_blake160(out, 32, hash);
+  hsk_hash_sha3((uint8_t *)name, strlen(name), hash);
 }
 
 void

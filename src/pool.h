@@ -43,7 +43,7 @@ typedef void (*hsk_resolve_cb)(
 
 typedef struct hsk_name_req_s {
   char name[256];
-  uint8_t hash[20];
+  uint8_t hash[32];
   uint8_t root[32];
   hsk_resolve_cb callback;
   void *arg;

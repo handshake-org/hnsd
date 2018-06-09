@@ -278,7 +278,7 @@ hsk_getproof_msg_read(
   if (!read_bytes(data, data_len, msg->root, 32))
     return false;
 
-  if (!read_bytes(data, data_len, msg->key, 20))
+  if (!read_bytes(data, data_len, msg->key, 32))
     return false;
 
   return true;
@@ -288,7 +288,7 @@ int
 hsk_getproof_msg_write(const hsk_getproof_msg_t *msg, uint8_t **data) {
   int s = 0;
   s += write_bytes(data, msg->root, 32);
-  s += write_bytes(data, msg->key, 20);
+  s += write_bytes(data, msg->key, 32);
   return s;
 }
 
@@ -297,7 +297,7 @@ hsk_proof_msg_read(uint8_t **data, size_t *data_len, hsk_proof_msg_t *msg) {
   if (!read_bytes(data, data_len, msg->root, 32))
     return false;
 
-  if (!read_bytes(data, data_len, msg->key, 20))
+  if (!read_bytes(data, data_len, msg->key, 32))
     return false;
 
   if (!hsk_proof_read(data, data_len, &msg->proof))
@@ -311,7 +311,7 @@ hsk_proof_msg_write(const hsk_proof_msg_t *msg, uint8_t **data) {
   int s = 0;
 
   s += write_bytes(data, msg->root, 32);
-  s += write_bytes(data, msg->key, 20);
+  s += write_bytes(data, msg->key, 32);
   // XXX
 
   return s;
@@ -472,14 +472,14 @@ hsk_msg_init(hsk_msg_t *msg) {
       hsk_getproof_msg_t *m = (hsk_getproof_msg_t *)msg;
       m->cmd = HSK_MSG_GETPROOF;
       memset(m->root, 0, 32);
-      memset(m->key, 0, 20);
+      memset(m->key, 0, 32);
       break;
     }
     case HSK_MSG_PROOF: {
       hsk_proof_msg_t *m = (hsk_proof_msg_t *)msg;
       m->cmd = HSK_MSG_PROOF;
       memset(m->root, 0, 32);
-      memset(m->key, 0, 20);
+      memset(m->key, 0, 32);
       hsk_proof_init(&m->proof);
       break;
     }

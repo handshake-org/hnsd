@@ -788,7 +788,7 @@ hsk_peer_init(hsk_peer_t *peer, hsk_pool_t *pool) {
   peer->headers = 0;
   peer->proofs = 0;
   peer->height = 0;
-  hsk_map_init_hash160_map(&peer->names, free);
+  hsk_map_init_hash_map(&peer->names, free);
   peer->getheaders_time = 0;
   peer->version_time = 0;
   peer->last_ping = 0;
@@ -1204,7 +1204,7 @@ hsk_peer_send_getproof(
   hsk_getproof_msg_t msg = { .cmd = HSK_MSG_GETPROOF };
   hsk_msg_init((hsk_msg_t *)&msg);
 
-  memcpy(msg.key, name_hash, 20);
+  memcpy(msg.key, name_hash, 32);
   memcpy(msg.root, root, 32);
 
   return hsk_peer_send(peer, (hsk_msg_t *)&msg);
@@ -1401,7 +1401,7 @@ hsk_peer_handle_headers(hsk_peer_t *peer, const hsk_headers_msg_t *msg) {
 
 static int
 hsk_peer_handle_proof(hsk_peer_t *peer, const hsk_proof_msg_t *msg) {
-  hsk_peer_log(peer, "received proof: %s\n", hsk_hex_encode20(msg->key));
+  hsk_peer_log(peer, "received proof: %s\n", hsk_hex_encode32(msg->key));
 
   hsk_name_req_t *reqs = hsk_map_get(&peer->names, msg->key);
 

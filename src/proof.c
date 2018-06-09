@@ -81,7 +81,7 @@ hsk_proof_read(uint8_t **data, size_t *data_len, hsk_proof_t *proof) {
 
   size_t count = field & ~(3 << 14);
 
-  if (count > 160)
+  if (count > 256)
     return false;
 
   size_t bsize = (count + 7) / 8;
@@ -122,7 +122,7 @@ hsk_proof_read(uint8_t **data, size_t *data_len, hsk_proof_t *proof) {
     case HSK_PROOF_DEADEND:
       break;
     case HSK_PROOF_COLLISION:
-      if (!alloc_bytes(data, data_len, &proof->nx_key, 20))
+      if (!alloc_bytes(data, data_len, &proof->nx_key, 32))
         goto fail;
 
       if (!alloc_bytes(data, data_len, &proof->nx_hash, 32))
@@ -166,7 +166,7 @@ hsk_proof_hash_leaf(const uint8_t *key, const uint8_t *hash, uint8_t *out) {
   hsk_blake2b_ctx ctx;
   assert(hsk_blake2b_init(&ctx, 32) == 0);
   hsk_blake2b_update(&ctx, hsk_proof_leaf, 1);
-  hsk_blake2b_update(&ctx, key, 20);
+  hsk_blake2b_update(&ctx, key, 32);
   hsk_blake2b_update(&ctx, hash, 32);
   assert(hsk_blake2b_final(&ctx, out, 32) == 0);
 }
@@ -200,7 +200,7 @@ hsk_proof_verify(
   uint8_t leaf[32];
 
   assert(proof->nodes || proof->node_count == 0);
-  assert(proof->node_count <= 160);
+  assert(proof->node_count <= 256);
   assert(proof->value_size <= 512);
 
   // Re-create the leaf.
@@ -223,7 +223,7 @@ hsk_proof_verify(
       assert(proof->value_size == 0);
       assert(proof->nx_key);
       assert(proof->nx_hash);
-      if (memcmp(proof->nx_key, key, 20) == 0)
+      if (memcmp(proof->nx_key, key, 32) == 0)
         return HSK_EHASHMISMATCH;
       hsk_proof_hash_leaf(proof->nx_key, proof->nx_hash, leaf);
       break;
