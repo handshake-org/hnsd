@@ -391,7 +391,7 @@ hsk_ns_respond(
   } else if (!res) {
     // Doesn't exist.
     //
-    // We should also be giving an NSEC proof
+    // We should be giving a real NSEC proof
     // here, but I don't think it's possible
     // with the current construction.
     //
@@ -399,7 +399,10 @@ hsk_ns_respond(
     // if NSEC3 begins to support BLAKE2b for
     // name hashing. Even then, it's still
     // not possible for SPV nodes since they
-    // can't arbitrarily iterate over the trie.
+    // can't arbitrarily iterate over the tree.
+    //
+    // Instead, we give a phony proof, which
+    // makes the root zone look empty.
     msg = hsk_resource_to_nx();
 
     if (!msg)

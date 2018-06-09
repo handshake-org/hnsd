@@ -27,6 +27,23 @@ static const uint8_t hsk_zero_inet6[16] = {
   0x00, 0x00, 0x00, 0x00
 };
 
+// NS SOA RRSIG NSEC DNSKEY
+// Possibly add A, AAAA, and DS
+static const uint8_t hsk_type_map[] = {
+  0x00, 0x07, 0x22, 0x00, 0x00,
+  0x00, 0x00, 0x03, 0x80
+};
+
+// A RRSIG NSEC
+static const uint8_t hsk_type_map_a[] = {
+  0x00, 0x06, 0x40, 0x00, 0x00, 0x00, 0x00, 0x03
+};
+
+// AAAA RRSIG NSEC
+static const uint8_t hsk_type_map_aaaa[] = {
+  0x00, 0x06, 0x00, 0x00, 0x00, 0x80, 0x00, 0x03
+};
+
 static void
 to_fqdn(char *name);
 
@@ -2213,6 +2230,78 @@ hsk_resource_root_to_ds(hsk_dns_rrs_t *an) {
   return true;
 }
 
+static bool
+hsk_resource_to_empty(
+  const char *name,
+  const uint8_t *type_map,
+  size_t type_map_len,
+  hsk_dns_rrs_t *an
+) {
+  hsk_dns_rr_t *rr = hsk_dns_rr_create(HSK_DNS_NSEC);
+
+  if (!rr)
+    return false;
+
+  rr->ttl = 86400;
+
+  hsk_dns_rr_set_name(rr, name);
+
+  hsk_dns_nsec_rd_t *rd = rr->rd;
+
+  strcpy(rd->next_domain, ".");
+  rd->type_map = NULL;
+  rd->type_map_len = 0;
+
+  if (type_map) {
+    uint8_t *buf = malloc(type_map_len);
+
+    if (!buf) {
+      hsk_dns_rr_free(rr);
+      return false;
+    }
+
+    memcpy(buf, type_map, type_map_len);
+
+    rd->type_map = buf;
+    rd->type_map_len = type_map_len;
+  }
+
+  hsk_dns_rrs_push(an, rr);
+
+  return true;
+}
+
+static bool
+hsk_resource_root_to_nsec(hsk_dns_rrs_t *an) {
+  hsk_dns_rr_t *rr = hsk_dns_rr_create(HSK_DNS_NSEC);
+
+  if (!rr)
+    return false;
+
+  uint8_t *bitmap = malloc(sizeof(hsk_type_map));
+
+  if (!bitmap) {
+    hsk_dns_rr_free(rr);
+    return false;
+  }
+
+  memcpy(bitmap, &hsk_type_map[0], sizeof(hsk_type_map));
+
+  rr->ttl = 86400;
+
+  hsk_dns_rr_set_name(rr, ".");
+
+  hsk_dns_nsec_rd_t *rd = rr->rd;
+
+  strcpy(rd->next_domain, ".");
+  rd->type_map = bitmap;
+  rd->type_map_len = sizeof(hsk_type_map);
+
+  hsk_dns_rrs_push(an, rr);
+
+  return true;
+}
+
 hsk_dns_msg_t *
 hsk_resource_to_dns(const hsk_resource_t *rs, const char *name, uint16_t type) {
   assert(hsk_dns_name_is_fqdn(name));
@@ -2253,6 +2342,24 @@ hsk_resource_to_dns(const hsk_resource_t *rs, const char *name, uint16_t type) {
 
       if (!match) {
         // Needs SOA.
+        // TODO: Make the reverse pointers TLDs.
+        // Empty proof:
+        if (family == HSK_INET4) {
+          hsk_resource_to_empty(
+            name,
+            hsk_type_map_a,
+            sizeof(hsk_type_map_a),
+            ns
+          );
+        } else {
+          hsk_resource_to_empty(
+            name,
+            hsk_type_map_aaaa,
+            sizeof(hsk_type_map_aaaa),
+            ns
+          );
+        }
+        hsk_dnssec_sign_zsk(ns, HSK_DNS_NSEC);
         hsk_resource_root_to_soa(ns);
         hsk_dnssec_sign_zsk(ns, HSK_DNS_SOA);
         return msg;
@@ -2376,6 +2483,9 @@ hsk_resource_to_dns(const hsk_resource_t *rs, const char *name, uint16_t type) {
       hsk_dnssec_sign_zsk(ar, HSK_DNS_AAAA);
     } else {
       // Needs SOA.
+      // Empty proof:
+      hsk_resource_to_empty(tld, NULL, 0, ns);
+      hsk_dnssec_sign_zsk(ns, HSK_DNS_NSEC);
       hsk_resource_root_to_soa(ns);
       hsk_dnssec_sign_zsk(ns, HSK_DNS_SOA);
     }
@@ -2466,6 +2576,9 @@ hsk_resource_to_dns(const hsk_resource_t *rs, const char *name, uint16_t type) {
         hsk_dnssec_sign_zsk(ns, HSK_DNS_DS);
     } else {
       // Needs SOA.
+      // Empty proof:
+      hsk_resource_to_empty(name, NULL, 0, ns);
+      hsk_dnssec_sign_zsk(ns, HSK_DNS_NSEC);
       hsk_resource_root_to_soa(ns);
       hsk_dnssec_sign_zsk(ns, HSK_DNS_SOA);
     }
@@ -2531,6 +2644,10 @@ hsk_resource_root(uint16_t type, const hsk_addr_t *addr) {
       hsk_dnssec_sign_zsk(an, HSK_DNS_DS);
       break;
     default:
+      // Empty Proof:
+      // Show all the types that we signed.
+      hsk_resource_root_to_nsec(ns);
+      hsk_dnssec_sign_zsk(ns, HSK_DNS_NSEC);
       hsk_resource_root_to_soa(ns);
       hsk_dnssec_sign_zsk(ns, HSK_DNS_SOA);
       break;
@@ -2550,6 +2667,15 @@ hsk_resource_to_nx(void) {
   msg->flags |= HSK_DNS_AA;
 
   hsk_dns_rrs_t *ns = &msg->ns;
+
+  // NX Proof:
+  // Just make it look like an
+  // empty zone for the NX proof.
+  // It seems to fool unbound without
+  // breaking anything.
+  hsk_resource_root_to_nsec(ns);
+  hsk_resource_root_to_nsec(ns);
+  hsk_dnssec_sign_zsk(ns, HSK_DNS_NSEC);
 
   hsk_resource_root_to_soa(ns);
   hsk_dnssec_sign_zsk(ns, HSK_DNS_SOA);
