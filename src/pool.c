@@ -460,7 +460,7 @@ hsk_pool_resolve(
     return HSK_ETIMEOUT;
   }
 
-  uint8_t *root = pool->chain.tip->name_root;
+  const uint8_t *root = hsk_chain_safe_root(&pool->chain);
   hsk_name_req_t *req = malloc(sizeof(hsk_name_req_t));
 
   if (!req)

@@ -56,6 +56,9 @@ hsk_chain_has_orphan(const hsk_chain_t *chain, const uint8_t *hash);
 hsk_header_t *
 hsk_chain_get_orphan(const hsk_chain_t *chain, const uint8_t *hash);
 
+const uint8_t *
+hsk_chain_safe_root(const hsk_chain_t *chain);
+
 hsk_header_t *
 hsk_chain_get_ancestor(
   const hsk_chain_t *chain,

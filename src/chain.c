@@ -185,6 +185,18 @@ hsk_chain_get_orphan(const hsk_chain_t *chain, const uint8_t *hash) {
   return hsk_map_get(&chain->orphans, hash);
 }
 
+const uint8_t *
+hsk_chain_safe_root(const hsk_chain_t *chain) {
+  int64_t interval = 21600 / HSK_TARGET_SPACING;
+  int64_t mod = chain->height % interval;
+  int64_t safe_height = chain->height - mod;
+
+  hsk_header_t *prev = hsk_chain_get_by_height(chain, (int32_t)safe_height);
+  assert(prev);
+
+  return prev->name_root;
+}
+
 static hsk_header_t *
 hsk_chain_resolve_orphan(hsk_chain_t *chain, const uint8_t *hash) {
   hsk_header_t *orphan = hsk_map_get(&chain->prevs, hash);
