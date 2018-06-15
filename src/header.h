@@ -9,7 +9,6 @@ typedef struct hsk_header_s {
   uint32_t version;
   uint8_t prev_block[32];
   uint8_t merkle_root[32];
-  uint8_t witness_root[32];
   uint8_t name_root[32];
   uint8_t reserved_root[32];
   uint64_t time;
