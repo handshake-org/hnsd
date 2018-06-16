@@ -13,8 +13,8 @@
 typedef struct hsk_aead_s {
   hsk_chacha20_ctx chacha;
   hsk_poly1305_ctx poly;
-  size_t aad_len;
-  size_t cipher_len;
+  uint64_t aad_len;
+  uint64_t cipher_len;
   bool has_cipher;
   uint8_t poly_key[32];
 } hsk_aead_t;
@@ -41,7 +41,7 @@ void
 hsk_aead_final(hsk_aead_t *aead, uint8_t *tag);
 
 void
-hsk_aead_pad16(hsk_aead_t *aead, size_t size);
+hsk_aead_pad16(hsk_aead_t *aead, uint64_t size);
 
 bool
 hsk_aead_verify(const uint8_t *mac1, const uint8_t *mac2);

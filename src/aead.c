@@ -17,6 +17,7 @@
 void
 hsk_aead_init(hsk_aead_t *aead) {
   memset(&aead->chacha, 0, sizeof(hsk_chacha20_ctx));
+  aead->chacha.nonce_size = 8;
   memset(&aead->poly, 0, sizeof(hsk_poly1305_ctx));
   aead->aad_len = 0;
   aead->cipher_len = 0;
@@ -26,15 +27,13 @@ hsk_aead_init(hsk_aead_t *aead) {
 
 void
 hsk_aead_setup(hsk_aead_t *aead, const uint8_t *key, const uint8_t *iv) {
+  assert(key && iv);
+
   memset(aead->poly_key, 0, 32);
 
-  if (key)
-    hsk_chacha20_keysetup(&aead->chacha, key, 32);
-
-  if (iv) {
-    hsk_chacha20_ivsetup(&aead->chacha, iv, 12);
-    hsk_chacha20_counter_set(&aead->chacha, 0);
-  }
+  hsk_chacha20_keysetup(&aead->chacha, key, 32);
+  hsk_chacha20_ivsetup(&aead->chacha, iv, 12);
+  hsk_chacha20_counter_set(&aead->chacha, 0);
 
   hsk_chacha20_encrypt(&aead->chacha, aead->poly_key, aead->poly_key, 32);
 
@@ -122,7 +121,7 @@ hsk_aead_final(hsk_aead_t *aead, uint8_t *tag) {
 }
 
 void
-hsk_aead_pad16(hsk_aead_t *aead, size_t size) {
+hsk_aead_pad16(hsk_aead_t *aead, uint64_t size) {
   size %= 16;
 
   if (size == 0)
