@@ -187,15 +187,31 @@ hsk_chain_get_orphan(const hsk_chain_t *chain, const uint8_t *hash) {
 
 const uint8_t *
 hsk_chain_safe_root(const hsk_chain_t *chain) {
-  int64_t interval = 21600 / HSK_TARGET_SPACING;
+  // The tree is committed on an interval.
+  // Mainnet is 72 blocks, meaning at height 72,
+  // the name set of the past 72 blocks are
+  // inserted into the tree. The commitment for
+  // that insertion actually appears in a block
+  // header one block later (height 73). We
+  // want the the root _before_ the current one
+  // so we can calculate that with:
+  //   chain_height - (chain_height % interval)
+
+  int64_t interval = HSK_TREE_INTERVAL;
   int64_t mod = chain->height % interval;
-  int64_t safe_height = chain->height - mod;
+  int64_t height = chain->height - mod;
 
-  if (safe_height < 2 && chain->height >= 2)
-    safe_height = 2;
+  // Height 1 is is a special commitment interval,
+  // causing block 2 to have the first tree commitment.
+  if (height < 2 && chain->height >= 2)
+    height = 2;
 
-  hsk_header_t *prev = hsk_chain_get_by_height(chain, (int32_t)safe_height);
+  hsk_header_t *prev = hsk_chain_get_by_height(chain, (int32_t)height);
   assert(prev);
+
+  hsk_chain_log(chain,
+    "using safe height of %u for resolution\n",
+    (uint32_t)height);
 
   return prev->name_root;
 }
