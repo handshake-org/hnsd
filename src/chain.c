@@ -92,12 +92,12 @@ hsk_chain_init_genesis(hsk_chain_t *chain) {
   assert(hsk_header_decode(data, size, tip));
   assert(hsk_header_calc_work(tip, NULL));
 
-  if (!hsk_map_set(&chain->hashes, hsk_header_cache(tip), (void *)tip)) {
+  if (!hsk_map_set(&chain->hashes, hsk_header_cache(tip), tip)) {
     free(tip);
     return HSK_ENOMEM;
   }
 
-  if (!hsk_map_set(&chain->heights, &tip->height, (void *)tip)) {
+  if (!hsk_map_set(&chain->heights, &tip->height, tip)) {
     hsk_map_del(&chain->hashes, hsk_header_cache(tip));
     free(tip);
     return HSK_ENOMEM;
@@ -171,7 +171,7 @@ hsk_chain_get(const hsk_chain_t *chain, const uint8_t *hash) {
 }
 
 hsk_header_t *
-hsk_chain_get_by_height(const hsk_chain_t *chain, int32_t height) {
+hsk_chain_get_by_height(const hsk_chain_t *chain, uint32_t height) {
   return hsk_map_get(&chain->heights, &height);
 }
 
@@ -197,21 +197,21 @@ hsk_chain_safe_root(const hsk_chain_t *chain) {
   // so we can calculate that with:
   //   chain_height - (chain_height % interval)
 
-  int64_t interval = HSK_TREE_INTERVAL;
-  int64_t mod = chain->height % interval;
-  int64_t height = chain->height - mod;
+  uint32_t interval = HSK_TREE_INTERVAL;
+  uint32_t mod = (uint32_t)chain->height % interval;
+  uint32_t height = (uint32_t)chain->height - mod;
 
   // Height 1 is is a special commitment interval,
   // causing block 2 to have the first tree commitment.
   if (height < 2 && chain->height >= 2)
     height = 2;
 
-  hsk_header_t *prev = hsk_chain_get_by_height(chain, (int32_t)height);
+  hsk_header_t *prev = hsk_chain_get_by_height(chain, height);
   assert(prev);
 
   hsk_chain_log(chain,
     "using safe height of %u for resolution\n",
-    (uint32_t)height);
+    height);
 
   return prev->name_root;
 }
@@ -233,7 +233,7 @@ hsk_header_t *
 hsk_chain_get_ancestor(
   const hsk_chain_t *chain,
   const hsk_header_t *hdr,
-  int32_t height
+  uint32_t height
 ) {
   assert(height >= 0);
   assert(height <= hdr->height);
@@ -292,8 +292,8 @@ hsk_chain_get_locator(const hsk_chain_t *chain, hsk_getheaders_msg_t *msg) {
 
   int i = 0;
   hsk_header_t *tip = chain->tip;
-  int32_t height = chain->height;
-  int step = 1;
+  int64_t height = chain->height;
+  int64_t step = 1;
 
   hsk_header_hash(tip, msg->hashes[i++]);
 
@@ -309,9 +309,7 @@ hsk_chain_get_locator(const hsk_chain_t *chain, hsk_getheaders_msg_t *msg) {
     if (i == sizeof(msg->hashes) - 1)
       height = 0;
 
-    hsk_header_t *hdr =
-      (hsk_header_t *)hsk_map_get(&chain->heights, &height);
-
+    hsk_header_t *hdr = hsk_chain_get_by_height(chain, (uint32_t)height);
     assert(hdr);
 
     hsk_header_hash(hdr, msg->hashes[i++]);
@@ -334,7 +332,7 @@ hsk_chain_get_mtp(const hsk_chain_t *chain, const hsk_header_t *prev) {
 
   for (i = 0; i < timespan && prev; i++) {
     median[i] = (int64_t)prev->time;
-    prev = (hsk_header_t *)hsk_map_get(&chain->hashes, prev->prev_block);
+    prev = hsk_map_get(&chain->hashes, prev->prev_block);
     size += 1;
   }
 
@@ -349,10 +347,11 @@ hsk_chain_retarget(const hsk_chain_t *chain, const hsk_header_t *prev) {
 
   uint32_t bits = HSK_BITS;
   uint8_t *limit = (uint8_t *)HSK_LIMIT;
-  int window = HSK_TARGET_WINDOW;
-  int timespan = HSK_TARGET_TIMESPAN;
-  int min = HSK_MIN_ACTUAL;
-  int max = HSK_MAX_ACTUAL;
+
+  int64_t window = HSK_TARGET_WINDOW;
+  int64_t timespan = HSK_TARGET_TIMESPAN;
+  int64_t min = HSK_MIN_ACTUAL;
+  int64_t max = HSK_MAX_ACTUAL;
 
   if (!prev)
     return bits;
@@ -362,8 +361,8 @@ hsk_chain_retarget(const hsk_chain_t *chain, const hsk_header_t *prev) {
 
   hsk_header_t *last = (hsk_header_t *)prev;
   hsk_header_t *first = last;
-  int i;
 
+  int64_t i;
   for (i = 0; first && i < window; i++) {
     uint8_t diff[32];
     assert(hsk_pow_to_target(first->bits, diff));

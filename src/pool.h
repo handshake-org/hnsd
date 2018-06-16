@@ -65,7 +65,7 @@ typedef struct hsk_peer_s {
   uint8_t read_buffer[HSK_BUFFER_SIZE];
   int headers;
   int proofs;
-  int height;
+  int64_t height;
   hsk_map_t names;
   int64_t getheaders_time;
   int64_t version_time;

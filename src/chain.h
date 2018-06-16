@@ -48,7 +48,7 @@ hsk_header_t *
 hsk_chain_get(const hsk_chain_t *chain, const uint8_t *hash);
 
 hsk_header_t *
-hsk_chain_get_by_height(const hsk_chain_t *chain, int32_t height);
+hsk_chain_get_by_height(const hsk_chain_t *chain, uint32_t height);
 
 bool
 hsk_chain_has_orphan(const hsk_chain_t *chain, const uint8_t *hash);
@@ -63,7 +63,7 @@ hsk_header_t *
 hsk_chain_get_ancestor(
   const hsk_chain_t *chain,
   const hsk_header_t *hdr,
-  int32_t height
+  uint32_t height
 );
 
 bool

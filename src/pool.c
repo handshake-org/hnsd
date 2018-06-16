@@ -1142,7 +1142,7 @@ hsk_peer_send_version(hsk_peer_t *peer) {
 
   msg.nonce = hsk_nonce();
   strcpy(msg.agent, HSK_USER_AGENT);
-  msg.height = pool->chain.height;
+  msg.height = (uint32_t)pool->chain.height;
 
   peer->version_time = hsk_now();
 
@@ -1215,7 +1215,7 @@ hsk_peer_handle_version(hsk_peer_t *peer, const hsk_version_msg_t *msg) {
   hsk_pool_t *pool = (hsk_pool_t *)peer->pool;
 
   hsk_peer_log(peer, "received version: %s (%u)\n", msg->agent, msg->height);
-  peer->height = msg->height;
+  peer->height = (int64_t)msg->height;
 
   hsk_timedata_add(&pool->td, &peer->addr, msg->time);
   hsk_addrman_mark_ack(&pool->am, &peer->addr, msg->services);
