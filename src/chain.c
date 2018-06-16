@@ -191,6 +191,9 @@ hsk_chain_safe_root(const hsk_chain_t *chain) {
   int64_t mod = chain->height % interval;
   int64_t safe_height = chain->height - mod;
 
+  if (safe_height < 2)
+    safe_height = 2;
+
   hsk_header_t *prev = hsk_chain_get_by_height(chain, (int32_t)safe_height);
   assert(prev);
 
