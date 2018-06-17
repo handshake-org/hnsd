@@ -32,8 +32,6 @@ static const uint8_t HSK_ZERO_HASH[32] = {
 static const char HSK_TRUST_ANCHOR[] = ". DS 35215 13 2 "
   "7C50EA94A63AEECB65B510D1EAC1846C973A89D4AB292287D5A4D715136B57A3";
 
-#define HSK_LAUNCH_DATE 1528833600
-
 #if HSK_NETWORK == HSK_MAIN
 
 /*
@@ -79,6 +77,7 @@ static const uint8_t HSK_CHAINWORK[32] = {
 #define HSK_USE_CHECKPOINTS false
 #define HSK_LAST_CHECKPOINT 0
 #define HSK_MAX_TIP_AGE (24 * 60 * 60)
+#define HSK_LAUNCH_DATE 1533427200
 
 #elif HSK_NETWORK == HSK_TESTNET
 
@@ -125,6 +124,7 @@ static const uint8_t HSK_CHAINWORK[32] = {
 #define HSK_USE_CHECKPOINTS false
 #define HSK_LAST_CHECKPOINT 0
 #define HSK_MAX_TIP_AGE (2 * 7 * 24 * 60 * 60)
+#define HSK_LAUNCH_DATE 1533427200
 
 #elif HSK_NETWORK == HSK_REGTEST
 
@@ -171,6 +171,7 @@ static const uint8_t HSK_CHAINWORK[32] = {
 #define HSK_USE_CHECKPOINTS false
 #define HSK_LAST_CHECKPOINT 0
 #define HSK_MAX_TIP_AGE (2 * 7 * 24 * 60 * 60)
+#define HSK_LAUNCH_DATE 0xffffffff
 
 #elif HSK_NETWORK == HSK_SIMNET
 
@@ -217,6 +218,7 @@ static const uint8_t HSK_CHAINWORK[32] = {
 #define HSK_USE_CHECKPOINTS false
 #define HSK_LAST_CHECKPOINT 0
 #define HSK_MAX_TIP_AGE (2 * 7 * 24 * 60 * 60)
+#define HSK_LAUNCH_DATE 0xffffffff
 
 #else
 
