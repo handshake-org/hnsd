@@ -1,3 +1,10 @@
+/**
+ * Ported to C from the go-lang implementation (LND):
+ *   Copyright (C) 2015-2017 The Lightning Network Developers
+ *   https://github.com/lightningnetwork/lnd/blob/master/brontide/noise.go
+ *   https://github.com/lightningnetwork/lnd/blob/master/brontide/noise_test.go
+ */
+
 #include "config.h"
 
 #include <assert.h>
@@ -10,6 +17,7 @@
 #include "aead.h"
 #include "bio.h"
 #include "brontide.h"
+#include "constants.h"
 #include "ec.h"
 #include "error.h"
 #include "hash.h"
@@ -19,6 +27,8 @@
 static const char brontide_protocol_name[] =
   "Noise_XK_secp256k1_ChaChaPoly_SHA256";
 
+// Our primary difference from lightning:
+// We use "hsk" instead of "lightning".
 static const char brontide_prologue[] = "hsk";
 
 #define BRONTIDE_ROTATION_INTERVAL 1000
@@ -38,7 +48,7 @@ static const char brontide_prologue[] = "hsk";
 #define BRONTIDE_ACT_THREE 3
 #define BRONTIDE_ACT_DONE 4
 
-#define BRONTIDE_MAX_MESSAGE (4 * 1000 * 1000)
+#define BRONTIDE_MAX_MESSAGE (HSK_MAX_MESSAGE + 9)
 
 /*
  * Cipher State
