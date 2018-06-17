@@ -8,48 +8,15 @@
 #ifndef _HSK_BN_H
 #define _HSK_BN_H
 
-#include <stdint.h>
 #include <assert.h>
+#include <stdint.h>
 
-#ifndef HSK_BN_WORD_SIZE
-#define HSK_BN_WORD_SIZE 4
-#endif
-
-#define HSK_BN_ARRAY_SIZE (64 / HSK_BN_WORD_SIZE)
-
-#ifndef HSK_BN_WORD_SIZE
-#error Must define HSK_BN_WORD_SIZE to be 1, 2, 4
-#elif (HSK_BN_WORD_SIZE == 1)
-#define HSK_BN_DTYPE uint8_t
-#define HSK_BN_DTYPE_MSB ((HSK_BN_DTYPE_TMP)(0x80))
-#define HSK_BN_DTYPE_TMP uint32_t
-#define HSK_BN_SPRINTF_FMT "%.02x"
-#define HSK_BN_SSCANF_FMT "%2hhx"
-#define HSK_BN_MAX_VAL ((HSK_BN_DTYPE_TMP)0xFF)
-#elif (HSK_BN_WORD_SIZE == 2)
-#define HSK_BN_DTYPE uint16_t
-#define HSK_BN_DTYPE_TMP uint32_t
-#define HSK_BN_DTYPE_MSB ((HSK_BN_DTYPE_TMP)(0x8000))
-#define HSK_BN_SPRINTF_FMT "%.04x"
-#define HSK_BN_SSCANF_FMT "%4hx"
-#define HSK_BN_MAX_VAL ((HSK_BN_DTYPE_TMP)0xFFFF)
-#elif (HSK_BN_WORD_SIZE == 4)
-#define HSK_BN_DTYPE uint32_t
-#define HSK_BN_DTYPE_TMP uint64_t
-#define HSK_BN_DTYPE_MSB ((HSK_BN_DTYPE_TMP)(0x80000000))
-#define HSK_BN_SPRINTF_FMT "%.08x"
-#define HSK_BN_SSCANF_FMT "%8x"
-#define HSK_BN_MAX_VAL ((HSK_BN_DTYPE_TMP)0xFFFFFFFF)
-#endif
-
-#ifndef HSK_BN_DTYPE
-#error HSK_BN_DTYPE must be defined to uint8_t, uint16_t uint32_t or whatever
-#endif
-
-#define HSK_BN_REQUIRE(p, msg) assert(p && #msg)
+#define HSK_BN_SIZE (64 / 4)
+#define HSK_BN_MSB ((uint64_t)0x80000000)
+#define HSK_BN_MAX ((uint64_t)0xffffffff)
 
 typedef struct hsk_bn_s {
-  HSK_BN_DTYPE array[HSK_BN_ARRAY_SIZE];
+  uint32_t array[HSK_BN_SIZE];
 } hsk_bn_t;
 
 /*
@@ -60,9 +27,9 @@ void
 hsk_bn_init(hsk_bn_t *n);
 
 void
-hsk_bn_from_int(hsk_bn_t *n, HSK_BN_DTYPE_TMP i);
+hsk_bn_from_int(hsk_bn_t *n, uint64_t i);
 
-int
+uint64_t
 hsk_bn_to_int(const hsk_bn_t *n);
 
 void
@@ -72,10 +39,10 @@ void
 hsk_bn_to_string(const hsk_bn_t *n, char *str, int maxsize);
 
 void
-hsk_bn_from_array(hsk_bn_t *n, const unsigned char *array, size_t size);
+hsk_bn_from_array(hsk_bn_t *n, const uint8_t *array, size_t size);
 
 void
-hsk_bn_to_array(const hsk_bn_t *n, unsigned char *array, size_t size);
+hsk_bn_to_array(const hsk_bn_t *n, uint8_t *array, size_t size);
 
 /*
  * Basic arithmetic operations
