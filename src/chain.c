@@ -369,14 +369,14 @@ hsk_chain_retarget(const hsk_chain_t *chain, const hsk_header_t *prev) {
     hsk_bn_t diff_bn;
     hsk_bn_from_array(&diff_bn, diff, 32);
     hsk_bn_add(&target_bn, &diff_bn, &target_bn);
-    first = (hsk_header_t *)hsk_map_get(&chain->hashes, first->prev_block);
+    first = hsk_map_get(&chain->hashes, first->prev_block);
   }
 
-  if (!first)
+  if (!first || first->height < 1)
     return bits;
 
   hsk_bn_t window_bn;
-  hsk_bn_from_int(&window_bn, window);
+  hsk_bn_from_int(&window_bn, (uint64_t)window);
 
   hsk_bn_div(&target_bn, &window_bn, &target_bn);
 
@@ -392,10 +392,10 @@ hsk_chain_retarget(const hsk_chain_t *chain, const hsk_header_t *prev) {
     actual = max;
 
   hsk_bn_t actual_bn;
-  hsk_bn_from_int(&actual_bn, actual);
+  hsk_bn_from_int(&actual_bn, (uint64_t)actual);
 
   hsk_bn_t timespan_bn;
-  hsk_bn_from_int(&timespan_bn, timespan);
+  hsk_bn_from_int(&timespan_bn, (uint64_t)timespan);
 
   hsk_bn_div(&target_bn, &timespan_bn, &target_bn);
   hsk_bn_mul(&target_bn, &actual_bn, &target_bn);
