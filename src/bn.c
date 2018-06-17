@@ -261,7 +261,7 @@ hsk_bn_add(const hsk_bn_t *a, const hsk_bn_t *b, hsk_bn_t *c) {
 
   int i;
   for (i = 0; i < HSK_BN_ARRAY_SIZE; i++) {
-    tmp = a->array[i] + b->array[i] + carry;
+    tmp = (HSK_BN_DTYPE_TMP)a->array[i] + (HSK_BN_DTYPE_TMP)b->array[i] + carry;
     carry = (tmp > HSK_BN_MAX_VAL);
     c->array[i] = (tmp & HSK_BN_MAX_VAL);
   }

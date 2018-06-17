@@ -15,7 +15,7 @@
 #define HSK_BN_WORD_SIZE 4
 #endif
 
-#define HSK_BN_ARRAY_SIZE (128 / HSK_BN_WORD_SIZE)
+#define HSK_BN_ARRAY_SIZE (64 / HSK_BN_WORD_SIZE)
 
 #ifndef HSK_BN_WORD_SIZE
 #error Must define HSK_BN_WORD_SIZE to be 1, 2, 4
