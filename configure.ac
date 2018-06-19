@@ -73,10 +73,10 @@ AC_CHECK_HEADERS([ \
 AC_ARG_WITH([network],
   [AS_HELP_STRING(
     [--with-network=main|testnet|regtest|simnet],
-    [Specify network. Default is simnet.]
+    [Specify network. Default is testnet.]
   )],
   [hsk_network=$withval],
-  [hsk_network=simnet])
+  [hsk_network=testnet])
 
 case $hsk_network in
   main)
