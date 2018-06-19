@@ -70,7 +70,7 @@ static const uint8_t HSK_CHAINWORK[32] = {
 #define HSK_NO_RETARGETTING false
 #define HSK_CUCKOO_BITS 30
 #define HSK_CUCKOO_SIZE 42
-#define HSK_CUCKOO_EASE 50
+#define HSK_CUCKOO_PERC 50
 #define HSK_CUCKOO_LEGACY false
 #define HSK_GENESIS HSK_GENESIS_MAIN
 
@@ -115,9 +115,9 @@ static const uint8_t HSK_CHAINWORK[32] = {
 #define HSK_TREE_INTERVAL 72
 #define HSK_TARGET_RESET true
 #define HSK_NO_RETARGETTING false
-#define HSK_CUCKOO_BITS 30
+#define HSK_CUCKOO_BITS 24
 #define HSK_CUCKOO_SIZE 42
-#define HSK_CUCKOO_EASE 50
+#define HSK_CUCKOO_PERC 50
 #define HSK_CUCKOO_LEGACY false
 #define HSK_GENESIS HSK_GENESIS_TESTNET
 
@@ -164,7 +164,7 @@ static const uint8_t HSK_CHAINWORK[32] = {
 #define HSK_NO_RETARGETTING true
 #define HSK_CUCKOO_BITS 8
 #define HSK_CUCKOO_SIZE 4
-#define HSK_CUCKOO_EASE 50
+#define HSK_CUCKOO_PERC 50
 #define HSK_CUCKOO_LEGACY false
 #define HSK_GENESIS HSK_GENESIS_REGTEST
 
@@ -211,7 +211,7 @@ static const uint8_t HSK_CHAINWORK[32] = {
 #define HSK_NO_RETARGETTING false
 #define HSK_CUCKOO_BITS 16
 #define HSK_CUCKOO_SIZE 18
-#define HSK_CUCKOO_EASE 50
+#define HSK_CUCKOO_PERC 50
 #define HSK_CUCKOO_LEGACY false
 #define HSK_GENESIS HSK_GENESIS_SIMNET
 

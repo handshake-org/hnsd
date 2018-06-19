@@ -385,7 +385,7 @@ hsk_header_verify_pow(const hsk_header_t *hdr) {
   assert(hsk_cuckoo_init(&ctx,
     HSK_CUCKOO_BITS,
     HSK_CUCKOO_SIZE,
-    HSK_CUCKOO_EASE,
+    HSK_CUCKOO_PERC,
     HSK_CUCKOO_LEGACY
   ) == 0);
 

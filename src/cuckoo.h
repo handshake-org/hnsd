@@ -18,7 +18,7 @@ hsk_cuckoo_init(
   hsk_cuckoo_t *ctx,
   int bits,
   int size,
-  int ease,
+  int perc,
   bool legacy
 );
 

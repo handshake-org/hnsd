@@ -15,7 +15,7 @@ hsk_cuckoo_init(
   hsk_cuckoo_t *ctx,
   int bits,
   int size,
-  int ease,
+  int perc,
   bool legacy
 ) {
   if (ctx == NULL)
@@ -30,7 +30,7 @@ hsk_cuckoo_init(
   if (size & 1)
     return HSK_EBADARGS;
 
-  if (ease < 1 || ease > 100)
+  if (perc < 1 || perc > 100)
     return HSK_EBADARGS;
 
   // Maximum number of nodes on the graph (NNODES).
@@ -45,10 +45,10 @@ hsk_cuckoo_init(
   ctx->size = size;
 
   // Maximum nonce size (easipct->easiness).
-  ctx->easiness = ((uint64_t)ease * ctx->nodes) / 100;
+  ctx->easiness = ((uint64_t)perc * ctx->nodes) / 100;
 
   // Sanity check.
-  assert(ease != 50 || ctx->easiness == (ctx->mask + 1));
+  assert(perc != 50 || ctx->easiness == (ctx->mask + 1));
 
   // Which style of hashing to use (SIPHASH_COMPAT).
   ctx->legacy = legacy;
