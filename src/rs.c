@@ -22,6 +22,7 @@
 #include "resource.h"
 #include "req.h"
 #include "rs.h"
+#include "tld.h"
 #include "utils.h"
 #include "uv.h"
 
@@ -67,7 +68,10 @@ after_recv(
 );
 
 static void
-after_poll(uv_poll_t *handle, int status, int events);
+after_poll_hns(uv_poll_t *handle, int status, int events);
+
+static void
+after_poll_icann(uv_poll_t *handle, int status, int events);
 
 static void
 after_resolve(void *data, int status, struct ub_result *result);
@@ -84,15 +88,25 @@ hsk_rs_init(hsk_rs_t *ns, const uv_loop_t *loop, const struct sockaddr *stub) {
   if (!ns || !loop)
     return HSK_EBADARGS;
 
-  struct ub_ctx *ub = NULL;
+  int err = HSK_ENOMEM;
+  struct ub_ctx *hns = NULL;
+  struct ub_ctx *icann = NULL;
   hsk_ec_t *ec = NULL;
 
-  ub = ub_ctx_create();
+  hns = ub_ctx_create();
 
-  if (!ub)
+  if (!hns)
     goto fail;
 
-  if (ub_ctx_async(ub, 1) != 0)
+  if (ub_ctx_async(hns, 1) != 0)
+    goto fail;
+
+  icann = ub_ctx_create();
+
+  if (!icann)
+    goto fail;
+
+  if (ub_ctx_async(icann, 1) != 0)
     goto fail;
 
   ec = hsk_ec_alloc();
@@ -101,9 +115,11 @@ hsk_rs_init(hsk_rs_t *ns, const uv_loop_t *loop, const struct sockaddr *stub) {
     goto fail;
 
   ns->loop = (uv_loop_t *)loop;
-  ns->ub = ub;
+  ns->hns = hns;
+  ns->icann = icann;
   ns->socket.data = (void *)ns;
-  ns->poll.data = (void *)ns;
+  ns->poll_hns.data = (void *)ns;
+  ns->poll_icann.data = (void *)ns;
   ns->ec = ec;
   memset(ns->config_, 0x00, sizeof(ns->config_));
   ns->config = NULL;
@@ -118,23 +134,28 @@ hsk_rs_init(hsk_rs_t *ns, const uv_loop_t *loop, const struct sockaddr *stub) {
   ns->polling = false;
 
   if (stub) {
+    err = HSK_EFAILURE;
+
     if (!hsk_sa_copy(ns->stub, stub))
-      return HSK_EFAILURE;
+      goto fail;
 
     if (!hsk_sa_localize(ns->stub))
-      return HSK_EFAILURE;
+      goto fail;
   }
 
   return HSK_SUCCESS;
 
 fail:
-  if (ub)
-    ub_ctx_delete(ub);
+  if (hns)
+    ub_ctx_delete(hns);
+
+  if (icann)
+    ub_ctx_delete(icann);
 
   if (ec)
     hsk_ec_free(ec);
 
-  return HSK_ENOMEM;
+  return err;
 }
 
 void
@@ -143,16 +164,21 @@ hsk_rs_uninit(hsk_rs_t *ns) {
     return;
 
   ns->socket.data = NULL;
-  ns->poll.data = NULL;
+  ns->poll_hns.data = NULL;
 
   if (ns->ec) {
     hsk_ec_free(ns->ec);
     ns->ec = NULL;
   }
 
-  if (ns->ub) {
-    ub_ctx_delete(ns->ub);
-    ns->ub = NULL;
+  if (ns->hns) {
+    ub_ctx_delete(ns->hns);
+    ns->hns = NULL;
+  }
+
+  if (ns->icann) {
+    ub_ctx_delete(ns->icann);
+    ns->icann = NULL;
   }
 }
 
@@ -198,40 +224,48 @@ hsk_rs_set_key(hsk_rs_t *ns, const uint8_t *key) {
 }
 
 static bool
-hsk_rs_inject_options(hsk_rs_t *ns) {
+setup_ub_config(hsk_rs_t *ns, struct ub_ctx *ub) {
   if (ns->config) {
-    if (ub_ctx_config(ns->ub, ns->config) != 0)
+    if (ub_ctx_config(ub, ns->config) != 0)
       return false;
   }
 
-  if (ub_ctx_set_option(ns->ub, "do-tcp:", "no") != 0)
+  if (ub_ctx_set_option(ub, "do-tcp:", "no") != 0)
     return false;
 
-  if (ub_ctx_set_option(ns->ub, "logfile:", "") != 0)
+  if (ub_ctx_set_option(ub, "logfile:", "") != 0)
     return false;
 
-  if (ub_ctx_set_option(ns->ub, "use-syslog:", "no") != 0)
+  if (ub_ctx_set_option(ub, "use-syslog:", "no") != 0)
     return false;
 
-  if (ub_ctx_set_option(ns->ub, "root-hints:", "") != 0)
-    return false;
-
-  // if (ub_ctx_set_option(ns->ub, "do-not-query-localhost:", "no") != 0)
+  // if (ub_ctx_set_option(ub, "do-not-query-localhost:", "no") != 0)
   //   return false;
 
-  if (ub_ctx_set_option(ns->ub, "trust-anchor-signaling:", "no") != 0)
+  if (ub_ctx_set_option(ub, "trust-anchor-signaling:", "no") != 0)
     return false;
 
-  if (ub_ctx_set_option(ns->ub, "do-tcp:", "no") != 0)
+  if (ub_ctx_set_option(ub, "edns-buffer-size:", "4096") != 0)
     return false;
 
-  if (ub_ctx_set_option(ns->ub, "edns-buffer-size:", "4096") != 0)
+  if (ub_ctx_set_option(ub, "max-udp-size:", "4096") != 0)
     return false;
 
-  if (ub_ctx_set_option(ns->ub, "max-udp-size:", "4096") != 0)
+  if (ub_ctx_set_option(ub, "qname-minimisation:", "yes") != 0)
     return false;
 
-  if (ub_ctx_set_option(ns->ub, "qname-minimisation:", "yes") != 0)
+  return true;
+}
+
+static bool
+hsk_rs_inject_options(hsk_rs_t *ns) {
+  if (!setup_ub_config(ns, ns->hns))
+    return false;
+
+  if (ub_ctx_set_option(ns->hns, "root-hints:", "") != 0)
+    return false;
+
+  if (ub_ctx_set_option(ns->hns, "do-tcp:", "no") != 0)
     return false;
 
   char stub[HSK_MAX_HOST];
@@ -239,13 +273,22 @@ hsk_rs_inject_options(hsk_rs_t *ns) {
   if (!hsk_sa_to_at(ns->stub, stub, HSK_MAX_HOST, HSK_NS_PORT))
     return false;
 
-  if (ub_ctx_set_stub(ns->ub, ".", stub, 0) != 0)
+  if (ub_ctx_set_stub(ns->hns, ".", stub, 0) != 0)
     return false;
 
-  if (ub_ctx_add_ta(ns->ub, HSK_TRUST_ANCHOR) != 0)
+  if (ub_ctx_add_ta(ns->hns, HSK_TRUST_ANCHOR) != 0)
     return false;
 
-  if (ub_ctx_zone_add(ns->ub, ".", "nodefault") != 0)
+  if (ub_ctx_zone_add(ns->hns, ".", "nodefault") != 0)
+    return false;
+
+  if (!setup_ub_config(ns, ns->icann))
+    return false;
+
+  if (ub_ctx_add_ta(ns->icann, HSK_KSK_2010) != 0)
+    return false;
+
+  if (ub_ctx_add_ta(ns->icann, HSK_KSK_2017) != 0)
     return false;
 
   hsk_rs_log(ns, "recursive nameserver pointing to: %s\n", stub);
@@ -284,13 +327,20 @@ hsk_rs_open(hsk_rs_t *ns, const struct sockaddr *addr) {
 
   ns->receiving = true;
 
-  if (uv_poll_init(ns->loop, &ns->poll, ub_fd(ns->ub)) != 0)
+  if (uv_poll_init(ns->loop, &ns->poll_hns, ub_fd(ns->hns)) != 0)
+    return HSK_EFAILURE;
+
+  if (uv_poll_init(ns->loop, &ns->poll_icann, ub_fd(ns->icann)) != 0)
     return HSK_EFAILURE;
 
   ns->polling = true;
-  ns->poll.data = (void *)ns;
+  ns->poll_hns.data = (void *)ns;
+  ns->poll_icann.data = (void *)ns;
 
-  if (uv_poll_start(&ns->poll, UV_READABLE, after_poll) != 0)
+  if (uv_poll_start(&ns->poll_hns, UV_READABLE, after_poll_hns) != 0)
+    return HSK_EFAILURE;
+
+  if (uv_poll_start(&ns->poll_icann, UV_READABLE, after_poll_icann) != 0)
     return HSK_EFAILURE;
 
   char host[HSK_MAX_HOST];
@@ -318,16 +368,26 @@ hsk_rs_close(hsk_rs_t *ns) {
   }
 
   if (ns->polling) {
-    if (uv_poll_stop(&ns->poll) != 0)
+    if (uv_poll_stop(&ns->poll_hns) != 0)
+      return HSK_EFAILURE;
+    if (uv_poll_stop(&ns->poll_icann) != 0)
       return HSK_EFAILURE;
     ns->polling = false;
   }
 
   ns->socket.data = NULL;
-  ns->poll.data = NULL;
+  ns->poll_hns.data = NULL;
+  ns->poll_icann.data = NULL;
 
-  ub_ctx_delete(ns->ub);
-  ns->ub = NULL;
+  if (ns->hns) {
+    ub_ctx_delete(ns->hns);
+    ns->hns = NULL;
+  }
+
+  if (ns->icann) {
+    ub_ctx_delete(ns->icann);
+    ns->icann = NULL;
+  }
 
   return HSK_SUCCESS;
 }
@@ -411,7 +471,7 @@ hsk_rs_onrecv(
   }
 
   rc = ub_resolve_async(
-    ns->ub,
+    ns->hns,
     req->name,
     req->type,
     req->class,
@@ -664,20 +724,119 @@ after_recv(
 }
 
 static void
-after_poll(uv_poll_t *handle, int status, int events) {
+after_poll_hns(uv_poll_t *handle, int status, int events) {
   hsk_rs_t *ns = (hsk_rs_t *)handle->data;
 
   if (!ns)
     return;
 
   if (status == 0 && (events & UV_READABLE))
-    ub_process(ns->ub);
+    ub_process(ns->hns);
+}
+
+static void
+after_poll_icann(uv_poll_t *handle, int status, int events) {
+  hsk_rs_t *ns = (hsk_rs_t *)handle->data;
+
+  if (!ns)
+    return;
+
+  if (status == 0 && (events & UV_READABLE))
+    ub_process(ns->icann);
+}
+
+static bool
+is_tld(const char *name) {
+  int start = 0;
+  int end = HSK_TLD_SIZE - 1;
+
+  while (start <= end) {
+    int pos = (start + end) >> 1;
+    int cmp = strcasecmp(HSK_TLD[pos], name);
+
+    if (cmp == 0)
+      return true;
+
+    if (cmp < 0)
+      start = pos + 1;
+    else
+      end = pos - 1;
+  }
+
+  return false;
+}
+
+static bool
+is_root_nx(const hsk_dns_req_t *req, const struct ub_result *result) {
+  if (strcmp(req->name, ".") == 0)
+    return false;
+
+  if (result->rcode != HSK_DNS_NXDOMAIN)
+    return false;
+
+  uint8_t *data = result->answer_packet;
+  size_t data_len = result->answer_len;
+  hsk_dns_msg_t *msg;
+
+  if (!hsk_dns_msg_decode(data, data_len, &msg))
+    return false;
+
+  bool found = false;
+  int i;
+
+  for (i = 0; i < msg->ns.size; i++) {
+    hsk_dns_rr_t *rr = msg->ns.items[i];
+
+    if (rr->type == HSK_DNS_SOA) {
+      if (strcmp(rr->name, ".") == 0) {
+        found = true;
+        break;
+      }
+    }
+  }
+
+  if (found) {
+    char name[HSK_DNS_MAX_LABEL + 1];
+
+    assert(hsk_dns_label_get(req->name, -1, name));
+
+    found = is_tld(name);
+  }
+
+  hsk_dns_msg_free(msg);
+
+  return found;
 }
 
 static void
 after_resolve(void *data, int status, struct ub_result *result) {
   hsk_dns_req_t *req = (hsk_dns_req_t *)data;
-  hsk_rs_respond((hsk_rs_t *)req->ns, req, status, result);
+  hsk_rs_t *ns = (hsk_rs_t *)req->ns;
+
+  assert(ns);
+
+  if (req->state == 0 && status == 0) {
+    if (is_root_nx(req, result)) {
+      req->state = 1;
+
+      int rc = ub_resolve_async(
+        ns->icann,
+        req->name,
+        req->type,
+        req->class,
+        (void *)req,
+        after_resolve,
+        NULL
+      );
+
+      if (rc == 0) {
+        ub_resolve_free(result);
+        return;
+      }
+    }
+  }
+
+  hsk_rs_respond(ns, req, status, result);
   hsk_dns_req_free(req);
   ub_resolve_free(result);
 }

@@ -16,9 +16,11 @@
 
 typedef struct {
   uv_loop_t *loop;
-  struct ub_ctx *ub;
+  struct ub_ctx *hns;
+  struct ub_ctx *icann;
   uv_udp_t socket;
-  uv_poll_t poll;
+  uv_poll_t poll_hns;
+  uv_poll_t poll_icann;
   hsk_ec_t *ec;
   char config_[256];
   char *config;

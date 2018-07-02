@@ -30,6 +30,7 @@ hsk_dns_req_init(hsk_dns_req_t *req) {
   req->ad = false;
   req->edns = false;
   req->dnssec = false;
+  req->state = 0;
   memset(req->tld, 0x00, sizeof(req->tld));
   memset(&req->ss, 0x00, sizeof(struct sockaddr_storage));
   req->addr = (struct sockaddr *)&req->ss;
