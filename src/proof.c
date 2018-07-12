@@ -49,6 +49,11 @@ hsk_proof_uninit(hsk_proof_t *proof) {
     proof->node_count = 0;
   }
 
+  if (proof->value) {
+    free(proof->value);
+    proof->value = NULL;
+  }
+
   if (proof->nx_key) {
     free(proof->nx_key);
     proof->nx_key = NULL;

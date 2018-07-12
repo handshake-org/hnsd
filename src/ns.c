@@ -584,13 +584,7 @@ after_recv(
 }
 
 static void
-after_close(uv_handle_t *handle) {
-  // hsk_ns_t *ns = (hsk_ns_t *)handle->data;
-  // assert(ns);
-  // handle->data = NULL;
-  // ns->bound = false;
-  // hsk_ns_free(peer);
-}
+after_close(uv_handle_t *handle) {}
 
 static void
 after_resolve(

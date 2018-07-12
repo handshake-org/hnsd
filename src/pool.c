@@ -253,7 +253,7 @@ hsk_pool_set_seeds(hsk_pool_t *pool, const char *seeds) {
       if (size >= HSK_MAX_HOST)
         return false;
 
-      memcpy(seed, seeds + start, size);
+      memcpy(&seed[0], &seeds[start], size);
       seed[size] = '\0';
 
       if (!hsk_addr_from_string(&addr, seed, HSK_PORT))
@@ -1408,7 +1408,7 @@ hsk_peer_handle_proof(hsk_peer_t *peer, const hsk_proof_msg_t *msg) {
   if (!reqs) {
     hsk_peer_log(peer,
       "received unsolicited proof: %s\n",
-      hsk_hex_encode20(msg->key));
+      hsk_hex_encode32(msg->key));
     return HSK_EBADARGS;
   }
 

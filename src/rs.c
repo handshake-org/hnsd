@@ -230,9 +230,6 @@ setup_ub_config(hsk_rs_t *ns, struct ub_ctx *ub) {
       return false;
   }
 
-  if (ub_ctx_set_option(ub, "do-tcp:", "no") != 0)
-    return false;
-
   if (ub_ctx_set_option(ub, "logfile:", "") != 0)
     return false;
 
@@ -746,7 +743,7 @@ after_poll_icann(uv_poll_t *handle, int status, int events) {
 }
 
 static bool
-is_tld(const char *name) {
+hsk_is_tld(const char *name) {
   int start = 0;
   int end = HSK_TLD_SIZE - 1;
 
@@ -767,11 +764,24 @@ is_tld(const char *name) {
 }
 
 static bool
-is_root_nx(const hsk_dns_req_t *req, const struct ub_result *result) {
-  if (strcmp(req->name, ".") == 0)
+hsk_has_tld(const char *name) {
+  if (strcmp(name, ".") == 0)
     return false;
 
+  char label[HSK_DNS_MAX_LABEL + 1];
+
+  if (!hsk_dns_label_get(req->name, -1, label))
+    return false;
+
+  return hsk_is_tld(label);
+}
+
+static bool
+is_root_nx(const hsk_dns_req_t *req, const struct ub_result *result) {
   if (result->rcode != HSK_DNS_NXDOMAIN)
+    return false;
+
+  if (!hsk_has_tld(req->name))
     return false;
 
   uint8_t *data = result->answer_packet;
@@ -793,14 +803,6 @@ is_root_nx(const hsk_dns_req_t *req, const struct ub_result *result) {
         break;
       }
     }
-  }
-
-  if (found) {
-    char name[HSK_DNS_MAX_LABEL + 1];
-
-    assert(hsk_dns_label_get(req->name, -1, name));
-
-    found = is_tld(name);
   }
 
   hsk_dns_msg_free(msg);
@@ -833,6 +835,8 @@ after_resolve(void *data, int status, struct ub_result *result) {
         ub_resolve_free(result);
         return;
       }
+
+      hsk_rs_log(ns, "unbound error: %s\n", ub_strerror(rc));
     }
   }
 
@@ -842,10 +846,4 @@ after_resolve(void *data, int status, struct ub_result *result) {
 }
 
 static void
-after_close(uv_handle_t *handle) {
-  // hsk_rs_t *ns = (hsk_rs_t *)handle->data;
-  // assert(ns);
-  // handle->data = NULL;
-  // ns->bound = false;
-  // hsk_rs_free(peer);
-}
+after_close(uv_handle_t *handle) {}
