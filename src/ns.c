@@ -21,6 +21,7 @@
 #include "ns.h"
 #include "pool.h"
 #include "req.h"
+#include "tld.h"
 #include "uv.h"
 
 /*
@@ -76,6 +77,12 @@ after_recv(
 
 static void
 after_close(uv_handle_t *handle);
+
+static int
+hsk_tld_index(const char *name);
+
+static const uint8_t *
+hsk_icann_lookup(const char *name);
 
 /*
  * Root Nameserver
@@ -599,11 +606,29 @@ after_resolve(
   hsk_ns_t *ns = (hsk_ns_t *)req->ns;
   hsk_resource_t *res = NULL;
 
-  if (status == HSK_SUCCESS && exists) {
-    if (!hsk_resource_decode(data, data_len, &res)) {
-      hsk_ns_log(ns, "could not decode resource for: %s\n", name);
-      status = HSK_EFAILURE;
-      res = NULL;
+  if (status == HSK_SUCCESS) {
+    if (!exists || data_len <= 13) {
+      const uint8_t *item = hsk_icann_lookup(name);
+
+      if (item) {
+        const uint8_t *raw = &item[2];
+        size_t raw_len = (((size_t)item[1]) << 8) | ((size_t)item[0]);
+
+        if (!hsk_resource_decode(raw, raw_len, &res)) {
+          hsk_ns_log(ns, "could not decode root resource for: %s\n", name);
+          status = HSK_EFAILURE;
+          res = NULL;
+        }
+      }
+    } else {
+      const uint8_t *raw = &data[13];
+      size_t raw_len = data_len - 13;
+
+      if (!hsk_resource_decode(raw, raw_len, &res)) {
+        hsk_ns_log(ns, "could not decode resource for: %s\n", name);
+        status = HSK_EFAILURE;
+        res = NULL;
+      }
     }
   }
 
@@ -613,4 +638,35 @@ after_resolve(
     hsk_resource_free(res);
 
   hsk_dns_req_free(req);
+}
+
+static int
+hsk_tld_index(const char *name) {
+  int start = 0;
+  int end = HSK_TLD_SIZE - 1;
+
+  while (start <= end) {
+    int pos = (start + end) >> 1;
+    int cmp = strcasecmp(HSK_TLD_NAMES[pos], name);
+
+    if (cmp == 0)
+      return pos;
+
+    if (cmp < 0)
+      start = pos + 1;
+    else
+      end = pos - 1;
+  }
+
+  return -1;
+}
+
+static const uint8_t *
+hsk_icann_lookup(const char *name) {
+  int index = hsk_tld_index(name);
+
+  if (index == -1)
+    return NULL;
+
+  return (const uint8_t *)HSK_TLD_DATA[index];
 }

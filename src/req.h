@@ -27,7 +27,6 @@ typedef struct {
   bool edns;
   size_t max_size;
   bool dnssec;
-  int state;
 
   // HSK stuff
   char tld[HSK_DNS_MAX_LABEL + 1];

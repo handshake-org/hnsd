@@ -201,11 +201,6 @@ hsk_chain_safe_root(const hsk_chain_t *chain) {
   uint32_t mod = (uint32_t)chain->height % interval;
   uint32_t height = (uint32_t)chain->height - mod;
 
-  // Height 1 is is a special commitment interval,
-  // causing block 2 to have the first tree commitment.
-  if (height < 2 && chain->height >= 2)
-    height = 2;
-
   hsk_header_t *prev = hsk_chain_get_by_height(chain, height);
   assert(prev);
 
