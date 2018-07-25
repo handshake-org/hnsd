@@ -8,7 +8,7 @@
 typedef struct {
   uint64_t nodes;
   uint32_t mask;
-  uint8_t size;
+  uint32_t size;
   uint64_t easiness;
   bool legacy;
 } hsk_cuckoo_t;

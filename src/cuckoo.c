@@ -106,6 +106,8 @@ hsk_cuckoo_verify(
   if (ctx == NULL || key == NULL || nonces == NULL)
     return HSK_EBADARGS;
 
+  assert(ctx->size != 0);
+
   uint32_t uvs[ctx->size * 2];
 
   uint32_t xor0 = 0;

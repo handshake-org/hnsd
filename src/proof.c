@@ -52,6 +52,7 @@ hsk_proof_uninit(hsk_proof_t *proof) {
   if (proof->value) {
     free(proof->value);
     proof->value = NULL;
+    proof->value_size = 0;
   }
 
   if (proof->nx_key) {
@@ -118,7 +119,7 @@ hsk_proof_read(uint8_t **data, size_t *data_len, hsk_proof_t *proof) {
       if (!read_u16(data, data_len, &proof->value_size))
         goto fail;
 
-      if (proof->value_size > 512)
+      if (proof->value_size > 512 + 13)
         goto fail;
 
       if (!alloc_bytes(data, data_len, &proof->value, proof->value_size))
@@ -206,7 +207,7 @@ hsk_proof_verify(
 
   assert(proof->nodes || proof->node_count == 0);
   assert(proof->node_count <= 256);
-  assert(proof->value_size <= 512);
+  assert(proof->value_size <= 512 + 13);
 
   // Re-create the leaf.
   switch (proof->type) {
@@ -229,7 +230,7 @@ hsk_proof_verify(
       assert(proof->nx_key);
       assert(proof->nx_hash);
       if (memcmp(proof->nx_key, key, 32) == 0)
-        return HSK_EHASHMISMATCH;
+        return HSK_ESAMEKEY;
       hsk_proof_hash_leaf(proof->nx_key, proof->nx_hash, leaf);
       break;
     default:
@@ -256,7 +257,7 @@ hsk_proof_verify(
     return HSK_EHASHMISMATCH;
 
   if (exists)
-    *exists = proof->type == 0;
+    *exists = proof->type == HSK_PROOF_EXISTS;
 
   if (data_len)
     *data_len = proof->value_size;
