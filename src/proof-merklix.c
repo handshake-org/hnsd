@@ -21,7 +21,7 @@ static const uint8_t hsk_proof_internal[1] = {0x01};
 static const uint8_t hsk_proof_leaf[1] = {0x00};
 
 static inline bool
-read_bitlen(uint8_t **data, size_t *len, uint16_t *bits, size_t *bytes) {
+read_bitlen(uint8_t **data, size_t *data_len, uint16_t *bits, size_t *bytes) {
   uint8_t byte;
 
   if (!read_u8(data, data_len, &byte))
@@ -266,7 +266,7 @@ hsk_proof_hash_internal(
   } else {
     uint8_t size[2];
     uint8_t *p = &size[0];
-    write_u16(p, prefix_size);
+    write_u16(&p, prefix_size);
 
     size_t bytes = ((size_t)prefix_size + 7) / 8;
 
@@ -371,7 +371,7 @@ hsk_proof_verify(
       assert(proof->left);
       assert(proof->right);
 
-      if (!hsk_proof_has(prefix, prefix_size, key, proof->depth))
+      if (hsk_proof_has(prefix, prefix_size, key, proof->depth))
         return HSK_ESAMEPATH;
 
       hsk_proof_hash_internal(prefix, prefix_size, left, right, leaf);
