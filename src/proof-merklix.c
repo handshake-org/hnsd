@@ -264,9 +264,9 @@ hsk_proof_hash_internal(
     hsk_blake2b_update(&ctx, left, 32);
     hsk_blake2b_update(&ctx, right, 32);
   } else {
-    uint8_t size_[2];
-    uint8_t *size = &size_[0];
-    write_u16(size, prefix_size);
+    uint8_t size[2];
+    uint8_t *p = &size[0];
+    write_u16(p, prefix_size);
 
     size_t bytes = ((size_t)prefix_size + 7) / 8;
 
