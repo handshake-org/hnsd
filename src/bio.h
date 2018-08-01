@@ -194,8 +194,10 @@ alloc_bytes(uint8_t **data, size_t *len, uint8_t **out, size_t size) {
   if (o == NULL)
     return false;
 
-  if (!read_bytes(data, len, o, size))
+  if (!read_bytes(data, len, o, size)) {
+    free(o);
     return false;
+  }
 
   *out = o;
 
