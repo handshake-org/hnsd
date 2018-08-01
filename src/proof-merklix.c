@@ -366,10 +366,10 @@ hsk_proof_verify(
       uint8_t *left = proof->left;
       uint8_t *right = proof->right;
 
-      assert(proof->prefix);
-      assert(proof->prefix_size != 0);
-      assert(proof->left);
-      assert(proof->right);
+      assert(prefix);
+      assert(prefix_size != 0);
+      assert(left);
+      assert(right);
 
       if (hsk_proof_has(prefix, prefix_size, key, proof->depth))
         return HSK_ESAMEPATH;
