@@ -1520,7 +1520,7 @@ hsk_peer_on_read(hsk_peer_t *peer, const uint8_t *data, size_t data_len) {
   peer->last_recv = hsk_now();
 
   while (peer->msg_pos + data_len >= peer->msg_len) {
-    assert(peer->msg_pos < peer->msg_len);
+    assert(peer->msg_pos <= peer->msg_len);
     size_t need = peer->msg_len - peer->msg_pos;
     memcpy(peer->msg + peer->msg_pos, data, need);
     data += need;
