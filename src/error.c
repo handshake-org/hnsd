@@ -51,6 +51,6 @@ static const char *errstrs[] = {
 const char *
 hsk_strerror(int code) {
   if (code < 0 || code > HSK_MAXERROR)
-    return errstrs[HSK_MAXERROR + 1];
+    return errstrs[HSK_MAXERROR];
   return errstrs[code];
 }
