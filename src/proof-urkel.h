@@ -4,9 +4,9 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-#define HSK_PROOF_EXISTS 0
-#define HSK_PROOF_DEADEND 1
-#define HSK_PROOF_COLLISION 2
+#define HSK_PROOF_DEADEND 0
+#define HSK_PROOF_COLLISION 1
+#define HSK_PROOF_EXISTS 2
 #define HSK_PROOF_UNKNOWN 3
 
 typedef struct hsk_proof_s {

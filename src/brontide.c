@@ -28,8 +28,8 @@ static const char brontide_protocol_name[] =
   "Noise_XK_secp256k1_ChaChaPoly_SHA256";
 
 // Our primary difference from lightning:
-// We use "hsk" instead of "lightning".
-static const char brontide_prologue[] = "hsk";
+// We use "hns" instead of "lightning".
+static const char brontide_prologue[] = "hns";
 
 #define BRONTIDE_ROTATION_INTERVAL 1000
 #define BRONTIDE_VERSION 0

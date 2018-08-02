@@ -115,16 +115,6 @@ hsk_proof_read(uint8_t **data, size_t *data_len, hsk_proof_t *proof) {
   }
 
   switch (proof->type) {
-    case HSK_PROOF_EXISTS:
-      if (!read_u16(data, data_len, &proof->value_size))
-        goto fail;
-
-      if (proof->value_size > 512 + 13)
-        goto fail;
-
-      if (!alloc_bytes(data, data_len, &proof->value, proof->value_size))
-        goto fail;
-      break;
     case HSK_PROOF_DEADEND:
       break;
     case HSK_PROOF_COLLISION:
@@ -132,6 +122,16 @@ hsk_proof_read(uint8_t **data, size_t *data_len, hsk_proof_t *proof) {
         goto fail;
 
       if (!alloc_bytes(data, data_len, &proof->nx_hash, 32))
+        goto fail;
+      break;
+    case HSK_PROOF_EXISTS:
+      if (!read_u16(data, data_len, &proof->value_size))
+        goto fail;
+
+      if (proof->value_size > HSK_MAX_DATA_SIZE)
+        goto fail;
+
+      if (!alloc_bytes(data, data_len, &proof->value, proof->value_size))
         goto fail;
       break;
     case HSK_PROOF_UNKNOWN:
@@ -191,6 +191,39 @@ hsk_proof_hash_value(
   hsk_proof_hash_leaf(key, out, out);
 }
 
+static bool
+hsk_parse_namestate(
+  uint8_t *data,
+  size_t data_len,
+  uint8_t **res,
+  size_t *res_len
+) {
+  if (data_len > HSK_MAX_DATA_SIZE)
+    return false;
+
+  uint8_t name_size;
+
+  if (!read_u8(&data, &data_len, &name_size))
+    return false;
+
+  uint8_t *name;
+
+  if (!slice_bytes(&data, &data_len, &name, name_size))
+    return false;
+
+  uint16_t res_size;
+
+  if (!read_u16(&data, &data_len, &res_size))
+    return false;
+
+  if (!alloc_bytes(&data, &data_len, res, res_size))
+    return false;
+
+  *res_len = res_size;
+
+  return true;
+}
+
 int
 hsk_proof_verify(
   const uint8_t *root,
@@ -207,16 +240,10 @@ hsk_proof_verify(
 
   assert(proof->nodes || proof->node_count == 0);
   assert(proof->node_count <= 256);
-  assert(proof->value_size <= 512 + 13);
+  assert(proof->value_size <= HSK_MAX_DATA_SIZE);
 
   // Re-create the leaf.
   switch (proof->type) {
-    case HSK_PROOF_EXISTS:
-      assert(proof->value || proof->value_size == 0);
-      assert(!proof->nx_key);
-      assert(!proof->nx_hash);
-      hsk_proof_hash_value(key, proof->value, proof->value_size, leaf);
-      break;
     case HSK_PROOF_DEADEND:
       assert(!proof->value);
       assert(proof->value_size == 0);
@@ -232,6 +259,12 @@ hsk_proof_verify(
       if (memcmp(proof->nx_key, key, 32) == 0)
         return HSK_ESAMEKEY;
       hsk_proof_hash_leaf(proof->nx_key, proof->nx_hash, leaf);
+      break;
+    case HSK_PROOF_EXISTS:
+      assert(proof->value || proof->value_size == 0);
+      assert(!proof->nx_key);
+      assert(!proof->nx_hash);
+      hsk_proof_hash_value(key, proof->value, proof->value_size, leaf);
       break;
     default:
       assert(0 && "unknown type");
@@ -256,21 +289,15 @@ hsk_proof_verify(
   if (memcmp(next, root, 32) != 0)
     return HSK_EHASHMISMATCH;
 
-  if (exists)
-    *exists = proof->type == HSK_PROOF_EXISTS;
+  if (proof->type == HSK_PROOF_EXISTS) {
+    if (!hsk_parse_namestate(proof->value, proof->value_size, data, data_len))
+      return HSK_EENCODING;
 
-  if (data_len)
-    *data_len = proof->value_size;
-
-  if (data) {
-    if (proof->value_size > 0) {
-      *data = malloc(proof->value_size);
-      if (!*data)
-        return HSK_ENOMEM;
-      memcpy(*data, proof->value, proof->value_size);
-    } else {
-      *data = NULL;
-    }
+    *exists = true;
+  } else {
+    *data = NULL;
+    *data_len = 0;
+    *exists = false;
   }
 
   return HSK_EPROOFOK;

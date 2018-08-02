@@ -607,7 +607,7 @@ after_resolve(
   hsk_resource_t *res = NULL;
 
   if (status == HSK_SUCCESS) {
-    if (!exists || data_len <= 13) {
+    if (!exists || data_len == 0) {
       const uint8_t *item = hsk_icann_lookup(name);
 
       if (item) {
@@ -621,10 +621,7 @@ after_resolve(
         }
       }
     } else {
-      const uint8_t *raw = &data[13];
-      size_t raw_len = data_len - 13;
-
-      if (!hsk_resource_decode(raw, raw_len, &res)) {
+      if (!hsk_resource_decode(data, data_len, &res)) {
         hsk_ns_log(ns, "could not decode resource for: %s\n", name);
         status = HSK_EFAILURE;
         res = NULL;
