@@ -1,1 +1,1 @@
-#include "proof-merklix.c"
+#include "proof-radix.c"
