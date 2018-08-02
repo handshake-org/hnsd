@@ -96,7 +96,7 @@ your OS uses.
 ### Cloning
 
 ``` sh
-$ git clone git@github.com:handshake-org/hnsd.git
+$ git clone git://github.com/handshake-org/hnsd.git
 $ cd hnsd
 ```
 
