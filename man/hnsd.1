@@ -1,0 +1,67 @@
+.ds q \N'34'
+.TH hnsd 1 "2018-08-01" "v0.0.0" "hnsd"
+
+.SH NAME
+hnsd \- SPV resolver for the Handshake network
+
+.SH SYNOPSIS
+.B hnsd
+[\-c \fI<config>\fP]
+[\-n \fI<ip:port>\fP]
+[\-r \fI<ip:port>\fP]
+[\-i \fI<ip>\fP]
+[\-u \fI<config>\fP]
+[\-p \fI<size>\fP]
+[\-k \fI<hex-string>\fP]
+[\-s \fI<seeds>\fP]
+[\-h]
+
+.SH DESCRIPTION
+.B hnsd
+is an SPV resolver for the Handshake network.
+
+.SH EXAMPLES
+.TP
+hnsd --rs-host=127.0.0.1:53 --pool-size=4
+.TP
+hnsd -r 127.0.0.1:53 -p 4 -k 79fea6a0beeddb0288759086a8397a7180ba451efa2045b7ec7937d8377848be
+.TP
+hnsd -s aorsxa4ylaacshipyjkfbvzfkh3jhh4yowtoqdt64nzemqtiw2whk@127.0.0.1
+
+.SH OPTIONS
+.TP
+.BI \-c,\ \-\-config\ [\fIconfig\fP]
+Path to config file.
+.TP
+.BI \-n,\ \-\-ns\-host\ [\fIip:port\fP]
+IP address and port for root nameserver, e.g. 127.0.0.1:5369.
+.TP
+.BI \-r,\ \-\-rs\-host\ [\fIip:port\fP]
+IP address and port for recursive nameserver, e.g. 127.0.0.1:53.
+.TP
+.BI \-i,\ \-\-ns\-ip\ [\fIip\fP]
+Public IP for NS records in the root zone.
+.TP
+.BI \-u,\ \-\-rs\-config\ [\fIconfig\fP]
+Path to unbound config file.
+.TP
+.BI \-p,\ \-\-pool\-size\ [\fIsize\fP]
+Size of peer pool.
+.TP
+.BI \-k,\ \-\-identity\-key\ [\fIhex-string\fP]
+Identity key for signing DNS responses as well as P2P messages.
+.TP
+.BI \-s,\ \-\-seeds\ [\fIseed1,seed2,...\fP]
+Extra seeds to connect to on P2P network.
+.TP
+.BI \-h,\ \-\-help
+Help message.
+
+.SH BUGS
+Please report any bugs to https://github.com/handshake-org/hnsd.
+
+.SH LICENSE
+Copyright (c) 2018, Christopher Jeffrey (MIT License).
+
+.SH "SEE ALSO"
+.BR hsd(1)
