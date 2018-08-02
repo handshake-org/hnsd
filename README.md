@@ -95,7 +95,7 @@ your OS uses.
 ### Cloning
 
 ``` sh
-$ git clone git@github.com:handshakecompany/hnsd.git
+$ git clone git@github.com:handshake-org/hnsd.git
 $ cd hnsd
 ```
 
@@ -122,7 +122,7 @@ on port 53 -- this requires root access on OSX, and some hackery on Linux.
    nameservers and add a single server: "127.0.0.1".
    You can change this back to google's servers
    (8.8.8.8 and 8.8.4.4) later if you want.
-6. Run hnsd with `$ sudo ./hnsd --pool-size=1 --rs-host=127.0.0.1:53`.
+6. Run hnsd with `$ sudo ./hnsd --pool-size=4 --rs-host=127.0.0.1:53`.
 
 #### Linux
 
@@ -148,7 +148,7 @@ $ sudo setcap 'cap_net_bind_service=+ep' /path/to/hnsd
 Now run with:
 
 ``` sh
-$ ./hnsd --pool-size=1 --rs-host=127.0.0.1:53
+$ ./hnsd --pool-size=4 --rs-host=127.0.0.1:53
 ```
 
 ## Usage
@@ -189,6 +189,12 @@ $ hnsd [options]
 -h, --help
   Help message.
 ```
+
+## License
+
+- Copyright (c) 2018, Christopher Jeffrey (MIT License).
+
+See LICENSE for more info.
 
 [hsk]: https://handshake.org
 [libuv]: https://github.com/libuv/libuv
