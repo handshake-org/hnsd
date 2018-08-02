@@ -5,7 +5,7 @@ speed/size/embedability.
 
 ## Architecture
 
-hnsd exists as a 3-layer architecture:
+hnsd exists as a 4-layer architecture:
 
 1. A Handshake SPV node wich syncs headers and requests name proofs and data
    from peers over the HSK P2P network.
@@ -13,6 +13,8 @@ hnsd exists as a 3-layer architecture:
    responses. These responses appear as if they came from a root zone.
 3. A recursive name server pointed at the authoritative server, which serves
    `.` as a stub zone
+4. Hardcoded fallback for ICANN's root zone, residing in the authoritative
+   layer.
 
 A standard stub resolver can hit the recursive server with a request. The flow
 looks something like this.
@@ -56,11 +58,10 @@ authoritative server.
 
 This is atypical when compared to a standard RFC 1035 nameserver which simply
 holds a zonefile in memory and serves it. All current ICANN-based root zone
-servers are RFC 1035 nameservers (this goes some way to explaining why ICANN
-hasn't "opened up" the root zone completely yet). We differ in that our root
-zonefile is a blockchain. With caching for the root server, new proofs only
-need to be requested every 6 hours (the duration of name trie update interval
-at the consensus layer). This substantially reduces load for full nodes who are
+servers are RFC 1035 nameservers. We differ in that our root zonefile is a
+blockchain. With caching for the root server, new proofs only need to be
+requested every 6 hours (the duration of name tree update interval at the
+consensus layer). This substantially reduces load for full nodes who are
 willing to serve proofs as a public service.
 
 ## Dependencies
