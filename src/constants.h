@@ -13,7 +13,7 @@
 #endif
 
 #define HSK_MAX_MESSAGE (8 * 1000 * 1000)
-#define HSK_USER_AGENT "/libhsk:0.0.0/"
+#define HSK_USER_AGENT "/hnsd:0.0.0/"
 #define HSK_PROTO_VERSION 1
 #define HSK_SERVICES 0
 #define HSK_MAX_DATA_SIZE 654
