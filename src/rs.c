@@ -213,8 +213,7 @@ hsk_rs_inject_options(hsk_rs_t *ns) {
   if (ub_ctx_set_option(ns->ub, "use-syslog:", "no") != 0)
     return false;
 
-  if (ub_ctx_set_option(ns->ub, "trust-anchor-signaling:", "no") != 0)
-    return false;
+  ub_ctx_set_option(ns->ub, "trust-anchor-signaling:", "no");
 
   if (ub_ctx_set_option(ns->ub, "edns-buffer-size:", "4096") != 0)
     return false;
@@ -222,8 +221,7 @@ hsk_rs_inject_options(hsk_rs_t *ns) {
   if (ub_ctx_set_option(ns->ub, "max-udp-size:", "4096") != 0)
     return false;
 
-  if (ub_ctx_set_option(ns->ub, "qname-minimisation:", "yes") != 0)
-    return false;
+  ub_ctx_set_option(ns->ub, "qname-minimisation:", "yes");
 
   if (ub_ctx_set_option(ns->ub, "root-hints:", "") != 0)
     return false;
@@ -242,8 +240,10 @@ hsk_rs_inject_options(hsk_rs_t *ns) {
   if (ub_ctx_add_ta(ns->ub, HSK_TRUST_ANCHOR) != 0)
     return false;
 
-  if (ub_ctx_zone_add(ns->ub, ".", "nodefault") != 0)
+  if (ub_ctx_zone_add(ns->ub, ".", "nodefault") != 0
+      && ub_ctx_zone_add(ns->ub, ".", "transparent") != 0) {
     return false;
+  }
 
   hsk_rs_log(ns, "recursive nameserver pointing to: %s\n", stub);
 

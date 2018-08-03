@@ -72,7 +72,7 @@ willing to serve proofs as a public service.
 
 ### Build/Runtime
 
-- [libunbound] >= 1.7.0
+- [libunbound] >= 1.6.0
 
 hnsd will recursively build and statically link to `uv`, which is included in
 the source repo.
