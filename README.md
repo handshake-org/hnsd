@@ -1,6 +1,6 @@
 # hnsd
 
-SPV resolver daemon for the [Handshake][hsk] network. Written in C for
+SPV resolver daemon for the [Handshake][hns] network. Written in C for
 speed/size/embedability.
 
 ## Architecture
@@ -8,7 +8,7 @@ speed/size/embedability.
 hnsd exists as a 4-layer architecture:
 
 1. A Handshake SPV node wich syncs headers and requests name proofs and data
-   from peers over the HSK P2P network.
+   from peers over the HNS P2P network.
 2. An authoritative root server which translates the handshake name data to DNS
    responses. These responses appear as if they came from a root zone.
 3. A recursive name server pointed at the authoritative server, which serves
@@ -197,6 +197,6 @@ $ hnsd [options]
 
 See LICENSE for more info.
 
-[hsk]: https://handshake.org
+[hns]: https://handshake.org
 [libuv]: https://github.com/libuv/libuv
 [libunbound]: https://github.com/NLnetLabs/unbound
