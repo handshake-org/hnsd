@@ -14,6 +14,8 @@ hnsd \- SPV resolver for the Handshake network
 [\-p \fI<size>\fP]
 [\-k \fI<hex-string>\fP]
 [\-s \fI<seeds>\fP]
+[\-l \fI<filename>\fP]
+[\-d]
 [\-h]
 
 .SH DESCRIPTION
@@ -54,6 +56,12 @@ Identity key for signing DNS responses as well as P2P messages.
 .BI \-s,\ \-\-seeds\ [\fIseed1,seed2,...\fP]
 Extra seeds to connect to on P2P network.
 .TP
+.BI \-l,\ \-\-log\-file\ [\fIfilename\fP]
+Redirect output to a log file.
+.TP
+.BI \-d,\ \-\-daemonize
+Fork and background the process.
+.TP
 .BI \-h,\ \-\-help
 Help message.
 
@@ -64,4 +72,5 @@ Please report any bugs to https://github.com/handshake-org/hnsd.
 Copyright (c) 2018, Christopher Jeffrey (MIT License).
 
 .SH "SEE ALSO"
-.BR hsd(1)
+.BR hsd(1),
+.BR dig(1)

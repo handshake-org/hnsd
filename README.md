@@ -187,6 +187,12 @@ $ hnsd [options]
   Example:
     -s aorsxa4ylaacshipyjkfbvzfkh3jhh4yowtoqdt64nzemqtiw2whk@127.0.0.1
 
+-l, --log-file <filename>
+  Redirect output to a log file.
+
+-d, --daemonize
+  Fork and background the process.
+
 -h, --help
   Help message.
 ```
