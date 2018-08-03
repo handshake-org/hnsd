@@ -29,6 +29,14 @@
 #include "utils.h"
 #include "uv.h"
 
+#ifdef HSK_DEBUG_LOG
+#define hsk_pool_debug hsk_pool_log
+#define hsk_peer_debug hsk_peer_log
+#else
+#define hsk_pool_debug(...) do {} while (0)
+#define hsk_peer_debug(...) do {} while (0)
+#endif
+
 /*
  * Types
  */
@@ -360,7 +368,7 @@ hsk_pool_refill(hsk_pool_t *pool) {
     hsk_addr_t addr;
 
     if (!hsk_pool_getaddr(pool, &addr)) {
-      hsk_pool_log(pool, "could not find suitable addr\n");
+      hsk_pool_debug(pool, "could not find suitable addr\n");
       break;
     }
 
@@ -718,7 +726,7 @@ hsk_pool_timer(hsk_pool_t *pool) {
       if (peer->challenge) {
         hsk_peer_log(peer, "peer has not responded to ping\n");
       } else {
-        hsk_peer_log(peer, "pinging...\n");
+        hsk_peer_debug(peer, "pinging...\n");
         peer->challenge = hsk_nonce();
         peer->last_ping = now;
         hsk_peer_send_ping(peer, peer->challenge);
@@ -1257,7 +1265,7 @@ hsk_peer_handle_pong(hsk_peer_t *peer, const hsk_pong_msg_t *msg) {
     return HSK_SUCCESS;
   }
 
-  hsk_peer_log(peer, "received pong\n");
+  hsk_peer_debug(peer, "received pong\n");
 
   int64_t now = hsk_now();
 
@@ -1465,7 +1473,7 @@ hsk_peer_handle_proof(hsk_peer_t *peer, const hsk_proof_msg_t *msg) {
 
 static int
 hsk_peer_handle_msg(hsk_peer_t *peer, const hsk_msg_t *msg) {
-  hsk_peer_log(peer, "handling msg: %s\n", hsk_msg_str(msg->cmd));
+  hsk_peer_debug(peer, "handling msg: %s\n", hsk_msg_str(msg->cmd));
 
   switch (msg->cmd) {
     case HSK_MSG_VERSION: {
@@ -1481,25 +1489,25 @@ hsk_peer_handle_msg(hsk_peer_t *peer, const hsk_msg_t *msg) {
       return hsk_peer_handle_pong(peer, (hsk_pong_msg_t *)msg);
     }
     case HSK_MSG_GETADDR: {
-      hsk_peer_log(peer, "cannot handle getaddr\n");
+      hsk_peer_debug(peer, "cannot handle getaddr\n");
       return HSK_SUCCESS;
     }
     case HSK_MSG_ADDR: {
       return hsk_peer_handle_addr(peer, (hsk_addr_msg_t *)msg);
     }
     case HSK_MSG_GETHEADERS: {
-      hsk_peer_log(peer, "cannot handle getheaders\n");
+      hsk_peer_debug(peer, "cannot handle getheaders\n");
       return HSK_SUCCESS;
     }
     case HSK_MSG_HEADERS: {
       return hsk_peer_handle_headers(peer, (hsk_headers_msg_t *)msg);
     }
     case HSK_MSG_SENDHEADERS: {
-      hsk_peer_log(peer, "cannot handle sendheaders\n");
+      hsk_peer_debug(peer, "cannot handle sendheaders\n");
       return HSK_SUCCESS;
     }
     case HSK_MSG_GETPROOF: {
-      hsk_peer_log(peer, "cannot handle getproof\n");
+      hsk_peer_debug(peer, "cannot handle getproof\n");
       return HSK_SUCCESS;
     }
     case HSK_MSG_PROOF: {
@@ -1579,8 +1587,8 @@ hsk_peer_parse_hdr(hsk_peer_t *peer, const uint8_t *msg, size_t msg_len) {
   peer->msg_len = size;
   peer->msg_cmd = cmd;
 
-  hsk_peer_log(peer, "received header: %s\n", str);
-  hsk_peer_log(peer, "  msg size: %u\n", peer->msg_len);
+  hsk_peer_debug(peer, "received header: %s\n", str);
+  hsk_peer_debug(peer, "  msg size: %u\n", peer->msg_len);
 
   return HSK_SUCCESS;
 }
