@@ -17,6 +17,7 @@
 #define HSK_PROTO_VERSION 1
 #define HSK_SERVICES 0
 #define HSK_MAX_DATA_SIZE 654
+#define HSK_MAX_VALUE_SIZE 512
 
 static const uint8_t HSK_ZERO_HASH[32] = {
   0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
