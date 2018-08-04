@@ -7,13 +7,13 @@ speed/size/embedability.
 
 hnsd exists as a 4-layer architecture:
 
-1. A Handshake SPV node wich syncs headers and requests name proofs and data
+1. A Handshake SPV node which syncs headers and requests name proofs and data
    from peers over the HNS P2P network.
 2. An authoritative root server which translates the handshake name data to DNS
    responses. These responses appear as if they came from a root zone.
 3. A recursive name server pointed at the authoritative server, which serves
    `.` as a stub zone
-4. Hardcoded fallback for ICANN's root zone, residing in the authoritative
+4. A hardcoded fallback for ICANN's root zone, residing in the authoritative
    layer.
 
 A standard stub resolver can hit the recursive server with a request. The flow
@@ -50,18 +50,17 @@ peer
 This daemon currently stores no data, and uses about 12mb of memory when
 operating with a full DNS cache.
 
-This architecture works well being that there's two layers of caching between
+This architecture works well, given that there's two layers of caching between
 the final resolution and the p2p layer (which entails the production of
-slightly expensive-to-compute proofs). The recursive resolver leverages
-libunbound's built-in cache, however, there is also a cache for the
-authoritative server.
+slightly expensive-to-compute proofs). 
 
-This is atypical when compared to a standard RFC 1035 nameserver which simply
-holds a zonefile in memory and serves it. All current ICANN-based root zone
-servers are RFC 1035 nameservers. We differ in that our root zonefile is a
-blockchain. With caching for the root server, new proofs only need to be
-requested every 6 hours (the duration of name tree update interval at the
-consensus layer). This substantially reduces load for full nodes who are
+The recursive resolver leverages libunbound's built-in cache: there is, however, 
+also a cache for the authoritative server. This is atypical when compared to a 
+standard RFC 1035 nameserver which simply holds a zonefile in memory and serves it. 
+All current ICANN-based root zone servers are RFC 1035 nameservers. We differ in
+that our root zonefile is a blockchain. With caching for the root server, new proofs
+only need to be requested every 6 hours (the duration of name tree update interval 
+at the consensus layer). This substantially reduces load for full nodes who are
 willing to serve proofs as a public service.
 
 ## Dependencies
