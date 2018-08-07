@@ -83,7 +83,7 @@ case $hsk_network in
     AC_DEFINE(HSK_NETWORK, HSK_MAIN,
       [Define this symbol to choose a network])
   ;;
-  testnet)
+  testnet | yes)
     AC_DEFINE(HSK_NETWORK, HSK_TESTNET,
       [Define this symbol to choose a network])
   ;;
