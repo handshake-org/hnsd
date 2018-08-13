@@ -145,13 +145,13 @@ Now run with:
 $ ./hnsd -p 4 -r 127.0.0.1:53
 ```
 
-##### Using a static resolv.conf
+#### Using a static resolv.conf
 
 On Linux, there are a few services which may try to automatically overwrite
 your `resolv.conf`. __resolvconf__, __dhcpcd__, and __NetworkManager__ are
 usually the culprits here.
 
-###### resolvconf
+##### resolvconf
 
 If you're using __resolvconf__, `/etc/resolvconf.conf` must be modified:
 
@@ -166,7 +166,7 @@ resolv.conf:
 name_servers="127.0.0.1"
 ```
 
-###### dhcpcd
+##### dhcpcd
 
 __dhcpcd__ may try to overwrite your resolv.conf with whatever nameservers are
 advertised by your router (usually your ISP's nameservers). To prevent this,
@@ -188,7 +188,7 @@ We want to remove `domain_name_servers` and `domain_search`.
 option domain_name, host_name
 ```
 
-###### NetworkManager
+##### NetworkManager
 
 Likewise, __NetworkManager__ has similar behavior to dhcpcd. To prevent it from
 tainting your resolv.conf, `/etc/NetworkManager/NetworkManager.conf` must be
