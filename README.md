@@ -7,9 +7,9 @@ speed/size/embedability.
 
 hnsd exists as a 4-layer architecture:
 
-1. A Handshake SPV node which syncs headers and requests name proofs and data
-   from peers over the HNS P2P network.
-2. An authoritative root server which translates the handshake name data to DNS
+1. An SPV node which syncs headers and requests name proofs and data from peers
+   over the HNS P2P network.
+2. An authoritative root server which translates the HNS name data to DNS
    responses. These responses appear as if they came from a root zone.
 3. A recursive name server pointed at the authoritative server, which serves
    `.` as a stub zone
@@ -52,14 +52,14 @@ operating with a full DNS cache.
 
 This architecture works well, given that there's two layers of caching between
 the final resolution and the p2p layer (which entails the production of
-slightly expensive-to-compute proofs). 
+slightly expensive-to-compute proofs).
 
-The recursive resolver leverages libunbound's built-in cache: there is, however, 
-also a cache for the authoritative server. This is atypical when compared to a 
-standard RFC 1035 nameserver which simply holds a zonefile in memory and serves it. 
+The recursive resolver leverages libunbound's built-in cache: there is, however,
+also a cache for the authoritative server. This is atypical when compared to a
+standard RFC 1035 nameserver which simply holds a zonefile in memory and serves it.
 All current ICANN-based root zone servers are RFC 1035 nameservers. We differ in
 that our root zonefile is a blockchain. With caching for the root server, new proofs
-only need to be requested every 6 hours (the duration of name tree update interval 
+only need to be requested every 6 hours (the duration of name tree update interval
 at the consensus layer). This substantially reduces load for full nodes who are
 willing to serve proofs as a public service.
 
@@ -122,7 +122,7 @@ on port 53 -- this requires root access on OSX, and some hackery on Linux.
    nameservers and add a single server: "127.0.0.1".
    You can change this back to google's servers
    (8.8.8.8 and 8.8.4.4) later if you want.
-6. Run hnsd with `$ sudo ./hnsd --pool-size=4 --rs-host=127.0.0.1:53`.
+6. Run hnsd with `$ sudo ./hnsd -p 4 -r 127.0.0.1:53`.
 
 #### Linux
 
@@ -130,12 +130,6 @@ First we need to alter our resolv.conf:
 
 ``` sh
 echo 'nameserver 127.0.0.1' | sudo tee /etc/resolv.conf > /dev/null
-```
-
-If you're using resolvconf, `/etc/resolvconf.conf` must be altered by setting:
-
-``` conf
-name_servers="127.0.0.1"
 ```
 
 Secondly, we need to allow our daemon to listen on low ports, without root
@@ -148,7 +142,68 @@ $ sudo setcap 'cap_net_bind_service=+ep' /path/to/hnsd
 Now run with:
 
 ``` sh
-$ ./hnsd --pool-size=4 --rs-host=127.0.0.1:53
+$ ./hnsd -p 4 -r 127.0.0.1:53
+```
+
+##### Using a static resolv.conf
+
+On Linux, there are a few services which may try to automatically overwrite
+your `resolv.conf`. __resolvconf__, __dhcpcd__, and __NetworkManager__ are
+usually the culprits here.
+
+###### resolvconf
+
+If you're using __resolvconf__, `/etc/resolvconf.conf` must be modified:
+
+``` sh
+$ sudo vi /etc/resolvconf.conf
+```
+
+The `name_servers` field must be altered in order to truly alter your
+resolv.conf:
+
+``` conf
+name_servers="127.0.0.1"
+```
+
+###### dhcpcd
+
+__dhcpcd__ may try to overwrite your resolv.conf with whatever nameservers are
+advertised by your router (usually your ISP's nameservers). To prevent this,
+`/etc/dhcpcd.conf` must be modified:
+
+``` sh
+$ sudo vi /etc/dhcpcd.conf
+```
+
+In the default config, you may see a line which looks like:
+
+``` conf
+option domain_name_servers, domain_name, domain_search, host_name
+```
+
+We want to remove `domain_name_servers` and `domain_search`.
+
+``` conf
+option domain_name, host_name
+```
+
+###### NetworkManager
+
+Likewise, __NetworkManager__ has similar behavior to dhcpcd. To prevent it from
+tainting your resolv.conf, `/etc/NetworkManager/NetworkManager.conf` must be
+altered:
+
+``` sh
+$ sudo vi /etc/NetworkManager/NetworkManager.conf
+```
+
+The default `NetworkManager.conf` is usually empty, but we need to add a `dns`
+option under the `[main]` section, resulting in a configuration like:
+
+``` conf
+[main]
+dns=none
 ```
 
 ## Usage
@@ -202,6 +257,6 @@ $ hnsd [options]
 
 See LICENSE for more info.
 
-[hns]: https://handshake.org
-[libuv]: https://github.com/libuv/libuv
-[libunbound]: https://github.com/NLnetLabs/unbound
+[hns]: https://handshake.org/
+[libuv]: https://libuv.org/
+[libunbound]: https://www.unbound.net/
