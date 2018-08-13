@@ -199,6 +199,13 @@ hsk_chain_safe_root(const hsk_chain_t *chain) {
 
   uint32_t interval = HSK_TREE_INTERVAL;
   uint32_t mod = (uint32_t)chain->height % interval;
+
+  // If there's enough proof-of-work
+  // on top of the most recent root,
+  // it should be safe to use it.
+  if (mod >= 12)
+    mod = 0;
+
   uint32_t height = (uint32_t)chain->height - mod;
 
   hsk_header_t *prev = hsk_chain_get_by_height(chain, height);
