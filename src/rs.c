@@ -460,13 +460,18 @@ hsk_rs_respond(
   }
 
   hsk_rs_log(ns, "received answer for: %s\n", req->name);
-  hsk_rs_log(ns, "  canonname: %s\n", result->canonname);
+
+  if (result->canonname)
+    hsk_rs_log(ns, "  canonname: %s\n", result->canonname);
+
   hsk_rs_log(ns, "  rcode: %u\n", result->rcode);
   hsk_rs_log(ns, "  havedata: %d\n", result->havedata);
   hsk_rs_log(ns, "  nxdomain: %d\n", result->nxdomain);
   hsk_rs_log(ns, "  secure: %d\n", result->secure);
   hsk_rs_log(ns, "  bogus: %d\n", result->bogus);
-  hsk_rs_log(ns, "  why_bogus: %s\n", result->why_bogus);
+
+  if (result->why_bogus)
+    hsk_rs_log(ns, "  why_bogus: %s\n", result->why_bogus);
 
   uint8_t *data = result->answer_packet;
   size_t data_len = result->answer_len;

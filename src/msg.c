@@ -5,6 +5,7 @@
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <inttypes.h>
 
 #include "addr.h"
 #include "bio.h"
@@ -74,14 +75,14 @@ hsk_version_msg_print(const hsk_version_msg_t *msg, const char *prefix) {
   assert(hsk_addr_to_string(&msg->remote.addr, remote, HSK_MAX_HOST, 1));
 
   printf("%sversion msg\n", prefix);
-  printf("%s  version=%d\n", prefix, msg->version);
-  printf("%s  services=%lu\n", prefix, msg->services);
-  printf("%s  time=%lu\n", prefix, msg->time);
+  printf("%s  version=%u\n", prefix, msg->version);
+  printf("%s  services=%" PRIu64 "\n", prefix, msg->services);
+  printf("%s  time=%" PRIu64 "\n", prefix, msg->time);
   printf("%s  remote=%s\n", prefix, remote);
-  printf("%s  nonce=%lu\n", prefix, msg->nonce);
+  printf("%s  nonce=%" PRIu64 "\n", prefix, msg->nonce);
   printf("%s  agent=%s\n", prefix, msg->agent);
-  printf("%s  height=%d\n", prefix, msg->height);
-  printf("%s  no_relay=%d\n", prefix, (int)msg->no_relay);
+  printf("%s  height=%u\n", prefix, msg->height);
+  printf("%s  no_relay=%u\n", prefix, (unsigned int)msg->no_relay);
 }
 
 bool

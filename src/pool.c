@@ -8,6 +8,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
+#include <inttypes.h>
 
 #include "addr.h"
 #include "addrmgr.h"
@@ -946,7 +947,7 @@ hsk_peer_destroy(hsk_peer_t *peer) {
 
 static void
 hsk_peer_log(hsk_peer_t *peer, const char *fmt, ...) {
-  printf("peer %lu (%s): ", peer->id, peer->host);
+  printf("peer %" PRIu64 " (%s): ", peer->id, peer->host);
 
   va_list args;
   va_start(args, fmt);

@@ -5,6 +5,7 @@
 #include <stdbool.h>
 #include <string.h>
 #include <stdarg.h>
+#include <inttypes.h>
 
 #include "addr.h"
 #include "error.h"
@@ -151,8 +152,9 @@ hsk_timedata_add(hsk_timedata_t *td, const hsk_addr_t *addr, int64_t time) {
     td->offset = median;
 
     hsk_timedata_log(td, "added new time sample\n");
-    hsk_timedata_log(td, "  new adjusted time: %d\n", hsk_timedata_now(td));
-    hsk_timedata_log(td, "  offset: %d\n", td->offset);
+    hsk_timedata_log(td, "  new adjusted time: %" PRId64 "\n",
+      hsk_timedata_now(td));
+    hsk_timedata_log(td, "  offset: %" PRId64 "\n", td->offset);
   }
 
   return HSK_SUCCESS;
