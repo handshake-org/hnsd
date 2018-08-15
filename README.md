@@ -148,12 +148,12 @@ $ ./hnsd -p 4 -r 127.0.0.1:53
 #### Using a static resolv.conf
 
 On Linux, there are a few services which may try to automatically overwrite
-your `resolv.conf`. __resolvconf__, __dhcpcd__, and __NetworkManager__ are
-usually the culprits here.
+your `resolv.conf`. _resolvconf_, _dhcpcd_, and _NetworkManager_ are usually
+the culprits here.
 
 ##### resolvconf
 
-If you're using __resolvconf__, `/etc/resolvconf.conf` must be modified:
+If you're using resolvconf, `/etc/resolvconf.conf` must be modified:
 
 ``` sh
 $ sudo vi /etc/resolvconf.conf
@@ -168,7 +168,7 @@ name_servers="127.0.0.1"
 
 ##### dhcpcd
 
-__dhcpcd__ may try to overwrite your resolv.conf with whatever nameservers are
+dhcpcd may try to overwrite your resolv.conf with whatever nameservers are
 advertised by your router (usually your ISP's nameservers). To prevent this,
 `/etc/dhcpcd.conf` must be modified:
 
@@ -190,7 +190,7 @@ option domain_name, host_name
 
 ##### NetworkManager
 
-Likewise, __NetworkManager__ has similar behavior to dhcpcd. To prevent it from
+Likewise, NetworkManager has similar behavior to dhcpcd. To prevent it from
 tainting your resolv.conf, `/etc/NetworkManager/NetworkManager.conf` must be
 altered:
 
@@ -204,6 +204,14 @@ option under the `[main]` section, resulting in a configuration like:
 ``` conf
 [main]
 dns=none
+```
+
+Note that NetworkManager will also [check][nm-1] [connectivity][nm-2] by
+resolving a domain. This can cause issues with hnsd. Disable with:
+
+``` conf
+[connectivity]
+interval=0
 ```
 
 ## Usage
@@ -260,3 +268,5 @@ See LICENSE for more info.
 [hns]: https://handshake.org/
 [libuv]: https://libuv.org/
 [libunbound]: https://www.unbound.net/
+[nm-1]: https://bbs.archlinux.org/viewtopic.php?id=223720
+[nm-2]: https://bbs.archlinux.org/viewtopic.php?id=225310
