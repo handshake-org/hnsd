@@ -64,8 +64,8 @@ set_logfile(const char *logfile) {
   freopen(logfile, "a", stdout);
   freopen(logfile, "a", stderr);
 #ifdef __linux
-  setbuf(stdout, NULL);
-  setbuf(stderr, NULL);
+  setlinebuf(stdout);
+  setlinebuf(stderr);
 #endif
 }
 
