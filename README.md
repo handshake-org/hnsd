@@ -76,43 +76,41 @@ willing to serve proofs as a public service.
 hnsd will recursively build and statically link to `uv`, which is included in
 the source repo.
 
-## Installation
+## Installing Dependencies
 
-### Installing Dependencies
-
-#### OSX
+### OSX
 
 ``` sh
 $ brew install git automake autoconf libtool unbound
 ```
 
-#### Linux
+### Linux
 
 You're a Linux user so you probably already know what to do. Make sure you have
 git, autotools, libtool, and unbound installed via whatever package manager
 your OS uses.
 
-### Cloning
+## Cloning
 
 ``` sh
 $ git clone git://github.com/handshake-org/hnsd.git
 $ cd hnsd
 ```
 
-### Building
+## Building
 
 ``` sh
 $ ./autogen.sh && ./configure && make
 ```
 
-### Setup
+## Setup
 
 Currently, hnsd will setup a recursive name server listening locally. If
 you want to resolve names through the handshake network, this requires you to
 change your resolv.conf to 127.0.0.1, as well as configure the daemon to listen
 on port 53 -- this requires root access on OSX, and some hackery on Linux.
 
-#### OSX
+### OSX
 
 1. Open "System Preferences" on the panel/dock.
 2. Select "Network".
@@ -124,7 +122,7 @@ on port 53 -- this requires root access on OSX, and some hackery on Linux.
    (8.8.8.8 and 8.8.4.4) later if you want.
 6. Run hnsd with `$ sudo ./hnsd -p 4 -r 127.0.0.1:53`.
 
-#### Linux
+### Linux
 
 First we need to alter our resolv.conf:
 
@@ -145,13 +143,13 @@ Now run with:
 $ ./hnsd -p 4 -r 127.0.0.1:53
 ```
 
-#### Using a static resolv.conf
+### Using a static resolv.conf
 
 On Linux, there are a few services which may try to automatically overwrite
 your `resolv.conf`. _resolvconf_, _dhcpcd_, and _NetworkManager_ are usually
 the culprits here.
 
-##### resolvconf
+#### resolvconf
 
 If you're using resolvconf, `/etc/resolvconf.conf` must be modified:
 
@@ -166,7 +164,7 @@ resolv.conf:
 name_servers="127.0.0.1"
 ```
 
-##### dhcpcd
+#### dhcpcd
 
 dhcpcd may try to overwrite your resolv.conf with whatever nameservers are
 advertised by your router (usually your ISP's nameservers). To prevent this,
@@ -188,7 +186,7 @@ We want to remove `domain_name_servers` and `domain_search`.
 option domain_name, host_name
 ```
 
-##### NetworkManager
+#### NetworkManager
 
 Likewise, NetworkManager has similar behavior to dhcpcd. To prevent it from
 tainting your resolv.conf, `/etc/NetworkManager/NetworkManager.conf` must be
