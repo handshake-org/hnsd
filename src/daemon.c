@@ -63,6 +63,10 @@ set_logfile(const char *logfile) {
   assert(logfile);
   freopen(logfile, "a", stdout);
   freopen(logfile, "a", stderr);
+#ifdef __linux
+  setbuf(stdout, NULL);
+  setbuf(stderr, NULL);
+#endif
 }
 
 static bool
