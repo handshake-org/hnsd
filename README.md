@@ -209,7 +209,7 @@ resolving a domain. This can cause issues with hnsd. Disable with:
 
 ``` conf
 [connectivity]
-interval=0
+interval=604800
 ```
 
 ## Usage
