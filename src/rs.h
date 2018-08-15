@@ -20,7 +20,6 @@ typedef struct {
   uv_udp_t socket;
   uv_poll_t poll;
   hsk_ec_t *ec;
-  char config_[256];
   char *config;
   struct sockaddr_storage stub_;
   struct sockaddr *stub;

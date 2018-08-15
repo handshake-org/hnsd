@@ -106,7 +106,6 @@ hsk_rs_init(hsk_rs_t *ns, const uv_loop_t *loop, const struct sockaddr *stub) {
   ns->socket.data = (void *)ns;
   ns->poll.data = (void *)ns;
   ns->ec = ec;
-  memset(ns->config_, 0x00, sizeof(ns->config_));
   ns->config = NULL;
   ns->stub = (struct sockaddr *)&ns->stub_;
   assert(hsk_sa_from_string(ns->stub, "127.0.0.1", HSK_NS_PORT));
@@ -157,6 +156,11 @@ hsk_rs_uninit(hsk_rs_t *ns) {
     ub_ctx_delete(ns->ub);
     ns->ub = NULL;
   }
+
+  if (ns->config) {
+    free(ns->config);
+    ns->config = NULL;
+  }
 }
 
 bool
@@ -164,18 +168,17 @@ hsk_rs_set_config(hsk_rs_t *ns, const char *config) {
   assert(ns);
 
   if (!config) {
-    memset(ns->config_, 0x00, sizeof(ns->config_));
     ns->config = NULL;
     return true;
   }
 
-  size_t size = strlen(config);
-
-  if (size > 255)
+  if (strlen(config) == 0)
     return false;
 
-  memcpy(&ns->config_[0], config, size + 1);
-  ns->config = &ns->config_[0];
+  ns->config = strdup(config);
+
+  if (!ns->config)
+    return false;
 
   return true;
 }

@@ -25,7 +25,6 @@ extern int optind, opterr, optopt;
 
 typedef struct hsk_options_s {
   char *config;
-  char config_[256];
   struct sockaddr *ns_host;
   struct sockaddr_storage _ns_host;
   struct sockaddr *rs_host;
@@ -33,7 +32,6 @@ typedef struct hsk_options_s {
   struct sockaddr *ns_ip;
   struct sockaddr_storage _ns_ip;
   char *rs_config;
-  char rs_config_[256];
   uint8_t identity_key_[32];
   uint8_t *identity_key;
   char *seeds;
@@ -43,7 +41,6 @@ typedef struct hsk_options_s {
 static void
 hsk_options_init(hsk_options_t *opt) {
   opt->config = NULL;
-  memset(opt->config_, 0, sizeof(opt->config_));
   opt->ns_host = (struct sockaddr *)&opt->_ns_host;
   opt->rs_host = (struct sockaddr *)&opt->_rs_host;
   opt->ns_ip = (struct sockaddr *)&opt->_ns_ip;
@@ -51,7 +48,6 @@ hsk_options_init(hsk_options_t *opt) {
   assert(hsk_sa_from_string(opt->rs_host, HSK_RS_IP, HSK_RS_PORT));
   assert(hsk_sa_from_string(opt->ns_ip, HSK_RS_A, 0));
   opt->rs_config = NULL;
-  memset(opt->rs_config_, 0, sizeof(opt->config_));
   memset(opt->identity_key_, 0, sizeof(opt->identity_key_));
   opt->identity_key = NULL;
   opt->seeds = NULL;
@@ -142,7 +138,7 @@ help(int r) {
     "  -l, --log-file <filename>\n"
     "    Redirect output to a log file.\n"
     "\n"
-    "  -d, --daemonize\n"
+    "  -d, --daemon\n"
     "    Fork and background the process.\n"
     "\n"
     "  -h, --help\n"
@@ -167,7 +163,7 @@ parse_arg(int argc, char **argv, hsk_options_t *opt) {
     { "identity-key", required_argument, NULL, 'k' },
     { "seeds", required_argument, NULL, 's' },
     { "log-file", required_argument, NULL, 'l' },
-    { "daemonize", no_argument, NULL, 'd' },
+    { "daemon", no_argument, NULL, 'd' },
     { "help", no_argument, NULL, 'h' }
   };
 
@@ -190,41 +186,65 @@ parse_arg(int argc, char **argv, hsk_options_t *opt) {
       }
 
       case 'c': {
-        if (strlen(optarg) > 255)
+        if (!optarg || strlen(optarg) == 0)
           return help(1);
-        strcpy(&opt->config_[0], optarg);
-        opt->config = &opt->config_[0];
+
+        if (opt->config)
+          free(opt->config);
+
+        opt->config = strdup(optarg);
+
         break;
       }
 
       case 'n': {
+        if (!optarg || strlen(optarg) == 0)
+          return help(1);
+
         if (!hsk_sa_from_string(opt->ns_host, optarg, HSK_NS_PORT))
           return help(1);
+
         break;
       }
 
       case 'r': {
+        if (!optarg || strlen(optarg) == 0)
+          return help(1);
+
         if (!hsk_sa_from_string(opt->rs_host, optarg, HSK_RS_PORT))
           return help(1);
+
         break;
       }
 
       case 'i': {
+        if (!optarg || strlen(optarg) == 0)
+          return help(1);
+
         if (!hsk_sa_from_string(opt->ns_ip, optarg, 0))
           return help(1);
+
         has_ip = true;
+
         break;
       }
 
       case 'u': {
-        if (strlen(optarg) > 255)
+        if (!optarg || strlen(optarg) == 0)
           return help(1);
-        strcpy(&opt->rs_config_[0], optarg);
-        opt->rs_config = &opt->rs_config_[0];
+
+        if (opt->rs_config)
+          free(opt->rs_config);
+
+        opt->rs_config = strdup(optarg);
+
         break;
       }
 
       case 'p': {
+        if (!optarg || strlen(optarg) == 0)
+          return help(1);
+
         int size = atoi(optarg);
 
         if (size <= 0 || size > 1000)
@@ -236,6 +256,9 @@ parse_arg(int argc, char **argv, hsk_options_t *opt) {
       }
 
       case 'k': {
+        if (!optarg || strlen(optarg) == 0)
+          return help(1);
+
         if (hsk_hex_decode_size(optarg) != 32)
           return help(1);
 
@@ -248,31 +271,25 @@ parse_arg(int argc, char **argv, hsk_options_t *opt) {
       }
 
       case 's': {
+        if (!optarg || strlen(optarg) == 0)
+          return help(1);
+
         if (opt->seeds)
           free(opt->seeds);
 
         opt->seeds = strdup(optarg);
 
-        if (!opt->seeds) {
-          printf("ENOMEM\n");
-          exit(1);
-          return;
-        }
-
         break;
       }
 
       case 'l': {
+        if (!optarg || strlen(optarg) == 0)
+          return help(1);
+
         if (logfile)
           free(logfile);
 
         logfile = strdup(optarg);
-
-        if (!logfile) {
-          printf("ENOMEM\n");
-          exit(1);
-          return;
-        }
 
         break;
       }

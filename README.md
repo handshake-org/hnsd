@@ -250,7 +250,7 @@ $ hnsd [options]
 -l, --log-file <filename>
   Redirect output to a log file.
 
--d, --daemonize
+-d, --daemon
   Fork and background the process.
 
 -h, --help
