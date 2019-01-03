@@ -437,7 +437,7 @@ hsk_chain_get_target(
 
   if (HSK_TARGET_RESET) {
     // Special behavior for testnet:
-    if (time > (int64_t)prev->time + HSK_TARGET_SPACING * 4)
+    if (time > (int64_t)prev->time + HSK_TARGET_SPACING * 2)
       return HSK_BITS;
    }
 

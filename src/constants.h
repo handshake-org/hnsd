@@ -51,13 +51,13 @@ static const char HSK_KSK_2017[] = ". DS 20326 8 2 "
 #define HSK_NS_PORT 5359
 #define HSK_RS_PORT 5360
 
-#define HSK_BITS 0x1f07ffff
+#define HSK_BITS 0x1d00ffff
 
 static const uint8_t HSK_LIMIT[32] = {
-  0x00, 0x07, 0xff, 0xff, 0x00, 0x00, 0x00, 0x00,
-  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
+  0x00, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0xff,
+  0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+  0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+  0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff
 };
 
 static const uint8_t HSK_CHAINWORK[32] = {
@@ -68,11 +68,11 @@ static const uint8_t HSK_CHAINWORK[32] = {
 };
 
 #define HSK_TARGET_WINDOW 17
-#define HSK_TARGET_SPACING (5 * 60)
+#define HSK_TARGET_SPACING (10 * 60)
 #define HSK_TARGET_TIMESPAN (HSK_TARGET_WINDOW * HSK_TARGET_SPACING)
 #define HSK_MIN_ACTUAL ((HSK_TARGET_TIMESPAN * (100 - 16)) / 100)
 #define HSK_MAX_ACTUAL ((HSK_TARGET_TIMESPAN * (100 + 32)) / 100)
-#define HSK_TREE_INTERVAL 72
+#define HSK_TREE_INTERVAL 36
 #define HSK_TARGET_RESET false
 #define HSK_NO_RETARGETTING false
 #define HSK_CUCKOO_BITS 30
@@ -84,7 +84,7 @@ static const uint8_t HSK_CHAINWORK[32] = {
 #define HSK_USE_CHECKPOINTS false
 #define HSK_LAST_CHECKPOINT 0
 #define HSK_MAX_TIP_AGE (24 * 60 * 60)
-#define HSK_LAUNCH_DATE 1536105600
+#define HSK_LAUNCH_DATE 0xffffffff
 
 #elif HSK_NETWORK == HSK_TESTNET
 
@@ -93,7 +93,7 @@ static const uint8_t HSK_CHAINWORK[32] = {
  */
 
 #define HSK_NETWORK_NAME "testnet"
-#define HSK_MAGIC 0x7cfa1fbe
+#define HSK_MAGIC 0x72b536d1
 #define HSK_PORT 13038
 #define HSK_NS_PORT 15359
 #define HSK_RS_PORT 15360
@@ -115,11 +115,11 @@ static const uint8_t HSK_CHAINWORK[32] = {
 };
 
 #define HSK_TARGET_WINDOW 17
-#define HSK_TARGET_SPACING (5 * 60)
+#define HSK_TARGET_SPACING (10 * 60)
 #define HSK_TARGET_TIMESPAN (HSK_TARGET_WINDOW * HSK_TARGET_SPACING)
 #define HSK_MIN_ACTUAL ((HSK_TARGET_TIMESPAN * (100 - 16)) / 100)
 #define HSK_MAX_ACTUAL ((HSK_TARGET_TIMESPAN * (100 + 32)) / 100)
-#define HSK_TREE_INTERVAL 72
+#define HSK_TREE_INTERVAL 36
 #define HSK_TARGET_RESET true
 #define HSK_NO_RETARGETTING false
 #define HSK_CUCKOO_BITS 24
@@ -131,7 +131,7 @@ static const uint8_t HSK_CHAINWORK[32] = {
 #define HSK_USE_CHECKPOINTS false
 #define HSK_LAST_CHECKPOINT 0
 #define HSK_MAX_TIP_AGE (2 * 7 * 24 * 60 * 60)
-#define HSK_LAUNCH_DATE 1536105600
+#define HSK_LAUNCH_DATE 0xffffffff
 
 #elif HSK_NETWORK == HSK_REGTEST
 
@@ -162,11 +162,11 @@ static const uint8_t HSK_CHAINWORK[32] = {
 };
 
 #define HSK_TARGET_WINDOW 17
-#define HSK_TARGET_SPACING (5 * 60)
+#define HSK_TARGET_SPACING (10 * 60)
 #define HSK_TARGET_TIMESPAN (HSK_TARGET_WINDOW * HSK_TARGET_SPACING)
 #define HSK_MIN_ACTUAL ((HSK_TARGET_TIMESPAN * (100 - 16)) / 100)
 #define HSK_MAX_ACTUAL ((HSK_TARGET_TIMESPAN * (100 + 32)) / 100)
-#define HSK_TREE_INTERVAL 10
+#define HSK_TREE_INTERVAL 5
 #define HSK_TARGET_RESET true
 #define HSK_NO_RETARGETTING true
 #define HSK_CUCKOO_BITS 8
@@ -209,11 +209,11 @@ static const uint8_t HSK_CHAINWORK[32] = {
 };
 
 #define HSK_TARGET_WINDOW 17
-#define HSK_TARGET_SPACING (5 * 60)
+#define HSK_TARGET_SPACING (10 * 60)
 #define HSK_TARGET_TIMESPAN (HSK_TARGET_WINDOW * HSK_TARGET_SPACING)
 #define HSK_MIN_ACTUAL ((HSK_TARGET_TIMESPAN * (100 - 16)) / 100)
 #define HSK_MAX_ACTUAL ((HSK_TARGET_TIMESPAN * (100 + 32)) / 100)
-#define HSK_TREE_INTERVAL 5
+#define HSK_TREE_INTERVAL 2
 #define HSK_TARGET_RESET false
 #define HSK_NO_RETARGETTING false
 #define HSK_CUCKOO_BITS 16

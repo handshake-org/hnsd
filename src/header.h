@@ -9,13 +9,13 @@ typedef struct hsk_header_s {
   uint32_t version;
   uint8_t prev_block[32];
   uint8_t merkle_root[32];
+  uint8_t witness_root[32];
   uint8_t name_root[32];
+  uint8_t filter_root[32];
   uint8_t reserved_root[32];
   uint64_t time;
   uint32_t bits;
-  uint8_t nonce[20];
-  uint8_t sol_size;
-  uint32_t sol[42];
+  uint8_t nonce[32];
 
   bool cache;
   uint8_t hash[32];
@@ -61,15 +61,6 @@ hsk_header_size(const hsk_header_t *hdr);
 int
 hsk_header_encode(const hsk_header_t *hdr, uint8_t *data);
 
-int
-hsk_header_write_pre(const hsk_header_t *hdr, uint8_t **data);
-
-int
-hsk_header_size_pre(const hsk_header_t *hdr);
-
-int
-hsk_header_encode_pre(const hsk_header_t *hdr, uint8_t *data);
-
 bool
 hsk_header_equal(hsk_header_t *a, hsk_header_t *b);
 
@@ -78,12 +69,6 @@ hsk_header_cache(hsk_header_t *hdr);
 
 void
 hsk_header_hash(hsk_header_t *hdr, uint8_t *hash);
-
-void
-hsk_header_hash_pre(const hsk_header_t *hdr, uint8_t *hash);
-
-void
-hsk_header_hash_sol(const hsk_header_t *hdr, uint8_t *hash);
 
 int
 hsk_header_verify_pow(const hsk_header_t *hdr);

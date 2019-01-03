@@ -9,10 +9,28 @@ void
 hsk_hash_blake2b(const uint8_t *data, size_t data_len, uint8_t *hash);
 
 void
+hsk_hash_blake2b_key(
+  const uint8_t *data,
+  size_t data_len,
+  const uint8_t *key,
+  size_t key_len,
+  uint8_t *hash
+);
+
+void
 hsk_hash_blake160(const uint8_t *data, size_t data_len, uint8_t *hash);
 
 void
 hsk_hash_sha3(const uint8_t *data, size_t data_len, uint8_t *hash);
+
+void
+hsk_hash_sha3_key(
+  const uint8_t *data,
+  size_t data_len,
+  const uint8_t *key,
+  size_t key_len,
+  uint8_t *hash
+);
 
 void
 hsk_hash_name(const char *name, uint8_t *hash);

@@ -48,5 +48,6 @@ void hsk_sha3_final(hsk_sha3_ctx *ctx, unsigned char *result);
 #define hsk_keccak_512_init hsk_sha3_512_init
 #define hsk_keccak_update hsk_sha3_update
 void hsk_keccak_final(hsk_sha3_ctx *ctx, unsigned char *result);
+void hsk_cshake_final(hsk_sha3_ctx *ctx, unsigned char *result);
 
 #endif

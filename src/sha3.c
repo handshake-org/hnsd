@@ -395,3 +395,23 @@ hsk_keccak_final(hsk_sha3_ctx *ctx, unsigned char *result) {
   if (result)
     me64_to_le_str(result, ctx->hash, digest_length);
 }
+
+void
+hsk_cshake_final(hsk_sha3_ctx *ctx, unsigned char *result) {
+  size_t digest_length = 100 - ctx->block_size / 2;
+  const size_t block_size = ctx->block_size;
+
+  if (!(ctx->rest & HSK_SHA3_FINALIZED)) {
+    memset((char *)ctx->message + ctx->rest, 0, block_size - ctx->rest);
+    ((char *)ctx->message)[ctx->rest] |= 0x04;
+    ((char *)ctx->message)[block_size - 1] |= 0x80;
+
+    hsk_sha3_process_block(ctx->hash, ctx->message, block_size);
+    ctx->rest = HSK_SHA3_FINALIZED;
+  }
+
+  assert(block_size > digest_length);
+
+  if (result)
+    me64_to_le_str(result, ctx->hash, digest_length);
+}

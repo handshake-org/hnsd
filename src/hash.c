@@ -22,6 +22,21 @@ hsk_hash_blake2b(const uint8_t *data, size_t data_len, uint8_t *hash) {
 }
 
 void
+hsk_hash_blake2b_key(
+  const uint8_t *data,
+  size_t data_len,
+  const uint8_t *key,
+  size_t key_len,
+  uint8_t *hash
+) {
+  assert(hash != NULL);
+  hsk_blake2b_ctx ctx;
+  assert(hsk_blake2b_init_key(&ctx, 32, key, key_len) == 0);
+  hsk_blake2b_update(&ctx, data, data_len);
+  assert(hsk_blake2b_final(&ctx, hash, 32) == 0);
+}
+
+void
 hsk_hash_blake160(const uint8_t *data, size_t data_len, uint8_t *hash) {
   assert(hash != NULL);
   hsk_blake2b_ctx ctx;
@@ -37,6 +52,74 @@ hsk_hash_sha3(const uint8_t *data, size_t data_len, uint8_t *hash) {
   hsk_sha3_256_init(&ctx);
   hsk_sha3_update(&ctx, data, data_len);
   hsk_sha3_final(&ctx, hash);
+}
+
+void
+hsk_hash_sha3_key(
+  const uint8_t *data,
+  size_t data_len,
+  const uint8_t *key,
+  size_t key_len,
+  uint8_t *hash
+) {
+  assert(hash != NULL);
+  assert(data_len == 208);
+  assert(key_len == 32);
+
+  hsk_sha3_ctx ctx;
+  hsk_sha3_256_init(&ctx);
+
+  uint8_t mac[483];
+
+  // leftEncode(rate / 8) 2,0 "0188"
+  mac[0] = 0x01;
+  mac[1] = 0x88;
+
+  // leftEncode(name.length * 8) 2,2 "0120"
+  mac[2] = 0x01;
+  mac[3] = 0x20;
+
+  // encodeString(name = "KMAC") 4,4 "4b4d4143"
+  mac[4] = 0x4b;
+  mac[5] = 0x4d;
+  mac[6] = 0x41;
+  mac[7] = 0x43;
+
+  // leftEncode(pers.length * 8) 2,8 "0100"
+  mac[8] = 0x01;
+  mac[9] = 0x00;
+
+  // encodeString(pers = "") 0,10 ""
+  memset(&mac[10], 0x00, 0);
+
+  // zeroPad(126) 126,10 "00..."
+  memset(&mac[10], 0x00, 126);
+
+  // leftEncode(rate / 8) 2,136 "0188"
+  mac[136] = 0x01;
+  mac[137] = 0x88;
+
+  // leftEncode(key.length * 8) 3,138 "020100"
+  mac[138] = 0x02;
+  mac[139] = 0x01;
+  mac[140] = 0x00;
+
+  // encodeString(key = nonce) 32,141 "..."
+  memcpy(&mac[141], &key[0], 32);
+
+  // zeroPad(99) 99,173 "00..."
+  memset(&mac[173], 0x00, 99);
+
+  // update(hdr) 208,272 "..."
+  memcpy(&mac[272], &data[0], 208);
+
+  // rightEncode(output_len * 8) 3,480 "010002"
+  mac[480] = 0x01;
+  mac[481] = 0x00;
+  mac[482] = 0x02;
+
+  hsk_sha3_update(&ctx, mac, 483);
+  hsk_cshake_final(&ctx, hash);
 }
 
 void
