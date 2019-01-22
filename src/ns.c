@@ -322,15 +322,10 @@ hsk_ns_onrecv(
     // Check blacklist.
     if (strcmp(req->tld, "bit") == 0 // Namecoin
         || strcmp(req->tld, "eth") == 0 // ENS
-        || strcmp(req->tld, "example") == 0 // ICANN reserved
         || strcmp(req->tld, "exit") == 0 // Tor
         || strcmp(req->tld, "gnu") == 0 // GNUnet (GNS)
         || strcmp(req->tld, "i2p") == 0 // Invisible Internet Project
-        || strcmp(req->tld, "invalid") == 0 // ICANN reserved
-        || strcmp(req->tld, "local") == 0 // mDNS
-        || strcmp(req->tld, "localhost") == 0 // ICANN reserved
         || strcmp(req->tld, "onion") == 0 // Tor
-        || strcmp(req->tld, "test") == 0 // ICANN reserved
         || strcmp(req->tld, "tor") == 0 // OnioNS
         || strcmp(req->tld, "zkey") == 0) { // GNS
       msg = hsk_resource_to_nx();
