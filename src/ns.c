@@ -319,25 +319,42 @@ hsk_ns_onrecv(
 
   // Requesting a lookup.
   if (req->labels > 0) {
-    req->ns = (void *)ns;
+    // Check blacklist.
+    if (strcmp(req->tld, "bit") == 0 // Namecoin
+        || strcmp(req->tld, "eth") == 0 // ENS
+        || strcmp(req->tld, "example") == 0 // ICANN reserved
+        || strcmp(req->tld, "exit") == 0 // Tor
+        || strcmp(req->tld, "gnu") == 0 // GNUnet (GNS)
+        || strcmp(req->tld, "i2p") == 0 // Invisible Internet Project
+        || strcmp(req->tld, "invalid") == 0 // ICANN reserved
+        || strcmp(req->tld, "local") == 0 // mDNS
+        || strcmp(req->tld, "localhost") == 0 // ICANN reserved
+        || strcmp(req->tld, "onion") == 0 // Tor
+        || strcmp(req->tld, "test") == 0 // ICANN reserved
+        || strcmp(req->tld, "tor") == 0 // OnioNS
+        || strcmp(req->tld, "zkey") == 0) { // GNS
+      msg = hsk_resource_to_nx();
+    } else {
+      req->ns = (void *)ns;
 
-    int rc = hsk_pool_resolve(
-      ns->pool,
-      req->tld,
-      after_resolve,
-      (void *)req
-    );
+      int rc = hsk_pool_resolve(
+        ns->pool,
+        req->tld,
+        after_resolve,
+        (void *)req
+      );
 
-    if (rc != HSK_SUCCESS) {
-      hsk_ns_log(ns, "pool resolve error: %s\n", hsk_strerror(rc));
-      goto fail;
+      if (rc != HSK_SUCCESS) {
+        hsk_ns_log(ns, "pool resolve error: %s\n", hsk_strerror(rc));
+        goto fail;
+      }
+
+      return;
     }
-
-    return;
+  } else {
+    // Querying the root zone.
+    msg = hsk_resource_root(req->type, ns->ip);
   }
-
-  // Querying the root zone.
-  msg = hsk_resource_root(req->type, ns->ip);
 
   if (!msg) {
     hsk_ns_log(ns, "could not create root soa\n");
