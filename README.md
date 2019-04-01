@@ -180,10 +180,10 @@ In the default config, you may see a line which looks like:
 option domain_name_servers, domain_name, domain_search, host_name
 ```
 
-We want to remove `domain_name_servers` and `domain_search`.
+We want to remove `domain_name_servers`, `domain_name`, and `domain_search`.
 
 ``` conf
-option domain_name, host_name
+option host_name
 ```
 
 #### NetworkManager
