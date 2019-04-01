@@ -343,75 +343,93 @@ hsk_chain_get_mtp(const hsk_chain_t *chain, const hsk_header_t *prev) {
   return median[size >> 1];
 }
 
-static uint32_t
-hsk_chain_retarget(const hsk_chain_t *chain, const hsk_header_t *prev) {
-  assert(chain);
+static void
+hsk_header_swap(hsk_header_t **x, hsk_header_t **y) {
+  hsk_header_t *z = *x;
+  *x = *y;
+  *y = z;
+}
 
-  uint32_t bits = HSK_BITS;
+static hsk_header_t *
+hsk_chain_suitable_block(const hsk_chain_t *chain, const hsk_header_t *prev) {
+  hsk_header_t *z = (hsk_header_t *)prev;
+  assert(z);
+
+  hsk_header_t *y = hsk_map_get(&chain->hashes, z->prev_block);
+  assert(y);
+
+  hsk_header_t *x = hsk_map_get(&chain->hashes, y->prev_block);
+  assert(x);
+
+  if (x->time > z->time)
+    hsk_header_swap(&x, &z);
+
+  if (x->time > y->time)
+    hsk_header_swap(&x, &y);
+
+  if (y->time > z->time)
+    hsk_header_swap(&y, &z);
+
+  return y;
+}
+
+static uint32_t
+hsk_chain_retarget(const hsk_chain_t *chain,
+                   const hsk_header_t *first,
+                   const hsk_header_t *last) {
+  assert(chain && first && last);
+  assert(last->height >= first->height);
+
   uint8_t *limit = (uint8_t *)HSK_LIMIT;
 
-  int64_t window = HSK_TARGET_WINDOW;
-  int64_t timespan = HSK_TARGET_TIMESPAN;
-  int64_t min = HSK_MIN_ACTUAL;
-  int64_t max = HSK_MAX_ACTUAL;
-
-  if (!prev)
-    return bits;
-
   hsk_bn_t target_bn;
-  hsk_bn_init(&target_bn);
-
-  hsk_header_t *last = (hsk_header_t *)prev;
-  hsk_header_t *first = last;
-
-  int64_t i;
-  for (i = 0; first && i < window; i++) {
-    uint8_t diff[32];
-    assert(hsk_pow_to_target(first->bits, diff));
-    hsk_bn_t diff_bn;
-    hsk_bn_from_array(&diff_bn, diff, 32);
-    hsk_bn_add(&target_bn, &diff_bn, &target_bn);
-    first = hsk_map_get(&chain->hashes, first->prev_block);
-  }
-
-  if (!first || first->height < 1)
-    return bits;
-
-  hsk_bn_t window_bn;
-  hsk_bn_from_int(&window_bn, (uint64_t)window);
-
-  hsk_bn_div(&target_bn, &window_bn, &target_bn);
-
-  int64_t start = hsk_chain_get_mtp(chain, first);
-  int64_t end = hsk_chain_get_mtp(chain, last);
-  int64_t diff = end - start;
-  int64_t actual = timespan + ((diff - timespan) >> 2);
-
-  if (actual < min)
-    actual = min;
-
-  if (actual > max)
-    actual = max;
-
+  hsk_bn_t last_bn;
+  hsk_bn_t spacing_bn;
   hsk_bn_t actual_bn;
+  hsk_bn_t max_bn;
+  hsk_bn_t limit_bn;
+
+  uint8_t target[32];
+  uint32_t cmpct;
+
+  hsk_bn_from_array(&target_bn, first->work, 32);
+  hsk_bn_from_array(&last_bn, last->work, 32);
+
+  hsk_bn_from_int(&spacing_bn, (uint64_t)HSK_TARGET_SPACING);
+
+  hsk_bn_sub(&last_bn, &target_bn, &target_bn);
+  hsk_bn_mul(&target_bn, &spacing_bn, &target_bn);
+
+  int64_t actual = last->time - first->time;
+
+  if (actual < HSK_MIN_ACTUAL)
+    actual = HSK_MIN_ACTUAL;
+
+  if (actual > HSK_MAX_ACTUAL)
+    actual = HSK_MAX_ACTUAL;
+
   hsk_bn_from_int(&actual_bn, (uint64_t)actual);
 
-  hsk_bn_t timespan_bn;
-  hsk_bn_from_int(&timespan_bn, (uint64_t)timespan);
+  hsk_bn_div(&target_bn, &actual_bn, &target_bn);
 
-  hsk_bn_div(&target_bn, &timespan_bn, &target_bn);
-  hsk_bn_mul(&target_bn, &actual_bn, &target_bn);
+  if (hsk_bn_is_zero(&target_bn))
+    return HSK_BITS;
 
-  hsk_bn_t limit_bn;
+  hsk_bn_t one_bn;
+  hsk_bn_from_int(&one_bn, 1);
+
+  hsk_bn_from_int(&max_bn, 1);
+  hsk_bn_lshift(&max_bn, &max_bn, 256);
+
+  hsk_bn_div(&max_bn, &target_bn, &target_bn);
+  hsk_bn_sub(&target_bn, &one_bn, &target_bn);
+
   hsk_bn_from_array(&limit_bn, limit, 32);
 
   if (hsk_bn_cmp(&target_bn, &limit_bn) > 0)
-    return bits;
+    return HSK_BITS;
 
-  uint8_t target[32];
   hsk_bn_to_array(&target_bn, target, 32);
-
-  uint32_t cmpct;
 
   assert(hsk_pow_to_bits(target, &cmpct));
 
@@ -441,7 +459,16 @@ hsk_chain_get_target(
       return HSK_BITS;
    }
 
-  return hsk_chain_retarget(chain, prev);
+  if (prev->height < 144 + 2)
+    return HSK_BITS;
+
+  hsk_header_t *last = hsk_chain_suitable_block(chain, prev);
+
+  int64_t height = prev->height - 144;
+  hsk_header_t *ancestor = hsk_chain_get_ancestor(chain, prev, height);
+  hsk_header_t *first = hsk_chain_suitable_block(chain, ancestor);
+
+  return hsk_chain_retarget(chain, first, last);
 }
 
 static hsk_header_t *
