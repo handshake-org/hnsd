@@ -93,7 +93,7 @@ static const uint8_t HSK_CHAINWORK[32] = {
  */
 
 #define HSK_NETWORK_NAME "testnet"
-#define HSK_MAGIC 0x72b536d1
+#define HSK_MAGIC 0x09d8647f
 #define HSK_PORT 13038
 #define HSK_NS_PORT 15359
 #define HSK_RS_PORT 15360
