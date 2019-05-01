@@ -67,11 +67,11 @@ hnsd_SOURCES = src/cache.c  \
                src/ns.c     \
                src/rs.c
 
-hnsd_LDADD = -lunbound                  \
+hnsd_LDADD = $(LIB_UNBOUND)             \
              $(top_builddir)/libhsk.la
 
 hnsd_LDFLAGS = -static
-hnsd_CFLAGS = -DHSK_BUILD $(AM_CFLAGS)
+hnsd_CFLAGS = -DHSK_BUILD $(INC_UNBOUND) $(AM_CFLAGS)
 hnsd_CPPFLAGS = $(AM_CPPFLAGS)
 
 # pkgconfigdir = $(libdir)/pkgconfig
