@@ -64,6 +64,8 @@ set_logfile(const char *logfile) {
 #endif
 }
 
+// --daemon is not supported under MinGW (no fork() syscall)
+#ifndef _WIN32
 static bool
 daemonize(const char *logfile) {
 #ifdef __linux
@@ -98,6 +100,7 @@ daemonize(const char *logfile) {
 
   return true;
 }
+#endif
 
 static void
 help(int r) {
@@ -137,9 +140,11 @@ help(int r) {
     "  -l, --log-file <filename>\n"
     "    Redirect output to a log file.\n"
     "\n"
+#ifndef _WIN32
     "  -d, --daemon\n"
     "    Fork and background the process.\n"
     "\n"
+#endif
     "  -h, --help\n"
     "    This help message.\n"
     "\n"
@@ -150,7 +155,11 @@ help(int r) {
 
 static void
 parse_arg(int argc, char **argv, hsk_options_t *opt) {
-  const static char *optstring = "c:n:r:i:u:p:k:s:l:dh";
+  const static char *optstring = "c:n:r:i:u:p:k:s:l:h"
+#ifndef _WIN32
+    "d"
+#endif
+    ;
 
   const static struct option longopts[] = {
     { "config", required_argument, NULL, 'c' },
@@ -162,14 +171,18 @@ parse_arg(int argc, char **argv, hsk_options_t *opt) {
     { "identity-key", required_argument, NULL, 'k' },
     { "seeds", required_argument, NULL, 's' },
     { "log-file", required_argument, NULL, 'l' },
+#ifndef _WIN32
     { "daemon", no_argument, NULL, 'd' },
+#endif
     { "help", no_argument, NULL, 'h' }
   };
 
   int longopt_idx = -1;
   bool has_ip = false;
   char *logfile = NULL;
+#ifndef _WIN32
   bool background = false;
+#endif
 
   optind = 1;
 
@@ -293,10 +306,12 @@ parse_arg(int argc, char **argv, hsk_options_t *opt) {
         break;
       }
 
+#ifndef _WIN32
       case 'd': {
         background = true;
         break;
       }
+#endif
 
       case '?': {
         return help(1);
@@ -310,10 +325,15 @@ parse_arg(int argc, char **argv, hsk_options_t *opt) {
   if (!has_ip)
     hsk_sa_copy(opt->ns_ip, opt->ns_host);
 
+#ifndef _WIN32
   if (background)
     daemonize(logfile);
-  else if (logfile)
-    set_logfile(logfile);
+  else
+#endif
+  {
+    if (logfile)
+      set_logfile(logfile);
+  }
 
   if (logfile)
     free(logfile);
