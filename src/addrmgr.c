@@ -4,8 +4,6 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <stdarg.h>
-#include <arpa/inet.h>
-#include <netinet/in.h>
 #include <math.h>
 
 #include "addr.h"
@@ -13,6 +11,7 @@
 #include "constants.h"
 #include "error.h"
 #include "map.h"
+#include "platform-net.h"
 #include "seeds.h"
 #include "timedata.h"
 #include "utils.h"

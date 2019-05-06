@@ -8,8 +8,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
-#include <arpa/inet.h>
-#include <netinet/in.h>
 
 #include "addr.h"
 #include "cache.h"
@@ -22,6 +20,7 @@
 #include "pool.h"
 #include "req.h"
 #include "tld.h"
+#include "platform-net.h"
 #include "uv.h"
 
 /*

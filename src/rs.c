@@ -8,9 +8,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
-#include <arpa/inet.h>
-#include <netinet/in.h>
-
 #include <unbound.h>
 
 #include "addr.h"
@@ -19,6 +16,7 @@
 #include "dnssec.h"
 #include "ec.h"
 #include "error.h"
+#include "platform-net.h"
 #include "resource.h"
 #include "req.h"
 #include "rs.h"

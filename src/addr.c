@@ -5,8 +5,6 @@
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <arpa/inet.h>
-#include <netinet/in.h>
 #include <string.h>
 
 #include "addr.h"
@@ -14,6 +12,7 @@
 #include "bio.h"
 #include "constants.h"
 #include "map.h"
+#include "platform-net.h"
 #include "uv.h"
 
 static const uint8_t hsk_ip4_mapped[12] = {

@@ -6,8 +6,8 @@
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <arpa/inet.h>
-#include <netinet/in.h>
+
+#include "platform-net.h"
 
 // INET6_ADDRSTRLEN = 65
 // 65 + 5 + 1 + 2 = 73 - long enough for [ipv6]:port

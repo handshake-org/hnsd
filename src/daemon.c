@@ -8,8 +8,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
-#include <arpa/inet.h>
-#include <netinet/in.h>
 #include <getopt.h>
 #include <sys/types.h>
 #include <unistd.h>
@@ -19,6 +17,7 @@
 #include "ns.h"
 #include "rs.h"
 #include "uv.h"
+#include "platform-net.h"
 
 extern char *optarg;
 extern int optind, opterr, optopt;
