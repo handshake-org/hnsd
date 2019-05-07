@@ -338,6 +338,13 @@ esac
 AC_SUBST(LIB_UNBOUND, ${LIB_UNBOUND})
 AC_SUBST(INC_UNBOUND, ${INC_UNBOUND})
 
+dnl Platform-specific libraries
+case "${host_os}" in
+  mingw*)
+    AC_SUBST(LIB_WINBCRYPT, "-lbcrypt")
+    ;;
+esac
+
 AC_MSG_NOTICE([Using endomorphism optimizations: $use_endomorphism])
 AC_MSG_NOTICE([Using static precomputation: $use_precomp])
 AC_MSG_NOTICE([Using assembly optimizations: $set_asm])

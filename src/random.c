@@ -79,33 +79,6 @@ hsk_randombytes(uint8_t *dst, size_t len) {
 }
 
 #elif defined(_WIN16) || defined(_WIN32) || defined(_WIN64)
-
-#if defined(HAVE_WINCRYPT_H)
-#define WIN32_LEAN_AND_MEAN
-#include <windows.h>
-#include <wincrypt.h>
-
-bool
-hsk_randombytes(uint8_t *dst, size_t len) {
-  HCRYPTPROV prov;
-
-  BOOL r = CryptAcquireContext(
-    &prov,
-    NULL,
-    NULL,
-    PROV_RSA_FULL,
-    CRYPT_VERIFYCONTEXT
-  );
-
-  if (!r)
-    return false;
-
-  CryptGenRandom(prov, len, (BYTE *)dst);
-  CryptReleaseContext(prov, 0);
-
-  return true;
-}
-#else
 #include <windows.h>
 
 bool
@@ -117,7 +90,6 @@ hsk_randombytes(uint8_t *dst, size_t len) {
 
   return true;
 }
-#endif
 
 #else
 

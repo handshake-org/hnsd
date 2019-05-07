@@ -19,7 +19,8 @@ CLEANFILES =
 
 lib_LTLIBRARIES = libhsk.la
 
-libhsk_la_LIBADD = $(top_builddir)/uv/libuv.la
+libhsk_la_LIBADD = $(top_builddir)/uv/libuv.la   \
+                   $(LIB_WINBCRYPT)
 
 libhsk_la_CFLAGS = -DHSK_BUILD @CFLAGS@
 libhsk_la_LDFLAGS = -no-undefined -version-info 0:0:0
