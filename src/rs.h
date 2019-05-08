@@ -14,11 +14,28 @@
  * Types
  */
 
+// Response data from libunbound - used to queue responses back to the libuv
+// event loop in a linked list
+typedef struct _hsk_rs_rsp_t {
+  struct _hsk_rs_rsp_t *next;
+  hsk_dns_req_t *req;
+  struct ub_result *result;
+  int status;
+} hsk_rs_rsp_t;
+
+typedef struct {
+  uv_mutex_t mutex;
+  hsk_rs_rsp_t *head;  // Oldest response
+  hsk_rs_rsp_t *tail;  // Newest response
+} hsk_rs_queue_t;
+
 typedef struct {
   uv_loop_t *loop;
   struct ub_ctx *ub;
   uv_udp_t socket;
-  uv_poll_t poll;
+  hsk_rs_queue_t *rs_queue;
+  uv_async_t *rs_async;
+  uv_thread_t rs_worker;
   hsk_ec_t *ec;
   char *config;
   struct sockaddr_storage stub_;
@@ -29,7 +46,7 @@ typedef struct {
   uint8_t read_buffer[4096];
   bool bound;
   bool receiving;
-  bool polling;
+  bool rs_worker_running;
 } hsk_rs_t;
 
 /*
