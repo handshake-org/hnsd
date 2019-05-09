@@ -66,7 +66,8 @@ noinst_PROGRAMS = $(PROGS)
 hnsd_SOURCES = src/cache.c  \
                src/daemon.c \
                src/ns.c     \
-               src/rs.c
+               src/rs.c     \
+               src/rs_worker.c
 
 hnsd_LDADD = $(LIB_UNBOUND)             \
              $(top_builddir)/libhsk.la

@@ -64,113 +64,11 @@ after_recv(
   unsigned flags
 );
 
-// Resolve callback on libunbound worker thread.
 static void
-after_resolve_onthread(void *data, int status, struct ub_result *result);
-
-// Resolve async event handler in libuv event loop.
-static void
-after_resolve(uv_async_t *async);
+after_resolve(void *data, int status, struct ub_result *result);
 
 static void
 after_close(uv_handle_t *handle);
-
-static void
-after_close_free(uv_handle_t *handle);
-
-static void
-run_unbound_worker(void *arg);
-
-static void
-after_resolve_shutdown(void *data, int status, struct ub_result *result);
-
-/*
- * Response Queue
- */
-int
-hsk_rs_queue_init(hsk_rs_queue_t *queue) {
-  if (uv_mutex_init(&queue->mutex))
-    return HSK_EFAILURE;
-  queue->head = NULL;
-  queue->tail = NULL;
-
-  return HSK_SUCCESS;
-}
-
-void
-hsk_rs_queue_uninit(hsk_rs_queue_t *queue) {
-  hsk_rs_rsp_t *current = queue->head;
-  while (current) {
-    hsk_rs_rsp_t *next = current->next;
-    free(current);
-    current = next;
-  }
-
-  uv_mutex_destroy(&queue->mutex);
-}
-
-hsk_rs_queue_t *hsk_rs_queue_alloc() {
-  hsk_rs_queue_t *queue = malloc(sizeof(hsk_rs_queue_t));
-  if(!queue)
-    return NULL;
-
-  if (hsk_rs_queue_init(queue) != HSK_SUCCESS) {
-    free(queue);
-    return NULL;
-  }
-
-  return queue;
-}
-
-void hsk_rs_queue_free(hsk_rs_queue_t *queue) {
-  if(!queue)
-    return;
-
-  hsk_rs_queue_uninit(queue);
-  free(queue);
-}
-
-// Dequeue the oldest queued response - thread-safe.
-// Returned object is now owned by the caller; returns nullptr if there is
-// nothing queued.
-hsk_rs_rsp_t *
-hsk_rs_queue_dequeue(hsk_rs_queue_t *queue) {
-  uv_mutex_lock(&queue->mutex);
-
-  hsk_rs_rsp_t *oldest = queue->head;
-  if (oldest) {
-    queue->head = oldest->next;
-    oldest->next = NULL;
-    // If this was the only queued request, clear tail too
-    if(queue->tail == oldest)
-      queue->tail = NULL;
-  }
-
-  uv_mutex_unlock(&queue->mutex);
-
-  return oldest;
-}
-
-// Enqueue a response - thread-safe.
-// The queue takes ownership of the response (until it's popped off again).
-void
-hsk_rs_queue_enqueue(hsk_rs_queue_t *queue, hsk_rs_rsp_t *rsp) {
-  uv_mutex_lock(&queue->mutex);
-
-  if (!queue->tail) {
-    // There were no requests queued; this one becomes head and tail
-    assert(!queue->head);   // Invariant - set and cleared together
-    queue->head = rsp;
-    queue->tail = rsp;
-  }
-  else {
-    // There are requests queued already, add this one to the tail
-    queue->tail->next = rsp;
-    queue->tail = rsp;
-  }
-
-  uv_mutex_unlock(&queue->mutex);
-}
 
 /*
  * Recursive NS
@@ -184,8 +82,6 @@ hsk_rs_init(hsk_rs_t *ns, const uv_loop_t *loop, const struct sockaddr *stub) {
   int err = HSK_ENOMEM;
   struct ub_ctx *ub = NULL;
   hsk_ec_t *ec = NULL;
-  hsk_rs_queue_t *rs_queue = NULL;
-  uv_async_t *rs_async = NULL;
 
   ub = ub_ctx_create();
 
@@ -193,16 +89,6 @@ hsk_rs_init(hsk_rs_t *ns, const uv_loop_t *loop, const struct sockaddr *stub) {
     goto fail;
 
   if (ub_ctx_async(ub, 1) != 0)
-    goto fail;
-
-  rs_queue = hsk_rs_queue_alloc();
-
-  if (!rs_queue)
-    goto fail;
-
-  // Allocate this separately on the heap because uv_close() is asynchronous.
-  rs_async = malloc(sizeof(uv_async_t));
-  if (!rs_async || uv_async_init((uv_loop_t*)loop, rs_async, after_resolve))
     goto fail;
 
   ec = hsk_ec_alloc();
@@ -213,9 +99,7 @@ hsk_rs_init(hsk_rs_t *ns, const uv_loop_t *loop, const struct sockaddr *stub) {
   ns->loop = (uv_loop_t *)loop;
   ns->ub = ub;
   ns->socket.data = (void *)ns;
-  ns->rs_queue = rs_queue;
-  ns->rs_async = rs_async;
-  ns->rs_async->data = (void *)ns;
+  ns->rs_worker = NULL;
   ns->ec = ec;
   ns->config = NULL;
   ns->stub = (struct sockaddr *)&ns->stub_;
@@ -226,7 +110,6 @@ hsk_rs_init(hsk_rs_t *ns, const uv_loop_t *loop, const struct sockaddr *stub) {
   memset(ns->read_buffer, 0x00, sizeof(ns->read_buffer));
   ns->bound = false;
   ns->receiving = false;
-  ns->rs_worker_running = false;
 
   if (stub) {
     err = HSK_EFAILURE;
@@ -243,12 +126,6 @@ hsk_rs_init(hsk_rs_t *ns, const uv_loop_t *loop, const struct sockaddr *stub) {
 fail:
   if (ub)
     ub_ctx_delete(ub);
-
-  if (rs_queue)
-    hsk_rs_queue_free(rs_queue);
-
-  if (rs_async)
-    free(rs_async);
 
   if (ec)
     hsk_ec_free(ec);
@@ -271,21 +148,6 @@ hsk_rs_uninit(hsk_rs_t *ns) {
   if (ns->ub) {
     ub_ctx_delete(ns->ub);
     ns->ub = NULL;
-  }
-
-  // Free the response event and queue after destroying the unbound context.
-  // The libunbound worker has now stopped, so we can safely free these.
-  if (ns->rs_async) {
-    ns->rs_async->data = NULL;
-    // We have to free this object in the callback, libuv specifically says it
-    // must not be freed before the callback occurs
-    uv_close((uv_handle_t *)ns->rs_async, after_close_free);
-    ns->rs_async = NULL;
-  }
-
-  if (ns->rs_queue) {
-    hsk_rs_queue_free(ns->rs_queue);
-    ns->rs_queue = NULL;
   }
 
   if (ns->config) {
@@ -419,11 +281,9 @@ hsk_rs_open(hsk_rs_t *ns, const struct sockaddr *addr) {
 
   ns->receiving = true;
 
-  ns->rs_worker_running = true;
-  if (uv_thread_create(&ns->rs_worker, run_unbound_worker, (void *)ns) != 0) {
-    ns->rs_worker_running = false;
+  ns->rs_worker = hsk_rs_worker_alloc(ns->loop, ns->ub);
+  if (!ns->rs_worker)
     return HSK_EFAILURE;
-  }
 
   char host[HSK_MAX_HOST];
   assert(hsk_sa_to_string(addr, host, HSK_MAX_HOST, HSK_NS_PORT));
@@ -438,23 +298,9 @@ hsk_rs_close(hsk_rs_t *ns) {
   if (!ns)
     return HSK_EBADARGS;
 
-  if (ns->rs_worker_running) {
-    // We need to tell the libunbound worker to exit - wake up the thread and
-    // clear rs_worker_running on that thread.
-    //
-    // libunbound doesn't give us a good way to do this, the only way is to
-    // issue a dummy query and do this in the callback on the worker thread.
-    //
-    // On Unix, we could poll unbound's file descriptor manually with another
-    // file descriptor to allow us to wake the thread here.  On Windows though,
-    // libunbound does not provide any access to its WSAEVENT to do the same
-    // thing.
-    int rc = ub_resolve_async(ns->ub, ".", HSK_DNS_NS, HSK_DNS_IN, (void *)ns,
-                              after_resolve_shutdown, NULL);
-    if(rc != 0)
-      hsk_rs_log(ns, "cannot shut down worker thread: %s\n", ub_strerror(rc));
-    else
-      uv_thread_join(&ns->rs_worker);
+  if (ns->rs_worker) {
+    hsk_rs_worker_free(ns->rs_worker);
+    ns->rs_worker = NULL;
   }
 
   if (ns->receiving) {
@@ -556,20 +402,19 @@ hsk_rs_onrecv(
     goto fail;
   }
 
-  rc = ub_resolve_async(
-    ns->ub,
+  rc = hsk_rs_worker_resolve(
+    ns->rs_worker,
     req->name,
     req->type,
     req->class,
     (void *)req,
-    after_resolve_onthread,
-    NULL
+    after_resolve
   );
 
-  if (rc == 0)
+  if (rc == HSK_SUCCESS)
     return;
 
-  hsk_rs_log(ns, "unbound error: %s\n", ub_strerror(rc));
+  hsk_rs_log(ns, "resolve error: %s\n", hsk_strerror(rc));
 
   msg = hsk_resource_to_servfail();
 
@@ -814,82 +659,17 @@ after_recv(
   );
 }
 
-// Handle a resolve result and respond to a DNS query for the recursive
-// resolver - called on the libunbound worker thread
 static void
-after_resolve_onthread(void *data, int status, struct ub_result *result) {
+after_resolve(void *data, int status, struct ub_result *result) {
   hsk_dns_req_t *req = (hsk_dns_req_t *)data;
-  // We can safely get the nameserver object from the request; the main thread
-  // does not use it after ub_resolve_async() succeeds (ownership is passed to
-  // this callback).
   hsk_rs_t *ns = (hsk_rs_t *)req->ns;
 
-  hsk_rs_rsp_t *rsp = malloc(sizeof(hsk_rs_rsp_t));
-  if(!rsp)
-    return;
+  assert(ns);
 
-  rsp->next = NULL;
-  rsp->req = req;
-  rsp->result = result;
-  rsp->status = status;
-
-  // Enqueue the response.  This is safe to do on the worker thread:
-  // - The ns->rs_queue pointer is not modified after initialization until the
-  //   worker thread has been stopped
-  // - The hsk_rs_queue_t object itself is thread-safe
-  hsk_rs_queue_enqueue(ns->rs_queue, rsp);
-
-  // Queue an async event to process the response on the libuv event loop.
-  // Like rs_queue, the rs_async pointer is safe to use because it's not
-  // modified until the libunbound worker is stopped.
-  uv_async_send(ns->rs_async);
-}
-
-static void
-after_resolve(uv_async_t *async) {
-  hsk_rs_t *ns = (hsk_rs_t *)async->data;
-
-  // Since uv_close() is async, it might be possible to process this event after
-  // the NS is shut down but before the async is closed.
-  if(!ns)
-    return;
-
-  // Dequeue and process all events in the queue - libuv coalesces calls to
-  // uv_async_send().
-  hsk_rs_rsp_t *rsp = hsk_rs_queue_dequeue(ns->rs_queue);
-  while(rsp) {
-    hsk_rs_respond(ns, rsp->req, rsp->status, rsp->result);
-
-    hsk_dns_req_free(rsp->req);
-    ub_resolve_free(rsp->result);
-    free(rsp);
-
-    rsp = hsk_rs_queue_dequeue(ns->rs_queue);
-  }
+  hsk_rs_respond(ns, req, status, result);
+  hsk_dns_req_free(req);
+  ub_resolve_free(result);
 }
 
 static void
 after_close(uv_handle_t *handle) {}
-
-static void
-after_close_free(uv_handle_t *handle) {
-  free(handle);
-}
-
-static void
-run_unbound_worker(void *arg) {
-  hsk_rs_t *ns = (hsk_rs_t *)arg;
-
-  while(ns->rs_worker_running) {
-    ub_wait(ns->ub);
-  }
-}
-
-static void
-after_resolve_shutdown(void *data, int status, struct ub_result *result) {
-  ub_resolve_free(result);
-
-  hsk_rs_t *ns = (hsk_rs_t *)data;
-
-  ns->rs_worker_running = false;
-}
