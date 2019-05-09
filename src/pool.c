@@ -333,8 +333,6 @@ hsk_pool_close(hsk_pool_t *pool) {
   if (uv_timer_stop(&pool->timer) != 0)
     return HSK_EFAILURE;
 
-  hsk_pool_uninit(pool);
-
   return HSK_SUCCESS;
 }
 
@@ -342,6 +340,12 @@ int
 hsk_pool_destroy(hsk_pool_t *pool) {
   if (!pool)
     return HSK_EBADARGS;
+
+  int rc = hsk_pool_close(pool);
+  if (rc != HSK_SUCCESS) {
+    hsk_pool_log(pool, "failed to close pool: %s\n", hsk_strerror(rc));
+    return rc;
+  }
 
   hsk_pool_free(pool);
 
