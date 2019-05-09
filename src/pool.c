@@ -108,7 +108,7 @@ static void
 after_write(uv_write_t *req, int status);
 
 static void
-after_read(uv_stream_t *stream, long int nread, const uv_buf_t *buf);
+after_read(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf);
 
 static void
 after_close(uv_handle_t *handle);
@@ -1719,7 +1719,7 @@ alloc_buffer(uv_handle_t *handle, size_t size, uv_buf_t *buf) {
 }
 
 static void
-after_read(uv_stream_t *stream, long int nread, const uv_buf_t *buf) {
+after_read(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf) {
   hsk_peer_t *peer = (hsk_peer_t *)stream->data;
 
   if (!peer)
