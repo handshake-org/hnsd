@@ -8,6 +8,8 @@
 #include <stdlib.h>
 #include <time.h>
 
+#include "uv.h"
+
 // Taken from:
 // https://github.com/wahern/dns/blob/master/src/dns.c
 #ifndef _HSK_RANDOM
@@ -223,4 +225,15 @@ hsk_to_lower(char *name) {
       *s += ' ';
     s += 1;
   }
+}
+
+static void
+after_close_free(uv_handle_t *handle) {
+  free(handle);
+}
+
+void
+hsk_uv_close_free(uv_handle_t *handle) {
+  if (handle)
+    uv_close(handle, after_close_free);
 }

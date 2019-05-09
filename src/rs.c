@@ -53,6 +53,9 @@ static void
 alloc_buffer(uv_handle_t *handle, size_t size, uv_buf_t *buf);
 
 static void
+after_worker_stop(void *data);
+
+static void
 after_send(uv_udp_send_t *req, int status);
 
 static void
@@ -110,6 +113,7 @@ hsk_rs_init(hsk_rs_t *ns, const uv_loop_t *loop, const struct sockaddr *stub) {
   memset(ns->read_buffer, 0x00, sizeof(ns->read_buffer));
   ns->bound = false;
   ns->receiving = false;
+  ns->stop_callback = NULL;
 
   if (stub) {
     err = HSK_EFAILURE;
@@ -281,8 +285,11 @@ hsk_rs_open(hsk_rs_t *ns, const struct sockaddr *addr) {
 
   ns->receiving = true;
 
-  ns->rs_worker = hsk_rs_worker_alloc(ns->loop, ns->ub);
+  ns->rs_worker = hsk_rs_worker_alloc(ns->loop, (void *)ns, after_worker_stop);
   if (!ns->rs_worker)
+    return HSK_EFAILURE;
+
+  if (hsk_rs_worker_open(ns->rs_worker, ns->ub) != HSK_SUCCESS)
     return HSK_EFAILURE;
 
   char host[HSK_MAX_HOST];
@@ -294,32 +301,19 @@ hsk_rs_open(hsk_rs_t *ns, const struct sockaddr *addr) {
 }
 
 int
-hsk_rs_close(hsk_rs_t *ns) {
+hsk_rs_close(hsk_rs_t *ns, void *stop_data, void (*stop_callback)(void *)) {
   if (!ns)
     return HSK_EBADARGS;
 
-  if (ns->rs_worker) {
-    hsk_rs_worker_free(ns->rs_worker);
-    ns->rs_worker = NULL;
-  }
+  ns->stop_data = stop_data;
+  ns->stop_callback = stop_callback;
 
-  if (ns->receiving) {
-    if (uv_udp_recv_stop(&ns->socket) != 0)
-      return HSK_EFAILURE;
-    ns->receiving = false;
-  }
-
-  if (ns->bound) {
-    uv_close((uv_handle_t *)&ns->socket, after_close);
-    ns->bound = false;
-  }
-
-  ns->socket.data = NULL;
-
-  if (ns->ub) {
-    ub_ctx_delete(ns->ub);
-    ns->ub = NULL;
-  }
+  // If the worker is running, stop it, after_worker_stop is called
+  // asynchronously.  Otherwise, just call it directly.
+  if(ns->rs_worker && hsk_rs_worker_is_open(ns->rs_worker))
+    hsk_rs_worker_close(ns->rs_worker);
+  else
+    after_worker_stop((void *)ns);
 
   return HSK_SUCCESS;
 }
@@ -346,21 +340,6 @@ hsk_rs_free(hsk_rs_t *ns) {
 
   hsk_rs_uninit(ns);
   free(ns);
-}
-
-int
-hsk_rs_destroy(hsk_rs_t *ns) {
-  if (!ns)
-    return HSK_EBADARGS;
-
-  int rc = hsk_rs_close(ns);
-
-  if (rc != 0)
-    return rc;
-
-  hsk_rs_free(ns);
-
-  return HSK_SUCCESS;
 }
 
 static void
@@ -601,6 +580,40 @@ alloc_buffer(uv_handle_t *handle, size_t size, uv_buf_t *buf) {
 
   buf->base = (char *)ns->read_buffer;
   buf->len = sizeof(ns->read_buffer);
+}
+
+static void
+after_worker_stop(void *data) {
+  hsk_rs_t *ns = (hsk_rs_t *)data;
+
+  if (ns->rs_worker) {
+    hsk_rs_worker_free(ns->rs_worker);
+    ns->rs_worker = NULL;
+  }
+
+  if (ns->receiving) {
+    uv_udp_recv_stop(&ns->socket);
+    ns->receiving = false;
+  }
+
+  if (ns->bound) {
+    uv_close((uv_handle_t *)&ns->socket, after_close);
+    ns->bound = false;
+  }
+
+  ns->socket.data = NULL;
+
+  if (ns->ub) {
+    ub_ctx_delete(ns->ub);
+    ns->ub = NULL;
+  }
+
+  // Grab these values, ns may be freed by this callback.
+  void *stop_data = ns->stop_data;
+  void (*stop_callback)(void *) = ns->stop_callback;
+  ns->stop_callback = NULL;
+
+  stop_callback(stop_data);
 }
 
 static void

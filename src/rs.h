@@ -30,6 +30,8 @@ typedef struct {
   uint8_t read_buffer[4096];
   bool bound;
   bool receiving;
+  void *stop_data;
+  void (*stop_callback)(void *);
 } hsk_rs_t;
 
 /*
@@ -51,15 +53,14 @@ hsk_rs_set_key(hsk_rs_t *ns, const uint8_t *key);
 int
 hsk_rs_open(hsk_rs_t *ns, const struct sockaddr *addr);
 
+// Close the recursive name server.  This may complete asynchronously;
+// stop_callback is called when the name server can be destroyed.
 int
-hsk_rs_close(hsk_rs_t *ns);
+hsk_rs_close(hsk_rs_t *ns, void *stop_data, void (*stop_callback)(void *));
 
 hsk_rs_t *
 hsk_rs_alloc(const uv_loop_t *loop, const struct sockaddr *stub);
 
 void
 hsk_rs_free(hsk_rs_t *ns);
-
-int
-hsk_rs_destroy(hsk_rs_t *ns);
 #endif

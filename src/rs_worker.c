@@ -1,6 +1,7 @@
 #include "config.h"
 
 #include <assert.h>
+#include <stdarg.h>
 #include <stdint.h>
 #include <stdbool.h>
 #include <unbound.h>
@@ -8,6 +9,7 @@
 #include "dns.h"
 #include "error.h"
 #include "rs_worker.h"
+#include "utils.h"
 #include "uv.h"
 
 /*
@@ -16,8 +18,11 @@
 static void
 hsk_rs_worker_log(hsk_rs_worker_t *ns, const char *fmt, ...);
 
+static uv_async_t *
+alloc_async(hsk_rs_worker_t *worker, uv_loop_t *loop, uv_async_cb callback);
+
 static void
-after_close_free(uv_handle_t *handle);
+free_async(uv_async_t *async);
 
 static void
 run_unbound_worker(void *arg);
@@ -30,6 +35,9 @@ after_resolve_onthread(void *data, int status, struct ub_result *result);
 
 static void
 after_resolve_async(uv_async_t *async);
+
+static void
+after_quit_async(uv_async_t *async);
 
 /*
  * Response Queue
@@ -124,13 +132,17 @@ hsk_rs_queue_enqueue(hsk_rs_queue_t *queue, hsk_rs_rsp_t *rsp) {
  * Response worker thread
  */
 int
-hsk_rs_worker_init(hsk_rs_worker_t *worker, uv_loop_t *loop, struct ub_ctx *ub) {
-  if (!worker || !loop || !ub)
+hsk_rs_worker_init(hsk_rs_worker_t *worker, uv_loop_t *loop, void *stop_data,
+                   void (*stop_callback)(void *)) {
+  if (!worker || !loop || !stop_callback)
     return HSK_EBADARGS;
 
   worker->rs_queue = NULL;
   worker->rs_async = NULL;
   worker->ub = NULL;
+  worker->cb_stop_data = stop_data;
+  worker->cb_stop_func = stop_callback;
+  worker->closing = false;
 
   worker->rs_queue = hsk_rs_queue_alloc();
   if (!worker->rs_queue) {
@@ -138,32 +150,13 @@ hsk_rs_worker_init(hsk_rs_worker_t *worker, uv_loop_t *loop, struct ub_ctx *ub) 
     goto fail;
   }
 
-  // Allocate this separately on the heap because uv_close() is asynchronous.
-  worker->rs_async = malloc(sizeof(uv_async_t));
-  if (!worker->rs_async) {
-    hsk_rs_worker_log(worker, "out of memory");
+  worker->rs_async = alloc_async(worker, loop, after_resolve_async);
+  if (!worker->rs_async)
     goto fail;
-  }
 
-  // Initialize the async and set data if successful.  (This also indicates to
-  // the cleanup logic that the async needs to be closed.)
-  worker->rs_async->data = NULL;
-  if (uv_async_init(loop, worker->rs_async, after_resolve_async)) {
-    hsk_rs_worker_log(worker, "failed to create libuv async event");
+  worker->rs_quit_async = alloc_async(worker, loop, after_quit_async);
+  if (!worker->rs_quit_async)
     goto fail;
-  }
-  worker->rs_async->data = (void *)worker;
-
-  // Start the worker thread.  Set unbound context to indicate that the thread
-  // is running.  If it starts, we can no longer write worker->ub until we sync
-  // up both threads again in _uninit().
-  worker->ub = ub;
-  if (uv_thread_create(&worker->rs_thread, run_unbound_worker, (void *)worker)) {
-    hsk_rs_worker_log(worker, "failed to create libuv worker thread");
-    // Failed to start, not running.
-    worker->ub = NULL;
-    goto fail;
-  }
 
   return HSK_SUCCESS;
 
@@ -178,38 +171,15 @@ hsk_rs_worker_uninit(hsk_rs_worker_t *worker) {
   // Note that _uninit() is also used to clean up a partially-constructed
   // worker if _init() fails.
 
-  if (worker->ub) {
-    // We need to tell the libunbound worker to exit - wake up the thread and
-    // clear ub on that thread.
-    //
-    // libunbound doesn't give us a good way to do this, the only way is to
-    // issue a dummy query and do this in the callback on the worker thread.
-    //
-    // On Unix, we could poll unbound's file descriptor manually with another
-    // file descriptor to allow us to wake the thread another way.  On Windows
-    // though, libunbound does not provide any access to its WSAEVENT to do the
-    // same thing; there's no other way to do this.
-    int rc = ub_resolve_async(worker->ub, ".", HSK_DNS_NS, HSK_DNS_IN,
-                              (void *)worker, after_resolve_shutdown, NULL);
-    if (rc != 0)
-      hsk_rs_worker_log(worker, "cannot shut down worker thread: %s\n", ub_strerror(rc));
-    else
-      uv_thread_join(&worker->rs_thread);
-  }
+  // Can't destroy while still closing.
+  assert(!worker->closing);
 
-  if (worker->rs_async) {
-    // If it was also initialized, close it and free asynchronously
-    if (worker->rs_async->data) {
-      worker->rs_async->data = NULL;
-      uv_close((uv_handle_t *)worker->rs_async, after_close_free);
-      worker->rs_async = NULL;
-    }
-    else {
-      // Wasn't initialized, just free memory
-      free(worker->rs_async);
-      worker->rs_async = NULL;
-    }
-  }
+  // Can't destroy while worker is still running.
+  assert(!worker->ub);
+
+  free_async(worker->rs_quit_async);
+
+  free_async(worker->rs_async);
 
   if (worker->rs_queue) {
     hsk_rs_queue_free(worker->rs_queue);
@@ -217,13 +187,76 @@ hsk_rs_worker_uninit(hsk_rs_worker_t *worker) {
   }
 }
 
+int
+hsk_rs_worker_open(hsk_rs_worker_t *worker, struct ub_ctx *ub) {
+  // Can't open if closing or already open.
+  assert(!worker->closing);
+  assert(!worker->ub);
+
+  // Start the worker thread.  Set unbound context to indicate that the thread
+  // is running.  If it starts, we can no longer write worker->ub from this
+  // thread.
+  worker->ub = ub;
+  if (uv_thread_create(&worker->rs_thread, run_unbound_worker, (void *)worker)) {
+    hsk_rs_worker_log(worker, "failed to create libuv worker thread");
+    // Failed to start, not running.
+    worker->ub = NULL;
+    return HSK_EFAILURE;
+  }
+
+  return HSK_SUCCESS;
+}
+
+bool
+hsk_rs_worker_is_open(hsk_rs_worker_t *worker) {
+  // If we're closing, the worker is open, don't read ub.  Otherwise, we're open
+  // if ub is set.
+  return !worker->closing || worker->ub;
+}
+
+void
+hsk_rs_worker_close(hsk_rs_worker_t *worker) {
+  // No effect if already closing
+  if (worker->closing)
+    return;
+
+  // Must be open
+  assert(worker->ub);
+
+  // Can't read worker->ub any more from the main thread once we tell the thread
+  // to close.
+  worker->closing = true;
+
+  // We need to tell the libunbound worker to exit - wake up the thread and
+  // clear ub on that thread.
+  //
+  // libunbound doesn't give us a good way to do this, the only way is to
+  // issue a dummy query and do this in the callback on the worker thread.
+  //
+  // This works whether the request is successful or not.  As long as the
+  // authoritative server initialized, it'll complete quickly (even if it could
+  // not reach any peers).  If the authoritative server did not initialize, it
+  // will unfortunately wait for a timeout.
+  //
+  // On Unix, we could poll unbound's file descriptor manually with another
+  // file descriptor to allow us to wake the thread another way.  On Windows
+  // though, libunbound does not provide any access to its WSAEVENT to do the
+  // same thing; there's no other way to do this.
+  hsk_rs_worker_log(worker, "stopping libunbound worker...\n");
+  int rc = ub_resolve_async(worker->ub, ".", HSK_DNS_NS, HSK_DNS_IN,
+                            (void *)worker, after_resolve_shutdown, NULL);
+  if (rc != 0)
+    hsk_rs_worker_log(worker, "cannot stop worker thread: %s\n", ub_strerror(rc));
+}
+
 hsk_rs_worker_t *
-hsk_rs_worker_alloc(uv_loop_t *loop, struct ub_ctx *ub) {
+hsk_rs_worker_alloc(uv_loop_t *loop, void *stop_data,
+                    void (*stop_callback)(void *)) {
   hsk_rs_worker_t *worker = malloc(sizeof(hsk_rs_worker_t));
   if (!worker)
     return NULL;
 
-  if (hsk_rs_worker_init(worker, loop, ub) != HSK_SUCCESS) {
+  if (hsk_rs_worker_init(worker, loop, stop_data, stop_callback) != HSK_SUCCESS) {
     free(worker);
     return NULL;
   }
@@ -244,6 +277,10 @@ hsk_rs_worker_resolve(hsk_rs_worker_t *worker, char *name, int rrtype,
                       int rrclass, void *data, ub_callback_type callback) {
   if (!callback)
     return HSK_EBADARGS;
+
+  // Can't resolve when closing or not open
+  if (worker->closing || !worker->ub)
+    return HSK_EFAILURE;
 
   // Hold the callback data/func in a response object.  When the results come
   // in, we'll fill in the rest of this object and add it to the result queue.
@@ -274,9 +311,33 @@ hsk_rs_worker_log(hsk_rs_worker_t *worker, const char *fmt, ...) {
   va_end(args);
 }
 
+static uv_async_t *
+alloc_async(hsk_rs_worker_t *worker, uv_loop_t *loop, uv_async_cb callback) {
+  uv_async_t *async = malloc(sizeof(uv_async_t));
+  if (!async) {
+    hsk_rs_worker_log(worker, "out of memory");
+    return NULL;
+  }
+  async->data = NULL;
+
+  // Initialize the async
+  if (uv_async_init(loop, async, callback)) {
+    hsk_rs_worker_log(worker, "failed to create libuv async event");
+    free(async);
+    return NULL;
+  }
+
+  async->data = (void *)worker;
+
+  return async;
+}
+
 static void
-after_close_free(uv_handle_t *handle) {
-  free(handle);
+free_async(uv_async_t *async) {
+  if(async) {
+    async->data = NULL;
+    hsk_uv_close_free((uv_handle_t *)async);
+  }
 }
 
 static void
@@ -286,6 +347,8 @@ run_unbound_worker(void *arg) {
   while(worker->ub) {
     ub_wait(worker->ub);
   }
+
+  uv_async_send(worker->rs_quit_async);
 }
 
 static void
@@ -296,8 +359,9 @@ after_resolve_shutdown(void *data, int status, struct ub_result *result) {
 
   // Clear this to stop the worker event loop.  This is safe because we've
   // synced up both threads to ensure they're not reading this - the main thread
-  // won't read it any more at all (it's just going to wait for the worker to
-  // exit with a _join()), and we're inside a ub_wait() on the worker thread.
+  // won't read it any more at all (it's waiting for the worker thread to exit
+  // after _close() was called), and we're inside a ub_wait() on the worker
+  // thread.
   worker->ub = NULL;
 }
 
@@ -325,10 +389,10 @@ after_resolve_onthread(void *data, int status, struct ub_result *result) {
 
 static void
 after_resolve_async(uv_async_t *async) {
-  hsk_rs_worker_t *worker = async->data;
+  hsk_rs_worker_t *worker = (hsk_rs_worker_t *)async->data;
 
   // Since uv_close() is async, it might be possible to process this event after
-  // the worker is shut down but before the async is closed.
+  // the worker is destroyed but before the async is closed.
   if(!worker)
     return;
 
@@ -344,4 +408,20 @@ after_resolve_async(uv_async_t *async) {
 
     rsp = hsk_rs_queue_dequeue(worker->rs_queue);
   }
+}
+
+static void
+after_quit_async(uv_async_t *async) {
+  hsk_rs_worker_t *worker = (hsk_rs_worker_t *)async->data;
+
+  // Should never get this after worker is destroyed, the worker can't be
+  // destroyed until _close() completes.
+  assert(worker);
+
+  worker->closing = false;
+
+  hsk_rs_worker_log(worker, "libunbound worker stopped\n");
+
+  // worker may be freed by this callback.
+  worker->cb_stop_func(worker->cb_stop_data);
 }

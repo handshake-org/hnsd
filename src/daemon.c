@@ -16,6 +16,7 @@
 #include "pool.h"
 #include "ns.h"
 #include "rs.h"
+#include "signals.h"
 #include "uv.h"
 #include "platform-net.h"
 
@@ -367,6 +368,206 @@ print_identity(const uint8_t *key) {
 }
 
 /*
+ * Daemon
+ */
+typedef struct {
+  hsk_signals_t *signals;
+  hsk_pool_t *pool;
+  hsk_ns_t *ns;
+  hsk_rs_t *rs;
+} hsk_daemon_t;
+
+static void
+hsk_daemon_after_close(void *data);
+static void
+hsk_daemon_signal_shutdown(void *data);
+
+int
+hsk_daemon_init(hsk_daemon_t *daemon, uv_loop_t *loop, hsk_options_t *opt) {
+  daemon->signals = NULL;
+  daemon->pool = NULL;
+  daemon->ns = NULL;
+  daemon->rs = NULL;
+
+  int rc = HSK_SUCCESS;
+
+  daemon->signals = hsk_signals_alloc(loop, (void *)daemon,
+                                      hsk_daemon_signal_shutdown);
+
+  if (!daemon->signals) {
+    fprintf(stderr, "failed initializing signal handlers\n");
+    rc = HSK_EFAILURE;
+    goto fail;
+  }
+
+  daemon->pool = hsk_pool_alloc(loop);
+
+  if (!daemon->pool) {
+    fprintf(stderr, "failed initializing pool\n");
+    rc = HSK_ENOMEM;
+    goto fail;
+  }
+
+  if (opt->identity_key) {
+    if (!hsk_pool_set_key(daemon->pool, opt->identity_key)) {
+      fprintf(stderr, "failed setting identity key\n");
+      rc = HSK_EFAILURE;
+      goto fail;
+    }
+  }
+
+  if (!hsk_pool_set_size(daemon->pool, opt->pool_size)) {
+    fprintf(stderr, "failed setting pool size\n");
+    rc = HSK_EFAILURE;
+    goto fail;
+  }
+
+  if (!hsk_pool_set_seeds(daemon->pool, opt->seeds)) {
+    fprintf(stderr, "failed adding seeds\n");
+    rc = HSK_EFAILURE;
+    goto fail;
+  }
+
+  daemon->ns = hsk_ns_alloc(loop, daemon->pool);
+
+  if (!daemon->ns) {
+    fprintf(stderr, "failed initializing ns\n");
+    rc = HSK_ENOMEM;
+    goto fail;
+  }
+
+  if (!hsk_ns_set_ip(daemon->ns, opt->ns_ip)) {
+    fprintf(stderr, "failed setting ip\n");
+    rc = HSK_EFAILURE;
+    goto fail;
+  }
+
+  if (opt->identity_key) {
+    if (!hsk_ns_set_key(daemon->ns, opt->identity_key)) {
+      fprintf(stderr, "failed setting identity key\n");
+      rc = HSK_EFAILURE;
+      goto fail;
+    }
+  }
+
+  daemon->rs = hsk_rs_alloc(loop, opt->ns_host);
+
+  if (!daemon->rs) {
+    fprintf(stderr, "failed initializing rns\n");
+    rc = HSK_ENOMEM;
+    goto fail;
+  }
+
+  if (opt->rs_config) {
+    if (!hsk_rs_set_config(daemon->rs, opt->rs_config)) {
+      fprintf(stderr, "failed setting rs config\n");
+      rc = HSK_EFAILURE;
+      goto fail;
+    }
+  }
+
+  if (opt->identity_key) {
+    if (!hsk_rs_set_key(daemon->rs, opt->identity_key)) {
+      fprintf(stderr, "failed setting identity key\n");
+      rc = HSK_EFAILURE;
+      goto fail;
+    }
+  }
+
+  return HSK_SUCCESS;
+
+fail:
+  hsk_daemon_after_close((void *)daemon);
+  return rc;
+}
+
+int
+hsk_daemon_open(hsk_daemon_t *daemon, hsk_options_t *opt) {
+  int rc = HSK_SUCCESS;
+
+  rc = hsk_pool_open(daemon->pool);
+
+  if (rc != HSK_SUCCESS) {
+    fprintf(stderr, "failed opening pool: %s\n", hsk_strerror(rc));
+    return rc;
+  }
+
+  rc = hsk_ns_open(daemon->ns, opt->ns_host);
+
+  if (rc != HSK_SUCCESS) {
+    fprintf(stderr, "failed opening ns: %s\n", hsk_strerror(rc));
+    return rc;
+  }
+
+  rc = hsk_rs_open(daemon->rs, opt->rs_host);
+
+  if (rc != HSK_SUCCESS) {
+    fprintf(stderr, "failed opening rns: %s\n", hsk_strerror(rc));
+    return rc;
+  }
+
+  return HSK_SUCCESS;
+}
+
+// After hsk_daemon_init() is called (even if it fails), test if the daemon has
+// been destroyed.
+bool
+hsk_daemon_destroyed(hsk_daemon_t *daemon) {
+  // signals is created first, so just check that.
+  return !daemon->signals;
+}
+
+void
+hsk_daemon_close(hsk_daemon_t *daemon) {
+  // If the daemon has already been destroyed, do nothing.
+  if (hsk_daemon_destroyed(daemon))
+    return;
+
+  // Stop the recursive nameserver to shut down.  When this completes, the
+  // daemon will be destroyed.
+  //
+  // If the close completes asynchronously, this could be called more than once
+  // while the close is occurring, which has no effect.
+  if (daemon->rs)
+    hsk_rs_close(daemon->rs, (void *)daemon, hsk_daemon_after_close);
+  else {
+    // The recursive nameserver was never created, destroy now.
+    hsk_daemon_after_close((void *)daemon);
+  }
+}
+
+static void
+hsk_daemon_after_close(void *data) {
+  hsk_daemon_t *daemon = (hsk_daemon_t *)data;
+
+  if (daemon->rs) {
+    hsk_rs_free(daemon->rs);
+    daemon->rs = NULL;
+  }
+
+  if (daemon->ns) {
+    hsk_ns_destroy(daemon->ns);
+    daemon->ns = NULL;
+  }
+
+  if (daemon->pool) {
+    hsk_pool_destroy(daemon->pool);
+    daemon->pool = NULL;
+  }
+
+  if (daemon->signals) {
+    hsk_signals_free(daemon->signals);
+    daemon->signals = NULL;
+  }
+}
+
+static void
+hsk_daemon_signal_shutdown(void *data) {
+  hsk_daemon_t *daemon = (hsk_daemon_t *)data;
+  hsk_daemon_close(daemon);
+}
+
+/*
  * Main
  */
 
@@ -379,9 +580,7 @@ main(int argc, char **argv) {
 
   int rc = HSK_SUCCESS;
   uv_loop_t *loop = NULL;
-  hsk_pool_t *pool = NULL;
-  hsk_ns_t *ns = NULL;
-  hsk_rs_t *rs = NULL;
+  hsk_daemon_t daemon;
 
   if (opt.identity_key) {
     if (!print_identity(opt.identity_key)) {
@@ -399,98 +598,15 @@ main(int argc, char **argv) {
     goto done;
   }
 
-  pool = hsk_pool_alloc(loop);
-
-  if (!pool) {
-    fprintf(stderr, "failed initializing pool\n");
-    rc = HSK_ENOMEM;
-    goto done;
-  }
-
-  if (opt.identity_key) {
-    if (!hsk_pool_set_key(pool, opt.identity_key)) {
-      fprintf(stderr, "failed setting identity key\n");
-      rc = HSK_EFAILURE;
-      goto done;
-    }
-  }
-
-  if (!hsk_pool_set_size(pool, opt.pool_size)) {
-    fprintf(stderr, "failed setting pool size\n");
-    rc = HSK_EFAILURE;
-    goto done;
-  }
-
-  if (!hsk_pool_set_seeds(pool, opt.seeds)) {
-    fprintf(stderr, "failed adding seeds\n");
-    rc = HSK_EFAILURE;
-    goto done;
-  }
-
-  ns = hsk_ns_alloc(loop, pool);
-
-  if (!ns) {
-    fprintf(stderr, "failed initializing ns\n");
-    rc = HSK_ENOMEM;
-    goto done;
-  }
-
-  if (!hsk_ns_set_ip(ns, opt.ns_ip)) {
-    fprintf(stderr, "failed setting ip\n");
-    rc = HSK_EFAILURE;
-    goto done;
-  }
-
-  if (opt.identity_key) {
-    if (!hsk_ns_set_key(ns, opt.identity_key)) {
-      fprintf(stderr, "failed setting identity key\n");
-      rc = HSK_EFAILURE;
-      goto done;
-    }
-  }
-
-  rs = hsk_rs_alloc(loop, opt.ns_host);
-
-  if (!rs) {
-    fprintf(stderr, "failed initializing rns\n");
-    rc = HSK_ENOMEM;
-    goto done;
-  }
-
-  if (opt.rs_config) {
-    if (!hsk_rs_set_config(rs, opt.rs_config)) {
-      fprintf(stderr, "failed setting rs config\n");
-      rc = HSK_EFAILURE;
-      goto done;
-    }
-  }
-
-  if (opt.identity_key) {
-    if (!hsk_rs_set_key(rs, opt.identity_key)) {
-      fprintf(stderr, "failed setting identity key\n");
-      rc = HSK_EFAILURE;
-      goto done;
-    }
-  }
-
-  rc = hsk_pool_open(pool);
-
+  rc = hsk_daemon_init(&daemon, loop, &opt);
   if (rc != HSK_SUCCESS) {
-    fprintf(stderr, "failed opening pool: %s\n", hsk_strerror(rc));
+    fprintf(stderr, "failed initializing daemon: %s\n", hsk_strerror(rc));
     goto done;
   }
 
-  rc = hsk_ns_open(ns, opt.ns_host);
-
+  rc = hsk_daemon_open(&daemon, &opt);
   if (rc != HSK_SUCCESS) {
-    fprintf(stderr, "failed opening ns: %s\n", hsk_strerror(rc));
-    goto done;
-  }
-
-  rc = hsk_rs_open(rs, opt.rs_host);
-
-  if (rc != HSK_SUCCESS) {
-    fprintf(stderr, "failed opening rns: %s\n", hsk_strerror(rc));
+    fprintf(stderr, "failed starting daemon: %s\n", hsk_strerror(rc));
     goto done;
   }
 
@@ -505,17 +621,15 @@ main(int argc, char **argv) {
   }
 
 done:
-  if (rs)
-    hsk_rs_destroy(rs);
+  if (loop) {
+    if (!hsk_daemon_destroyed(&daemon)) {
+      hsk_daemon_close(&daemon);
+      // Run the event loop until the potentially-asynchronous close completes.
+      uv_run(loop, UV_RUN_DEFAULT);
+    }
 
-  if (ns)
-    hsk_ns_destroy(ns);
-
-  if (pool)
-    hsk_pool_destroy(pool);
-
-  if (loop)
     uv_loop_close(loop);
+  }
 
   return rc;
 }
