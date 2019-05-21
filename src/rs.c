@@ -70,9 +70,6 @@ after_recv(
 static void
 after_resolve(void *data, int status, struct ub_result *result);
 
-static void
-after_close(uv_handle_t *handle);
-
 /*
  * Recursive NS
  */
@@ -101,7 +98,7 @@ hsk_rs_init(hsk_rs_t *ns, const uv_loop_t *loop, const struct sockaddr *stub) {
 
   ns->loop = (uv_loop_t *)loop;
   ns->ub = ub;
-  ns->socket.data = (void *)ns;
+  ns->socket = NULL;
   ns->rs_worker = NULL;
   ns->ec = ec;
   ns->config = NULL;
@@ -111,7 +108,6 @@ hsk_rs_init(hsk_rs_t *ns, const uv_loop_t *loop, const struct sockaddr *stub) {
   ns->key = NULL;
   memset(ns->pubkey, 0x00, sizeof(ns->pubkey));
   memset(ns->read_buffer, 0x00, sizeof(ns->read_buffer));
-  ns->bound = false;
   ns->receiving = false;
   ns->stop_callback = NULL;
 
@@ -141,8 +137,6 @@ void
 hsk_rs_uninit(hsk_rs_t *ns) {
   if (!ns)
     return;
-
-  ns->socket.data = NULL;
 
   if (ns->ec) {
     hsk_ec_free(ns->ec);
@@ -262,25 +256,27 @@ hsk_rs_open(hsk_rs_t *ns, const struct sockaddr *addr) {
   if (!hsk_rs_inject_options(ns))
     return HSK_EFAILURE;
 
-  if (uv_udp_init(ns->loop, &ns->socket) != 0)
+  ns->socket = malloc(sizeof(uv_udp_t));
+  if (!ns->socket)
+    return HSK_ENOMEM;
+
+  if (uv_udp_init(ns->loop, ns->socket) != 0)
     return HSK_EFAILURE;
 
-  ns->socket.data = (void *)ns;
+  ns->socket->data = (void *)ns;
 
-  if (uv_udp_bind(&ns->socket, addr, 0) != 0)
+  if (uv_udp_bind(ns->socket, addr, 0) != 0)
     return HSK_EFAILURE;
-
-  ns->bound = true;
 
   int value = sizeof(ns->read_buffer);
 
-  if (uv_send_buffer_size((uv_handle_t *)&ns->socket, &value) != 0)
+  if (uv_send_buffer_size((uv_handle_t *)ns->socket, &value) != 0)
     return HSK_EFAILURE;
 
-  if (uv_recv_buffer_size((uv_handle_t *)&ns->socket, &value) != 0)
+  if (uv_recv_buffer_size((uv_handle_t *)ns->socket, &value) != 0)
     return HSK_EFAILURE;
 
-  if (uv_udp_recv_start(&ns->socket, alloc_buffer, after_recv) != 0)
+  if (uv_udp_recv_start(ns->socket, alloc_buffer, after_recv) != 0)
     return HSK_EFAILURE;
 
   ns->receiving = true;
@@ -517,6 +513,11 @@ hsk_rs_send(
   hsk_send_data_t *sd = NULL;
   uv_udp_send_t *req = NULL;
 
+  if (!ns->socket) {
+    rc = HSK_EFAILURE;
+    goto fail;
+  }
+
   sd = (hsk_send_data_t *)malloc(sizeof(hsk_send_data_t));
 
   if (!sd) {
@@ -541,7 +542,7 @@ hsk_rs_send(
     { .base = (char *)data, .len = data_len }
   };
 
-  int status = uv_udp_send(req, &ns->socket, bufs, 1, addr, after_send);
+  int status = uv_udp_send(req, ns->socket, bufs, 1, addr, after_send);
 
   if (status != 0) {
     hsk_rs_log(ns, "failed sending: %s\n", uv_strerror(status));
@@ -592,16 +593,15 @@ after_worker_stop(void *data) {
   }
 
   if (ns->receiving) {
-    uv_udp_recv_stop(&ns->socket);
+    uv_udp_recv_stop(ns->socket);
     ns->receiving = false;
   }
 
-  if (ns->bound) {
-    uv_close((uv_handle_t *)&ns->socket, after_close);
-    ns->bound = false;
+  if (ns->socket) {
+    hsk_uv_close_free((uv_handle_t *)ns->socket);
+    ns->socket->data = NULL;
+    ns->socket = NULL;
   }
-
-  ns->socket.data = NULL;
 
   if (ns->ub) {
     ub_ctx_delete(ns->ub);
@@ -683,6 +683,3 @@ after_resolve(void *data, int status, struct ub_result *result) {
   hsk_dns_req_free(req);
   ub_resolve_free(result);
 }
-
-static void
-after_close(uv_handle_t *handle) {}

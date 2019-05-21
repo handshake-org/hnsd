@@ -18,7 +18,7 @@
 typedef struct {
   uv_loop_t *loop;
   struct ub_ctx *ub;
-  uv_udp_t socket;
+  uv_udp_t *socket;
   hsk_rs_worker_t *rs_worker;
   hsk_ec_t *ec;
   char *config;
@@ -28,7 +28,6 @@ typedef struct {
   uint8_t *key;
   uint8_t pubkey[33];
   uint8_t read_buffer[4096];
-  bool bound;
   bool receiving;
   void *stop_data;
   void (*stop_callback)(void *);

@@ -25,14 +25,13 @@ typedef struct {
   hsk_pool_t *pool;
   hsk_addr_t ip_;
   hsk_addr_t *ip;
-  uv_udp_t socket;
+  uv_udp_t *socket;
   hsk_ec_t *ec;
   hsk_cache_t cache;
   uint8_t key_[32];
   uint8_t *key;
   uint8_t pubkey[33];
   uint8_t read_buffer[HSK_UDP_BUFFER];
-  bool bound;
   bool receiving;
 } hsk_ns_t;
 

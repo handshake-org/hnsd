@@ -94,7 +94,7 @@ typedef struct hsk_pool_s {
   hsk_timedata_t td;
   hsk_chain_t chain;
   hsk_addrman_t am;
-  uv_timer_t timer;
+  uv_timer_t *timer;
   uint64_t peer_id;
   hsk_map_t peers;
   hsk_peer_t *head;
