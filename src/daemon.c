@@ -578,6 +578,12 @@ main(int argc, char **argv) {
 
   parse_arg(argc, argv, &opt);
 
+#ifndef _WIN32
+  // Ignore SIGPIPE, remotely closed sockets are handled and shouldn't kill
+  // hnsd.  (This happens a lot under Valgrind but can happen normally too.)
+  signal(SIGPIPE, SIG_IGN);
+#endif
+
   int rc = HSK_SUCCESS;
   uv_loop_t *loop = NULL;
   hsk_daemon_t daemon;

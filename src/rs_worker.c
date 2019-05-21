@@ -16,6 +16,9 @@
  * Prototypes
  */
 static void
+hsk_rs_pending_log(hsk_rs_pending_t *pending, const char *fmt, ...);
+
+static void
 hsk_rs_worker_log(hsk_rs_worker_t *ns, const char *fmt, ...);
 
 static uv_async_t *
@@ -26,9 +29,6 @@ free_async(uv_async_t *async);
 
 static void
 run_unbound_worker(void *arg);
-
-static void
-after_resolve_shutdown(void *data, int status, struct ub_result *result);
 
 static void
 after_resolve_onthread(void *data, int status, struct ub_result *result);
@@ -57,6 +57,11 @@ hsk_rs_queue_uninit(hsk_rs_queue_t *queue) {
   hsk_rs_rsp_t *current = queue->head;
   while (current) {
     hsk_rs_rsp_t *next = current->next;
+
+    // For responses still in the queue, call them now to ensure they don't
+    // leak memory
+    current->cb_func(current->cb_data, current->status, current->result);
+
     free(current);
     current = next;
   }
@@ -97,9 +102,12 @@ hsk_rs_queue_dequeue(hsk_rs_queue_t *queue) {
   if (oldest) {
     queue->head = oldest->next;
     oldest->next = NULL;
-    // If this was the only queued request, clear tail too
-    if(queue->tail == oldest)
+    if(queue->head)
+      queue->head->prev = NULL; // Removed the prior request
+    else {
+      assert(queue->tail == oldest); // There was only one request
       queue->tail = NULL;
+    }
   }
 
   uv_mutex_unlock(&queue->mutex);
@@ -122,10 +130,179 @@ hsk_rs_queue_enqueue(hsk_rs_queue_t *queue, hsk_rs_rsp_t *rsp) {
   else {
     // There are requests queued already, add this one to the tail
     queue->tail->next = rsp;
+    rsp->prev = queue->tail;
     queue->tail = rsp;
   }
 
   uv_mutex_unlock(&queue->mutex);
+}
+
+/*
+ * Pending Requests
+ */
+int
+hsk_rs_pending_init(hsk_rs_pending_t *pending) {
+  if (uv_mutex_init(&pending->mutex))
+    return HSK_EFAILURE;
+  if (uv_cond_init(&pending->cond)) {
+    uv_mutex_destroy(&pending->mutex);
+    return HSK_EFAILURE;
+  }
+  pending->head = NULL;
+  pending->tail = NULL;
+  pending->exit = false;
+
+  return HSK_SUCCESS;
+}
+
+void
+hsk_rs_pending_uninit(hsk_rs_pending_t *pending) {
+  // There shouldn't be any outstanding requests, they would have been discarded
+  // by _reset()
+  assert(!pending->head);
+
+  uv_cond_destroy(&pending->cond);
+  uv_mutex_destroy(&pending->mutex);
+}
+
+hsk_rs_pending_t *
+hsk_rs_pending_alloc() {
+  hsk_rs_pending_t *pending = malloc(sizeof(hsk_rs_pending_t));
+  if (!pending)
+    return NULL;
+
+  if (hsk_rs_pending_init(pending) != HSK_SUCCESS) {
+    free(pending);
+    return NULL;
+  }
+
+  return pending;
+}
+
+void
+hsk_rs_pending_free(hsk_rs_pending_t *pending) {
+  if(pending) {
+    hsk_rs_pending_uninit(pending);
+    free(pending);
+  }
+}
+
+// Enqueue a pending request
+void
+hsk_rs_pending_enqueue(hsk_rs_pending_t *pending, hsk_rs_rsp_t *rsp) {
+  uv_mutex_lock(&pending->mutex);
+
+  if (!pending->tail) {
+    assert(!pending->head);   // Invariant - set and cleared together
+    pending->head = rsp;
+    pending->tail = rsp;
+  }
+  else {
+    pending->tail->next = rsp;
+    rsp->prev = pending->tail;
+    pending->tail = rsp;
+  }
+
+  uv_cond_signal(&pending->cond);
+  uv_mutex_unlock(&pending->mutex);
+}
+
+// Remove a request that has received a response
+void
+hsk_rs_pending_remove(hsk_rs_pending_t *pending, hsk_rs_rsp_t *rsp) {
+  uv_mutex_lock(&pending->mutex);
+
+  // rsp must be in this queue, which means we must have at least one request
+  // (rsp->prev and rsp->next could be NULL though if it is the only request)
+  assert(pending->head);
+  assert(pending->tail);
+
+  if(rsp->prev) {
+    rsp->prev->next = rsp->next;
+  }
+  else {
+    assert(pending->head == rsp);   // head of list
+    pending->head = rsp->next;  // NULL if this is the only request
+  }
+
+  if(rsp->next) {
+    rsp->next->prev = rsp->prev;
+  }
+  else {
+    assert(pending->tail == rsp);   // tail of list
+    pending->tail = rsp->prev;
+  }
+
+  rsp->next = rsp->prev = NULL;
+
+  uv_mutex_unlock(&pending->mutex);
+}
+
+// Signal the worker thread to exit.  Cancels all outstanding requests to
+// libunbound.
+void
+hsk_rs_pending_exit(hsk_rs_pending_t *pending) {
+  uv_mutex_lock(&pending->mutex);
+  pending->exit = true;
+
+  // The worker thread won't be able to exit until ub_wait() returns, which is
+  // after all outstanding requests are resolved.  In the worst case, this could
+  // take a few minutes to time out if nameservers are not responding (this is
+  // not configurable in libunbound).
+  //
+  // We _could_ attempt to cancel the outstanding requests here, but then
+  // ub_wait() seens to _never_ return, even if we issue another request to try
+  // to kick it out of its wait.  libunbound might be leaking request counts
+  // after cancelling a request.  Instead, just trace the outstanding requests.
+  for(hsk_rs_rsp_t *current = pending->head; current; current = current->next) {
+    hsk_rs_pending_log(pending, "still pending: %d\n", current->async_id);
+  }
+
+  uv_cond_signal(&pending->cond);
+  uv_mutex_unlock(&pending->mutex);
+}
+
+// Check whether worker has been signaled to exit (including if it has exited)
+bool
+hsk_rs_pending_exiting(hsk_rs_pending_t *pending) {
+  uv_mutex_lock(&pending->mutex);
+  bool ret = pending->exit;
+  uv_mutex_unlock(&pending->mutex);
+  return ret;
+}
+
+// Reset after the worker thread has returned - clears exit flag and discards
+// any remaining requests
+void
+hsk_rs_pending_reset(hsk_rs_pending_t *pending) {
+  uv_mutex_lock(&pending->mutex);
+  pending->exit = false;
+
+  // There shouldn't be anything left at this point; _wait() does not indicate
+  // to exit until there are no requests left _and_ exit is signaled.
+  assert(!pending->head);
+  assert(!pending->tail);
+
+  uv_mutex_unlock(&pending->mutex);
+}
+
+// Wait until there is a pending request (returns true) or worker is signaled to exit
+// (returns false)
+bool
+hsk_rs_pending_wait(hsk_rs_pending_t *pending) {
+  uv_mutex_lock(&pending->mutex);
+  while(!pending->head && !pending->exit) {
+    // Wait until cond is signaled (count is incremented or thread is told to
+    // exit)
+    uv_cond_wait(&pending->cond, &pending->mutex);
+  }
+  // Return 'true' (process requests) if there is at least one outstanding
+  // request, even if we are also signaled to exit.  We can't exit if a request
+  // couldn't be canceled but hasn't been delivered yet; we would leak the
+  // response object.
+  bool ret = pending->head;
+  uv_mutex_unlock(&pending->mutex);
+  return ret;
 }
 
 /*
@@ -138,15 +315,21 @@ hsk_rs_worker_init(hsk_rs_worker_t *worker, uv_loop_t *loop, void *stop_data,
     return HSK_EBADARGS;
 
   worker->rs_queue = NULL;
+  worker->rs_pending = NULL;
   worker->rs_async = NULL;
   worker->ub = NULL;
   worker->cb_stop_data = stop_data;
   worker->cb_stop_func = stop_callback;
-  worker->closing = false;
 
   worker->rs_queue = hsk_rs_queue_alloc();
   if (!worker->rs_queue) {
     hsk_rs_worker_log(worker, "failed to create response queue");
+    goto fail;
+  }
+
+  worker->rs_pending = hsk_rs_pending_alloc();
+  if (!worker->rs_pending) {
+    hsk_rs_worker_log(worker, "failed to create pending request queue");
     goto fail;
   }
 
@@ -172,7 +355,7 @@ hsk_rs_worker_uninit(hsk_rs_worker_t *worker) {
   // worker if _init() fails.
 
   // Can't destroy while still closing.
-  assert(!worker->closing);
+  assert(!worker->rs_pending || !hsk_rs_pending_exiting(worker->rs_pending));
 
   // Can't destroy while worker is still running.
   assert(!worker->ub);
@@ -180,6 +363,11 @@ hsk_rs_worker_uninit(hsk_rs_worker_t *worker) {
   free_async(worker->rs_quit_async);
 
   free_async(worker->rs_async);
+
+  if (worker->rs_pending) {
+    hsk_rs_pending_free(worker->rs_pending);
+    worker->rs_pending = NULL;
+  }
 
   if (worker->rs_queue) {
     hsk_rs_queue_free(worker->rs_queue);
@@ -190,7 +378,7 @@ hsk_rs_worker_uninit(hsk_rs_worker_t *worker) {
 int
 hsk_rs_worker_open(hsk_rs_worker_t *worker, struct ub_ctx *ub) {
   // Can't open if closing or already open.
-  assert(!worker->closing);
+  assert(!hsk_rs_pending_exiting(worker->rs_pending));
   assert(!worker->ub);
 
   // Start the worker thread.  Set unbound context to indicate that the thread
@@ -209,44 +397,27 @@ hsk_rs_worker_open(hsk_rs_worker_t *worker, struct ub_ctx *ub) {
 
 bool
 hsk_rs_worker_is_open(hsk_rs_worker_t *worker) {
-  // If we're closing, the worker is open, don't read ub.  Otherwise, we're open
-  // if ub is set.
-  return !worker->closing || worker->ub;
+  return worker->ub;
 }
 
 void
 hsk_rs_worker_close(hsk_rs_worker_t *worker) {
   // No effect if already closing
-  if (worker->closing)
+  if (hsk_rs_pending_exiting(worker->rs_pending))
     return;
 
   // Must be open
   assert(worker->ub);
 
-  // Can't read worker->ub any more from the main thread once we tell the thread
-  // to close.
-  worker->closing = true;
-
-  // We need to tell the libunbound worker to exit - wake up the thread and
-  // clear ub on that thread.
+  // We need to tell the libunbound worker to exit - wake it up by signaling
+  // the waitable count.
   //
-  // libunbound doesn't give us a good way to do this, the only way is to
-  // issue a dummy query and do this in the callback on the worker thread.
-  //
-  // This works whether the request is successful or not.  As long as the
-  // authoritative server initialized, it'll complete quickly (even if it could
-  // not reach any peers).  If the authoritative server did not initialize, it
-  // will unfortunately wait for a timeout.
-  //
-  // On Unix, we could poll unbound's file descriptor manually with another
-  // file descriptor to allow us to wake the thread another way.  On Windows
-  // though, libunbound does not provide any access to its WSAEVENT to do the
-  // same thing; there's no other way to do this.
+  // This allows the worker thread to exit if nothing is going on in libunbound.
+  // It could already be inside a ub_wait() though - if there are any ongoing
+  // requests, this attempts to cancel them.  ub_wait() returns when there are
+  // no more pending requests.
   hsk_rs_worker_log(worker, "stopping libunbound worker...\n");
-  int rc = ub_resolve_async(worker->ub, ".", HSK_DNS_NS, HSK_DNS_IN,
-                            (void *)worker, after_resolve_shutdown, NULL);
-  if (rc != 0)
-    hsk_rs_worker_log(worker, "cannot stop worker thread: %s\n", ub_strerror(rc));
+  hsk_rs_pending_exit(worker->rs_pending);
 }
 
 hsk_rs_worker_t *
@@ -279,26 +450,45 @@ hsk_rs_worker_resolve(hsk_rs_worker_t *worker, char *name, int rrtype,
     return HSK_EBADARGS;
 
   // Can't resolve when closing or not open
-  if (worker->closing || !worker->ub)
+  if (hsk_rs_pending_exiting(worker->rs_pending) || !worker->ub)
     return HSK_EFAILURE;
 
   // Hold the callback data/func in a response object.  When the results come
   // in, we'll fill in the rest of this object and add it to the result queue.
   hsk_rs_rsp_t *rsp = malloc(sizeof(hsk_rs_rsp_t));
-  rsp->next = NULL;
+  rsp->prev = rsp->next = NULL;
   rsp->cb_data = data;
   rsp->cb_func = callback;
   rsp->worker = worker;
+  rsp->async_id = 0;
+  rsp->result = NULL;
   rsp->status = 0;
 
+  // Enqueue before attempting to send; we have to do this before sending to
+  // avoid racing with the callback.
+  hsk_rs_pending_enqueue(worker->rs_pending, rsp);
+
   int rc = ub_resolve_async(worker->ub, name, rrtype, rrclass, (void *)rsp,
-                            after_resolve_onthread, NULL);
+                            after_resolve_onthread, &rsp->async_id);
   if (rc) {
+    // Remove the response since it couldn't be sent.
+    hsk_rs_pending_remove(worker->rs_pending, rsp);
     hsk_rs_worker_log(worker, "unbound error: %s\n", ub_strerror(rc));
     return HSK_EFAILURE;
   }
+  hsk_rs_worker_log(worker, "request %d: %s\n", rsp->async_id, name);
 
   return HSK_SUCCESS;
+}
+
+static void
+hsk_rs_pending_log(hsk_rs_pending_t *pending, const char *fmt, ...) {
+  printf("rs_pending: ");
+
+  va_list args;
+  va_start(args, fmt);
+  vprintf(fmt, args);
+  va_end(args);
 }
 
 static void
@@ -344,25 +534,19 @@ static void
 run_unbound_worker(void *arg) {
   hsk_rs_worker_t *worker = (hsk_rs_worker_t *)arg;
 
-  while(worker->ub) {
+  // Annoyingly, ub_wait() does not actually wait if there are no outstanding
+  // requests.  To prevent a busy-wait when there's no work to do, we have to
+  // keep track of the outstanding requests manually and use a condition
+  // variable to block on them.  (libunbound already knows the count, but it
+  // doesn't give us any access to it.)
+  while(hsk_rs_pending_wait(worker->rs_pending)) {
+    // Not modified while worker is running
+    assert(worker->ub);
     ub_wait(worker->ub);
   }
 
+  // hsk_rs_pending_wait() returned false; worker was signaled to exit.
   uv_async_send(worker->rs_quit_async);
-}
-
-static void
-after_resolve_shutdown(void *data, int status, struct ub_result *result) {
-  ub_resolve_free(result);
-
-  hsk_rs_worker_t *worker = (hsk_rs_worker_t *)data;
-
-  // Clear this to stop the worker event loop.  This is safe because we've
-  // synced up both threads to ensure they're not reading this - the main thread
-  // won't read it any more at all (it's waiting for the worker thread to exit
-  // after _close() was called), and we're inside a ub_wait() on the worker
-  // thread.
-  worker->ub = NULL;
 }
 
 // Handle a resolve result on the libunbound worker thread, dispatch back to the
@@ -374,6 +558,9 @@ after_resolve_onthread(void *data, int status, struct ub_result *result) {
 
   rsp->result = result;
   rsp->status = status;
+
+  // This request finished, remove it from the pending queue.
+  hsk_rs_pending_remove(worker->rs_pending, rsp);
 
   // Enqueue the response.  This is safe to do on the worker thread:
   // - The worker->rs_queue pointer is not modified after initialization until
@@ -418,7 +605,11 @@ after_quit_async(uv_async_t *async) {
   // destroyed until _close() completes.
   assert(worker);
 
-  worker->closing = false;
+  uv_thread_join(&worker->rs_thread);
+
+  hsk_rs_pending_reset(worker->rs_pending);
+  // Worker has exited, could be opened again at this point
+  worker->ub = NULL;
 
   hsk_rs_worker_log(worker, "libunbound worker stopped\n");
 

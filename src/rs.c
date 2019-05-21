@@ -679,7 +679,11 @@ after_resolve(void *data, int status, struct ub_result *result) {
 
   assert(ns);
 
-  hsk_rs_respond(ns, req, status, result);
+  // If the request is aborted, result is NULL, we just need to free req in that
+  // case
+  if (result) {
+    hsk_rs_respond(ns, req, status, result);
+    ub_resolve_free(result);
+  }
   hsk_dns_req_free(req);
-  ub_resolve_free(result);
 }
