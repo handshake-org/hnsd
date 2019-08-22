@@ -2,20 +2,27 @@
 #define _HSK_HEADER_H
 
 #include <assert.h>
-#include <stdint.h>
 #include <stdbool.h>
+#include <stdint.h>
+#include <stdlib.h>
 
 typedef struct hsk_header_s {
-  uint32_t version;
-  uint8_t prev_block[32];
-  uint8_t merkle_root[32];
-  uint8_t witness_root[32];
-  uint8_t name_root[32];
-  uint8_t filter_root[32];
-  uint8_t reserved_root[32];
+  // Preheader.
+  uint32_t nonce;
   uint64_t time;
+  uint8_t prev_block[32];
+  uint8_t name_root[32];
+
+  // Subheader.
+  uint8_t extra_nonce[24];
+  uint8_t reserved_root[32];
+  uint8_t witness_root[32];
+  uint8_t merkle_root[32];
+  uint32_t version;
   uint32_t bits;
-  uint8_t nonce[32];
+
+  // Mask.
+  uint8_t mask[32];
 
   bool cache;
   uint8_t hash[32];
@@ -60,6 +67,36 @@ hsk_header_size(const hsk_header_t *hdr);
 
 int
 hsk_header_encode(const hsk_header_t *hdr, uint8_t *data);
+
+int
+hsk_header_pre_write(const hsk_header_t *hdr, uint8_t **data);
+
+int
+hsk_header_pre_size(const hsk_header_t *hdr);
+
+int
+hsk_header_pre_encode(const hsk_header_t *hdr, uint8_t *data);
+
+int
+hsk_header_sub_write(const hsk_header_t *hdr, uint8_t **data);
+
+int
+hsk_header_sub_size(const hsk_header_t *hdr);
+
+int
+hsk_header_sub_encode(const hsk_header_t *hdr, uint8_t *data);
+
+void
+hsk_header_sub_hash(const hsk_header_t *hdr, uint8_t *hash);
+
+void
+hsk_header_mask_hash(const hsk_header_t *hdr, uint8_t *hash);
+
+void
+hsk_header_commit_hash(const hsk_header_t *hdr, uint8_t *hash);
+
+void
+hsk_header_padding(const hsk_header_t *hdr, uint8_t *pad, size_t size);
 
 bool
 hsk_header_equal(hsk_header_t *a, hsk_header_t *b);

@@ -46,6 +46,24 @@ hsk_hash_blake160(const uint8_t *data, size_t data_len, uint8_t *hash) {
 }
 
 void
+hsk_hash_blake256(const uint8_t *data, size_t data_len, uint8_t *hash) {
+  assert(hash != NULL);
+  hsk_blake2b_ctx ctx;
+  assert(hsk_blake2b_init(&ctx, 32) == 0);
+  hsk_blake2b_update(&ctx, data, data_len);
+  assert(hsk_blake2b_final(&ctx, hash, 32) == 0);
+}
+
+void
+hsk_hash_blake512(const uint8_t *data, size_t data_len, uint8_t *hash) {
+  assert(hash != NULL);
+  hsk_blake2b_ctx ctx;
+  assert(hsk_blake2b_init(&ctx, 64) == 0);
+  hsk_blake2b_update(&ctx, data, data_len);
+  assert(hsk_blake2b_final(&ctx, hash, 64) == 0);
+}
+
+void
 hsk_hash_sha3(const uint8_t *data, size_t data_len, uint8_t *hash) {
   assert(hash != NULL);
   hsk_sha3_ctx ctx;
