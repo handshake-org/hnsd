@@ -1,5 +1,6 @@
 [Unit]
 Description=Handshake Name Resolution
+Documentation=man:hnsd(8)
 Documentation=https://handshake-org.github.io/
 DefaultDependencies=no
 After=systemd-sysusers.service systemd-networkd.service
