@@ -2800,6 +2800,8 @@ hsk_dns_label_decode_tlsa(const char *name, char *protocol, uint16_t *port) {
 
     if (word > 0xffff)
       return false;
+
+    s += 1;
   }
 
   if (port)
