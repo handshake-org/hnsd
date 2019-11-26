@@ -10,7 +10,6 @@
 #include "brontide.h"
 #include "chain.h"
 #include "constants.h"
-#include "cuckoo.h"
 #include "dns.h"
 #include "dnssec.h"
 #include "ec.h"
