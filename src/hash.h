@@ -21,6 +21,12 @@ void
 hsk_hash_blake160(const uint8_t *data, size_t data_len, uint8_t *hash);
 
 void
+hsk_hash_blake256(const uint8_t *data, size_t data_len, uint8_t *hash);
+
+void
+hsk_hash_blake512(const uint8_t *data, size_t data_len, uint8_t *hash);
+
+void
 hsk_hash_sha3(const uint8_t *data, size_t data_len, uint8_t *hash);
 
 void
