@@ -90,6 +90,23 @@ You're a Linux user so you probably already know what to do. Make sure you have
 git, autotools, libtool, and unbound installed via whatever package manager
 your OS uses.
 
+### Windows
+
+Windows builds are made natively with MSYS2 / MinGW.  This uses the MinGW
+libunbound and OpenSSL packages provided by MSYS2.
+
+1. Install MSYS2 from https://www.msys2.org - follow the instructions on that page
+2. Install dependencies - do one of the following in an MSYS2 shell
+   - x86_64: `pacman -S base-devel mingw-w64-x86_64-toolchain mingw-w64-x86_64-unbound mingw-w64-x86_64-crt-git`
+   - x86: `pacman -S base-devel mingw-w64-i686-toolchain mingw-w64-i686-unbound mingw-w64-i686-crt-git`
+3. (Optional) You can install git if you want to use it from the MSYS2 shell - `pacman -S git`
+   - Git for Windows works fine too but avoid mixing the two, they may not handle line endings the same way
+4. Then build normally from the MSYS2 shell.
+
+The Windows build will dynamically link to the MinGW libunbound and OpenSSL DLLs.
+You can run it from the MSYS2 shell, which sets PATH appropriately, copy those
+DLLs to the hnsd directory, etc.
+
 ## Cloning
 
 ``` sh

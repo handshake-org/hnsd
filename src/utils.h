@@ -5,6 +5,8 @@
 #include <stdbool.h>
 #include <stdlib.h>
 
+#include "uv.h"
+
 int64_t
 hsk_now(void);
 
@@ -51,4 +53,11 @@ hsk_hex_decode(const char *str, uint8_t *data);
 
 void
 hsk_to_lower(char *name);
+
+// Close and then free a libuv handle (with free()).
+// libuv specifically documents that the handle memory cannot be freed until the
+// async close callback is invoked, so this frees the handle in that callback.
+void
+hsk_uv_close_free(uv_handle_t *handle);
+
 #endif

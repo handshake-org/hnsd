@@ -108,7 +108,7 @@ static void
 after_write(uv_write_t *req, int status);
 
 static void
-after_read(uv_stream_t *stream, long int nread, const uv_buf_t *buf);
+after_read(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf);
 
 static void
 after_close(uv_handle_t *handle);
@@ -159,6 +159,7 @@ hsk_pool_init(hsk_pool_t *pool, const uv_loop_t *loop) {
   hsk_timedata_init(&pool->td);
   hsk_chain_init(&pool->chain, &pool->td);
   hsk_addrman_init(&pool->am, &pool->td);
+  pool->timer = NULL;
   pool->peer_id = 0;
   hsk_map_init_map(&pool->peers, hsk_addr_hash, hsk_addr_equal, NULL);
   pool->head = NULL;
@@ -310,12 +311,16 @@ hsk_pool_open(hsk_pool_t *pool) {
   if (!pool)
     return HSK_EBADARGS;
 
-  pool->timer.data = (void *)pool;
+  pool->timer = malloc(sizeof(uv_timer_t));
+  if (!pool->timer)
+    return HSK_ENOMEM;
 
-  if (uv_timer_init(pool->loop, &pool->timer) != 0)
+  pool->timer->data = (void *)pool;
+
+  if (uv_timer_init(pool->loop, pool->timer) != 0)
     return HSK_EFAILURE;
 
-  if (uv_timer_start(&pool->timer, after_timer, 3000, 3000) != 0)
+  if (uv_timer_start(pool->timer, after_timer, 3000, 3000) != 0)
     return HSK_EFAILURE;
 
   hsk_pool_log(pool, "pool opened (size=%u)\n", pool->max_size);
@@ -330,10 +335,11 @@ hsk_pool_close(hsk_pool_t *pool) {
   if (!pool)
     return HSK_EBADARGS;
 
-  if (uv_timer_stop(&pool->timer) != 0)
+  if (uv_timer_stop(pool->timer) != 0)
     return HSK_EFAILURE;
 
-  hsk_pool_uninit(pool);
+  hsk_uv_close_free((uv_handle_t*)pool->timer);
+  pool->timer = NULL;
 
   return HSK_SUCCESS;
 }
@@ -342,6 +348,12 @@ int
 hsk_pool_destroy(hsk_pool_t *pool) {
   if (!pool)
     return HSK_EBADARGS;
+
+  int rc = hsk_pool_close(pool);
+  if (rc != HSK_SUCCESS) {
+    hsk_pool_log(pool, "failed to close pool: %s\n", hsk_strerror(rc));
+    return rc;
+  }
 
   hsk_pool_free(pool);
 
@@ -1719,7 +1731,7 @@ alloc_buffer(uv_handle_t *handle, size_t size, uv_buf_t *buf) {
 }
 
 static void
-after_read(uv_stream_t *stream, long int nread, const uv_buf_t *buf) {
+after_read(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf) {
   hsk_peer_t *peer = (hsk_peer_t *)stream->data;
 
   if (!peer)

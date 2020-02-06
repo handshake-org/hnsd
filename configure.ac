@@ -152,6 +152,14 @@ AC_ARG_WITH([asm],
   [req_asm=$withval],
   [req_asm=auto])
 
+AC_ARG_WITH([unbound],
+  [AS_HELP_STRING(
+    [--with-unbound=path]
+    [Use libunbound installed at path. Default is to search system paths.]
+  )],
+  [libunbound_path=$withval],
+  [libunbound_path=yes])
+
 AC_CHECK_TYPES([__int128])
 
 AC_MSG_CHECKING([for __builtin_expect])
@@ -309,11 +317,41 @@ if test x"$use_external_asm" = x"yes"; then
     [Define this symbol if an external assembly implementation is used])
 fi
 
+dnl Find libunbound, and define LIB_UNBOUND/INC_UNBOUND for hnsd.
+dnl Don't add these to the default libs/includes, they're not needed by the
+dnl other targets.
+case $libunbound_path in
+  no)
+    AC_MSG_ERROR([libunbound is required])
+    ;;
+  yes)
+    AC_CHECK_LIB(unbound, ub_ctx_create, LIB_UNBOUND="-lunbound",
+      AC_MSG_ERROR([Unable to find libunbound]))
+    AC_CHECK_HEADER(unbound.h, INC_UNBOUND="",
+      AC_MSG_ERROR([Unable to found unbound.h]))
+    ;;
+  *)
+    LIB_UNBOUND="-L${libunbound_path}/lib -lunbound"
+    INC_UNBOUND="-I${libunbound_path}/include"
+    ;;
+esac
+AC_SUBST(LIB_UNBOUND, ${LIB_UNBOUND})
+AC_SUBST(INC_UNBOUND, ${INC_UNBOUND})
+
+dnl Platform-specific libraries
+case "${host_os}" in
+  mingw*)
+    AC_SUBST(LIB_WINBCRYPT, "-lbcrypt")
+    ;;
+esac
+
 AC_MSG_NOTICE([Using endomorphism optimizations: $use_endomorphism])
 AC_MSG_NOTICE([Using static precomputation: $use_precomp])
 AC_MSG_NOTICE([Using assembly optimizations: $set_asm])
 AC_MSG_NOTICE([Using field implementation: $set_field])
 AC_MSG_NOTICE([Using scalar implementation: $set_scalar])
+AC_MSG_NOTICE([Linker flags for libunbound: $LIB_UNBOUND])
+AC_MSG_NOTICE([Compiler flags for libunbound: $INC_UNBOUND])
 
 AM_CONDITIONAL(
   [HSK_USE_ECMULT_STATIC_PRECOMPUTATION],

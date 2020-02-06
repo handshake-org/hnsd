@@ -8,9 +8,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
-#include <arpa/inet.h>
-#include <netinet/in.h>
-
 #include <unbound.h>
 
 #include "addr.h"
@@ -19,6 +16,7 @@
 #include "dnssec.h"
 #include "ec.h"
 #include "error.h"
+#include "platform-net.h"
 #include "resource.h"
 #include "req.h"
 #include "rs.h"
@@ -55,6 +53,9 @@ static void
 alloc_buffer(uv_handle_t *handle, size_t size, uv_buf_t *buf);
 
 static void
+after_worker_stop(void *data);
+
+static void
 after_send(uv_udp_send_t *req, int status);
 
 static void
@@ -67,13 +68,7 @@ after_recv(
 );
 
 static void
-after_poll(uv_poll_t *handle, int status, int events);
-
-static void
 after_resolve(void *data, int status, struct ub_result *result);
-
-static void
-after_close(uv_handle_t *handle);
 
 /*
  * Recursive NS
@@ -103,8 +98,8 @@ hsk_rs_init(hsk_rs_t *ns, const uv_loop_t *loop, const struct sockaddr *stub) {
 
   ns->loop = (uv_loop_t *)loop;
   ns->ub = ub;
-  ns->socket.data = (void *)ns;
-  ns->poll.data = (void *)ns;
+  ns->socket = NULL;
+  ns->rs_worker = NULL;
   ns->ec = ec;
   ns->config = NULL;
   ns->stub = (struct sockaddr *)&ns->stub_;
@@ -113,9 +108,8 @@ hsk_rs_init(hsk_rs_t *ns, const uv_loop_t *loop, const struct sockaddr *stub) {
   ns->key = NULL;
   memset(ns->pubkey, 0x00, sizeof(ns->pubkey));
   memset(ns->read_buffer, 0x00, sizeof(ns->read_buffer));
-  ns->bound = false;
   ns->receiving = false;
-  ns->polling = false;
+  ns->stop_callback = NULL;
 
   if (stub) {
     err = HSK_EFAILURE;
@@ -143,9 +137,6 @@ void
 hsk_rs_uninit(hsk_rs_t *ns) {
   if (!ns)
     return;
-
-  ns->socket.data = NULL;
-  ns->poll.data = NULL;
 
   if (ns->ec) {
     hsk_ec_free(ns->ec);
@@ -248,6 +239,10 @@ hsk_rs_inject_options(hsk_rs_t *ns) {
     return false;
   }
 
+  // Use a thread instead of forking for libunbound's async work.  Threads work
+  // on all platforms, but forking does not work on Windows.
+  ub_ctx_async(ns->ub, 1);
+
   hsk_rs_log(ns, "recursive nameserver pointing to: %s\n", stub);
 
   return true;
@@ -261,36 +256,36 @@ hsk_rs_open(hsk_rs_t *ns, const struct sockaddr *addr) {
   if (!hsk_rs_inject_options(ns))
     return HSK_EFAILURE;
 
-  if (uv_udp_init(ns->loop, &ns->socket) != 0)
+  ns->socket = malloc(sizeof(uv_udp_t));
+  if (!ns->socket)
+    return HSK_ENOMEM;
+
+  if (uv_udp_init(ns->loop, ns->socket) != 0)
     return HSK_EFAILURE;
 
-  ns->socket.data = (void *)ns;
+  ns->socket->data = (void *)ns;
 
-  if (uv_udp_bind(&ns->socket, addr, 0) != 0)
+  if (uv_udp_bind(ns->socket, addr, 0) != 0)
     return HSK_EFAILURE;
-
-  ns->bound = true;
 
   int value = sizeof(ns->read_buffer);
 
-  if (uv_send_buffer_size((uv_handle_t *)&ns->socket, &value) != 0)
+  if (uv_send_buffer_size((uv_handle_t *)ns->socket, &value) != 0)
     return HSK_EFAILURE;
 
-  if (uv_recv_buffer_size((uv_handle_t *)&ns->socket, &value) != 0)
+  if (uv_recv_buffer_size((uv_handle_t *)ns->socket, &value) != 0)
     return HSK_EFAILURE;
 
-  if (uv_udp_recv_start(&ns->socket, alloc_buffer, after_recv) != 0)
+  if (uv_udp_recv_start(ns->socket, alloc_buffer, after_recv) != 0)
     return HSK_EFAILURE;
 
   ns->receiving = true;
 
-  if (uv_poll_init(ns->loop, &ns->poll, ub_fd(ns->ub)) != 0)
+  ns->rs_worker = hsk_rs_worker_alloc(ns->loop, (void *)ns, after_worker_stop);
+  if (!ns->rs_worker)
     return HSK_EFAILURE;
 
-  ns->polling = true;
-  ns->poll.data = (void *)ns;
-
-  if (uv_poll_start(&ns->poll, UV_READABLE, after_poll) != 0)
+  if (hsk_rs_worker_open(ns->rs_worker, ns->ub) != HSK_SUCCESS)
     return HSK_EFAILURE;
 
   char host[HSK_MAX_HOST];
@@ -302,34 +297,19 @@ hsk_rs_open(hsk_rs_t *ns, const struct sockaddr *addr) {
 }
 
 int
-hsk_rs_close(hsk_rs_t *ns) {
+hsk_rs_close(hsk_rs_t *ns, void *stop_data, void (*stop_callback)(void *)) {
   if (!ns)
     return HSK_EBADARGS;
 
-  if (ns->receiving) {
-    if (uv_udp_recv_stop(&ns->socket) != 0)
-      return HSK_EFAILURE;
-    ns->receiving = false;
-  }
+  ns->stop_data = stop_data;
+  ns->stop_callback = stop_callback;
 
-  if (ns->bound) {
-    uv_close((uv_handle_t *)&ns->socket, after_close);
-    ns->bound = false;
-  }
-
-  if (ns->polling) {
-    if (uv_poll_stop(&ns->poll) != 0)
-      return HSK_EFAILURE;
-    ns->polling = false;
-  }
-
-  ns->socket.data = NULL;
-  ns->poll.data = NULL;
-
-  if (ns->ub) {
-    ub_ctx_delete(ns->ub);
-    ns->ub = NULL;
-  }
+  // If the worker is running, stop it, after_worker_stop is called
+  // asynchronously.  Otherwise, just call it directly.
+  if(ns->rs_worker && hsk_rs_worker_is_open(ns->rs_worker))
+    hsk_rs_worker_close(ns->rs_worker);
+  else
+    after_worker_stop((void *)ns);
 
   return HSK_SUCCESS;
 }
@@ -356,21 +336,6 @@ hsk_rs_free(hsk_rs_t *ns) {
 
   hsk_rs_uninit(ns);
   free(ns);
-}
-
-int
-hsk_rs_destroy(hsk_rs_t *ns) {
-  if (!ns)
-    return HSK_EBADARGS;
-
-  int rc = hsk_rs_close(ns);
-
-  if (rc != 0)
-    return rc;
-
-  hsk_rs_free(ns);
-
-  return HSK_SUCCESS;
 }
 
 static void
@@ -412,20 +377,19 @@ hsk_rs_onrecv(
     goto fail;
   }
 
-  rc = ub_resolve_async(
-    ns->ub,
+  rc = hsk_rs_worker_resolve(
+    ns->rs_worker,
     req->name,
     req->type,
     req->class,
     (void *)req,
-    after_resolve,
-    NULL
+    after_resolve
   );
 
-  if (rc == 0)
+  if (rc == HSK_SUCCESS)
     return;
 
-  hsk_rs_log(ns, "unbound error: %s\n", ub_strerror(rc));
+  hsk_rs_log(ns, "resolve error: %s\n", hsk_strerror(rc));
 
   msg = hsk_resource_to_servfail();
 
@@ -549,6 +513,11 @@ hsk_rs_send(
   hsk_send_data_t *sd = NULL;
   uv_udp_send_t *req = NULL;
 
+  if (!ns->socket) {
+    rc = HSK_EFAILURE;
+    goto fail;
+  }
+
   sd = (hsk_send_data_t *)malloc(sizeof(hsk_send_data_t));
 
   if (!sd) {
@@ -573,7 +542,7 @@ hsk_rs_send(
     { .base = (char *)data, .len = data_len }
   };
 
-  int status = uv_udp_send(req, &ns->socket, bufs, 1, addr, after_send);
+  int status = uv_udp_send(req, ns->socket, bufs, 1, addr, after_send);
 
   if (status != 0) {
     hsk_rs_log(ns, "failed sending: %s\n", uv_strerror(status));
@@ -612,6 +581,39 @@ alloc_buffer(uv_handle_t *handle, size_t size, uv_buf_t *buf) {
 
   buf->base = (char *)ns->read_buffer;
   buf->len = sizeof(ns->read_buffer);
+}
+
+static void
+after_worker_stop(void *data) {
+  hsk_rs_t *ns = (hsk_rs_t *)data;
+
+  if (ns->rs_worker) {
+    hsk_rs_worker_free(ns->rs_worker);
+    ns->rs_worker = NULL;
+  }
+
+  if (ns->receiving) {
+    uv_udp_recv_stop(ns->socket);
+    ns->receiving = false;
+  }
+
+  if (ns->socket) {
+    hsk_uv_close_free((uv_handle_t *)ns->socket);
+    ns->socket->data = NULL;
+    ns->socket = NULL;
+  }
+
+  if (ns->ub) {
+    ub_ctx_delete(ns->ub);
+    ns->ub = NULL;
+  }
+
+  // Grab these values, ns may be freed by this callback.
+  void *stop_data = ns->stop_data;
+  void (*stop_callback)(void *) = ns->stop_callback;
+  ns->stop_callback = NULL;
+
+  stop_callback(stop_data);
 }
 
 static void
@@ -671,27 +673,17 @@ after_recv(
 }
 
 static void
-after_poll(uv_poll_t *handle, int status, int events) {
-  hsk_rs_t *ns = (hsk_rs_t *)handle->data;
-
-  if (!ns)
-    return;
-
-  if (status == 0 && (events & UV_READABLE))
-    ub_process(ns->ub);
-}
-
-static void
 after_resolve(void *data, int status, struct ub_result *result) {
   hsk_dns_req_t *req = (hsk_dns_req_t *)data;
   hsk_rs_t *ns = (hsk_rs_t *)req->ns;
 
   assert(ns);
 
-  hsk_rs_respond(ns, req, status, result);
+  // If the request is aborted, result is NULL, we just need to free req in that
+  // case
+  if (result) {
+    hsk_rs_respond(ns, req, status, result);
+    ub_resolve_free(result);
+  }
   hsk_dns_req_free(req);
-  ub_resolve_free(result);
 }
-
-static void
-after_close(uv_handle_t *handle) {}

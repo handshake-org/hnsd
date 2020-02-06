@@ -5,11 +5,10 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <stdlib.h>
-#include <arpa/inet.h>
-#include <netinet/in.h>
 
 #include "dns.h"
 #include "ec.h"
+#include "platform-net.h"
 
 typedef struct {
   // Reference.

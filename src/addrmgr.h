@@ -4,12 +4,11 @@
 #include <assert.h>
 #include <stdint.h>
 #include <stdbool.h>
-#include <arpa/inet.h>
-#include <netinet/in.h>
 
 #include "addr.h"
 #include "timedata.h"
 #include "map.h"
+#include "platform-net.h"
 
 typedef struct hsk_addrentry_s {
   hsk_addr_t addr;

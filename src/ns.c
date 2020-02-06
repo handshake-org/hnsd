@@ -8,8 +8,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
-#include <arpa/inet.h>
-#include <netinet/in.h>
 
 #include "addr.h"
 #include "cache.h"
@@ -22,6 +20,8 @@
 #include "pool.h"
 #include "req.h"
 #include "tld.h"
+#include "platform-net.h"
+#include "utils.h"
 #include "uv.h"
 
 /*
@@ -102,14 +102,13 @@ hsk_ns_init(hsk_ns_t *ns, const uv_loop_t *loop, const hsk_pool_t *pool) {
   ns->pool = (hsk_pool_t *)pool;
   hsk_addr_init(&ns->ip_);
   ns->ip = NULL;
-  ns->socket.data = (void *)ns;
+  ns->socket = NULL;
   ns->ec = ec;
   hsk_cache_init(&ns->cache);
   memset(ns->key_, 0x00, sizeof(ns->key_));
   ns->key = NULL;
   memset(ns->pubkey, 0x00, sizeof(ns->pubkey));
   memset(ns->read_buffer, 0x00, sizeof(ns->read_buffer));
-  ns->bound = false;
   ns->receiving = false;
 
   return HSK_SUCCESS;
@@ -119,8 +118,6 @@ void
 hsk_ns_uninit(hsk_ns_t *ns) {
   if (!ns)
     return;
-
-  ns->socket.data = NULL;
 
   if (ns->ec) {
     hsk_ec_free(ns->ec);
@@ -176,25 +173,27 @@ hsk_ns_open(hsk_ns_t *ns, const struct sockaddr *addr) {
   if (!ns || !addr)
     return HSK_EBADARGS;
 
-  if (uv_udp_init(ns->loop, &ns->socket) != 0)
+  ns->socket = malloc(sizeof(uv_udp_t));
+  if (!ns->socket)
+    return HSK_ENOMEM;
+
+  if (uv_udp_init(ns->loop, ns->socket) != 0)
     return HSK_EFAILURE;
 
-  ns->socket.data = (void *)ns;
+  ns->socket->data = (void *)ns;
 
-  if (uv_udp_bind(&ns->socket, addr, 0) != 0)
+  if (uv_udp_bind(ns->socket, addr, 0) != 0)
     return HSK_EFAILURE;
-
-  ns->bound = true;
 
   int value = sizeof(ns->read_buffer);
 
-  if (uv_send_buffer_size((uv_handle_t *)&ns->socket, &value) != 0)
+  if (uv_send_buffer_size((uv_handle_t *)ns->socket, &value) != 0)
     return HSK_EFAILURE;
 
-  if (uv_recv_buffer_size((uv_handle_t *)&ns->socket, &value) != 0)
+  if (uv_recv_buffer_size((uv_handle_t *)ns->socket, &value) != 0)
     return HSK_EFAILURE;
 
-  if (uv_udp_recv_start(&ns->socket, alloc_buffer, after_recv) != 0)
+  if (uv_udp_recv_start(ns->socket, alloc_buffer, after_recv) != 0)
     return HSK_EFAILURE;
 
   ns->receiving = true;
@@ -216,17 +215,16 @@ hsk_ns_close(hsk_ns_t *ns) {
     return HSK_EBADARGS;
 
   if (ns->receiving) {
-    if (uv_udp_recv_stop(&ns->socket) != 0)
+    if (uv_udp_recv_stop(ns->socket) != 0)
       return HSK_EFAILURE;
     ns->receiving = false;
   }
 
-  if (ns->bound) {
-    uv_close((uv_handle_t *)&ns->socket, after_close);
-    ns->bound = false;
+  if (ns->socket) {
+    hsk_uv_close_free((uv_handle_t *)ns->socket);
+    ns->socket->data = NULL;
+    ns->socket = NULL;
   }
-
-  ns->socket.data = NULL;
 
   return HSK_SUCCESS;
 }
@@ -481,6 +479,11 @@ hsk_ns_send(
   hsk_send_data_t *sd = NULL;
   uv_udp_send_t *req = NULL;
 
+  if (!ns->socket) {
+    rc = HSK_EFAILURE;
+    goto fail;
+  }
+
   sd = (hsk_send_data_t *)malloc(sizeof(hsk_send_data_t));
 
   if (!sd) {
@@ -505,7 +508,7 @@ hsk_ns_send(
     { .base = (char *)data, .len = data_len }
   };
 
-  int status = uv_udp_send(req, &ns->socket, bufs, 1, addr, after_send);
+  int status = uv_udp_send(req, ns->socket, bufs, 1, addr, after_send);
 
   if (status != 0) {
     hsk_ns_log(ns, "failed sending: %s\n", uv_strerror(status));
@@ -601,9 +604,6 @@ after_recv(
     (uint32_t)flags
   );
 }
-
-static void
-after_close(uv_handle_t *handle) {}
 
 static void
 after_resolve(

@@ -8,6 +8,7 @@
 #include <unbound.h>
 
 #include "ec.h"
+#include "rs_worker.h"
 #include "uv.h"
 
 /*
@@ -17,8 +18,8 @@
 typedef struct {
   uv_loop_t *loop;
   struct ub_ctx *ub;
-  uv_udp_t socket;
-  uv_poll_t poll;
+  uv_udp_t *socket;
+  hsk_rs_worker_t *rs_worker;
   hsk_ec_t *ec;
   char *config;
   struct sockaddr_storage stub_;
@@ -27,9 +28,9 @@ typedef struct {
   uint8_t *key;
   uint8_t pubkey[33];
   uint8_t read_buffer[4096];
-  bool bound;
   bool receiving;
-  bool polling;
+  void *stop_data;
+  void (*stop_callback)(void *);
 } hsk_rs_t;
 
 /*
@@ -51,15 +52,14 @@ hsk_rs_set_key(hsk_rs_t *ns, const uint8_t *key);
 int
 hsk_rs_open(hsk_rs_t *ns, const struct sockaddr *addr);
 
+// Close the recursive name server.  This may complete asynchronously;
+// stop_callback is called when the name server can be destroyed.
 int
-hsk_rs_close(hsk_rs_t *ns);
+hsk_rs_close(hsk_rs_t *ns, void *stop_data, void (*stop_callback)(void *));
 
 hsk_rs_t *
 hsk_rs_alloc(const uv_loop_t *loop, const struct sockaddr *stub);
 
 void
 hsk_rs_free(hsk_rs_t *ns);
-
-int
-hsk_rs_destroy(hsk_rs_t *ns);
 #endif
