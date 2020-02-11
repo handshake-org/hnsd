@@ -1,3 +1,7 @@
+:warning: Currently, `hnsd` is not compatible with the latest, Handshake
+p2p network protocol. We are exploring a potential rewrite of the entire
+codebase. Please watch this repo for development updates.
+
 # hnsd
 
 SPV resolver daemon for the [Handshake][hns] network. Written in C for
