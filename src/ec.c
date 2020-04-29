@@ -216,3 +216,50 @@ hsk_ec_ecdh(
 
   return true;
 }
+
+bool
+hsk_ec_pubkey_to_hash(
+  const hsk_ec_t *ec,
+  const uint8_t *pubkey,
+  uint8_t *result
+) {
+  assert(ec && pubkey && result);
+
+  hsk_secp256k1_pubkey pub;
+
+  if (!hsk_secp256k1_ec_pubkey_parse(ec, &pub, pubkey, 33))
+    return false;
+
+  uint8_t entropy[32];
+  if(!hsk_randombytes(entropy, 32))
+    return false;
+
+  if (!hsk_secp256k1_ec_pubkey_to_hash(ec, result, &pub, entropy))
+    return false;
+
+  return true;
+}
+
+bool
+hsk_ec_pubkey_from_hash(
+  const hsk_ec_t *ec,
+  const uint8_t *hash,
+  uint8_t *result
+) {
+  assert(ec && hash && result);
+
+  hsk_secp256k1_pubkey pub;
+
+  if (!hsk_secp256k1_ec_pubkey_from_hash(ec, &pub, hash))
+    return false;
+
+  unsigned int flags = HSK_SECP256K1_EC_COMPRESSED;
+  size_t len = 33;
+
+  if (!hsk_secp256k1_ec_pubkey_serialize(ec, result, &len, &pub, flags))
+    return false;
+
+  assert(len == 33);
+
+  return true;
+}
