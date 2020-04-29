@@ -266,7 +266,7 @@ hsk_pool_set_seeds(hsk_pool_t *pool, const char *seeds) {
       memcpy(&seed[0], &seeds[start], size);
       seed[size] = '\0';
 
-      if (!hsk_addr_from_string(&addr, seed, HSK_PORT))
+      if (!hsk_addr_from_string(&addr, seed, HSK_BRONTIDE_PORT))
         return false;
 
       if (!hsk_addr_has_key(&addr))
@@ -895,7 +895,7 @@ hsk_peer_open(hsk_peer_t *peer, const hsk_addr_t *addr) {
 
   hsk_addr_copy(&peer->addr, addr);
 
-  if (!hsk_addr_to_string(addr, peer->host, HSK_MAX_HOST, HSK_PORT))
+  if (!hsk_addr_to_string(addr, peer->host, HSK_MAX_HOST, HSK_BRONTIDE_PORT))
     return HSK_EBADARGS;
 
   uv_connect_t *conn = malloc(sizeof(uv_connect_t));
