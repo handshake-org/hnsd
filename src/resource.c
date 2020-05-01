@@ -104,68 +104,39 @@ hsk_ds_record_read(
 }
 
 bool
-hsk_resource_target_read(
-  uint8_t **data,
-  size_t *data_len,
-  uint8_t type,
-  const hsk_dns_dmp_t *dmp,
-  hsk_target_t *target
-) {
-  target->type = type;
-
-  switch (type) {
-    case HSK_INET4: {
-      return read_bytes(data, data_len, target->inet4, 4);
-    }
-    case HSK_INET6: {
-      uint8_t field;
-
-      if (!read_u8(data, data_len, &field))
-        return false;
-
-      uint8_t start = field >> 4;
-      uint8_t len = field & 0x0f;
-
-      if (start + len > 16)
-        return false;
-
-      uint8_t left = 16 - (start + len);
-
-      // Front half.
-      if (!read_bytes(data, data_len, target->inet6, start))
-        return false;
-
-      // Fill in the missing section.
-      memset(&target->inet6[start], 0x00, len);
-
-      // Back half.
-      uint8_t *back = &target->inet6[start + len];
-
-      return read_bytes(data, data_len, back, left);
-    }
-    case HSK_ONION: {
-      return read_bytes(data, data_len, target->onion, 10);
-    }
-    case HSK_ONIONNG: {
-      return read_bytes(data, data_len, target->onion, 33);
-    }
-    case HSK_NAME: {
-      return hsk_dns_name_read(data, data_len, &dmp, target->name);
-    }
-    default: {
-      return false;
-    }
-  }
-}
-
-bool
 hsk_ns_record_read(
   uint8_t **data,
   size_t *data_len,
   const hsk_dns_dmp_t *dmp,
   hsk_ns_record_t *rec
 ) {
-  return hsk_dns_name_read(data, data_len, &dmp, &rec->name);
+  return hsk_dns_name_read(data, data_len, dmp, rec->name);
+}
+
+bool
+hsk_glue4_record_read(
+  uint8_t **data,
+  size_t *data_len,
+  const hsk_dns_dmp_t *dmp,
+  hsk_glue4_record_t *rec
+) {
+  if (!hsk_dns_name_read(data, data_len, dmp, rec->name))
+    return false;
+
+  return read_bytes(data, data_len, rec->inet4, 4);
+}
+
+bool
+hsk_glue6_record_read(
+  uint8_t **data,
+  size_t *data_len,
+  const hsk_dns_dmp_t *dmp,
+  hsk_glue6_record_t *rec
+) {
+  if (!hsk_dns_name_read(data, data_len, dmp, rec->name))
+    return false;
+
+  return read_bytes(data, data_len, rec->inet6, 16);
 }
 
 bool
@@ -253,6 +224,18 @@ hsk_record_init(hsk_record_t *r) {
       memset(rec->name, 0, sizeof(rec->name));
       break;
     }
+    case HSK_GLUE4: {
+      hsk_glue4_record_t *rec = (hsk_glue4_record_t *)r;
+      memset(rec->name, 0, sizeof(rec->name));
+      memset(rec->inet4, 0, sizeof(rec->inet4));
+      break;
+    }
+    case HSK_GLUE6: {
+      hsk_glue6_record_t *rec = (hsk_glue6_record_t *)r;
+      memset(rec->name, 0, sizeof(rec->name));
+      memset(rec->inet6, 0, sizeof(rec->inet6));
+      break;
+    }
     case HSK_TEXT: {
       hsk_txt_record_t *rec = (hsk_txt_record_t *)r;
       memset(rec->text, 0, sizeof(rec->text));
@@ -272,6 +255,14 @@ hsk_record_alloc(uint8_t type) {
     }
     case HSK_NS: {
       r = (hsk_record_t *)malloc(sizeof(hsk_ns_record_t));
+      break;
+    }
+    case HSK_GLUE4: {
+      r = (hsk_record_t *)malloc(sizeof(hsk_glue4_record_t));
+      break;
+    }
+    case HSK_GLUE6: {
+      r = (hsk_record_t *)malloc(sizeof(hsk_glue6_record_t));
       break;
     }
     case HSK_TEXT: {
@@ -303,6 +294,16 @@ hsk_record_free(hsk_record_t *r) {
     }
     case HSK_NS: {
       hsk_ns_record_t *rec = (hsk_ns_record_t *)r;
+      free(rec);
+      break;
+    }
+    case HSK_GLUE4: {
+      hsk_glue4_record_t *rec = (hsk_glue4_record_t *)r;
+      free(rec);
+      break;
+    }
+    case HSK_GLUE6: {
+      hsk_glue6_record_t *rec = (hsk_glue6_record_t *)r;
       free(rec);
       break;
     }
