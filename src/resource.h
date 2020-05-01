@@ -156,14 +156,6 @@ typedef struct hsk_extra_record_s {
   uint8_t data[255];
 } hsk_extra_record_t;
 
-// Symbol Table
-typedef struct hsk_symbol_table_s {
-  char *strings[255];
-  uint8_t sizes[255];
-  uint8_t size;
-  hsk_dns_dmp_t dmp;
-} hsk_symbol_table_t;
-
 // Resource
 typedef struct hsk_resource_s {
   uint8_t version;
