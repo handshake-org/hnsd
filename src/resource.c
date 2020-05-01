@@ -954,50 +954,50 @@ hsk_resource_decode(
   size_t data_len,
   hsk_resource_t **resource
 ) {
+  // Pointer to iterate through input resource data.
   uint8_t *dat = (uint8_t *)data;
 
+  // Initialize DNS Message Compression by storing
+  // a "copy" of the entire message for pointer reference.
+  // See rfc1035 section 4.1.4
   hsk_dns_dmp_t dmp;
   dmp.msg = dat;
   dmp.msg_len = data_len;
 
+  // Initialize response struct.
   hsk_resource_t *res = malloc(sizeof(hsk_resource_t));
 
   if (res == NULL)
     goto fail;
 
   res->version = 0;
-  res->compat = false;
-  res->ttl = 0;
   res->record_count = 0;
   memset(res->records, 0, sizeof(hsk_record_t *));
 
+  // Copy version from input.
   if (!read_u8(&dat, &data_len, &res->version))
     goto fail;
 
+  // Only version 0 is valid at this time.
   if (res->version != 0)
     goto fail;
 
-  uint16_t field;
-  if (!read_u16be(&dat, &data_len, &field))
-    goto fail;
+  // TTL is always constant due to tree interval.
+  res->ttl = HSK_DEFAULT_TTL;
 
-  res->compat = (field & 0x8000) != 0;
-  res->ttl = ((uint32_t)(field & 0x7fff)) << 6;
-
-  if (res->ttl == 0)
-    res->ttl = 1 << 6;
-
-  // Read records.
-  for (i = 0; i < 255; i++) {
-    if (data_len <= 0)
-      break;
-
+  // The rest of the data is records, read until empty.
+  int i = 0;
+  while (data_len > 0) {
+    // Get record type.
     uint8_t type;
-
     read_u8(&dat, &data_len, &type);
 
+    // Read the body of the record.
     if (!hsk_record_read(&dat, &data_len, type, &dmp, &res->records[i]))
       goto fail;
+
+    // Increment total amount of records in this resource.
+    i++;
   }
 
   res->record_count = i;

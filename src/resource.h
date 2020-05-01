@@ -24,6 +24,8 @@
 #define HSK_ADDR 21
 #define HSK_EXTRA 255
 
+#define HSK_DEFAULT_TTL 21600
+
 #include <stdint.h>
 #include <stdbool.h>
 #include "addr.h"
@@ -159,7 +161,6 @@ typedef struct hsk_extra_record_s {
 // Resource
 typedef struct hsk_resource_s {
   uint8_t version;
-  bool compat;
   uint32_t ttl;
   size_t record_count;
   hsk_record_t *records[255];
