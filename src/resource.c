@@ -44,6 +44,10 @@ static const uint8_t hsk_type_map_aaaa[] = {
   0x00, 0x06, 0x00, 0x00, 0x00, 0x80, 0x00, 0x03
 };
 
+/*
+ * Helpers
+ */
+
 static void
 to_fqdn(char *name);
 
@@ -68,56 +72,33 @@ pointer_to_ip(const char *name, uint8_t *ip, uint16_t *family);
 static bool
 target_to_dns(const hsk_target_t *target, const char *name, char *host);
 
+/*
+ * Resource serialization version 0
+ * Record types: read
+ */
+
 bool
-hsk_resource_str_read(
+hsk_ds_record_read(
   uint8_t **data,
   size_t *data_len,
-  char *str,
-  size_t limit
+  hsk_ds_record_t *rec
 ) {
+  if (*data_len < 5)
+    return false;
+
   uint8_t size = 0;
-  uint8_t *chunk;
+  read_u16be(data, data_len, &rec->key_tag);
+  read_u8(data, data_len, &rec->algorithm);
+  read_u8(data, data_len, &rec->digest_type);
+  read_u8(data, data_len, &size);
 
-  if (!read_u8(data, data_len, &size))
+  if (size > 64)
     return false;
 
-  if (!slice_bytes(data, data_len, &chunk, size))
+  if (!read_bytes(data, data_len, rec->digest, size))
     return false;
 
-  int real_size = 0;
-  int i;
-
-  for (i = 0; i < size; i++) {
-    uint8_t ch = chunk[i];
-
-    // No DEL.
-    if (ch == 0x7f)
-      return false;
-
-    // Any non-printable character can screw.
-    // Tab, line feed, and carriage return all valid.
-    if (ch < 0x20
-        && ch != 0x09
-        && ch != 0x0a
-        && ch != 0x0d) {
-      return false;
-    }
-
-    real_size += 1;
-  }
-
-  if (real_size > limit)
-    return false;
-
-  char *s = str;
-  for (i = 0; i < size; i++) {
-    uint8_t ch = chunk[i];
-
-    *s = ch;
-    s += 1;
-  }
-
-  *s ='\0';
+  rec->digest_len = size;
 
   return true;
 }
@@ -223,331 +204,66 @@ hsk_host_record_read(
 }
 
 bool
+hsk_resource_str_read(
+  uint8_t **data,
+  size_t *data_len,
+  char *str,
+  size_t limit
+) {
+  uint8_t size = 0;
+  uint8_t *chunk;
+
+  if (!read_u8(data, data_len, &size))
+    return false;
+
+  if (!slice_bytes(data, data_len, &chunk, size))
+    return false;
+
+  int real_size = 0;
+  int i;
+
+  for (i = 0; i < size; i++) {
+    uint8_t ch = chunk[i];
+
+    // No DEL.
+    if (ch == 0x7f)
+      return false;
+
+    // Any non-printable character can screw.
+    // Tab, line feed, and carriage return all valid.
+    if (ch < 0x20
+        && ch != 0x09
+        && ch != 0x0a
+        && ch != 0x0d) {
+      return false;
+    }
+
+    real_size += 1;
+  }
+
+  if (real_size > limit)
+    return false;
+
+  char *s = str;
+  for (i = 0; i < size; i++) {
+    uint8_t ch = chunk[i];
+
+    *s = ch;
+    s += 1;
+  }
+
+  *s ='\0';
+
+  return true;
+}
+
+bool
 hsk_txt_record_read(
   uint8_t **data,
   size_t *data_len,
   hsk_txt_record_t *rec
 ) {
   return hsk_resource_str_read(data, data_len, rec->text, 255);
-}
-
-bool
-hsk_service_record_read(
-  uint8_t **data,
-  size_t *data_len,
-  const hsk_dns_dmp_t *dmp,
-  hsk_service_record_t *rec
-) {
-  if (!hsk_dns_name_read(data, data_len, &dmp, rec->service))
-    return false;
-
-  if (hsk_dns_label_count(rec->service) != 1)
-    return false;
-
-  if (!hsk_dns_name_read(data, data_len, &dmp, rec->protocol))
-    return false;
-
-  if (hsk_dns_label_count(rec->protocol) != 1)
-    return false;
-
-  if (!read_u8(data, data_len, &rec->priority))
-    return false;
-
-  if (!read_u8(data, data_len, &rec->weight))
-    return false;
-
-  if (!hsk_resource_host_read(data, data_len, dmp, &rec->target))
-    return false;
-
-  if (!read_u16be(data, data_len, &rec->port))
-    return false;
-
-  return true;
-}
-
-bool
-hsk_location_record_read(
-  uint8_t **data,
-  size_t *data_len,
-  hsk_location_record_t *rec
-) {
-  if (*data_len < 16)
-    return false;
-
-  read_u8(data, data_len, &rec->version);
-  read_u8(data, data_len, &rec->size);
-  read_u8(data, data_len, &rec->horiz_pre);
-  read_u8(data, data_len, &rec->vert_pre);
-  read_u32be(data, data_len, &rec->latitude);
-  read_u32be(data, data_len, &rec->longitude);
-  read_u32be(data, data_len, &rec->altitude);
-
-  return true;
-}
-
-bool
-hsk_magnet_record_read(
-  uint8_t **data,
-  size_t *data_len,
-  const hsk_dns_dmp_t *dmp,
-  hsk_magnet_record_t *rec
-) {
-  if (!hsk_dns_name_read(data, data_len, &dmp, rec->nid))
-    return false;
-
-  if (hsk_dns_label_count(rec->nid) != 1)
-    return false;
-
-  uint8_t size = 0;
-  if (!read_u8(data, data_len, &size))
-    return false;
-
-  if (size > 64)
-    return false;
-
-  if (!read_bytes(data, data_len, rec->nin, size))
-    return false;
-
-  rec->nin_len = size;
-
-  return true;
-}
-
-bool
-hsk_ds_record_read(
-  uint8_t **data,
-  size_t *data_len,
-  hsk_ds_record_t *rec
-) {
-  if (*data_len < 5)
-    return false;
-
-  uint8_t size = 0;
-  read_u16be(data, data_len, &rec->key_tag);
-  read_u8(data, data_len, &rec->algorithm);
-  read_u8(data, data_len, &rec->digest_type);
-  read_u8(data, data_len, &size);
-
-  if (size > 64)
-    return false;
-
-  if (!read_bytes(data, data_len, rec->digest, size))
-    return false;
-
-  rec->digest_len = size;
-
-  return true;
-}
-
-bool
-hsk_tls_record_read(
-  uint8_t **data,
-  size_t *data_len,
-  const hsk_dns_dmp_t *dmp,
-  hsk_tls_record_t *rec
-) {
-  if (!hsk_dns_name_read(data, data_len, &dmp, rec->protocol))
-    return false;
-
-  if (hsk_dns_label_count(rec->protocol) != 1)
-    return false;
-
-  if (*data_len < 6)
-    return false;
-
-  uint8_t size = 0;
-  read_u16be(data, data_len, &rec->port);
-  read_u8(data, data_len, &rec->usage);
-  read_u8(data, data_len, &rec->selector);
-  read_u8(data, data_len, &rec->matching_type);
-  read_u8(data, data_len, &size);
-
-  if (size > 64)
-    return false;
-
-  if (!read_bytes(data, data_len, rec->certificate, size))
-    return false;
-
-  rec->certificate_len = size;
-
-  return true;
-}
-
-bool
-hsk_smime_record_read(
-  uint8_t **data,
-  size_t *data_len,
-  hsk_smime_record_t *rec
-) {
-  if (!read_bytes(data, data_len, rec->hash, 28))
-    return false;
-
-  if (*data_len < 4)
-    return false;
-
-  uint8_t size = 0;
-  read_u8(data, data_len, &rec->usage);
-  read_u8(data, data_len, &rec->selector);
-  read_u8(data, data_len, &rec->matching_type);
-  read_u8(data, data_len, &size);
-
-  if (size > 64)
-    return false;
-
-  if (!read_bytes(data, data_len, rec->certificate, size))
-    return false;
-
-  rec->certificate_len = size;
-
-  return true;
-}
-
-bool
-hsk_ssh_record_read(
-  uint8_t **data,
-  size_t *data_len,
-  hsk_ssh_record_t *rec
-) {
-  if (*data_len < 3)
-    return false;
-
-  uint8_t size = 0;
-  read_u8(data, data_len, &rec->algorithm);
-  read_u8(data, data_len, &rec->digest_type);
-  read_u8(data, data_len, &size);
-
-  if (size > 64)
-    return false;
-
-  if (!read_bytes(data, data_len, rec->fingerprint, size))
-    return false;
-
-  rec->fingerprint_len = size;
-
-  return true;
-}
-
-bool
-hsk_pgp_record_read(
-  uint8_t **data,
-  size_t *data_len,
-  hsk_pgp_record_t *rec
-) {
-  if (!read_bytes(data, data_len, rec->hash, 28))
-    return false;
-
-  uint16_t size;
-
-  if (!read_u16be(data, data_len, &size))
-    return false;
-
-  if (size > 512)
-    return false;
-
-  if (!read_bytes(data, data_len, rec->pubkey, size))
-    return false;
-
-  rec->pubkey_len = size;
-
-  return true;
-}
-
-bool
-hsk_addr_record_read(
-  uint8_t **data,
-  size_t *data_len,
-  const hsk_dns_dmp_t *dmp,
-  hsk_addr_record_t *rec
-) {
-  uint8_t ctype;
-
-  if (!read_u8(data, data_len, &ctype))
-    return false;
-
-  rec->ctype = ctype;
-
-  switch (ctype) {
-    case 0: {
-      if (!hsk_dns_name_read(data, data_len, &dmp, rec->currency))
-        return false;
-
-      if (hsk_dns_label_count(rec->currency) != 1)
-        return false;
-
-      uint8_t size = 0;
-
-      if (!read_u8(data, data_len, &size))
-        return false;
-
-      if (!read_ascii(data, data_len, rec->address, size))
-        return false;
-
-      break;
-    }
-    case 1:
-    case 2: { // HSK / BTC
-      uint8_t field;
-
-      if (!read_u8(data, data_len, &field))
-        return false;
-
-      rec->testnet = (field & 0x80) != 0;
-
-      if (!read_u8(data, data_len, &rec->version))
-        return false;
-
-      uint8_t size = (field & 0x7f) + 1;
-
-      if (size > 64)
-        return false;
-
-      if (!read_bytes(data, data_len, rec->hash, size))
-        return false;
-
-      rec->hash_len = size;
-
-      if (ctype == 1)
-        strcpy(rec->currency, "handshake.");
-      else
-        strcpy(rec->currency, "bitcoin.");
-
-      break;
-    }
-    case 3: { // ETH
-      strcpy(rec->currency, "ethereum.");
-
-      if (!read_bytes(data, data_len, rec->hash, 20))
-        return false;
-
-      rec->hash_len = 20;
-
-      break;
-    }
-    default: {
-      return false;
-    }
-  }
-
-  return true;
-}
-
-bool
-hsk_extra_record_read(
-  uint8_t **data,
-  size_t *data_len,
-  hsk_extra_record_t *rec
-) {
-  uint16_t size = 0;
-
-  if (!read_u16be(data, data_len, &size))
-    return false;
-
-  if (!read_bytes(data, data_len, rec->data, size))
-    return false;
-
-  rec->data_len = size;
-
-  return true;
 }
 
 void
@@ -558,61 +274,6 @@ hsk_record_init(hsk_record_t *r) {
   r->type = r->type;
 
   switch (r->type) {
-    case HSK_INET4:
-    case HSK_INET6:
-    case HSK_ONION:
-    case HSK_ONIONNG:
-    case HSK_NAME:
-    case HSK_CANONICAL:
-    case HSK_DELEGATE:
-    case HSK_NS: {
-      hsk_host_record_t *rec = (hsk_host_record_t *)r;
-      rec->target.type = 0;
-      memset(rec->target.name, 0, sizeof(rec->target.name));
-      memset(rec->target.inet4, 0, sizeof(rec->target.inet4));
-      memset(rec->target.inet6, 0, sizeof(rec->target.inet6));
-      memset(rec->target.onion, 0, sizeof(rec->target.onion));
-      break;
-    }
-    case HSK_SERVICE: {
-      hsk_service_record_t *rec = (hsk_service_record_t *)r;
-      memset(rec->service, 0, sizeof(rec->service));
-      memset(rec->protocol, 0, sizeof(rec->protocol));
-      rec->priority = 0;
-      rec->weight = 0;
-      rec->target.type = 0;
-      memset(rec->target.name, 0, sizeof(rec->target.name));
-      memset(rec->target.inet4, 0, sizeof(rec->target.inet4));
-      memset(rec->target.inet6, 0, sizeof(rec->target.inet6));
-      memset(rec->target.onion, 0, sizeof(rec->target.onion));
-      rec->port = 0;
-      break;
-    }
-    case HSK_URI:
-    case HSK_EMAIL:
-    case HSK_TEXT: {
-      hsk_txt_record_t *rec = (hsk_txt_record_t *)r;
-      memset(rec->text, 0, sizeof(rec->text));
-      break;
-    }
-    case HSK_LOCATION: {
-      hsk_location_record_t *rec = (hsk_location_record_t *)r;
-      rec->version = 0;
-      rec->size = 0;
-      rec->horiz_pre = 0;
-      rec->vert_pre = 0;
-      rec->latitude = 0;
-      rec->longitude = 0;
-      rec->altitude = 0;
-      break;
-    }
-    case HSK_MAGNET: {
-      hsk_magnet_record_t *rec = (hsk_magnet_record_t *)r;
-      memset(rec->nid, 0, sizeof(rec->nid));
-      rec->nin_len = 0;
-      memset(rec->nin, 0, sizeof(rec->nin));
-      break;
-    }
     case HSK_DS: {
       hsk_ds_record_t *rec = (hsk_ds_record_t *)r;
       rec->key_tag = 0;
@@ -622,57 +283,18 @@ hsk_record_init(hsk_record_t *r) {
       memset(rec->digest, 0, sizeof(rec->digest));
       break;
     }
-    case HSK_TLS: {
-      hsk_tls_record_t *rec = (hsk_tls_record_t *)r;
-      memset(rec->protocol, 0, sizeof(rec->protocol));
-      rec->port = 0;
-      rec->usage = 0;
-      rec->selector = 0;
-      rec->matching_type = 0;
-      rec->certificate_len = 0;
-      memset(rec->certificate, 0, sizeof(rec->certificate));
+    case HSK_NS: {
+      hsk_host_record_t *rec = (hsk_host_record_t *)r;
+      rec->target.type = 0;
+      memset(rec->target.name, 0, sizeof(rec->target.name));
+      memset(rec->target.inet4, 0, sizeof(rec->target.inet4));
+      memset(rec->target.inet6, 0, sizeof(rec->target.inet6));
+      memset(rec->target.onion, 0, sizeof(rec->target.onion));
       break;
     }
-    case HSK_SMIME: {
-      hsk_smime_record_t *rec = (hsk_smime_record_t *)r;
-      memset(rec->hash, 0, sizeof(rec->hash));
-      rec->usage = 0;
-      rec->selector = 0;
-      rec->matching_type = 0;
-      rec->certificate_len = 0;
-      memset(rec->certificate, 0, sizeof(rec->certificate));
-      break;
-    }
-    case HSK_SSH: {
-      hsk_ssh_record_t *rec = (hsk_ssh_record_t *)r;
-      rec->algorithm = 0;
-      rec->digest_type = 0;
-      rec->fingerprint_len = 0;
-      memset(rec->fingerprint, 0, sizeof(rec->fingerprint));
-      break;
-    }
-    case HSK_PGP: {
-      hsk_pgp_record_t *rec = (hsk_pgp_record_t *)r;
-      rec->pubkey_len = 0;
-      memset(rec->pubkey, 0, sizeof(rec->pubkey));
-      break;
-    }
-    case HSK_ADDR: {
-      hsk_addr_record_t *rec = (hsk_addr_record_t *)r;
-      memset(rec->currency, 0, sizeof(rec->currency));
-      memset(rec->address, 0, sizeof(rec->address));
-      rec->ctype = 0;
-      rec->testnet = false;
-      rec->version = 0;
-      rec->hash_len = 0;
-      memset(rec->hash, 0, sizeof(rec->hash));
-      break;
-    }
-    default: {
-      hsk_extra_record_t *rec = (hsk_extra_record_t *)r;
-      rec->rtype = 0;
-      rec->data_len = 0;
-      memset(rec->data, 0, sizeof(rec->data));
+    case HSK_TEXT: {
+      hsk_txt_record_t *rec = (hsk_txt_record_t *)r;
+      memset(rec->text, 0, sizeof(rec->text));
       break;
     }
   }
@@ -683,70 +305,23 @@ hsk_record_alloc(uint8_t type) {
   hsk_record_t *r = NULL;
 
   switch (type) {
-    case HSK_INET4:
-    case HSK_INET6:
-    case HSK_ONION:
-    case HSK_ONIONNG:
-    case HSK_NAME:
-    case HSK_CANONICAL:
-    case HSK_DELEGATE:
-    case HSK_NS: {
-      r = (hsk_record_t *)malloc(sizeof(hsk_host_record_t));
-      break;
-    }
-    case HSK_SERVICE: {
-      r = (hsk_record_t *)malloc(sizeof(hsk_service_record_t));
-      break;
-    }
-    case HSK_URI:
-    case HSK_EMAIL:
-    case HSK_TEXT: {
-      r = (hsk_record_t *)malloc(sizeof(hsk_txt_record_t));
-      break;
-    }
-    case HSK_LOCATION: {
-      r = (hsk_record_t *)malloc(sizeof(hsk_location_record_t));
-      break;
-    }
-    case HSK_MAGNET: {
-      r = (hsk_record_t *)malloc(sizeof(hsk_magnet_record_t));
-      break;
-    }
     case HSK_DS: {
       r = (hsk_record_t *)malloc(sizeof(hsk_ds_record_t));
       break;
     }
-    case HSK_TLS: {
-      r = (hsk_record_t *)malloc(sizeof(hsk_tls_record_t));
+    case HSK_NS: {
+      r = (hsk_record_t *)malloc(sizeof(hsk_host_record_t));
       break;
     }
-    case HSK_SMIME: {
-      r = (hsk_record_t *)malloc(sizeof(hsk_smime_record_t));
-      break;
-    }
-    case HSK_SSH: {
-      r = (hsk_record_t *)malloc(sizeof(hsk_ssh_record_t));
-      break;
-    }
-    case HSK_PGP: {
-      r = (hsk_record_t *)malloc(sizeof(hsk_pgp_record_t));
-      break;
-    }
-    case HSK_ADDR: {
-      r = (hsk_record_t *)malloc(sizeof(hsk_addr_record_t));
+    case HSK_TEXT: {
+      r = (hsk_record_t *)malloc(sizeof(hsk_txt_record_t));
       break;
     }
     default: {
-      r = (hsk_record_t *)malloc(sizeof(hsk_extra_record_t));
-      break;
+      // Unknown record type.
+      return NULL;
     }
   }
-
-  if (r == NULL)
-    return NULL;
-
-  if (type == HSK_NAME)
-    type = HSK_CANONICAL;
 
   r->type = type;
 
@@ -760,73 +335,23 @@ hsk_record_free(hsk_record_t *r) {
     return;
 
   switch (r->type) {
-    case HSK_INET4:
-    case HSK_INET6:
-    case HSK_ONION:
-    case HSK_ONIONNG:
-    case HSK_NAME:
-    case HSK_CANONICAL:
-    case HSK_DELEGATE:
-    case HSK_NS: {
-      hsk_host_record_t *rec = (hsk_host_record_t *)r;
-      free(rec);
-      break;
-    }
-    case HSK_SERVICE: {
-      hsk_service_record_t *rec = (hsk_service_record_t *)r;
-      free(rec);
-      break;
-    }
-    case HSK_URI:
-    case HSK_EMAIL:
-    case HSK_TEXT: {
-      hsk_txt_record_t *rec = (hsk_txt_record_t *)r;
-      free(rec);
-      break;
-    }
-    case HSK_LOCATION: {
-      hsk_location_record_t *rec = (hsk_location_record_t *)r;
-      free(rec);
-      break;
-    }
-    case HSK_MAGNET: {
-      hsk_magnet_record_t *rec = (hsk_magnet_record_t *)r;
-      free(rec);
-      break;
-    }
     case HSK_DS: {
       hsk_ds_record_t *rec = (hsk_ds_record_t *)r;
       free(rec);
       break;
     }
-    case HSK_TLS: {
-      hsk_tls_record_t *rec = (hsk_tls_record_t *)r;
+    case HSK_NS: {
+      hsk_host_record_t *rec = (hsk_host_record_t *)r;
       free(rec);
       break;
     }
-    case HSK_SMIME: {
-      hsk_smime_record_t *rec = (hsk_smime_record_t *)r;
-      free(rec);
-      break;
-    }
-    case HSK_SSH: {
-      hsk_ssh_record_t *rec = (hsk_ssh_record_t *)r;
-      free(rec);
-      break;
-    }
-    case HSK_PGP: {
-      hsk_pgp_record_t *rec = (hsk_pgp_record_t *)r;
-      free(rec);
-      break;
-    }
-    case HSK_ADDR: {
-      hsk_addr_record_t *rec = (hsk_addr_record_t *)r;
+    case HSK_TEXT: {
+      hsk_txt_record_t *rec = (hsk_txt_record_t *)r;
       free(rec);
       break;
     }
     default: {
-      hsk_extra_record_t *rec = (hsk_extra_record_t *)r;
-      free(rec);
+      // Why are we freeing memory for an unknown record type?
       break;
     }
   }
@@ -860,87 +385,47 @@ hsk_record_read(
   if (r == NULL)
     return false;
 
-  bool result = true;
-
   switch (type) {
-    case HSK_INET4:
-    case HSK_INET6:
-    case HSK_ONION:
-    case HSK_ONIONNG:
-    case HSK_NAME: {
-      hsk_host_record_t *rec = (hsk_host_record_t *)r;
-      result = hsk_resource_target_read(data, data_len, type, dmp, &rec->target);
-      break;
-    }
-    case HSK_CANONICAL:
-    case HSK_DELEGATE:
-    case HSK_NS: {
-      hsk_host_record_t *rec = (hsk_host_record_t *)r;
-      result = hsk_host_record_read(data, data_len, dmp, rec);
-      break;
-    }
-    case HSK_SERVICE: {
-      hsk_service_record_t *rec = (hsk_service_record_t *)r;
-      result = hsk_service_record_read(data, data_len, dmp, rec);
-      break;
-    }
-    case HSK_URI:
-    case HSK_EMAIL:
-    case HSK_TEXT: {
-      hsk_txt_record_t *rec = (hsk_txt_record_t *)r;
-      result = hsk_txt_record_read(data, data_len, rec);
-      break;
-    }
-    case HSK_LOCATION: {
-      hsk_location_record_t *rec = (hsk_location_record_t *)r;
-      result = hsk_location_record_read(data, data_len, rec);
-      break;
-    }
-    case HSK_MAGNET: {
-      hsk_magnet_record_t *rec = (hsk_magnet_record_t *)r;
-      result = hsk_magnet_record_read(data, data_len, dmp, rec);
-      break;
-    }
     case HSK_DS: {
       hsk_ds_record_t *rec = (hsk_ds_record_t *)r;
-      result = hsk_ds_record_read(data, data_len, rec);
+      hsk_ds_record_read(data, data_len, rec);
       break;
     }
-    case HSK_TLS: {
-      hsk_tls_record_t *rec = (hsk_tls_record_t *)r;
-      result = hsk_tls_record_read(data, data_len, dmp, rec);
+    case HSK_NS: {
+      hsk_ns_record_t *rec = (hsk_ns_record_t *)r;
+      hsk_ns_record_read(data, data_len, dmp, rec);
       break;
     }
-    case HSK_SMIME: {
-      hsk_smime_record_t *rec = (hsk_smime_record_t *)r;
-      result = hsk_smime_record_read(data, data_len, rec);
+    case HSK_GLUE4: {
+      hsk_glue4_record_t *rec = (hsk_glue4_record_t *)r;
+      hsk_glue4_record_read(data, data_len, dmp, rec);
       break;
     }
-    case HSK_SSH: {
-      hsk_ssh_record_t *rec = (hsk_ssh_record_t *)r;
-      result = hsk_ssh_record_read(data, data_len, rec);
+    case HSK_GLUE6: {
+      hsk_glue6_record_t *rec = (hsk_glue6_record_t *)r;
+      hsk_glue6_record_read(data, data_len, dmp, rec);
       break;
     }
-    case HSK_PGP: {
-      hsk_pgp_record_t *rec = (hsk_pgp_record_t *)r;
-      result = hsk_pgp_record_read(data, data_len, rec);
+    case HSK_SYNTH4: {
+      hsk_synth4_record_t *rec = (hsk_synth4_record_t *)r;
+      hsk_synth4_record_read(data, data_len, rec);
       break;
     }
-    case HSK_ADDR: {
-      hsk_addr_record_t *rec = (hsk_addr_record_t *)r;
-      result = hsk_addr_record_read(data, data_len, dmp, rec);
+    case HSK_SYNTH6: {
+      hsk_synth6_record_t *rec = (hsk_synth6_record_t *)r;
+      hsk_synth6_record_read(data, data_len, rec);
+      break;
+    }
+    case HSK_TEXT: {
+      hsk_txt_record_t *rec = (hsk_txt_record_t *)r;
+      hsk_txt_record_read(data, data_len, rec);
       break;
     }
     default: {
-      hsk_extra_record_t *rec = (hsk_extra_record_t *)r;
-      result = hsk_extra_record_read(data, data_len, rec);
-      break;
+      // Unknown record type.
+      free(r);
+      return false;
     }
-  }
-
-  if (!result) {
-    free(r);
-    return false;
   }
 
   *res = r;
@@ -1442,7 +927,7 @@ hsk_resource_to_txt(
     if (c->type != HSK_TEXT)
       continue;
 
-    hsk_text_record_t *rec = (hsk_text_record_t *)c;
+    hsk_txt_record_t *rec = (hsk_txt_record_t *)c;
 
     hsk_dns_rr_t *rr = hsk_dns_rr_create(HSK_DNS_TXT);
 
