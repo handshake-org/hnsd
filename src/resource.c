@@ -159,48 +159,13 @@ hsk_resource_target_read(
 }
 
 bool
-hsk_resource_host_read(
+hsk_ns_record_read(
   uint8_t **data,
   size_t *data_len,
   const hsk_dns_dmp_t *dmp,
-  hsk_target_t *target
+  hsk_ns_record_t *rec
 ) {
-  uint8_t type;
-
-  if (!read_u8(data, data_len, &type))
-    return false;
-
-  if (type == HSK_GLUE) {
-    if (!hsk_resource_target_read(data, data_len, HSK_NAME, dmp, target))
-      return false;
-
-    if (!hsk_resource_target_read(data, data_len, HSK_INET4, dmp, target))
-      return false;
-
-    if (!hsk_resource_target_read(data, data_len, HSK_INET6, dmp, target))
-      return false;
-
-    if (memcmp(target->inet4, hsk_zero_inet4, 4) == 0
-        && memcmp(target->inet6, hsk_zero_inet6, 16) == 0) {
-      return false;
-    }
-
-    target->type = HSK_GLUE;
-
-    return true;
-  }
-
-  return hsk_resource_target_read(data, data_len, type, dmp, target);
-}
-
-bool
-hsk_host_record_read(
-  uint8_t **data,
-  size_t *data_len,
-  const hsk_dns_dmp_t *dmp,
-  hsk_host_record_t *rec
-) {
-  return hsk_resource_host_read(data, data_len, dmp, &rec->target);
+  return hsk_dns_name_read(data, data_len, &dmp, &rec->name);
 }
 
 bool
@@ -284,12 +249,8 @@ hsk_record_init(hsk_record_t *r) {
       break;
     }
     case HSK_NS: {
-      hsk_host_record_t *rec = (hsk_host_record_t *)r;
-      rec->target.type = 0;
-      memset(rec->target.name, 0, sizeof(rec->target.name));
-      memset(rec->target.inet4, 0, sizeof(rec->target.inet4));
-      memset(rec->target.inet6, 0, sizeof(rec->target.inet6));
-      memset(rec->target.onion, 0, sizeof(rec->target.onion));
+      hsk_ns_record_t *rec = (hsk_ns_record_t *)r;
+      memset(rec->name, 0, sizeof(rec->name));
       break;
     }
     case HSK_TEXT: {
@@ -310,7 +271,7 @@ hsk_record_alloc(uint8_t type) {
       break;
     }
     case HSK_NS: {
-      r = (hsk_record_t *)malloc(sizeof(hsk_host_record_t));
+      r = (hsk_record_t *)malloc(sizeof(hsk_ns_record_t));
       break;
     }
     case HSK_TEXT: {
@@ -341,7 +302,7 @@ hsk_record_free(hsk_record_t *r) {
       break;
     }
     case HSK_NS: {
-      hsk_host_record_t *rec = (hsk_host_record_t *)r;
+      hsk_ns_record_t *rec = (hsk_ns_record_t *)r;
       free(rec);
       break;
     }

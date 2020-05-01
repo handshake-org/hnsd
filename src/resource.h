@@ -39,12 +39,10 @@ typedef struct hsk_target_s {
   uint8_t onion[33];
 } hsk_target_t;
 
-typedef struct hsk_host_record_s {
+typedef struct hsk_ns_record_s {
   uint8_t type;
-  hsk_target_t target;
-} hsk_host_record_t;
-
-typedef hsk_host_record_t hsk_ns_record_t;
+  char name[256];
+} hsk_ns_record_t;
 
 typedef struct hsk_txt_record_s {
   uint8_t type;
