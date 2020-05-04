@@ -140,6 +140,24 @@ hsk_glue6_record_read(
 }
 
 bool
+hsk_synth4_record_read(
+  uint8_t **data,
+  size_t *data_len,
+  hsk_synth4_record_t *rec
+) {
+  return read_bytes(data, data_len, rec->inet4, 4);
+}
+
+bool
+hsk_synth6_record_read(
+  uint8_t **data,
+  size_t *data_len,
+  hsk_synth6_record_t *rec
+) {
+  return read_bytes(data, data_len, rec->inet6, 16);
+}
+
+bool
 hsk_resource_str_read(
   uint8_t **data,
   size_t *data_len,
@@ -236,6 +254,16 @@ hsk_record_init(hsk_record_t *r) {
       memset(rec->inet6, 0, sizeof(rec->inet6));
       break;
     }
+    case HSK_SYNTH4: {
+      hsk_synth4_record_t *rec = (hsk_synth4_record_t *)r;
+      memset(rec->inet4, 0, sizeof(rec->inet4));
+      break;
+    }
+    case HSK_SYNTH6: {
+      hsk_synth6_record_t *rec = (hsk_synth6_record_t *)r;
+      memset(rec->inet6, 0, sizeof(rec->inet6));
+      break;
+    }
     case HSK_TEXT: {
       hsk_txt_record_t *rec = (hsk_txt_record_t *)r;
       memset(rec->text, 0, sizeof(rec->text));
@@ -263,6 +291,14 @@ hsk_record_alloc(uint8_t type) {
     }
     case HSK_GLUE6: {
       r = (hsk_record_t *)malloc(sizeof(hsk_glue6_record_t));
+      break;
+    }
+    case HSK_SYNTH4: {
+      r = (hsk_record_t *)malloc(sizeof(hsk_synth4_record_t));
+      break;
+    }
+    case HSK_SYNTH6: {
+      r = (hsk_record_t *)malloc(sizeof(hsk_synth6_record_t));
       break;
     }
     case HSK_TEXT: {
@@ -304,6 +340,16 @@ hsk_record_free(hsk_record_t *r) {
     }
     case HSK_GLUE6: {
       hsk_glue6_record_t *rec = (hsk_glue6_record_t *)r;
+      free(rec);
+      break;
+    }
+    case HSK_SYNTH4: {
+      hsk_synth4_record_t *rec = (hsk_synth4_record_t *)r;
+      free(rec);
+      break;
+    }
+    case HSK_SYNTH6: {
+      hsk_synth6_record_t *rec = (hsk_synth6_record_t *)r;
       free(rec);
       break;
     }

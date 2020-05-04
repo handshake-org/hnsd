@@ -56,6 +56,16 @@ typedef struct hsk_glue6_record_s {
   uint8_t inet6[16];
 } hsk_glue6_record_t;
 
+typedef struct hsk_synth4_record_s {
+  uint8_t type;
+  uint8_t inet4[4];
+} hsk_synth4_record_t;
+
+typedef struct hsk_synth6_record_s {
+  uint8_t type;
+  uint8_t inet6[16];
+} hsk_synth6_record_t;
+
 typedef struct hsk_txt_record_s {
   uint8_t type;
   char text[256];
