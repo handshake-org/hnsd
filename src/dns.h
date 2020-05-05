@@ -640,12 +640,33 @@ hsk_dns_name_is_fqdn(const char *name);
 int
 hsk_dns_name_cmp(const char *a, const char *b);
 
+/**
+ * Returns: number of labels found in the name
+ * In:      name:   pointer to string containing full domain name
+            size:   max number of labels expected in the name
+ * Out:     labels: if present, array is filled with offset (in bytes)
+ *                  of starting point of each label in name
+ */
 int
 hsk_dns_label_split(const char *name, uint8_t *labels, size_t size);
 
+/**
+ * Returns: number of labels in the name
+ * In:      name:   pointer to string containing full domain name
+ */
 int
 hsk_dns_label_count(const char *name);
 
+/**
+ * Returns: length of string from requested label through end of name
+ * In:      name:   pointer to string containing full domain name
+ *          labels: pointer to array of offsets of each label in name
+ *          count:  number of labels in the name
+ *          index:  index of starting label in name to return
+ *                  (-1 = last label, TLD)
+ * Out:     ret:    pointer to string to be filled with name from
+ *                  specified label through end of name
+ */
 int
 hsk_dns_label_from2(
   const char *name,
@@ -655,9 +676,25 @@ hsk_dns_label_from2(
   char *ret
 );
 
+/**
+ * Returns: length of string from requested label through end of name
+ * In:      name:   pointer to string containing full domain name
+ *          index:  index of starting label in name to return
+ *                  (-1 = last label, TLD)
+ * Out:     ret:    pointer to string to be filled with name from
+ *                  specified label through end of name
+ */
 int
 hsk_dns_label_from(const char *name, int index, char *ret);
 
+/**
+ * Returns: length of requested label
+ * In:      name:   pointer to string containing full domain name
+ *          labels: pointer to array of offsets of each label in name
+ *          count:  number of labels in the name
+ *          index:  index of label in name to return (-1 = last label, TLD)
+ * Out:     ret:    pointer to string to be filled with requested label
+ */
 int
 hsk_dns_label_get2(
   const char *name,
@@ -667,6 +704,12 @@ hsk_dns_label_get2(
   char *ret
 );
 
+/**
+ * Returns: length of requested label
+ * In:      name:   pointer to string containing full domain name
+ *          index:  index of label in name to return (-1 = last label, TLD)
+ * Out:     ret:    pointer to string to be filled with requested label
+ */
 int
 hsk_dns_label_get(const char *name, int index, char *ret);
 
