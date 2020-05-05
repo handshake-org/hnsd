@@ -1551,6 +1551,9 @@ hsk_resource_to_dns(const hsk_resource_t *rs, const char *name, uint16_t type) {
   if (labels == 0)
     return NULL;
 
+  char tld[HSK_DNS_MAX_LABEL + 1];
+  hsk_dns_label_from(name, -1, tld);
+
   hsk_dns_msg_t *msg = hsk_dns_msg_alloc();
 
   if (!msg)
@@ -1561,11 +1564,19 @@ hsk_resource_to_dns(const hsk_resource_t *rs, const char *name, uint16_t type) {
   hsk_dns_rrs_t *ar = &msg->ar;
 
   // Handle reverse pointers.
-  if (labels == 2) {
+  // See https://github.com/handshake-org/hsd/issues/125
+  // Resolving a name with a synth record will return an NS record
+  // with a name that encodes an IP address: _[base32]._synth.
+  // The synth name then resolves to an A/AAAA record that is derived
+  // by decoding the name itself (it does not have to be looked up).
+  if (tld === '_synth' && labels == 2 && name[0] === '_') {
     uint8_t ip[16];
     uint16_t family;
 
-    if (pointer_to_ip(name, ip, &family)) {
+    char synth[HSK_DNS_MAX_LABEL + 1];
+    hsk_dns_label_from(name, -2, synth);
+
+    if (pointer_to_ip(synth, ip, &family)) {
       bool match = false;
 
       switch (type) {
@@ -1573,10 +1584,10 @@ hsk_resource_to_dns(const hsk_resource_t *rs, const char *name, uint16_t type) {
           match = true;
           break;
         case HSK_DNS_A:
-          match = family == HSK_INET4;
+          match = family == HSK_DNS_A;
           break;
         case HSK_DNS_AAAA:
-          match = family == HSK_INET6;
+          match = family == HSK_DNS_AAAA;
           break;
       }
 
@@ -1584,7 +1595,7 @@ hsk_resource_to_dns(const hsk_resource_t *rs, const char *name, uint16_t type) {
         // Needs SOA.
         // TODO: Make the reverse pointers TLDs.
         // Empty proof:
-        if (family == HSK_INET4) {
+        if (family == HSK_DNS_A) {
           hsk_resource_to_empty(
             name,
             hsk_type_map_a,
@@ -1605,10 +1616,7 @@ hsk_resource_to_dns(const hsk_resource_t *rs, const char *name, uint16_t type) {
         return msg;
       }
 
-      uint16_t rrtype = HSK_DNS_A;
-
-      if (family == HSK_INET6)
-        rrtype = HSK_DNS_AAAA;
+      uint16_t rrtype = family;
 
       msg->flags |= HSK_DNS_AA;
 
@@ -1622,7 +1630,7 @@ hsk_resource_to_dns(const hsk_resource_t *rs, const char *name, uint16_t type) {
       rr->ttl = rs->ttl;
       hsk_dns_rr_set_name(rr, name);
 
-      if (family == HSK_INET4) {
+      if (family == HSK_DNS_A) {
         hsk_dns_a_rd_t *rd = rr->rd;
         memcpy(&rd->addr[0], &ip[0], 4);
       } else {
@@ -1640,10 +1648,6 @@ hsk_resource_to_dns(const hsk_resource_t *rs, const char *name, uint16_t type) {
 
   // Referral.
   if (labels > 1) {
-    char tld[HSK_DNS_MAX_LABEL + 1];
-
-    hsk_dns_label_from(name, -1, tld);
-
     if (hsk_resource_has(rs, HSK_NS)) {
       hsk_resource_to_ns(rs, tld, ns);
       hsk_resource_to_ds(rs, tld, ns);
@@ -2024,10 +2028,10 @@ b32_to_ip(const char *str, uint8_t *ip, uint16_t *family) {
     if (memcmp(ip, (void *)&mapped[0], 12) == 0) {
       memcpy(&ip[0], &ip[12], 4);
       if (family)
-        *family = HSK_INET4;
+        *family = HSK_DNS_A;
     } else {
       if (family)
-        *family = HSK_INET6;
+        *family = HSK_DNS_AAAA;
     }
   }
 
