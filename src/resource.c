@@ -34,16 +34,6 @@ static const uint8_t hsk_type_map[] = {
   0x00, 0x00, 0x03, 0x80
 };
 
-// A RRSIG NSEC
-static const uint8_t hsk_type_map_a[] = {
-  0x00, 0x06, 0x40, 0x00, 0x00, 0x00, 0x00, 0x03
-};
-
-// AAAA RRSIG NSEC
-static const uint8_t hsk_type_map_aaaa[] = {
-  0x00, 0x06, 0x00, 0x00, 0x00, 0x80, 0x00, 0x03
-};
-
 /*
  * Helpers
  */
@@ -59,15 +49,6 @@ ip_write(const uint8_t *ip, uint8_t *data);
 
 static bool
 ip_read(const uint8_t *data, uint8_t *ip);
-
-static void
-ip_to_b32(const hsk_target_t *target, char *dst);
-
-static bool
-b32_to_ip(const char *str, uint8_t *ip, uint16_t *family);
-
-static bool
-pointer_to_ip(const char *name, uint8_t *ip, uint16_t *family);
 
 static bool
 target_to_dns(const hsk_target_t *target, const char *name, char *host);
@@ -1330,7 +1311,7 @@ hsk_resource_to_glue(
   return true;
 }
 
-static bool
+bool
 hsk_resource_root_to_soa(hsk_dns_rrs_t *an) {
   hsk_dns_rr_t *rr = hsk_dns_rr_create(HSK_DNS_SOA);
 
@@ -1470,7 +1451,7 @@ hsk_resource_root_to_ds(hsk_dns_rrs_t *an) {
   return true;
 }
 
-static bool
+bool
 hsk_resource_to_empty(
   const char *name,
   const uint8_t *type_map,
@@ -1562,89 +1543,6 @@ hsk_resource_to_dns(const hsk_resource_t *rs, const char *name, uint16_t type) {
   hsk_dns_rrs_t *an = &msg->an;
   hsk_dns_rrs_t *ns = &msg->ns;
   hsk_dns_rrs_t *ar = &msg->ar;
-
-  // Handle reverse pointers.
-  // See https://github.com/handshake-org/hsd/issues/125
-  // Resolving a name with a synth record will return an NS record
-  // with a name that encodes an IP address: _[base32]._synth.
-  // The synth name then resolves to an A/AAAA record that is derived
-  // by decoding the name itself (it does not have to be looked up).
-  if (tld === '_synth' && labels == 2 && name[0] === '_') {
-    uint8_t ip[16];
-    uint16_t family;
-
-    char synth[HSK_DNS_MAX_LABEL + 1];
-    hsk_dns_label_from(name, -2, synth);
-
-    if (pointer_to_ip(synth, ip, &family)) {
-      bool match = false;
-
-      switch (type) {
-        case HSK_DNS_ANY:
-          match = true;
-          break;
-        case HSK_DNS_A:
-          match = family == HSK_DNS_A;
-          break;
-        case HSK_DNS_AAAA:
-          match = family == HSK_DNS_AAAA;
-          break;
-      }
-
-      if (!match) {
-        // Needs SOA.
-        // TODO: Make the reverse pointers TLDs.
-        // Empty proof:
-        if (family == HSK_DNS_A) {
-          hsk_resource_to_empty(
-            name,
-            hsk_type_map_a,
-            sizeof(hsk_type_map_a),
-            ns
-          );
-        } else {
-          hsk_resource_to_empty(
-            name,
-            hsk_type_map_aaaa,
-            sizeof(hsk_type_map_aaaa),
-            ns
-          );
-        }
-        hsk_dnssec_sign_zsk(ns, HSK_DNS_NSEC);
-        hsk_resource_root_to_soa(ns);
-        hsk_dnssec_sign_zsk(ns, HSK_DNS_SOA);
-        return msg;
-      }
-
-      uint16_t rrtype = family;
-
-      msg->flags |= HSK_DNS_AA;
-
-      hsk_dns_rr_t *rr = hsk_dns_rr_create(rrtype);
-
-      if (!rr) {
-        hsk_dns_msg_free(msg);
-        return NULL;
-      }
-
-      rr->ttl = rs->ttl;
-      hsk_dns_rr_set_name(rr, name);
-
-      if (family == HSK_DNS_A) {
-        hsk_dns_a_rd_t *rd = rr->rd;
-        memcpy(&rd->addr[0], &ip[0], 4);
-      } else {
-        hsk_dns_aaaa_rd_t *rd = rr->rd;
-        memcpy(&rd->addr[0], &ip[0], 16);
-      }
-
-      hsk_dns_rrs_push(an, rr);
-
-      hsk_dnssec_sign_zsk(ar, rrtype);
-
-      return msg;
-    }
-  }
 
   // Referral.
   if (labels > 1) {
@@ -1982,14 +1880,16 @@ ip_read(const uint8_t *data, uint8_t *ip) {
   return true;
 }
 
-static void
-ip_to_b32(const hsk_target_t *target, char *dst) {
-  uint8_t ip[16];
+void
+ip_to_b32(const uint8_t *ip, char *dst) {
+  uint8_t mapped[16];
+  const size_t family = sizeof(ip);
 
-  if (target->type == HSK_INET4) {
-    memset(&ip[0], 0x00, 10);
-    memset(&ip[10], 0xff, 2);
-    memcpy(&ip[12], target->inet4, 4);
+  if (family == 4) {
+    // https://tools.ietf.org/html/rfc4291#section-2.5.5.2
+    memset(&mapped[0], 0x00, 10);
+    memset(&mapped[10], 0xff, 2);
+    memcpy(&mapped[12], ip, 4);
   } else {
     memcpy(&ip[0], target->inet6, 16);
   }
@@ -2005,7 +1905,7 @@ ip_to_b32(const hsk_target_t *target, char *dst) {
   hsk_base32_encode_hex(data, size, dst, false);
 }
 
-static bool
+bool
 b32_to_ip(const char *str, uint8_t *ip, uint16_t *family) {
   size_t size = hsk_base32_decode_hex_size(str);
 
@@ -2038,7 +1938,7 @@ b32_to_ip(const char *str, uint8_t *ip, uint16_t *family) {
   return true;
 }
 
-static bool
+bool
 pointer_to_ip(const char *name, uint8_t *ip, uint16_t *family) {
   char label[HSK_DNS_MAX_LABEL + 1];
   size_t len = hsk_dns_label_get(name, 0, label);
