@@ -95,6 +95,9 @@ hsk_resource_get(const hsk_resource_t *res, uint8_t type);
 bool
 hsk_resource_has(const hsk_resource_t *res, uint8_t type);
 
+bool
+hsk_resource_has_ns(const hsk_resource_t *res);
+
 hsk_dns_msg_t *
 hsk_resource_to_dns(const hsk_resource_t *rs, const char *name, uint16_t type);
 

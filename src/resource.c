@@ -501,6 +501,17 @@ hsk_resource_has(const hsk_resource_t *res, uint8_t type) {
   return hsk_resource_get(res, type) != NULL;
 }
 
+bool
+hsk_resource_has_ns(const hsk_resource_t *res) {
+  int i;
+  for (i = 0; i < res->record_count; i++) {
+    hsk_record_t *rec = res->records[i];
+    if (rec->type >= HSK_NS && rec->type <= HSK_SYNTH6)
+      return true;
+  }
+  return false;
+}
+
 static bool
 hsk_resource_to_a(
   const hsk_resource_t *res,
@@ -663,14 +674,38 @@ hsk_resource_to_ns(
   for (i = 0; i < res->record_count; i++) {
     hsk_record_t *c = res->records[i];
 
-    if (c->type != HSK_NS)
-      continue;
+    bool synth = false;
 
-    hsk_ns_record_t *rec = (hsk_ns_record_t *)c;
-    hsk_target_t *target = &rec->target;
+    switch (c->type) {
+      case HSK_SYNTH4:
+      case HSK_SYNTH6:
+        synth = true;
+      case HSK_NS:
+      case HSK_GLUE4:
+      case HSK_GLUE6:
+        break;
+      default:
+        continue;
+    }
 
-    if (!target_to_dns(target, name, nsname))
-      continue;
+    if (synth) {
+      // SYNTH records only actually contain an IP address
+      // for the adiditonal section. The NS name must
+      // be computed on the fly by encoding the IP into base32.
+      char b32[29];
+
+      if (c->type == HSK_SYNTH4)
+        ip_to_b32(c->inet4, b32);
+      else
+        ip_to_b32(c->inet6, b32);
+
+      // Magic pseudo-TLD can also be directly resolved by hnsd
+      sprintf(nsname, "_%s._synth.", b32);
+    } else {
+      // NS and GLUE records have the NS names ready to go.
+      assert(hsk_dns_name_is_fqdn(c->name));
+      strcpy(nsname, c->name);
+    }
 
     hsk_dns_rr_t *rr = hsk_dns_rr_create(HSK_DNS_NS);
 
@@ -1540,13 +1575,13 @@ hsk_resource_to_dns(const hsk_resource_t *rs, const char *name, uint16_t type) {
   if (!msg)
     return NULL;
 
-  hsk_dns_rrs_t *an = &msg->an;
-  hsk_dns_rrs_t *ns = &msg->ns;
-  hsk_dns_rrs_t *ar = &msg->ar;
+  hsk_dns_rrs_t *an = &msg->an; // answer
+  hsk_dns_rrs_t *ns = &msg->ns; // authority
+  hsk_dns_rrs_t *ar = &msg->ar; // additional
 
   // Referral.
   if (labels > 1) {
-    if (hsk_resource_has(rs, HSK_NS)) {
+    if (hsk_resource_has_ns(rs)) {
       hsk_resource_to_ns(rs, tld, ns);
       hsk_resource_to_ds(rs, tld, ns);
       hsk_resource_to_nsip(rs, tld, ar);
@@ -1891,12 +1926,12 @@ ip_to_b32(const uint8_t *ip, char *dst) {
     memset(&mapped[10], 0xff, 2);
     memcpy(&mapped[12], ip, 4);
   } else {
-    memcpy(&ip[0], target->inet6, 16);
+    memcpy(&mapped[0], ip, 16);
   }
 
   uint8_t data[17];
 
-  size_t size = ip_write(ip, data);
+  size_t size = ip_write(mapped, data);
   assert(size <= 17);
 
   size_t b32_size = hsk_base32_encode_hex_size(data, size, false);
