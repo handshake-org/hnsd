@@ -725,57 +725,6 @@ hsk_resource_to_ns(
 }
 
 static bool
-hsk_resource_to_nsip(
-  const hsk_resource_t *res,
-  const char *name,
-  hsk_dns_rrs_t *ar
-) {
-  int i;
-  char ptr[HSK_DNS_MAX_NAME + 1];
-
-  for (i = 0; i < res->record_count; i++) {
-    hsk_record_t *c = res->records[i];
-
-    if (c->type != HSK_NS)
-      continue;
-
-    hsk_ns_record_t *rec = (hsk_ns_record_t *)c;
-    hsk_target_t *target = &rec->target;
-
-    if (target->type != HSK_INET4 && target->type != HSK_INET6)
-      continue;
-
-    if (!target_to_dns(target, name, ptr))
-      continue;
-
-    uint16_t rrtype = HSK_DNS_A;
-
-    if (target->type == HSK_INET6)
-      rrtype = HSK_DNS_AAAA;
-
-    hsk_dns_rr_t *rr = hsk_dns_rr_create(rrtype);
-
-    if (!rr)
-      return false;
-
-    hsk_dns_rr_set_name(rr, ptr);
-    rr->ttl = res->ttl;
-
-    if (rrtype == HSK_DNS_A) {
-      hsk_dns_a_rd_t *rd = rr->rd;
-      memcpy(&rd->addr[0], &target->inet4[0], 4);
-    } else {
-      hsk_dns_aaaa_rd_t *rd = rr->rd;
-      memcpy(&rd->addr[0], &target->inet6[0], 16);
-    }
-
-    hsk_dns_rrs_push(ar, rr);
-  }
-
-  return true;
-}
-
-static bool
 hsk_resource_to_mx(
   const hsk_resource_t *res,
   const char *name,
@@ -1584,7 +1533,6 @@ hsk_resource_to_dns(const hsk_resource_t *rs, const char *name, uint16_t type) {
     if (hsk_resource_has_ns(rs)) {
       hsk_resource_to_ns(rs, tld, ns);
       hsk_resource_to_ds(rs, tld, ns);
-      hsk_resource_to_nsip(rs, tld, ar);
       hsk_resource_to_glue(rs, ar, HSK_DNS_NS);
       if (!hsk_resource_has(rs, HSK_DS))
         hsk_dnssec_sign_zsk(ns, HSK_DNS_NS);
@@ -1634,7 +1582,6 @@ hsk_resource_to_dns(const hsk_resource_t *rs, const char *name, uint16_t type) {
     case HSK_DNS_NS:
       hsk_resource_to_ns(rs, name, ns);
       hsk_resource_to_glue(rs, ar, HSK_DNS_NS);
-      hsk_resource_to_nsip(rs, name, ar);
       hsk_dnssec_sign_zsk(ns, HSK_DNS_NS);
       break;
     case HSK_DNS_MX:
@@ -1683,7 +1630,6 @@ hsk_resource_to_dns(const hsk_resource_t *rs, const char *name, uint16_t type) {
     } else if (hsk_resource_has(rs, HSK_NS)) {
       hsk_resource_to_ns(rs, name, ns);
       hsk_resource_to_ds(rs, name, ns);
-      hsk_resource_to_nsip(rs, name, ar);
       hsk_resource_to_glue(rs, ar, HSK_DNS_NS);
       if (!hsk_resource_has(rs, HSK_DS))
         hsk_dnssec_sign_zsk(ns, HSK_DNS_NS);
