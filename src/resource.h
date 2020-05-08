@@ -31,14 +31,6 @@ typedef struct hsk_ds_record_s {
   uint8_t digest[64];
 } hsk_ds_record_t;
 
-typedef struct hsk_target_s {
-  uint8_t type;
-  char name[256];
-  uint8_t inet4[4];
-  uint8_t inet6[16];
-  uint8_t onion[33];
-} hsk_target_t;
-
 typedef struct hsk_ns_record_s {
   uint8_t type;
   char name[256];

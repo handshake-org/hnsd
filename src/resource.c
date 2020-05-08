@@ -50,9 +50,6 @@ ip_write(const uint8_t *ip, uint8_t *data);
 static bool
 ip_read(const uint8_t *data, uint8_t *ip);
 
-static bool
-target_to_dns(const hsk_target_t *target, const char *name, char *host);
-
 /*
  * Resource serialization version 0
  * Record types: read
@@ -513,156 +510,6 @@ hsk_resource_has_ns(const hsk_resource_t *res) {
 }
 
 static bool
-hsk_resource_to_a(
-  const hsk_resource_t *res,
-  const char *name,
-  hsk_dns_rrs_t *an
-) {
-  int i;
-
-  for (i = 0; i < res->record_count; i++) {
-    hsk_record_t *c = res->records[i];
-
-    if (c->type != HSK_INET4)
-      continue;
-
-    hsk_inet4_record_t *rec = (hsk_inet4_record_t *)c;
-    hsk_target_t *target = &rec->target;
-
-    hsk_dns_rr_t *rr = hsk_dns_rr_create(HSK_DNS_A);
-
-    if (!rr)
-      return false;
-
-    hsk_dns_rr_set_name(rr, name);
-    rr->ttl = res->ttl;
-
-    hsk_dns_a_rd_t *rd = rr->rd;
-    memcpy(&rd->addr[0], &target->inet4[0], 4);
-
-    hsk_dns_rrs_push(an, rr);
-  }
-
-  return true;
-}
-
-static bool
-hsk_resource_to_aaaa(
-  const hsk_resource_t *res,
-  const char *name,
-  hsk_dns_rrs_t *an
-) {
-  int i;
-
-  for (i = 0; i < res->record_count; i++) {
-    hsk_record_t *c = res->records[i];
-
-    if (c->type != HSK_INET6)
-      continue;
-
-    hsk_inet6_record_t *rec = (hsk_inet6_record_t *)c;
-    hsk_target_t *target = &rec->target;
-
-    hsk_dns_rr_t *rr = hsk_dns_rr_create(HSK_DNS_AAAA);
-
-    if (!rr)
-      return false;
-
-    hsk_dns_rr_set_name(rr, name);
-    rr->ttl = res->ttl;
-
-    hsk_dns_aaaa_rd_t *rd = rr->rd;
-    memcpy(&rd->addr[0], &target->inet6[0], 16);
-
-    hsk_dns_rrs_push(an, rr);
-  }
-
-  return true;
-}
-
-static bool
-hsk_resource_to_cname(
-  const hsk_resource_t *res,
-  const char *name,
-  hsk_dns_rrs_t *an
-) {
-  int i;
-  char cname[HSK_DNS_MAX_NAME + 1];
-
-  for (i = 0; i < res->record_count; i++) {
-    hsk_record_t *c = res->records[i];
-
-    if (c->type != HSK_CANONICAL)
-      continue;
-
-    hsk_canonical_record_t *rec = (hsk_canonical_record_t *)c;
-    hsk_target_t *target = &rec->target;
-
-    if (target->type != HSK_NAME && target->type != HSK_GLUE)
-      continue;
-
-    if (!target_to_dns(target, name, cname))
-      continue;
-
-    hsk_dns_rr_t *rr = hsk_dns_rr_create(HSK_DNS_CNAME);
-
-    if (!rr)
-      return false;
-
-    hsk_dns_rr_set_name(rr, name);
-    rr->ttl = res->ttl;
-
-    hsk_dns_cname_rd_t *rd = rr->rd;
-    strcpy(rd->target, cname);
-
-    hsk_dns_rrs_push(an, rr);
-  }
-
-  return true;
-}
-
-static bool
-hsk_resource_to_dname(
-  const hsk_resource_t *res,
-  const char *name,
-  hsk_dns_rrs_t *an
-) {
-  int i;
-  char dname[HSK_DNS_MAX_NAME + 1];
-
-  for (i = 0; i < res->record_count; i++) {
-    hsk_record_t *c = res->records[i];
-
-    if (c->type != HSK_DELEGATE)
-      continue;
-
-    hsk_delegate_record_t *rec = (hsk_delegate_record_t *)c;
-    hsk_target_t *target = &rec->target;
-
-    if (target->type != HSK_NAME && target->type != HSK_GLUE)
-      continue;
-
-    if (!target_to_dns(target, name, dname))
-      continue;
-
-    hsk_dns_rr_t *rr = hsk_dns_rr_create(HSK_DNS_DNAME);
-
-    if (!rr)
-      return false;
-
-    hsk_dns_rr_set_name(rr, name);
-    rr->ttl = res->ttl;
-
-    hsk_dns_dname_rd_t *rd = rr->rd;
-    strcpy(rd->target, dname);
-
-    hsk_dns_rrs_push(an, rr);
-  }
-
-  return true;
-}
-
-static bool
 hsk_resource_to_ns(
   const hsk_resource_t *res,
   const char *name,
@@ -725,109 +572,6 @@ hsk_resource_to_ns(
 }
 
 static bool
-hsk_resource_to_mx(
-  const hsk_resource_t *res,
-  const char *name,
-  hsk_dns_rrs_t *an
-) {
-  int i;
-  char mx[HSK_DNS_MAX_NAME + 1];
-
-  for (i = 0; i < res->record_count; i++) {
-    hsk_record_t *c = res->records[i];
-
-    if (c->type != HSK_SERVICE)
-      continue;
-
-    hsk_service_record_t *rec = (hsk_service_record_t *)c;
-    hsk_target_t *target = &rec->target;
-
-    if (strcasecmp(rec->service, "smtp.") != 0
-        || strcasecmp(rec->protocol, "tcp.") != 0) {
-      continue;
-    }
-
-    if (!target_to_dns(target, name, mx))
-      continue;
-
-    hsk_dns_rr_t *rr = hsk_dns_rr_create(HSK_DNS_MX);
-
-    if (!rr)
-      return false;
-
-    hsk_dns_rr_set_name(rr, name);
-    rr->ttl = res->ttl;
-
-    hsk_dns_mx_rd_t *rd = rr->rd;
-    rd->preference = rec->priority;
-    strcpy(rd->mx, mx);
-
-    hsk_dns_rrs_push(an, rr);
-  }
-
-  return true;
-}
-
-static bool
-hsk_resource_to_mxip(
-  const hsk_resource_t *res,
-  const char *name,
-  hsk_dns_rrs_t *an
-) {
-  return hsk_resource_to_srvip(res, name, "tcp.", "smtp.", an);
-}
-
-static bool
-hsk_resource_to_srv(
-  const hsk_resource_t *res,
-  const char *name,
-  const char *protocol,
-  const char *service,
-  hsk_dns_rrs_t *an
-) {
-  int i;
-  char host[HSK_DNS_MAX_NAME + 1];
-
-  for (i = 0; i < res->record_count; i++) {
-    hsk_record_t *c = res->records[i];
-
-    if (c->type != HSK_SERVICE)
-      continue;
-
-    hsk_service_record_t *rec = (hsk_service_record_t *)c;
-    hsk_target_t *target = &rec->target;
-
-    if (strcasecmp(protocol, rec->protocol) != 0)
-      continue;
-
-    if (strcasecmp(service, rec->service) != 0)
-      continue;
-
-    if (!target_to_dns(target, name, host))
-      continue;
-
-    hsk_dns_rr_t *rr = hsk_dns_rr_create(HSK_DNS_SRV);
-
-    if (!rr)
-      return false;
-
-    hsk_dns_rr_set_name(rr, name);
-    rr->ttl = res->ttl;
-
-    hsk_dns_srv_rd_t *rd = rr->rd;
-
-    rd->priority = rec->priority;
-    rd->weight = rec->weight;
-    rd->port = rec->port;
-    strcpy(rd->target, host);
-
-    hsk_dns_rrs_push(an, rr);
-  }
-
-  return true;
-}
-
-static bool
 hsk_resource_to_txt(
   const hsk_resource_t *res,
   const char *name,
@@ -874,46 +618,6 @@ hsk_resource_to_txt(
 }
 
 static bool
-hsk_resource_to_loc(
-  const hsk_resource_t *res,
-  const char *name,
-  hsk_dns_rrs_t *an
-) {
-  int i;
-
-  for (i = 0; i < res->record_count; i++) {
-    hsk_record_t *c = res->records[i];
-
-    if (c->type != HSK_LOCATION)
-      continue;
-
-    hsk_location_record_t *rec = (hsk_location_record_t *)c;
-
-    hsk_dns_rr_t *rr = hsk_dns_rr_create(HSK_DNS_LOC);
-
-    if (!rr)
-      return false;
-
-    hsk_dns_rr_set_name(rr, name);
-    rr->ttl = res->ttl;
-
-    hsk_dns_loc_rd_t *rd = rr->rd;
-
-    rd->version = rec->version;
-    rd->size = rec->size;
-    rd->horiz_pre = rec->horiz_pre;
-    rd->vert_pre = rec->vert_pre;
-    rd->latitude = rec->latitude;
-    rd->longitude = rec->longitude;
-    rd->altitude = rec->altitude;
-
-    hsk_dns_rrs_push(an, rr);
-  }
-
-  return true;
-}
-
-static bool
 hsk_resource_to_ds(
   const hsk_resource_t *res,
   const char *name,
@@ -952,236 +656,6 @@ hsk_resource_to_ds(
     }
 
     memcpy(rd->digest, &rec->digest[0], rec->digest_len);
-
-    hsk_dns_rrs_push(an, rr);
-  }
-
-  return true;
-}
-
-static bool
-hsk_resource_to_sshfp(
-  const hsk_resource_t *res,
-  const char *name,
-  hsk_dns_rrs_t *an
-) {
-  int i;
-
-  for (i = 0; i < res->record_count; i++) {
-    hsk_record_t *c = res->records[i];
-
-    if (c->type != HSK_SSH)
-      continue;
-
-    hsk_ssh_record_t *rec = (hsk_ssh_record_t *)c;
-
-    hsk_dns_rr_t *rr = hsk_dns_rr_create(HSK_DNS_SSHFP);
-
-    if (!rr)
-      return false;
-
-    hsk_dns_rr_set_name(rr, name);
-    rr->ttl = res->ttl;
-
-    hsk_dns_sshfp_rd_t *rd = rr->rd;
-
-    rd->algorithm = rec->algorithm;
-    rd->digest_type = rec->digest_type;
-    rd->fingerprint_len = rec->fingerprint_len;
-
-    rd->fingerprint = malloc(rec->fingerprint_len);
-
-    if (!rd->fingerprint) {
-      hsk_dns_rr_free(rr);
-      return false;
-    }
-
-    memcpy(rd->fingerprint, &rec->fingerprint[0], rec->fingerprint_len);
-
-    hsk_dns_rrs_push(an, rr);
-  }
-
-  return true;
-}
-
-static bool
-hsk_resource_to_uri(
-  const hsk_resource_t *res,
-  const char *name,
-  hsk_dns_rrs_t *an
-) {
-  int i;
-
-  for (i = 0; i < res->record_count; i++) {
-    hsk_record_t *c = res->records[i];
-
-    if (c->type != HSK_URI)
-      continue;
-
-    hsk_uri_record_t *rec = (hsk_uri_record_t *)c;
-
-    hsk_dns_rr_t *rr = hsk_dns_rr_create(HSK_DNS_URI);
-
-    if (!rr)
-      return false;
-
-    hsk_dns_rr_set_name(rr, name);
-    rr->ttl = res->ttl;
-
-    hsk_dns_uri_rd_t *rd = rr->rd;
-
-    rd->priority = 0;
-    rd->weight = 0;
-    rd->data_len = strlen(rec->text);
-
-    assert(rd->data_len <= 255);
-
-    memcpy(&rd->data[0], &rec->text[0], rd->data_len);
-
-    hsk_dns_rrs_push(an, rr);
-  }
-
-  char nid[HSK_DNS_MAX_LABEL + 1];
-  char nin[HSK_DNS_MAX_NAME + 1];
-
-  for (i = 0; i < res->record_count; i++) {
-    hsk_record_t *c = res->records[i];
-
-    if (c->type != HSK_MAGNET)
-      continue;
-
-    hsk_magnet_record_t *rec = (hsk_magnet_record_t *)c;
-
-    size_t nid_len = hsk_dns_label_get(rec->nid, 0, nid);
-    hsk_to_lower(nid);
-
-    size_t len = 16 + nid_len + rec->nin_len * 2;
-
-    if (len + 1 > 255)
-      continue;
-
-    hsk_dns_rr_t *rr = hsk_dns_rr_create(HSK_DNS_URI);
-
-    if (!rr)
-      return false;
-
-    hsk_dns_rr_set_name(rr, name);
-    rr->ttl = res->ttl;
-
-    assert(rec->nin_len <= 64);
-    hsk_hex_encode(rec->nin, rec->nin_len, nin);
-
-    hsk_dns_uri_rd_t *rd = rr->rd;
-
-    rd->priority = 0;
-    rd->weight = 0;
-    rd->data_len = len;
-
-    assert(rd->data_len <= 255);
-
-    sprintf((char *)rd->data, "magnet:?xt=urn:%s:%s", nid, nin);
-
-    hsk_dns_rrs_push(an, rr);
-  }
-
-  char *currency = &nid[0];
-  char *addr = &nin[0];
-
-  for (i = 0; i < res->record_count; i++) {
-    hsk_record_t *c = res->records[i];
-
-    if (c->type != HSK_ADDR)
-      continue;
-
-    hsk_addr_record_t *rec = (hsk_addr_record_t *)c;
-
-    if (rec->ctype != 0 && rec->ctype != 3)
-      continue;
-
-    size_t currency_len = hsk_dns_label_get(rec->currency, 0, currency);
-    hsk_to_lower(currency);
-
-    size_t addr_len = 0;
-
-    if (rec->ctype == 0) {
-      addr_len = strlen(rec->address);
-      memcpy(addr, rec->address, addr_len);
-    } else if (rec->ctype == 3) {
-      assert(rec->hash_len <= 64);
-      addr_len = 2 + rec->hash_len * 2;
-      addr[0] = '0';
-      addr[1] = 'x';
-      hsk_hex_encode(rec->hash, rec->hash_len, &addr[2]);
-    } else {
-      assert(0);
-    }
-
-    size_t len = currency_len + 1 + addr_len;
-
-    if (len + 1 > 255)
-      continue;
-
-    hsk_dns_rr_t *rr = hsk_dns_rr_create(HSK_DNS_URI);
-
-    if (!rr)
-      return false;
-
-    hsk_dns_rr_set_name(rr, name);
-    rr->ttl = res->ttl;
-
-    hsk_dns_uri_rd_t *rd = rr->rd;
-
-    rd->priority = 0;
-    rd->weight = 0;
-    rd->data_len = len;
-
-    assert(rd->data_len <= 255);
-
-    sprintf((char *)rd->data, "%s:%s", currency, addr);
-
-    hsk_dns_rrs_push(an, rr);
-  }
-
-  return true;
-}
-
-static bool
-hsk_resource_to_rp(
-  const hsk_resource_t *res,
-  const char *name,
-  hsk_dns_rrs_t *an
-) {
-  char mbox[HSK_DNS_MAX_NAME + 2];
-  int i;
-
-  for (i = 0; i < res->record_count; i++) {
-    hsk_record_t *c = res->records[i];
-
-    if (c->type != HSK_EMAIL)
-      continue;
-
-    hsk_email_record_t *rec = (hsk_email_record_t *)c;
-
-    if (strlen(rec->text) > 63)
-      continue;
-
-    sprintf(mbox, "%s.", rec->text);
-
-    if (!hsk_dns_name_verify(mbox))
-      continue;
-
-    hsk_dns_rr_t *rr = hsk_dns_rr_create(HSK_DNS_RP);
-
-    if (!rr)
-      return false;
-
-    hsk_dns_rr_set_name(rr, name);
-    rr->ttl = res->ttl;
-
-    hsk_dns_rp_rd_t *rd = rr->rd;
-
-    strcpy(rd->mbox, mbox);
-    strcpy(rd->txt, ".");
 
     hsk_dns_rrs_push(an, rr);
   }
@@ -1486,12 +960,6 @@ hsk_resource_to_dns(const hsk_resource_t *rs, const char *name, uint16_t type) {
         hsk_dnssec_sign_zsk(ns, HSK_DNS_NS);
       else
         hsk_dnssec_sign_zsk(ns, HSK_DNS_DS);
-    } else if (hsk_resource_has(rs, HSK_DELEGATE)) {
-      hsk_resource_to_dname(rs, name, an);
-      hsk_resource_to_glue(rs, ar, HSK_DNS_DNAME);
-      hsk_dnssec_sign_zsk(an, HSK_DNS_DNAME);
-      hsk_dnssec_sign_zsk(ar, HSK_DNS_A);
-      hsk_dnssec_sign_zsk(ar, HSK_DNS_AAAA);
     } else {
       // Needs SOA.
       // Empty proof:
@@ -1504,81 +972,33 @@ hsk_resource_to_dns(const hsk_resource_t *rs, const char *name, uint16_t type) {
     return msg;
   }
 
+  // Record types actually on-chain for HNS TLDs.
   switch (type) {
-    case HSK_DNS_A:
-      hsk_resource_to_a(rs, name, an);
-      hsk_dnssec_sign_zsk(an, HSK_DNS_A);
-      break;
-    case HSK_DNS_AAAA:
-      hsk_resource_to_aaaa(rs, name, an);
-      hsk_dnssec_sign_zsk(an, HSK_DNS_AAAA);
-      break;
-    case HSK_DNS_CNAME:
-      hsk_resource_to_cname(rs, name, an);
-      hsk_resource_to_glue(rs, ar, HSK_DNS_CNAME);
-      hsk_dnssec_sign_zsk(an, HSK_DNS_CNAME);
-      hsk_dnssec_sign_zsk(ar, HSK_DNS_A);
-      hsk_dnssec_sign_zsk(ar, HSK_DNS_AAAA);
-      break;
-    case HSK_DNS_DNAME:
-      hsk_resource_to_dname(rs, name, an);
-      hsk_resource_to_glue(rs, ar, HSK_DNS_DNAME);
-      hsk_dnssec_sign_zsk(an, HSK_DNS_DNAME);
-      hsk_dnssec_sign_zsk(ar, HSK_DNS_A);
-      hsk_dnssec_sign_zsk(ar, HSK_DNS_AAAA);
-      break;
-    case HSK_DNS_NS:
-      hsk_resource_to_ns(rs, name, ns);
-      hsk_resource_to_glue(rs, name, ar);
-      hsk_dnssec_sign_zsk(ns, HSK_DNS_NS);
-      break;
-    case HSK_DNS_MX:
-      hsk_resource_to_mx(rs, name, an);
-      hsk_resource_to_mxip(rs, name, ar);
-      hsk_resource_to_glue(rs, ar, HSK_DNS_MX);
-      hsk_dnssec_sign_zsk(an, HSK_DNS_MX);
-      break;
-    case HSK_DNS_TXT:
-      hsk_resource_to_txt(rs, name, an);
-      hsk_dnssec_sign_zsk(an, HSK_DNS_TXT);
-      break;
-    case HSK_DNS_LOC:
-      hsk_resource_to_loc(rs, name, an);
-      hsk_dnssec_sign_zsk(an, HSK_DNS_LOC);
-      break;
     case HSK_DNS_DS:
       hsk_resource_to_ds(rs, name, an);
       hsk_dnssec_sign_zsk(an, HSK_DNS_DS);
       break;
-    case HSK_DNS_SSHFP:
-      hsk_resource_to_sshfp(rs, name, an);
-      hsk_dnssec_sign_zsk(an, HSK_DNS_SSHFP);
+    case HSK_DNS_NS:
+      // Includes SYNTH and GLUE records.
+      hsk_resource_to_ns(rs, name, ns);
+      hsk_resource_to_glue(rs, name, ar);
+      hsk_dnssec_sign_zsk(ns, HSK_DNS_NS);
       break;
-    case HSK_DNS_URI:
-      hsk_resource_to_uri(rs, name, an);
-      hsk_dnssec_sign_zsk(an, HSK_DNS_URI);
-      break;
-    case HSK_DNS_RP:
-      hsk_resource_to_rp(rs, name, an);
-      hsk_dnssec_sign_zsk(an, HSK_DNS_RP);
+    case HSK_DNS_TXT:
+      hsk_resource_to_txt(rs, name, an);
+      hsk_dnssec_sign_zsk(an, HSK_DNS_TXT);
       break;
   }
 
   if (an->size > 0)
     msg->flags |= HSK_DNS_AA;
 
+  // Attempt to force a referral if we don't have an answer.
   if (an->size == 0 && ns->size == 0) {
-    if (hsk_resource_has(rs, HSK_CANONICAL)) {
-      msg->flags |= HSK_DNS_AA;
-      hsk_resource_to_cname(rs, name, an);
-      hsk_resource_to_glue(rs, ar, HSK_DNS_CNAME);
-      hsk_dnssec_sign_zsk(an, HSK_DNS_CNAME);
-      hsk_dnssec_sign_zsk(ar, HSK_DNS_A);
-      hsk_dnssec_sign_zsk(ar, HSK_DNS_AAAA);
-    } else if (hsk_resource_has(rs, HSK_NS)) {
+    if (hsk_resource_has_ns(rs)) {
       hsk_resource_to_ns(rs, name, ns);
       hsk_resource_to_ds(rs, name, ns);
-      hsk_resource_to_glue(rs, ar, HSK_DNS_NS);
+      hsk_resource_to_glue(rs, name, ar);
       if (!hsk_resource_has(rs, HSK_DS))
         hsk_dnssec_sign_zsk(ns, HSK_DNS_NS);
       else
@@ -1876,33 +1296,6 @@ pointer_to_ip(const char *name, uint8_t *ip, uint16_t *family) {
     return false;
 
   return b32_to_ip(&label[1], ip, family);
-}
-
-static bool
-target_to_dns(const hsk_target_t *target, const char *name, char *host) {
-  if (target->type == HSK_NAME || target->type == HSK_GLUE) {
-    assert(hsk_dns_name_is_fqdn(target->name));
-    strcpy(host, target->name);
-    return true;
-  }
-
-  if (target->type == HSK_INET4 || target->type == HSK_INET6) {
-    char b32[29];
-    char tld[HSK_DNS_MAX_LABEL + 1];
-
-    ip_to_b32(target, b32);
-
-    int len = hsk_dns_label_get(name, -1, tld);
-
-    if (len <= 0)
-      return false;
-
-    sprintf(host, "_%s.%s.", b32, tld);
-
-    return true;
-  }
-
-  return false;
 }
 
 bool
