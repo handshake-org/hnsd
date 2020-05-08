@@ -16,17 +16,6 @@
 #include "resource.h"
 #include "utils.h"
 
-static const uint8_t hsk_zero_inet4[4] = {
-  0x00, 0x00, 0x00, 0x00
-};
-
-static const uint8_t hsk_zero_inet6[16] = {
-  0x00, 0x00, 0x00, 0x00,
-  0x00, 0x00, 0x00, 0x00,
-  0x00, 0x00, 0x00, 0x00,
-  0x00, 0x00, 0x00, 0x00
-};
-
 // NS SOA RRSIG NSEC DNSKEY
 // Possibly add A, AAAA, and DS
 static const uint8_t hsk_type_map[] = {
