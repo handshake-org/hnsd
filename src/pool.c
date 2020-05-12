@@ -1143,6 +1143,7 @@ hsk_peer_send(hsk_peer_t *peer, const hsk_msg_t *msg) {
 
 static int
 hsk_peer_send_version(hsk_peer_t *peer) {
+  hsk_peer_log(peer, "sending version\n");
   hsk_pool_t *pool = (hsk_pool_t *)peer->pool;
 
   hsk_version_msg_t msg = { .cmd = HSK_MSG_VERSION };
@@ -1172,6 +1173,7 @@ hsk_peer_send_version(hsk_peer_t *peer) {
 
 static int
 hsk_peer_send_verack(hsk_peer_t *peer) {
+  hsk_peer_log(peer, "sending verack\n");
   hsk_version_msg_t msg = { .cmd = HSK_MSG_VERACK };
   return hsk_peer_send(peer, (hsk_msg_t *)&msg);
 }
@@ -1196,12 +1198,14 @@ hsk_peer_send_pong(hsk_peer_t *peer, uint64_t nonce) {
 
 static int
 hsk_peer_send_sendheaders(hsk_peer_t *peer) {
+  hsk_peer_log(peer, "sending sendheaders\n");
   hsk_version_msg_t msg = { .cmd = HSK_MSG_SENDHEADERS };
   return hsk_peer_send(peer, (hsk_msg_t *)&msg);
 }
 
 static int
 hsk_peer_send_getheaders(hsk_peer_t *peer, const uint8_t *stop) {
+  hsk_peer_log(peer, "sending getheaders\n");
   hsk_getheaders_msg_t msg = { .cmd = HSK_MSG_GETHEADERS };
 
   hsk_msg_init((hsk_msg_t *)&msg);
@@ -1241,19 +1245,27 @@ hsk_peer_handle_version(hsk_peer_t *peer, const hsk_version_msg_t *msg) {
   hsk_timedata_add(&pool->td, &peer->addr, msg->time);
   hsk_addrman_mark_ack(&pool->am, &peer->addr, msg->services);
 
-  return hsk_peer_send_verack(peer);
-}
+  hsk_peer_send_verack(peer);
 
-static int
-hsk_peer_handle_verack(hsk_peer_t *peer, const hsk_verack_msg_t *msg) {
-  peer->version_time = 0;
-
+  // At this point, we've sent a version and received VERACK.
+  // The peer sent us their version and we sent back a VERACK.
+  // The handshake is complete, start syncing.
   int rc = hsk_peer_send_sendheaders(peer);
 
   if (rc != HSK_SUCCESS)
     return rc;
 
   return hsk_peer_send_getheaders(peer, NULL);
+}
+
+static int
+hsk_peer_handle_verack(hsk_peer_t *peer, const hsk_verack_msg_t *msg) {
+  hsk_peer_log(peer, "received verack\n");
+
+  peer->version_time = 0;
+
+  // VERACK is boring, no need to respond.
+  return HSK_SUCCESS;
 }
 
 static int
