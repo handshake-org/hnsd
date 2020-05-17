@@ -531,9 +531,9 @@ hsk_resource_to_ns(
       char b32[29];
 
       if (c->type == HSK_SYNTH4)
-        ip_to_b32(c->inet4, b32);
+        ip_to_b32(c->inet4, b32, 4);
       else
-        ip_to_b32(c->inet6, b32);
+        ip_to_b32(c->inet6, b32, 16);
 
       // Magic pseudo-TLD can also be directly resolved by hnsd
       sprintf(nsname, "_%s._synth.", b32);
@@ -593,7 +593,7 @@ hsk_resource_to_txt(
       return false;
     }
 
-    txt->data_len = strlen(rec->text);
+    txt->data_len = sizeof(rec->text);
     assert(txt->data_len <= 255);
 
     memcpy(&txt->data[0], rec->text, txt->data_len);
@@ -1219,9 +1219,8 @@ ip_read(const uint8_t *data, uint8_t *ip) {
 }
 
 void
-ip_to_b32(const uint8_t *ip, char *dst) {
+ip_to_b32(const uint8_t *ip, char *dst, uint8_t family) {
   uint8_t mapped[16];
-  const size_t family = sizeof(ip);
 
   if (family == 4) {
     // https://tools.ietf.org/html/rfc4291#section-2.5.5.2
