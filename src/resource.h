@@ -46,7 +46,7 @@ typedef hsk_record_t hsk_synth6_record_t;
 
 typedef struct hsk_txt_record_s {
   uint8_t type;
-  char text[256];
+  hsk_dns_txts_t txts;
 } hsk_txt_record_t;
 
 // Resource
@@ -106,7 +106,7 @@ bool
 hsk_resource_root_to_soa(hsk_dns_rrs_t *an);
 
 void
-ip_to_b32(const uint8_t *ip, char *dst);
+ip_to_b32(const uint8_t *ip, char *dst, uint8_t family);
 
 bool
 b32_to_ip(const char *str, uint8_t *ip, uint16_t *family);

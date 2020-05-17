@@ -125,66 +125,46 @@ hsk_synth6_record_read(
 }
 
 bool
-hsk_resource_str_read(
-  uint8_t **data,
-  size_t *data_len,
-  char *str,
-  size_t limit
-) {
-  uint8_t size = 0;
-  uint8_t *chunk;
-
-  if (!read_u8(data, data_len, &size))
-    return false;
-
-  if (!slice_bytes(data, data_len, &chunk, size))
-    return false;
-
-  int real_size = 0;
-  int i;
-
-  for (i = 0; i < size; i++) {
-    uint8_t ch = chunk[i];
-
-    // No DEL.
-    if (ch == 0x7f)
-      return false;
-
-    // Any non-printable character can screw.
-    // Tab, line feed, and carriage return all valid.
-    if (ch < 0x20
-        && ch != 0x09
-        && ch != 0x0a
-        && ch != 0x0d) {
-      return false;
-    }
-
-    real_size += 1;
-  }
-
-  if (real_size > limit)
-    return false;
-
-  char *s = str;
-  for (i = 0; i < size; i++) {
-    uint8_t ch = chunk[i];
-
-    *s = ch;
-    s += 1;
-  }
-
-  *s ='\0';
-
-  return true;
-}
-
-bool
 hsk_txt_record_read(
   uint8_t **data,
   size_t *data_len,
   hsk_txt_record_t *rec
 ) {
-  return hsk_resource_str_read(data, data_len, rec->text, 255);
+  // Length of the array of strings
+  uint8_t length = 0;
+  if (!read_u8(data, data_len, &length))
+    return false;
+
+  hsk_dns_txts_t *txts = &rec->txts;
+  txts->size = length;
+
+  // Iterate through array
+  int i;
+  for (i = 0; i < length; i++) {
+    hsk_dns_txt_t *txt = hsk_dns_txt_alloc();
+
+    if(!txt)
+      return false;
+
+    txts->items[i] = txt;
+
+    // Size of this string
+    uint8_t size = 0;
+    if (!read_u8(data, data_len, &size)) {
+      hsk_dns_txt_free(txt);
+      return false;
+    }
+    
+    txt->data_len = size;
+
+    // Copy string
+    if(!read_bytes(data, data_len, txt->data, size)){
+      hsk_dns_txt_free(txt);
+      return false;
+    }
+  }
+
+  return true;
 }
 
 void
@@ -233,7 +213,7 @@ hsk_record_init(hsk_record_t *r) {
     }
     case HSK_TEXT: {
       hsk_txt_record_t *rec = (hsk_txt_record_t *)r;
-      memset(rec->text, 0, sizeof(rec->text));
+      memset(&rec->txts, 0, sizeof(rec->txts));
       break;
     }
   }
@@ -575,6 +555,7 @@ hsk_resource_to_txt(
       continue;
 
     hsk_txt_record_t *rec = (hsk_txt_record_t *)c;
+    hsk_dns_txts_t *txts = &rec->txts;
 
     hsk_dns_rr_t *rr = hsk_dns_rr_create(HSK_DNS_TXT);
 
@@ -586,19 +567,22 @@ hsk_resource_to_txt(
 
     hsk_dns_txt_rd_t *rd = rr->rd;
 
-    hsk_dns_txt_t *txt = hsk_dns_txt_alloc();
+    int i;
+    for (i = 0; i < txts->size; i++) {
+      hsk_dns_txt_t *txt = hsk_dns_txt_alloc();
 
-    if (!txt) {
-      hsk_dns_rr_free(rr);
-      return false;
+      if (!txt) {
+        hsk_dns_rr_free(rr);
+        return false;
+      }
+
+      hsk_dns_txt_t *item = txts->items[i]; 
+      txt->data_len = item->data_len;
+      assert(txt->data_len <= 255);
+
+      memcpy(&txt->data[0], item->data, txt->data_len);
+      hsk_dns_txts_push(&rd->txts, txt);
     }
-
-    txt->data_len = sizeof(rec->text);
-    assert(txt->data_len <= 255);
-
-    memcpy(&txt->data[0], rec->text, txt->data_len);
-
-    hsk_dns_txts_push(&rd->txts, txt);
 
     hsk_dns_rrs_push(an, rr);
   }
