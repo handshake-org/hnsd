@@ -396,8 +396,8 @@ hsk_addr_from_string(hsk_addr_t *addr, const char *src, uint16_t port) {
     }
 
     sin_port = (uint16_t)word;
-  } else if (!port && port_s) {
-    return false;
+  } else if (!port) {
+    sin_port = at ? HSK_BRONTIDE_PORT : HSK_PORT;
   }
 
   uint8_t sin_addr[16];
@@ -940,7 +940,11 @@ hsk_addr_print(const hsk_addr_t *addr, const char *prefix) {
   char host[HSK_MAX_HOST];
   assert(hsk_addr_to_string(addr, host, HSK_MAX_HOST, HSK_BRONTIDE_PORT));
 
+  char b32[54];
+  hsk_base32_encode(addr->key, 33, b32, false);
+
   printf("%saddr\n", prefix);
+  printf("%skey=%s\n", prefix, b32);
   printf("%s  type=%d\n", prefix, addr->type);
   printf("%s  host=%s\n", prefix, host);
 }

@@ -57,7 +57,7 @@ hsk_addrman_init(hsk_addrman_t *am, const hsk_timedata_t *td) {
   const char **seed;
   for (seed = hsk_seeds; *seed; seed++) {
     hsk_addr_t addr;
-    assert(hsk_addr_from_string(&addr, *seed, HSK_BRONTIDE_PORT));
+    assert(hsk_addr_from_string(&addr, *seed, 0));
     assert(hsk_addrman_add_addr(am, &addr));
   }
 
