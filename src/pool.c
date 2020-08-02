@@ -53,7 +53,7 @@ typedef struct hsk_write_data_s {
  */
 
 static hsk_peer_t *
-hsk_peer_alloc(hsk_pool_t *pool);
+hsk_peer_alloc(hsk_pool_t *pool, bool encrypted);
 
 static void
 hsk_peer_free(hsk_peer_t *peer);
@@ -266,10 +266,7 @@ hsk_pool_set_seeds(hsk_pool_t *pool, const char *seeds) {
       memcpy(&seed[0], &seeds[start], size);
       seed[size] = '\0';
 
-      if (!hsk_addr_from_string(&addr, seed, HSK_BRONTIDE_PORT))
-        return false;
-
-      if (!hsk_addr_has_key(&addr))
+      if (!hsk_addr_from_string(&addr, seed, 0))
         return false;
 
       if (!hsk_addrman_add_addr(&pool->am, &addr))
@@ -385,12 +382,12 @@ hsk_pool_refill(hsk_pool_t *pool) {
       break;
     }
 
-    if (!hsk_ec_verify_pubkey(pool->ec, addr.key)) {
+    if (hsk_addr_has_key(&addr) && !hsk_ec_verify_pubkey(pool->ec, addr.key)) {
       hsk_addrman_remove_addr(&pool->am, &addr);
       continue;
     }
 
-    hsk_peer_t *peer = hsk_peer_alloc(pool);
+    hsk_peer_t *peer = hsk_peer_alloc(pool, hsk_addr_has_key(&addr));
 
     if (!peer) {
       hsk_pool_log(pool, "could not allocate peer\n");
@@ -782,7 +779,7 @@ hsk_pool_timer(hsk_pool_t *pool) {
  */
 
 static int
-hsk_peer_init(hsk_peer_t *peer, hsk_pool_t *pool) {
+hsk_peer_init(hsk_peer_t *peer, hsk_pool_t *pool, bool encrypted) {
   if (!peer || !pool)
     return HSK_EBADARGS;
 
@@ -793,13 +790,17 @@ hsk_peer_init(hsk_peer_t *peer, hsk_pool_t *pool) {
   peer->loop = pool->loop;
   // peer->socket;
 
-  hsk_brontide_init(&peer->brontide, pool->ec);
-  peer->brontide.connect_cb = after_brontide_connect;
-  peer->brontide.connect_arg = (void *)peer;
-  peer->brontide.write_cb = brontide_do_write;
-  peer->brontide.write_arg = (void *)peer;
-  peer->brontide.read_cb = after_brontide_read;
-  peer->brontide.read_arg = (void *)peer;
+  peer->brontide = NULL;
+  if (encrypted) {
+    peer->brontide = malloc(sizeof(hsk_brontide_t));
+    hsk_brontide_init(peer->brontide, pool->ec);
+    peer->brontide->connect_cb = after_brontide_connect;
+    peer->brontide->connect_arg = (void *)peer;
+    peer->brontide->write_cb = brontide_do_write;
+    peer->brontide->write_arg = (void *)peer;
+    peer->brontide->read_cb = after_brontide_read;
+    peer->brontide->read_arg = (void *)peer;
+  }
 
   peer->id = pool->peer_id++;
   memset(peer->host, 0, sizeof(peer->host));
@@ -846,7 +847,8 @@ hsk_peer_uninit(hsk_peer_t *peer) {
   if (!peer)
     return;
 
-  hsk_brontide_uninit(&peer->brontide);
+  if (peer->brontide != NULL)
+    hsk_brontide_uninit(peer->brontide);
 
   hsk_map_uninit(&peer->names);
 
@@ -857,13 +859,13 @@ hsk_peer_uninit(hsk_peer_t *peer) {
 }
 
 static hsk_peer_t *
-hsk_peer_alloc(hsk_pool_t *pool) {
+hsk_peer_alloc(hsk_pool_t *pool, bool encrypted) {
   hsk_peer_t *peer = malloc(sizeof(hsk_peer_t));
 
   if (!peer)
     return NULL;
 
-  if (hsk_peer_init(peer, pool) != HSK_SUCCESS) {
+  if (hsk_peer_init(peer, pool, encrypted) != HSK_SUCCESS) {
     hsk_peer_free(peer);
     return NULL;
   }
@@ -908,7 +910,8 @@ hsk_peer_open(hsk_peer_t *peer, const hsk_addr_t *addr) {
 
   assert(hsk_addr_to_sa(addr, sa));
 
-  assert(hsk_brontide_connect(&peer->brontide, pool->key, addr->key) == 0);
+  if (peer->brontide != NULL)
+    assert(hsk_brontide_connect(peer->brontide, pool->key, addr->key) == 0);
 
   if (uv_tcp_connect(conn, &peer->socket, sa, on_connect) != 0) {
     free(conn);
@@ -926,7 +929,8 @@ hsk_peer_close(hsk_peer_t *peer) {
     case HSK_STATE_DISCONNECTING:
       return HSK_SUCCESS;
     case HSK_STATE_HANDSHAKE:
-      hsk_brontide_destroy(&peer->brontide);
+      if (peer->brontide != NULL)
+        hsk_brontide_destroy(peer->brontide);
     case HSK_STATE_READING:
       assert(uv_read_stop((uv_stream_t *)&peer->socket) == 0);
     case HSK_STATE_CONNECTED:
@@ -1033,21 +1037,6 @@ hsk_peer_remove(hsk_peer_t *peer) {
 }
 
 static int
-hsk_peer_write(
-  hsk_peer_t *peer,
-  uint8_t *data,
-  size_t data_len,
-  bool should_free
-) {
-  if (peer->state != HSK_STATE_HANDSHAKE)
-    return HSK_SUCCESS;
-
-  assert(should_free);
-
-  return hsk_brontide_write(&peer->brontide, data, data_len);
-}
-
-static int
 hsk_peer_write_raw(
   hsk_peer_t *peer,
   uint8_t *data,
@@ -1110,6 +1099,27 @@ fail:
   if (data && should_free)
     free(data);
 
+  return rc;
+}
+
+static int
+hsk_peer_write(
+  hsk_peer_t *peer,
+  uint8_t *data,
+  size_t data_len,
+  bool should_free
+) {
+  if (peer->state != HSK_STATE_HANDSHAKE)
+    return HSK_SUCCESS;
+
+  assert(should_free);
+
+  int rc;
+  if (peer->brontide != NULL) {
+    rc = hsk_brontide_write(peer->brontide, data, data_len);
+  } else {
+    rc = hsk_peer_write_raw(peer, data, data_len, true);
+ }
   return rc;
 }
 
@@ -1336,7 +1346,7 @@ hsk_peer_handle_addr(hsk_peer_t *peer, hsk_addr_msg_t *msg) {
     if (addr->addr.port == 0)
       continue;
 
-    if (!hsk_addr_has_key(&addr->addr))
+    if (hsk_addr_has_key(&addr->addr))
       continue;
 
     hsk_addrman_add_na(&pool->am, addr);
@@ -1697,13 +1707,19 @@ on_connect(uv_connect_t *conn, int status) {
   peer->state = HSK_STATE_READING;
   peer->conn_time = hsk_now();
 
-  int r = hsk_brontide_on_connect(&peer->brontide);
+  if (peer->brontide != NULL) {
+    int r = hsk_brontide_on_connect(peer->brontide);
 
-  if (r != HSK_SUCCESS) {
-    hsk_peer_log(peer, "brontide_on_connect failed: %s\n", hsk_strerror(r));
-    hsk_peer_destroy(peer);
+    if (r != HSK_SUCCESS) {
+      hsk_peer_log(peer, "brontide_on_connect failed: %s\n", hsk_strerror(r));
+      hsk_peer_destroy(peer);
+      return;
+    }
     return;
   }
+
+  peer->state = HSK_STATE_HANDSHAKE;
+  hsk_peer_send_version(peer);
 }
 
 static void
@@ -1749,21 +1765,28 @@ after_read(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf) {
   if (!peer)
     return;
 
+  if (peer->brontide != NULL) {
+    int r = hsk_brontide_on_read(
+        peer->brontide,
+        (uint8_t *)buf->base,
+        (size_t)nread
+        );
+    if (r != HSK_SUCCESS) {
+      hsk_peer_log(peer, "brontide_on_read failed: %s\n", hsk_strerror(r));
+      hsk_peer_destroy(peer);
+      return;
+    }
+  } else {
+    hsk_peer_on_read(
+        peer,
+        (uint8_t *)buf->base,
+        (size_t)nread
+        );
+  }
+
   if (nread < 0) {
     if (nread != UV_EOF)
       hsk_peer_log(peer, "read error: %s\n", uv_strerror(nread));
-    hsk_peer_destroy(peer);
-    return;
-  }
-
-  int r = hsk_brontide_on_read(
-    &peer->brontide,
-    (uint8_t *)buf->base,
-    (size_t)nread
-  );
-
-  if (r != HSK_SUCCESS) {
-    hsk_peer_log(peer, "brontide_on_read failed: %s\n", hsk_strerror(r));
     hsk_peer_destroy(peer);
     return;
   }
