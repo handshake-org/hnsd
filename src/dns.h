@@ -784,4 +784,11 @@ hsk_dns_msg_clean(hsk_dns_msg_t *msg, uint16_t type);
 bool
 hsk_dns_rrs_clean(hsk_dns_rrs_t *rrs, uint16_t type);
 
+/*
+ * Helpers
+ */
+
+bool
+hsk_dns_is_subdomain(const char *parent, const char *child);
+
 #endif

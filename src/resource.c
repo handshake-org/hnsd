@@ -649,6 +649,8 @@ hsk_resource_to_glue(
 
     switch (c->type) {
       case HSK_GLUE4:
+        if (!hsk_dns_is_subdomain(tld, c->name))
+          continue;
       case HSK_SYNTH4: {
         hsk_dns_rr_t *rr = hsk_dns_rr_create(HSK_DNS_A);
 
@@ -666,6 +668,8 @@ hsk_resource_to_glue(
         break;
       }
       case HSK_GLUE6:
+        if (!hsk_dns_is_subdomain(tld, c->name))
+          continue;
       case HSK_SYNTH6: {
         hsk_dns_rr_t *rr = hsk_dns_rr_create(HSK_DNS_AAAA);
 
