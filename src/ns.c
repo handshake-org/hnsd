@@ -23,6 +23,17 @@
 #include "platform-net.h"
 #include "utils.h"
 #include "uv.h"
+#include "dnssec.h"
+
+// A RRSIG NSEC
+static const uint8_t hsk_type_map_a[] = {
+  0x00, 0x06, 0x40, 0x00, 0x00, 0x00, 0x00, 0x03
+};
+
+// AAAA RRSIG NSEC
+static const uint8_t hsk_type_map_aaaa[] = {
+  0x00, 0x06, 0x00, 0x00, 0x00, 0x80, 0x00, 0x03
+};
 
 /*
  * Types
@@ -309,6 +320,101 @@ hsk_ns_onrecv(
     }
 
     hsk_ns_log(ns, "sending cached msg (%u): %u\n", req->id, wire_len);
+
+    hsk_ns_send(ns, wire, wire_len, addr, true);
+
+    goto done;
+  }
+
+  // Handle reverse pointers.
+  // See https://github.com/handshake-org/hsd/issues/125
+  // Resolving a name with a synth record will return an NS record
+  // with a name that encodes an IP address: _[base32]._synth.
+  // The synth name then resolves to an A/AAAA record that is derived
+  // by decoding the name itself (it does not have to be looked up).
+  if (strcmp(req->tld, "_synth") && req->labels == 2 && req->name[0] == '_') {
+    uint8_t ip[16];
+    uint16_t family;
+
+    char synth[HSK_DNS_MAX_LABEL + 1];
+    hsk_dns_label_from(req->name, -2, synth);
+
+    hsk_dns_rrs_t *an = &msg->an;
+    hsk_dns_rrs_t *rrns = &msg->ns;
+    hsk_dns_rrs_t *ar = &msg->ar;
+
+    if (pointer_to_ip(synth, ip, &family)) {
+      bool match = false;
+
+      switch (req->type) {
+        case HSK_DNS_ANY:
+          match = true;
+          break;
+        case HSK_DNS_A:
+          match = family == HSK_DNS_A;
+          break;
+        case HSK_DNS_AAAA:
+          match = family == HSK_DNS_AAAA;
+          break;
+      }
+
+      if (!match) {
+        // Needs SOA.
+        // TODO: Make the reverse pointers TLDs.
+        // Empty proof:
+        if (family == HSK_DNS_A) {
+          hsk_resource_to_empty(
+            req->name,
+            hsk_type_map_a,
+            sizeof(hsk_type_map_a),
+            rrns
+          );
+        } else {
+          hsk_resource_to_empty(
+            req->name,
+            hsk_type_map_aaaa,
+            sizeof(hsk_type_map_aaaa),
+            rrns
+          );
+        }
+        hsk_dnssec_sign_zsk(rrns, HSK_DNS_NSEC);
+        hsk_resource_root_to_soa(rrns);
+        hsk_dnssec_sign_zsk(rrns, HSK_DNS_SOA);
+      } else {
+        uint16_t rrtype = family;
+
+        msg->flags |= HSK_DNS_AA;
+
+        hsk_dns_rr_t *rr = hsk_dns_rr_create(rrtype);
+
+        if (!rr) {
+          hsk_dns_msg_free(msg);
+          goto fail;
+        }
+
+        rr->ttl = HSK_DEFAULT_TTL;
+        hsk_dns_rr_set_name(rr, req->name);
+
+        if (family == HSK_DNS_A) {
+          hsk_dns_a_rd_t *rd = rr->rd;
+          memcpy(&rd->addr[0], &ip[0], 4);
+        } else {
+          hsk_dns_aaaa_rd_t *rd = rr->rd;
+          memcpy(&rd->addr[0], &ip[0], 16);
+        }
+
+        hsk_dns_rrs_push(an, rr);
+
+        hsk_dnssec_sign_zsk(ar, rrtype);
+      }
+    }
+
+    if (!hsk_dns_msg_finalize(&msg, req, ns->ec, ns->key, &wire, &wire_len)) {
+      hsk_ns_log(ns, "could not reply\n");
+      goto fail;
+    }
+
+    hsk_ns_log(ns, "sending synthesized msg (%u): %u\n", req->id, wire_len);
 
     hsk_ns_send(ns, wire, wire_len, addr, true);
 

@@ -3346,6 +3346,23 @@ hsk_dns_rrs_clean(hsk_dns_rrs_t *rrs, uint16_t type) {
  * Helpers
  */
 
+bool
+hsk_dns_is_subdomain(const char *parent, const char *child) {
+  int parent_count = hsk_dns_label_count(parent);
+  int child_count = hsk_dns_label_count(child);
+
+  if (parent_count >= child_count)
+    return false;
+
+  uint8_t child_labels[child_count];
+  hsk_dns_label_split(child, child_labels, child_count);
+
+  char sub[HSK_DNS_MAX_LABEL + 1];
+  hsk_dns_label_from2(child, child_labels, child_count, parent_count * -1, sub);
+
+  return strcmp(sub, parent) == 0;
+}
+
 static int
 raw_rr_cmp(const void *a, const void *b) {
   assert(a && b);
