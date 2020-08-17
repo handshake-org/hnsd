@@ -25,7 +25,7 @@
 #include "utils.h"
 
 static const char brontide_protocol_name[] =
-  "Noise_XK_secp256k1_ChaChaPoly_SHA256";
+  "Noise_XK_secp256k1_ChaChaPoly_SHA256+SVDW_Squared";
 
 // Our primary difference from lightning:
 // We use "hns" instead of "lightning".
@@ -38,9 +38,9 @@ static const char brontide_prologue[] = "hns";
 #define BRONTIDE_LENGTH_SIZE 4
 #define BRONTIDE_HEADER_SIZE 20
 
-#define BRONTIDE_ACT_ONE_SIZE 50
-#define BRONTIDE_ACT_TWO_SIZE 50
-#define BRONTIDE_ACT_THREE_SIZE 66
+#define BRONTIDE_ACT_ONE_SIZE 80
+#define BRONTIDE_ACT_TWO_SIZE 80
+#define BRONTIDE_ACT_THREE_SIZE 65
 
 #define BRONTIDE_ACT_NONE 0
 #define BRONTIDE_ACT_ONE 1
@@ -344,6 +344,10 @@ hsk_brontide_gen_act_one(hsk_brontide_t *b, uint8_t *act1) {
 
   uint8_t ephemeral[33];
   assert(hsk_ec_create_pubkey(b->ec, b->local_ephemeral, ephemeral));
+
+  uint8_t uniform[64];
+  hsk_ec_pubkey_to_hash(b->ec, ephemeral, uniform);
+
   hsk_brontide_mix_hash(b, ephemeral, 33);
 
   // ec
@@ -352,21 +356,18 @@ hsk_brontide_gen_act_one(hsk_brontide_t *b, uint8_t *act1) {
   hsk_brontide_mix_key(b, s);
 
   hsk_brontide_encrypt(b, NULL, NULL, 0);
-  act1[0] = BRONTIDE_VERSION;
-  memcpy(&act1[1], ephemeral, 33);
-  memcpy(&act1[34], b->cs.tag, 16);
+
+  memcpy(&act1[0], uniform, 64);
+  memcpy(&act1[64], b->cs.tag, 16);
 }
 
 bool
 hsk_brontide_recv_act_one(hsk_brontide_t *b, const uint8_t *act1) {
-  if (act1[0] != BRONTIDE_VERSION)
-    return false;
+  const uint8_t *u = &act1[0];
+  const uint8_t *p = &act1[64];
 
-  const uint8_t *e = &act1[1];
-  const uint8_t *p = &act1[34];
-
-  if (!hsk_ec_verify_pubkey(b->ec, e))
-    return false;
+  uint8_t e[33];
+  hsk_ec_pubkey_from_hash(b->ec, u, e);
 
   // e
   memcpy(b->remote_ephemeral, e, 33);
@@ -392,6 +393,10 @@ hsk_brontide_gen_act_two(hsk_brontide_t *b, uint8_t *act2) {
 
   uint8_t ephemeral[33];
   assert(hsk_ec_create_pubkey(b->ec, b->local_ephemeral, ephemeral));
+
+  uint8_t uniform[64];
+  hsk_ec_pubkey_to_hash(b->ec, ephemeral, uniform);
+
   hsk_brontide_mix_hash(b, ephemeral, 33);
 
   // ee
@@ -400,18 +405,18 @@ hsk_brontide_gen_act_two(hsk_brontide_t *b, uint8_t *act2) {
   hsk_brontide_mix_key(b, s);
 
   hsk_brontide_encrypt(b, NULL, NULL, 0);
-  act2[0] = BRONTIDE_VERSION;
-  memcpy(&act2[1], ephemeral, 33);
-  memcpy(&act2[34], b->cs.tag, 16);
+
+  memcpy(&act2[0], uniform, 64);
+  memcpy(&act2[64], b->cs.tag, 16);
 }
 
 bool
 hsk_brontide_recv_act_two(hsk_brontide_t *b, const uint8_t *act2) {
-  if (act2[0] != BRONTIDE_VERSION)
-    return false;
+  const uint8_t *u = &act2[0];
+  const uint8_t *p = &act2[64];
 
-  const uint8_t *e = &act2[1];
-  const uint8_t *p = &act2[34];
+  uint8_t e[33];
+  hsk_ec_pubkey_from_hash(b->ec, u, e);
 
   if (!hsk_ec_verify_pubkey(b->ec, e))
     return false;
@@ -448,32 +453,25 @@ hsk_brontide_gen_act_three(hsk_brontide_t *b, uint8_t *act3) {
   hsk_brontide_encrypt(b, NULL, NULL, 0);
   uint8_t *tag2 = b->cs.tag;
 
-  act3[0] = BRONTIDE_VERSION;
-  memcpy(&act3[1], our_pubkey, 33);
-  memcpy(&act3[34], tag1, 16);
-  memcpy(&act3[50], tag2, 16);
+  memcpy(&act3[0], our_pubkey, 33);
+  memcpy(&act3[33], tag1, 16);
+  memcpy(&act3[49], tag2, 16);
 
   hsk_brontide_split(b);
 }
 
 bool
 hsk_brontide_recv_act_three(hsk_brontide_t *b, const uint8_t *act3) {
-  if (act3[0] != BRONTIDE_VERSION)
-    return false;
-
-  const uint8_t *s1 = &act3[1];
-  const uint8_t *p1 = &act3[34];
+  const uint8_t *s1 = &act3[0];
+  const uint8_t *p1 = &act3[33];
 
   const uint8_t *s2 = NULL;
-  const uint8_t *p2 = &act3[50];
+  const uint8_t *p2 = &act3[49];
 
   uint8_t remote_pub[33];
   hsk_brontide_decrypt(b, s1, remote_pub, 33, p1);
 
   if (!hsk_cs_verify(&b->cs, p1))
-    return false;
-
-  if (!hsk_ec_verify_pubkey(b->ec, remote_pub))
     return false;
 
   memcpy(b->remote_static, remote_pub, 33);

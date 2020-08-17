@@ -592,3 +592,4 @@ int hsk_secp256k1_ec_pubkey_combine(const hsk_secp256k1_context* ctx, hsk_secp25
 
 #include "ecdh_impl.h"
 #include "recovery_impl.h"
+#include "elligator_impl.h"

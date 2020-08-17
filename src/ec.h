@@ -77,4 +77,18 @@ hsk_ec_ecdh(
   const uint8_t *key,
   uint8_t *result
 );
+
+bool
+hsk_ec_pubkey_to_hash(
+  const hsk_ec_t *ec,
+  const uint8_t *pubkey,
+  uint8_t *result
+);
+
+bool
+hsk_ec_pubkey_from_hash(
+  const hsk_ec_t *ec,
+  const uint8_t *hash,
+  uint8_t *result
+);
 #endif
