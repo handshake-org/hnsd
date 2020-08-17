@@ -154,7 +154,7 @@ hsk_txt_record_read(
       hsk_dns_txt_free(txt);
       return false;
     }
-    
+
     txt->data_len = size;
 
     // Copy string
