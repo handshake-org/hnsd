@@ -9,7 +9,7 @@
 #define HSK_SIMNET 3
 
 #ifndef HSK_NETWORK
-#define HSK_NETWORK HSK_SIMNET
+#define HSK_NETWORK HSK_MAIN
 #endif
 
 #define HSK_MAX_MESSAGE (8 * 1000 * 1000)
@@ -46,25 +46,26 @@ static const char HSK_KSK_2017[] = ". DS 20326 8 2 "
  */
 
 #define HSK_NETWORK_NAME "main"
-#define HSK_MAGIC 0xebf10ad8
+#define HSK_MAGIC 0x5b6ef2d3
 #define HSK_PORT 12038
-#define HSK_NS_PORT 5359
-#define HSK_RS_PORT 5360
+#define HSK_BRONTIDE_PORT 44806
+#define HSK_NS_PORT 5349
+#define HSK_RS_PORT 5350
 
-#define HSK_BITS 0x1d00ffff
+#define HSK_BITS 0x1c00ffff
 
 static const uint8_t HSK_LIMIT[32] = {
-  0x00, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0xff,
-  0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-  0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-  0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff
+  0x00, 0x00, 0x00, 0x00, 0x00, 0xff, 0xff, 0x00,
+  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
 };
 
 static const uint8_t HSK_CHAINWORK[32] = {
   0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
   0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
   0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
+  0x75, 0xb5, 0xa2, 0xb7, 0xbf, 0x52, 0x2d, 0x45
 };
 
 #define HSK_TARGET_WINDOW 144
@@ -77,10 +78,10 @@ static const uint8_t HSK_CHAINWORK[32] = {
 #define HSK_NO_RETARGETTING false
 #define HSK_GENESIS HSK_GENESIS_MAIN
 
-#define HSK_USE_CHECKPOINTS false
-#define HSK_LAST_CHECKPOINT 0
+#define HSK_USE_CHECKPOINTS true
+#define HSK_LAST_CHECKPOINT 1008          // Used for maybe_sync, no block hash
 #define HSK_MAX_TIP_AGE (24 * 60 * 60)
-#define HSK_LAUNCH_DATE 0xffffffff
+#define HSK_LAUNCH_DATE 0xffffffff        // Used for maybe_sync, not useful
 
 #elif HSK_NETWORK == HSK_TESTNET
 
@@ -89,10 +90,11 @@ static const uint8_t HSK_CHAINWORK[32] = {
  */
 
 #define HSK_NETWORK_NAME "testnet"
-#define HSK_MAGIC 0x09d8647f
+#define HSK_MAGIC 0xb1520dd2
 #define HSK_PORT 13038
-#define HSK_NS_PORT 15359
-#define HSK_RS_PORT 15360
+#define HSK_BRONTIDE_PORT 45806
+#define HSK_NS_PORT 15349
+#define HSK_RS_PORT 15350
 
 // Note: BTC limit. Consider switching to
 // this once we have a new miner written.
@@ -105,10 +107,10 @@ static const uint8_t HSK_CHAINWORK[32] = {
 //   0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff
 // };
 
-#define HSK_BITS 0x1d300000
+#define HSK_BITS 0x1d00ffff
 
 static const uint8_t HSK_LIMIT[32] = {
-  0x00, 0x00, 0x00, 0x30, 0x00, 0x00, 0x00, 0x00,
+  0x00, 0x00, 0x00, 0x00, 0xff, 0xff, 0x00, 0x00,
   0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
   0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
   0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
@@ -143,10 +145,11 @@ static const uint8_t HSK_CHAINWORK[32] = {
  */
 
 #define HSK_NETWORK_NAME "regtest"
-#define HSK_MAGIC 0xbcf173aa
+#define HSK_MAGIC 0xae3895cf
 #define HSK_PORT 14038
-#define HSK_NS_PORT 25359
-#define HSK_RS_PORT 25360
+#define HSK_BRONTIDE_PORT 46806
+#define HSK_NS_PORT 25349
+#define HSK_RS_PORT 25350
 
 #define HSK_BITS 0x207fffff
 
@@ -186,10 +189,11 @@ static const uint8_t HSK_CHAINWORK[32] = {
  */
 
 #define HSK_NETWORK_NAME "simnet"
-#define HSK_MAGIC 0x473bd012
+#define HSK_MAGIC 0xe648edc
 #define HSK_PORT 15038
-#define HSK_NS_PORT 35359
-#define HSK_RS_PORT 35360
+#define HSK_BRONTIDE_PORT 47806
+#define HSK_NS_PORT 35349
+#define HSK_RS_PORT 35350
 
 #define HSK_BITS 0x207fffff
 

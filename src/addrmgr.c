@@ -57,7 +57,7 @@ hsk_addrman_init(hsk_addrman_t *am, const hsk_timedata_t *td) {
   const char **seed;
   for (seed = hsk_seeds; *seed; seed++) {
     hsk_addr_t addr;
-    assert(hsk_addr_from_string(&addr, *seed, HSK_PORT));
+    assert(hsk_addr_from_string(&addr, *seed, HSK_BRONTIDE_PORT));
     assert(hsk_addrman_add_addr(am, &addr));
   }
 
@@ -146,7 +146,7 @@ hsk_addrman_add_entry(hsk_addrman_t *am, const hsk_netaddr_t *na, bool src) {
   hsk_addrentry_t *entry = hsk_map_get(&am->map, &na->addr);
 
   char host[HSK_MAX_HOST];
-  hsk_addr_to_string(&na->addr, host, HSK_MAX_HOST, HSK_PORT);
+  hsk_addr_to_string(&na->addr, host, HSK_MAX_HOST, HSK_BRONTIDE_PORT);
 
   if (entry) {
     int penalty = 2 * 60 * 60;
@@ -437,7 +437,7 @@ hsk_addrman_pick(hsk_addrman_t *am, const hsk_map_t *map) {
     if (i < 30 && now - entry->last_attempt < 600)
       continue;
 
-    if (i < 50 && entry->addr.port != HSK_PORT)
+    if (i < 50 && entry->addr.port != HSK_BRONTIDE_PORT)
       continue;
 
     if (i < 95 && hsk_addrman_is_banned(am, &entry->addr))

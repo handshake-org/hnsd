@@ -73,17 +73,17 @@ AC_CHECK_HEADERS([ \
 AC_ARG_WITH([network],
   [AS_HELP_STRING(
     [--with-network=main|testnet|regtest|simnet],
-    [Specify network. Default is testnet.]
+    [Specify network. Default is main.]
   )],
   [hsk_network=$withval],
-  [hsk_network=testnet])
+  [hsk_network=main])
 
 case $hsk_network in
-  main)
+  main | yes)
     AC_DEFINE(HSK_NETWORK, HSK_MAIN,
       [Define this symbol to choose a network])
   ;;
-  testnet | yes)
+  testnet)
     AC_DEFINE(HSK_NETWORK, HSK_TESTNET,
       [Define this symbol to choose a network])
   ;;

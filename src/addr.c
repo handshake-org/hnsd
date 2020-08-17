@@ -938,7 +938,7 @@ hsk_addr_print(const hsk_addr_t *addr, const char *prefix) {
   assert(addr);
 
   char host[HSK_MAX_HOST];
-  assert(hsk_addr_to_string(addr, host, HSK_MAX_HOST, HSK_PORT));
+  assert(hsk_addr_to_string(addr, host, HSK_MAX_HOST, HSK_BRONTIDE_PORT));
 
   printf("%saddr\n", prefix);
   printf("%s  type=%d\n", prefix, addr->type);
