@@ -251,7 +251,7 @@ hsk_pool_set_seeds(hsk_pool_t *pool, const char *seeds) {
   char seed[HSK_MAX_HOST + 1];
   hsk_addr_t addr;
 
-  for (i = 0; i < len + 1; i++) {
+  for (i = 0; i < len; i++) {
     if (seeds[i] == ',' || seeds[i] == '\0') {
       size_t size = i - start;
 
