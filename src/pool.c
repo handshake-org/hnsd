@@ -92,6 +92,9 @@ static int
 hsk_peer_send_getheaders(hsk_peer_t *peer, const uint8_t *stop);
 
 static int
+hsk_peer_send_getaddr(hsk_peer_t *peer);
+
+static int
 hsk_peer_send_getproof(
   hsk_peer_t *peer,
   const uint8_t *name_hash,
@@ -1214,6 +1217,13 @@ hsk_peer_send_sendheaders(hsk_peer_t *peer) {
 }
 
 static int
+hsk_peer_send_getaddr(hsk_peer_t *peer) {
+  hsk_peer_log(peer, "sending getaddr\n");
+  hsk_version_msg_t msg = { .cmd = HSK_MSG_GETADDR };
+  return hsk_peer_send(peer, (hsk_msg_t *)&msg);
+}
+
+static int
 hsk_peer_send_getheaders(hsk_peer_t *peer, const uint8_t *stop) {
   hsk_peer_log(peer, "sending getheaders\n");
   hsk_getheaders_msg_t msg = { .cmd = HSK_MSG_GETHEADERS };
@@ -1265,6 +1275,13 @@ hsk_peer_handle_version(hsk_peer_t *peer, const hsk_version_msg_t *msg) {
   if (rc != HSK_SUCCESS)
     return rc;
 
+  // Discover more peers
+  rc = hsk_peer_send_getaddr(peer);
+
+  if (rc != HSK_SUCCESS)
+    return rc;
+
+  // Start syncing
   return hsk_peer_send_getheaders(peer, NULL);
 }
 
