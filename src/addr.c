@@ -375,7 +375,7 @@ hsk_addr_from_string(hsk_addr_t *addr, const char *src, uint16_t port) {
 
   uint16_t sin_port = port;
 
-  if (port && port_s) {
+  if (port_s) {
     int i = 0;
     uint32_t word = 0;
     char *s = port_s;
@@ -398,6 +398,8 @@ hsk_addr_from_string(hsk_addr_t *addr, const char *src, uint16_t port) {
     sin_port = (uint16_t)word;
   } else if (!port) {
     sin_port = at ? HSK_BRONTIDE_PORT : HSK_PORT;
+  } else {
+    sin_port = port;
   }
 
   uint8_t sin_addr[16];
