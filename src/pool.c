@@ -1585,7 +1585,10 @@ hsk_peer_on_read(hsk_peer_t *peer, const uint8_t *data, size_t data_len) {
     memcpy(peer->msg + peer->msg_pos, data, need);
     data += need;
     data_len -= need;
-    hsk_peer_parse(peer, peer->msg, peer->msg_len);
+    if (hsk_peer_parse(peer, peer->msg, peer->msg_len) != 0) {
+      hsk_peer_destroy(peer);
+      return;
+    }
   }
 
   memcpy(peer->msg + peer->msg_pos, data, data_len);
