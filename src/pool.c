@@ -263,17 +263,23 @@ hsk_pool_set_seeds(hsk_pool_t *pool, const char *seeds) {
         continue;
       }
 
-      if (size >= HSK_MAX_HOST)
-        return false;
+      if (size >= HSK_MAX_HOST) {
+        hsk_pool_log(pool, "seed address exceeds maximum length allowed.\n");
+        continue;
+      }
 
       memcpy(&seed[0], &seeds[start], size);
       seed[size] = '\0';
 
-      if (!hsk_addr_from_string(&addr, seed, 0))
-        return false;
+      if (!hsk_addr_from_string(&addr, seed, 0)) {
+        hsk_pool_log(pool, "could not parse seed from string: %s\n", seed);
+        continue;
+      }
 
-      if (!hsk_addrman_add_addr(&pool->am, &addr))
-        return false;
+      if (!hsk_addrman_add_addr(&pool->am, &addr)) {
+        hsk_pool_log(pool, "could not add seed: %s\n", seed);
+        continue;
+      }
 
       start = i + 1;
     }
