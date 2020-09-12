@@ -437,8 +437,10 @@ hsk_rs_respond(
   hsk_rs_log(ns, "  secure: %d\n", result->secure);
   hsk_rs_log(ns, "  bogus: %d\n", result->bogus);
 
-  if (result->why_bogus)
+  if (result->bogus) {
     hsk_rs_log(ns, "  why_bogus: %s\n", result->why_bogus);
+    goto fail;
+  }  
 
   uint8_t *data = result->answer_packet;
   size_t data_len = result->answer_len;
@@ -455,7 +457,7 @@ hsk_rs_respond(
   msg->code = result->rcode;
   msg->flags |= HSK_DNS_RA;
 
-  if (result->secure && !result->bogus)
+  if (result->secure)
     msg->flags |= HSK_DNS_AD;
 
   // Strip out non-answer sections.
