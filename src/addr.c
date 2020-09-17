@@ -448,8 +448,7 @@ hsk_addr_to_string(
     if (!port)
       port = fb;
 
-    // XXX Not thread safe.
-    static char tmp[HSK_MAX_HOST];
+    char tmp[HSK_MAX_HOST];
 
     if (af == AF_INET6) {
       assert(len + need < HSK_MAX_HOST);
@@ -489,8 +488,7 @@ hsk_addr_to_full(
   char b32[54];
   hsk_base32_encode(addr->key, 33, b32, false);
 
-  // XXX Not thread safe.
-  static char tmp[HSK_MAX_HOST];
+  char tmp[HSK_MAX_HOST];
   sprintf(tmp, "%s@%s", b32, dst);
   strcpy(dst, tmp);
 
@@ -517,8 +515,7 @@ hsk_addr_to_at(const hsk_addr_t *addr, char *dst, size_t dst_len, uint16_t fb) {
     if (!port)
       port = fb;
 
-    // XXX Not thread safe.
-    static char tmp[HSK_MAX_HOST];
+    char tmp[HSK_MAX_HOST];
     sprintf(tmp, "%s@%u", dst, port);
     strcpy(dst, tmp);
   }
