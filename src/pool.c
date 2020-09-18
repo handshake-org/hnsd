@@ -929,6 +929,16 @@ hsk_peer_open(hsk_peer_t *peer, const hsk_addr_t *addr) {
 
   peer->state = HSK_STATE_CONNECTING;
 
+
+  hsk_peer_t *peerIter, *next;
+  uint64_t active = 0;
+  for (peerIter = pool->head; peerIter; peerIter = next) {
+    next = peerIter->next;
+    if (peerIter->state == HSK_STATE_HANDSHAKE)
+      active++;
+  }
+  hsk_pool_log(pool, "size: %d active: %d\n", pool->size, active);
+
   return HSK_SUCCESS;
 }
 
