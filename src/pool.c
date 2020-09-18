@@ -383,17 +383,17 @@ hsk_pool_getaddr(hsk_pool_t *pool, hsk_addr_t *addr) {
 
 static int
 hsk_pool_refill(hsk_pool_t *pool) {
-  while (pool->size < pool->max_size) {
+  if (pool->size < pool->max_size) {
     hsk_addr_t addr;
 
     if (!hsk_pool_getaddr(pool, &addr)) {
       hsk_pool_debug(pool, "could not find suitable addr\n");
-      break;
+      return HSK_SUCCESS;
     }
 
     if (hsk_addr_has_key(&addr) && !hsk_ec_verify_pubkey(pool->ec, addr.key)) {
       hsk_addrman_remove_addr(&pool->am, &addr);
-      continue;
+      return HSK_SUCCESS;
     }
 
     hsk_peer_t *peer = hsk_peer_alloc(pool, hsk_addr_has_key(&addr));
