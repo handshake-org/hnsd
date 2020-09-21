@@ -896,6 +896,8 @@ hsk_peer_open(hsk_peer_t *peer, const hsk_addr_t *addr) {
   assert(peer && addr);
   assert(peer->pool && peer->loop && peer->state == HSK_STATE_DISCONNECTED);
 
+  peer->state = HSK_STATE_CONNECTING;
+
   hsk_pool_t *pool = (hsk_pool_t *)peer->pool;
   uv_loop_t *loop = pool->loop;
 
@@ -926,9 +928,6 @@ hsk_peer_open(hsk_peer_t *peer, const hsk_addr_t *addr) {
     free(conn);
     return HSK_EFAILURE;
   }
-
-  peer->state = HSK_STATE_CONNECTING;
-
 
   hsk_peer_t *peerIter, *next;
   uint64_t active = 0;
