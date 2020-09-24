@@ -1,5 +1,5 @@
 AC_PREREQ([2.57])
-AC_INIT([hnsd], [0.0.0], [chjj@handshake.org])
+AC_INIT([hnsd], [1.0.0], [chjj@handshake.org])
 AC_CONFIG_MACRO_DIR([m4])
 AM_INIT_AUTOMAKE([-Wall -Werror foreign subdir-objects])
 

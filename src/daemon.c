@@ -107,7 +107,7 @@ static void
 help(int r) {
   fprintf(stderr,
     "\n"
-    "hnsd 0.0.0\n"
+    "hnsd 1.0.0\n"
     "  Copyright (c) 2018, Christopher Jeffrey <chjj@handshake.org>\n"
     "\n"
     "Usage: hnsd [options]\n"
