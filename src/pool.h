@@ -56,11 +56,10 @@ typedef struct hsk_peer_s {
   hsk_chain_t *chain;
   uv_loop_t *loop;
   uv_tcp_t socket;
-  hsk_brontide_t brontide;
+  hsk_brontide_t *brontide;
   uint64_t id;
   char host[HSK_MAX_HOST];
   hsk_addr_t addr;
-  uint16_t port;
   int state;
   uint8_t read_buffer[HSK_BUFFER_SIZE];
   int headers;

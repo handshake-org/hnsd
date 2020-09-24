@@ -375,7 +375,7 @@ hsk_addr_from_string(hsk_addr_t *addr, const char *src, uint16_t port) {
 
   uint16_t sin_port = port;
 
-  if (port && port_s) {
+  if (port_s) {
     int i = 0;
     uint32_t word = 0;
     char *s = port_s;
@@ -396,8 +396,10 @@ hsk_addr_from_string(hsk_addr_t *addr, const char *src, uint16_t port) {
     }
 
     sin_port = (uint16_t)word;
-  } else if (!port && port_s) {
-    return false;
+  } else if (!port) {
+    sin_port = at ? HSK_BRONTIDE_PORT : HSK_PORT;
+  } else {
+    sin_port = port;
   }
 
   uint8_t sin_addr[16];
@@ -446,8 +448,7 @@ hsk_addr_to_string(
     if (!port)
       port = fb;
 
-    // XXX Not thread safe.
-    static char tmp[HSK_MAX_HOST];
+    char tmp[HSK_MAX_HOST];
 
     if (af == AF_INET6) {
       assert(len + need < HSK_MAX_HOST);
@@ -487,8 +488,7 @@ hsk_addr_to_full(
   char b32[54];
   hsk_base32_encode(addr->key, 33, b32, false);
 
-  // XXX Not thread safe.
-  static char tmp[HSK_MAX_HOST];
+  char tmp[HSK_MAX_HOST];
   sprintf(tmp, "%s@%s", b32, dst);
   strcpy(dst, tmp);
 
@@ -515,8 +515,7 @@ hsk_addr_to_at(const hsk_addr_t *addr, char *dst, size_t dst_len, uint16_t fb) {
     if (!port)
       port = fb;
 
-    // XXX Not thread safe.
-    static char tmp[HSK_MAX_HOST];
+    char tmp[HSK_MAX_HOST];
     sprintf(tmp, "%s@%u", dst, port);
     strcpy(dst, tmp);
   }
@@ -940,7 +939,11 @@ hsk_addr_print(const hsk_addr_t *addr, const char *prefix) {
   char host[HSK_MAX_HOST];
   assert(hsk_addr_to_string(addr, host, HSK_MAX_HOST, HSK_BRONTIDE_PORT));
 
+  char b32[54];
+  hsk_base32_encode(addr->key, 33, b32, false);
+
   printf("%saddr\n", prefix);
+  printf("%skey=%s\n", prefix, b32);
   printf("%s  type=%d\n", prefix, addr->type);
   printf("%s  host=%s\n", prefix, host);
 }
