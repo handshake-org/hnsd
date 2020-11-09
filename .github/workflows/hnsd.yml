@@ -10,7 +10,7 @@ jobs:
     steps:
     - uses: actions/checkout@v2
     - name: install unbound
-      run: sudo apt install -y unbound
+      run: sudo apt install -y unbound libunbound-dev
     - name: autogen
       run: ./autogen.sh
     - name: configure
