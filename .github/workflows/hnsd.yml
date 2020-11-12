@@ -27,6 +27,21 @@ jobs:
       run: ./configure
     - name: make
       run: make
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: MSYS
+      - shell: msys2 {0}
+        run: |
+          pacman -S base-devel mingw-w64-x86_64-toolchain mingw-w64-x86_64-unbound mingw-w64-x86_64-crt-git
+          ./autogen.sh
+          ./configure
+          make
+      
+
     
 
 
