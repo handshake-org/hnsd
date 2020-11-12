@@ -20,7 +20,7 @@ jobs:
     steps:
     - uses: actions/checkout@v2
     - name: install unbound
-      run: brew install unbound
+      run: brew install automake autoconf libtool unbound
     - name: autogen
       run: ./autogen.sh
     - name: configure
