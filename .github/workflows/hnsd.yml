@@ -3,11 +3,8 @@ name: hnsd
 on: [push, pull_request]
 
 jobs:
-  build:
-    strategy:
-      matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
-    runs-on: ${{ matrix.os }}
+  linux:
+    runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v2
     - name: install unbound
@@ -18,5 +15,18 @@ jobs:
       run: ./configure
     - name: make
       run: make
+  mac:
+    runs-on: macos-latest
+    steps:
+    - uses: actions/checkout@v2
+    - name: install unbound
+      run: brew install unbound
+    - name: autogen
+      run: ./autogen.sh
+    - name: configure
+      run: ./configure
+    - name: make
+      run: make
+    
 
 
