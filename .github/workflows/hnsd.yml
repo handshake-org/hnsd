@@ -35,8 +35,9 @@ jobs:
         with:
           msystem: MSYS
       - shell: msys2 {0}
+        run: pacman -Syyu --noconfirm base-devel mingw-w64-x86_64-toolchain mingw-w64-x86_64-unbound mingw-w64-x86_64-crt-git | true
+      - shell: msys2 {0}
         run: |
-          pacman -Syyu --noconfirm base-devel mingw-w64-x86_64-toolchain mingw-w64-x86_64-unbound mingw-w64-x86_64-crt-git
           ./autogen.sh
           ./configure
           make
