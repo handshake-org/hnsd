@@ -59,8 +59,7 @@ libhsk_la_SOURCES = src/addr.c                   \
 EXTRA_DIST = README.md \
              LICENSE
 
-PROGS = hnsd
-noinst_PROGRAMS = $(PROGS)
+bin_PROGRAMS = hnsd
 
 hnsd_SOURCES = src/cache.c  \
                src/daemon.c \
