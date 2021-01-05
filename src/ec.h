@@ -8,6 +8,8 @@
 
 #include "hash.h"
 #include "secp256k1.h"
+#include "secp256k1/elligator.h"
+
 
 typedef hsk_secp256k1_context hsk_ec_t;
 
