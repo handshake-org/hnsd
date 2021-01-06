@@ -120,6 +120,12 @@ $ cd hnsd
 $ ./autogen.sh && ./configure && make
 ```
 
+### Optional
+
+``` sh
+$ sudo make install
+```
+
 ## Setup
 
 Currently, hnsd will setup a recursive name server listening locally. If
