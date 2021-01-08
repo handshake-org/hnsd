@@ -235,6 +235,54 @@ resolving a domain. This can cause issues with hnsd. Disable with:
 interval=604800
 ```
 
+### Docker
+#### Building an image
+
+To build a Docker image with the name `hnsd:<version>-<arch>-<commit>`, run:
+
+```bash
+$ VERSION=$(git ls-remote --tags --refs --sort="v:refname" git://github.com/handshake-org/hnsd.git | tail -n1 | sed 's/.*\///')
+$ ARCH=$(arch)
+$ COMMIT=$(git rev-parse --short HEAD)
+$ docker build -t hnsd:$VERSION-$ARCH-$COMMIT .
+```
+
+#### Running a container
+
+Getting your local IP first
+
+```bash
+IP=$(ifconfig eth0 | sed -En 's/127.0.0.1//;s/.*inet (addr:)?(([0-9]*\.){3}[0-9]*).*/\2/p')
+```
+
+To create and run a container named `hnsd`, run:
+
+```bash
+$ docker create \
+    --name=hnsd \
+    --net=host \
+    --restart=unless-stopped \
+  hnsd:$VERSION-$ARCH-$COMMIT -r $IP:53
+```
+
+```bash
+$ docker start hnsd
+```
+
+To check the `hnsd` container if it runs correctly
+
+```bash
+$ docker ps -a
+```
+
+#### Stopping a container
+
+To stop a container named `hnsd`, run:
+
+```bash
+$ docker stop hnsd
+```
+
 ## Usage
 
 ``` sh
