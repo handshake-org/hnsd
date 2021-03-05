@@ -32,6 +32,7 @@ libhsk_la_SOURCES = src/addr.c                   \
                     src/bn.c                     \
                     src/brontide.c               \
                     src/chacha20/chacha20.c      \
+                    src/store.c                  \
                     src/chain.c                  \
                     src/dns.c                    \
                     src/dnssec.c                 \

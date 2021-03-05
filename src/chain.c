@@ -17,6 +17,7 @@
 #include "msg.h"
 #include "timedata.h"
 #include "utils.h"
+#include "store.h"
 
 /*
  * Prototypes
@@ -58,8 +59,8 @@ qsort_cmp(const void *a, const void *b) {
  */
 
 int
-hsk_chain_init(hsk_chain_t *chain, const hsk_timedata_t *td) {
-  if (!chain || !td)
+hsk_chain_init(hsk_chain_t *chain, const hsk_timedata_t *td, const uv_loop_t *loop) {
+  if (!chain || !td || !loop)
     return HSK_EBADARGS;
 
   chain->height = 0;
@@ -67,11 +68,15 @@ hsk_chain_init(hsk_chain_t *chain, const hsk_timedata_t *td) {
   chain->genesis = NULL;
   chain->synced = false;
   chain->td = (hsk_timedata_t *)td;
+  chain->loop = (uv_loop_t *)loop;
 
   hsk_map_init_hash_map(&chain->hashes, free);
   hsk_map_init_int_map(&chain->heights, NULL);
   hsk_map_init_hash_map(&chain->orphans, free);
   hsk_map_init_hash_map(&chain->prevs, NULL);
+
+  chain->store = hsk_store_alloc(chain->loop);
+  hsk_store_open(chain->store);
 
   return hsk_chain_init_genesis(chain);
 }
@@ -122,18 +127,21 @@ hsk_chain_uninit(hsk_chain_t *chain) {
   hsk_map_uninit(&chain->prevs);
   hsk_map_uninit(&chain->orphans);
 
+  hsk_store_close(chain->store);
+  hsk_store_uninit(chain->store);
+
   chain->tip = NULL;
   chain->genesis = NULL;
 }
 
 hsk_chain_t *
-hsk_chain_alloc(const hsk_timedata_t *td) {
+hsk_chain_alloc(const hsk_timedata_t *td, const uv_loop_t *loop) {
   hsk_chain_t *chain = malloc(sizeof(hsk_chain_t));
 
   if (!chain)
     return NULL;
 
-  if (hsk_chain_init(chain, td) != HSK_SUCCESS) {
+  if (hsk_chain_init(chain, td, loop) != HSK_SUCCESS) {
     free(chain);
     return NULL;
   }
@@ -718,6 +726,10 @@ hsk_chain_insert(
 
     hsk_chain_maybe_sync(chain);
   }
+
+  uint8_t *data = malloc(236);
+  hsk_header_encode(hdr, data);
+  hsk_store_write(chain->store, data, sizeof(data));
 
   return HSK_SUCCESS;
 }
