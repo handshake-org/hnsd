@@ -97,7 +97,7 @@ int
 hsk_store_read(hsk_store_t *store, int height, hsk_header_t *header) {
   uint8_t *data = malloc(236);
   for (size_t i = 0; i < 236; i++) {
-    data[i] = store->map[i*height];
+    data[i] = store->map[i + height*236];
   }
   hsk_header_decode(data, 236, header);
   free(data);

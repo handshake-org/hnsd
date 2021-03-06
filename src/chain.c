@@ -729,7 +729,7 @@ hsk_chain_insert(
 
   uint8_t *data = malloc(236);
   hsk_header_encode(hdr, data);
-  hsk_store_write(chain->store, data, sizeof(data));
+  hsk_store_write(chain->store, data, 236);
   free(data);
 
   return HSK_SUCCESS;
