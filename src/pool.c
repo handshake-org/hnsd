@@ -17,6 +17,7 @@
 #include "brontide.h"
 #include "chain.h"
 #include "store.h"
+#include "store.h"
 #include "constants.h"
 #include "ec.h"
 #include "error.h"
@@ -782,6 +783,12 @@ hsk_pool_timer(hsk_pool_t *pool) {
   }
 
   hsk_pool_refill(pool);
+
+  // FIXME: testing header store - read tip
+  hsk_header_t *hdr = hsk_header_alloc();
+  hsk_store_read(pool->chain.store, pool->chain.tip->height, hdr);
+  printf("pool->chain.tip->height; hdr->height: %d; %d\n", pool->chain.tip->height, hdr->height);
+  free(hdr);
 }
 
 /*

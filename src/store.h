@@ -35,6 +35,9 @@ int
 hsk_store_write(hsk_store_t *store, uint8_t *data, size_t len);
 
 int
+hsk_store_read(hsk_store_t *store, int height, hsk_header_t *header);
+
+int
 hsk_store_sync(hsk_store_t *store);
 
 int
