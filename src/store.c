@@ -87,10 +87,10 @@ hsk_store_open(hsk_store_t *store) {
 
 int
 hsk_store_write(hsk_store_t *store, uint8_t *data, size_t len) {
-  for (size_t i = store->pos; i < len; i++) {
-    store->map[i] = data[i-store->pos];
+  for (size_t i = 0; i < len; i++) {
+    store->map[i+store->pos] = data[i];
   }
-  store->pos = len;
+  store->pos += len;
 }
 
 int
