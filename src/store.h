@@ -10,6 +10,7 @@
 
 typedef struct hsk_store_s {
   uv_loop_t *loop;
+  bool init;
   int fd;
   size_t size;
   uint8_t *map;

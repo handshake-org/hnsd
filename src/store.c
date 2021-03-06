@@ -6,11 +6,13 @@
 #include "error.h"
 #include "header.h"
 #include "store.h"
+#include "errno.h"
 
 int
 hsk_store_init(hsk_store_t *store, const uv_loop_t *loop) {
   store->loop = (uv_loop_t *)loop;
   store->fd = -1;
+  store->init = false;
   store->map = NULL;
   store->location = "/tmp/hnsd.bin";
   store->headers = malloc(sizeof(hsk_store_t));
@@ -42,25 +44,17 @@ hsk_store_timer(hsk_store_t *store) {
 
 int
 hsk_store_open(hsk_store_t *store) {
-  store->fd = open(store->location, O_RDWR | O_CREAT | O_TRUNC, (mode_t)0600);
+  store->size = 65536 * 236;
+  store->fd = open(store->location, O_RDWR | O_CREAT | O_TRUNC | O_EXCL, (mode_t)0600);
 
-  if (store->fd == -1)
-  {
-    return HSK_EFAILURE;
-  }
-
-   store->size = 65536 * 236 + 1;
-
-  if (lseek(store->fd, store->size-1, SEEK_SET) == -1)
-  {
-    close(store->fd);
-    return HSK_EFAILURE;
-  }
-
-  if (write(store->fd, "", 1) == -1)
-  {
-    close(store->fd);
-    return HSK_EFAILURE;
+  if (store->fd == -1) {
+    if (errno != EEXIST) {
+      return HSK_EFAILURE;
+    }
+    store->fd = open(store->location, O_RDWR, (mode_t)0600);
+  } else {
+    store->init = true;
+    ftruncate(store->fd, store->size);
   }
 
   store->map = mmap(0, store->size, PROT_READ | PROT_WRITE, MAP_SHARED, store->fd, 0);

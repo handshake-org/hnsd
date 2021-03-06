@@ -89,11 +89,19 @@ hsk_chain_init(hsk_chain_t *chain, const hsk_timedata_t *td, const uv_loop_t *lo
   chain->store = hsk_store_alloc(chain->loop);
   hsk_store_open(chain->store);
 
-  for (int i = 0; i < 236; i++) {
+  int rc = hsk_chain_init_genesis(chain);
+  if (rc != HSK_SUCCESS) {
+    return rc;
+  }
+
+  // TODO: hardcoded 65536 because we don't know how many headers we've written
+  // So we read until we hit a header which has garbage data and break
+  // Here we're checking if bits == 0
+  for (int i = 1; i < 65536; i++) {
     hsk_header_t *hdr = hsk_header_alloc();
-    hsk_store_read(chain->store, 65536, hdr);
+    hsk_store_read(chain->store, i, hdr);
     // FIXME: ugly hack ugh!
-    if (hdr->version != 0) {
+    if (hdr->bits == 0) {
       break;
     }
     int rc = hsk_chain_add(chain, hdr);
@@ -102,8 +110,6 @@ hsk_chain_init(hsk_chain_t *chain, const hsk_timedata_t *td, const uv_loop_t *lo
       return rc;
     }
   }
-
-  return hsk_chain_init_genesis(chain);
 }
 
 static int
