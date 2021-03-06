@@ -49,7 +49,7 @@ hsk_store_open(hsk_store_t *store) {
     return HSK_EFAILURE;
   }
 
-   store->size = 65536 * sizeof(hsk_store_t) + 1;
+   store->size = 65536 * 236 + 1;
 
   if (lseek(store->fd, store->size-1, SEEK_SET) == -1)
   {

@@ -58,6 +58,17 @@ qsort_cmp(const void *a, const void *b) {
  * Chain
  */
 
+
+static void
+hsk_chain_log(const hsk_chain_t *chain, const char *fmt, ...) {
+  printf("chain (%u): ", (uint32_t)chain->height);
+
+  va_list args;
+  va_start(args, fmt);
+  vprintf(fmt, args);
+  va_end(args);
+}
+
 int
 hsk_chain_init(hsk_chain_t *chain, const hsk_timedata_t *td, const uv_loop_t *loop) {
   if (!chain || !td || !loop)
@@ -77,6 +88,20 @@ hsk_chain_init(hsk_chain_t *chain, const hsk_timedata_t *td, const uv_loop_t *lo
 
   chain->store = hsk_store_alloc(chain->loop);
   hsk_store_open(chain->store);
+
+  for (int i = 0; i < 236; i++) {
+    hsk_header_t *hdr = hsk_header_alloc();
+    hsk_store_read(chain->store, 65536, hdr);
+    // FIXME: ugly hack ugh!
+    if (hdr->version != 0) {
+      break;
+    }
+    int rc = hsk_chain_add(chain, hdr);
+    if (rc != HSK_SUCCESS) {
+      hsk_chain_log(chain, "failed adding block: %s\n", hsk_strerror(rc));
+      return rc;
+    }
+  }
 
   return hsk_chain_init_genesis(chain);
 }
@@ -158,16 +183,6 @@ hsk_chain_free(hsk_chain_t *chain) {
 
   hsk_chain_uninit(chain);
   free(chain);
-}
-
-static void
-hsk_chain_log(const hsk_chain_t *chain, const char *fmt, ...) {
-  printf("chain (%u): ", (uint32_t)chain->height);
-
-  va_list args;
-  va_start(args, fmt);
-  vprintf(fmt, args);
-  va_end(args);
 }
 
 bool
