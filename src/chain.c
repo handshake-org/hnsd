@@ -112,6 +112,8 @@ hsk_chain_init_genesis(hsk_chain_t *chain) {
   chain->tip = tip;
   chain->genesis = tip;
 
+  hsk_store_write(chain->store, data, 236);
+
   hsk_chain_maybe_sync(chain);
 
   return HSK_SUCCESS;
