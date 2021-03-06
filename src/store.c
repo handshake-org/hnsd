@@ -94,6 +94,16 @@ hsk_store_write(hsk_store_t *store, uint8_t *data, size_t len) {
 }
 
 int
+hsk_store_read(hsk_store_t *store, int height, hsk_header_t *header) {
+  uint8_t *data = malloc(236);
+  for (size_t i = 0; i < 236; i++) {
+    data[i] = store->map[i*height];
+  }
+  hsk_header_decode(data, 236, header);
+  free(data);
+}
+
+int
 hsk_store_sync(hsk_store_t *store) {
   if(msync(store->map, store->size, MS_SYNC) == -1)
   {
