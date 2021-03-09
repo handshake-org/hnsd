@@ -1,23 +1,19 @@
-FROM alpine AS builder
-
-RUN apk update && \
-    apk --no-cache --update add build-base
-
-RUN apk add git automake autoconf libtool unbound-dev
-
+FROM alpine AS base
 COPY . /
 
+FROM base AS build
+RUN apk add --no-cache \
+  build-base \
+  git \
+  automake \
+  autoconf \
+  libtool \
+  unbound-dev
 RUN ./autogen.sh && ./configure && make
 
-FROM alpine:latest
-
-RUN apk update && apk upgrade 
-
-#.required dependency
-RUN apk add unbound-libs
-
-COPY --from=builder /hnsd /usr/local/bin/hnsd
+FROM base
+RUN apk add --no-cache unbound-libs
+COPY --from=build /hnsd /usr/local/bin/hnsd
 
 ENTRYPOINT ["/usr/local/bin/hnsd"]
-
 CMD []

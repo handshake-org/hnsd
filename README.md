@@ -236,33 +236,33 @@ interval=604800
 ```
 
 ### Docker
-#### Building an image
 
-To build a Docker image with the name `hnsd:<version>-<arch>-<commit>`, run:
+**Windows users:** your system may alter the "end of line" characters in certain files
+that will break the build inside docker. To prevent this, add this option to your
+git global configuraiton before cloning this repo:
 
 ```bash
-$ VERSION=$(git ls-remote --tags --refs --sort="v:refname" git://github.com/handshake-org/hnsd.git | tail -n1 | sed 's/.*\///')
-$ ARCH=$(arch)
-$ COMMIT=$(git rev-parse --short HEAD)
-$ docker build -t hnsd:$VERSION-$ARCH-$COMMIT .
+ $ git config --global core.autocrlf input
+ ```
+
+#### Building an image
+
+To build a Docker image with the name `hnsd`, run:
+
+```bash
+$ docker build -t hnsd .
 ```
 
 #### Running a container
-
-Getting your local IP first
-
-```bash
-IP=$(ifconfig eth0 | sed -En 's/127.0.0.1//;s/.*inet (addr:)?(([0-9]*\.){3}[0-9]*).*/\2/p')
-```
 
 To create and run a container named `hnsd`, run:
 
 ```bash
 $ docker create \
-    --name=hnsd \
-    --net=host \
-    --restart=unless-stopped \
-  hnsd:$VERSION-$ARCH-$COMMIT -r $IP:53
+  --name=hnsd \
+  --publish=127.0.0.1:53:53/udp \
+  --restart=unless-stopped \
+  hnsd -r 0.0.0.0:53
 ```
 
 ```bash
