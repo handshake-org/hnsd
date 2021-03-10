@@ -31,7 +31,7 @@ typedef struct {
   char tld[HSK_DNS_MAX_LABEL + 1];
 
   // Who it's from.
-  struct sockaddr_storage ss;
+  struct sockaddr_storage *ss;
   struct sockaddr *addr;
 } hsk_dns_req_t;
 
