@@ -235,6 +235,54 @@ resolving a domain. This can cause issues with hnsd. Disable with:
 interval=604800
 ```
 
+### Docker
+
+**Windows users:** your system may alter the "end of line" characters in certain files
+that will break the build inside docker. To prevent this, add this option to your
+git global configuraiton before cloning this repo:
+
+```bash
+ $ git config --global core.autocrlf input
+ ```
+
+#### Building an image
+
+To build a Docker image with the name `hnsd`, run:
+
+```bash
+$ docker build -t hnsd .
+```
+
+#### Running a container
+
+To create and run a container named `hnsd`, run:
+
+```bash
+$ docker create \
+  --name=hnsd \
+  --publish=127.0.0.1:53:53/udp \
+  --restart=unless-stopped \
+  hnsd -r 0.0.0.0:53
+```
+
+```bash
+$ docker start hnsd
+```
+
+To check the `hnsd` container if it runs correctly
+
+```bash
+$ docker ps -a
+```
+
+#### Stopping a container
+
+To stop a container named `hnsd`, run:
+
+```bash
+$ docker stop hnsd
+```
+
 ## Usage
 
 ``` sh
