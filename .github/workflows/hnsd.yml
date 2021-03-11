@@ -1,0 +1,48 @@
+name: hnsd
+
+on: [push, pull_request]
+
+jobs:
+  linux:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - name: install unbound
+      run: sudo apt install -y unbound libunbound-dev
+    - name: autogen
+      run: ./autogen.sh
+    - name: configure
+      run: ./configure
+    - name: make
+      run: make
+  mac:
+    runs-on: macos-latest
+    steps:
+    - uses: actions/checkout@v2
+    - name: install unbound
+      run: brew install automake autoconf libtool unbound
+    - name: autogen
+      run: ./autogen.sh
+    - name: configure
+      run: ./configure
+    - name: make
+      run: make
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: MSYS
+      - shell: msys2 {0} | true
+        run: pacman -Syyu --noconfirm base-devel mingw-w64-x86_64-toolchain mingw-w64-x86_64-unbound mingw-w64-x86_64-crt-git | true
+      - shell: msys2 {0}
+        run: |
+          ./autogen.sh
+          ./configure
+          make
+      
+
+    
+
+
