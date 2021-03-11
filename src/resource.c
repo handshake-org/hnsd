@@ -23,6 +23,11 @@ static const uint8_t hsk_type_map[] = {
   0x00, 0x00, 0x03, 0x80
 };
 
+// NS RRSIG NSEC
+static const uint8_t hsk_type_map_ns[] = {
+  0x00, 0x06, 0x20, 0x00, 0x00, 0x00, 0x00, 0x03
+};
+
 /*
  * Helpers
  */
@@ -976,10 +981,15 @@ hsk_resource_to_dns(const hsk_resource_t *rs, const char *name, uint16_t type) {
       hsk_resource_to_ns(rs, name, ns);
       hsk_resource_to_ds(rs, name, ns);
       hsk_resource_to_glue(rs, name, ar);
-      if (!hsk_resource_has(rs, HSK_DS))
-        hsk_dnssec_sign_zsk(ns, HSK_DNS_NS);
-      else
-        hsk_dnssec_sign_zsk(ns, HSK_DNS_DS);
+      if (!hsk_resource_has(rs, HSK_DS)) {
+          hsk_dnssec_sign_zsk(ns, HSK_DNS_NS);
+          // No DS proof:
+          // This allows unbound to treat the zone as unsigned (and not bogus)
+          hsk_resource_to_empty(name, hsk_type_map_ns, sizeof(hsk_type_map_ns), ns);
+          hsk_dnssec_sign_zsk(ns, HSK_DNS_NSEC);
+      } else {
+          hsk_dnssec_sign_zsk(ns, HSK_DNS_DS);
+      }
     } else {
       // Needs SOA.
       // Empty proof:
