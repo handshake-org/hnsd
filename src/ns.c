@@ -100,7 +100,12 @@ hsk_icann_lookup(const char *name);
  */
 
 int
-hsk_ns_init(hsk_ns_t *ns, const uv_loop_t *loop, const hsk_pool_t *pool) {
+hsk_ns_init(
+  hsk_ns_t *ns,
+  const uv_loop_t *loop,
+  const hsk_pool_t *pool,
+  const bool upstream
+) {
   if (!ns || !loop || !pool)
     return HSK_EBADARGS;
 
@@ -121,6 +126,7 @@ hsk_ns_init(hsk_ns_t *ns, const uv_loop_t *loop, const hsk_pool_t *pool) {
   memset(ns->pubkey, 0x00, sizeof(ns->pubkey));
   memset(ns->read_buffer, 0x00, sizeof(ns->read_buffer));
   ns->receiving = false;
+  ns->upstream = upstream;
 
   return HSK_SUCCESS;
 }
@@ -241,13 +247,17 @@ hsk_ns_close(hsk_ns_t *ns) {
 }
 
 hsk_ns_t *
-hsk_ns_alloc(const uv_loop_t *loop, const hsk_pool_t *pool) {
+hsk_ns_alloc(
+  const uv_loop_t *loop,
+  const hsk_pool_t *pool,
+  const bool upstream
+) {
   hsk_ns_t *ns = malloc(sizeof(hsk_ns_t));
 
   if (!ns)
     return NULL;
 
-  if (hsk_ns_init(ns, loop, pool) != HSK_SUCCESS) {
+  if (hsk_ns_init(ns, loop, pool, upstream) != HSK_SUCCESS) {
     free(ns);
     return NULL;
   }
@@ -511,6 +521,16 @@ hsk_ns_respond(
   if (status != HSK_SUCCESS) {
     // Pool resolve error.
     hsk_ns_log(ns, "resolve response error: %s\n", hsk_strerror(status));
+
+    // Forward to custom upstream resolver
+    if (status == HSK_EREFUSED) {
+      msg = hsk_resource_to_refused();
+
+      if (!msg)
+        hsk_ns_log(ns, "could not create refused response (%u)\n", req->id);
+      else
+        hsk_ns_log(ns, "sending refused (%u)\n", req->id);
+    }
   } else if (!res) {
     // Doesn't exist.
     //
@@ -726,16 +746,26 @@ after_resolve(
 
   if (status == HSK_SUCCESS) {
     if (!exists || data_len == 0) {
-      const uint8_t *item = hsk_icann_lookup(name);
+      if (ns->upstream) {
+        // User has requested that all non-HNS queries
+        // get forwarded to a specific upstream resolver.
+        // Instead of sending NXDOMAIN we respond to the recursive
+        // with a REFUSED error as a special cue.
+        hsk_ns_log(ns, "forwarding to upstream resolver: %s\n", name);
+        status = HSK_EREFUSED;
+        res = NULL;
+      } else {
+        const uint8_t *item = hsk_icann_lookup(name);
 
-      if (item) {
-        const uint8_t *raw = &item[2];
-        size_t raw_len = (((size_t)item[1]) << 8) | ((size_t)item[0]);
+        if (item) {
+          const uint8_t *raw = &item[2];
+          size_t raw_len = (((size_t)item[1]) << 8) | ((size_t)item[0]);
 
-        if (!hsk_resource_decode(raw, raw_len, &res)) {
-          hsk_ns_log(ns, "could not decode root resource for: %s\n", name);
-          status = HSK_EFAILURE;
-          res = NULL;
+          if (!hsk_resource_decode(raw, raw_len, &res)) {
+            hsk_ns_log(ns, "could not decode root resource for: %s\n", name);
+            status = HSK_EFAILURE;
+            res = NULL;
+          }
         }
       }
     } else {
