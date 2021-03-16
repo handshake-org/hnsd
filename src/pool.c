@@ -1675,7 +1675,7 @@ hsk_peer_parse(hsk_peer_t *peer, const uint8_t *msg, size_t msg_len) {
   const char *str = hsk_msg_str(peer->msg_cmd);
 
   if (strcmp(str, "unknown") == 0) {
-    hsk_peer_log(peer, "unknown command: %u\n", peer->msg_cmd);
+    hsk_peer_debug(peer, "unknown command: %u\n", peer->msg_cmd);
     goto done;
   }
 
