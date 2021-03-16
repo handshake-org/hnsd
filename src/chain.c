@@ -87,9 +87,16 @@ hsk_chain_init(hsk_chain_t *chain, const hsk_timedata_t *td, const uv_loop_t *lo
   hsk_map_init_hash_map(&chain->prevs, NULL);
 
   chain->store = hsk_store_alloc(chain->loop);
-  hsk_store_open(chain->store);
 
-  int rc = hsk_chain_init_genesis(chain);
+  if (!chain->store)
+    return HSK_ENOMEM;
+
+  int rc = hsk_store_open(chain->store);
+  if (rc != HSK_SUCCESS) {
+    return rc;
+  }
+
+  rc = hsk_chain_init_genesis(chain);
   if (rc != HSK_SUCCESS) {
     return rc;
   }
@@ -99,17 +106,25 @@ hsk_chain_init(hsk_chain_t *chain, const hsk_timedata_t *td, const uv_loop_t *lo
   // Here we're checking if bits == 0
   for (int i = 1; i < 65536; i++) {
     hsk_header_t *hdr = hsk_header_alloc();
+
+    if (!hdr)
+      return HSK_ENOMEM;
+
     hsk_store_read(chain->store, i, hdr);
+
     // FIXME: ugly hack ugh!
     if (hdr->bits == 0) {
       break;
     }
+
     int rc = hsk_chain_add(chain, hdr);
     if (rc != HSK_SUCCESS) {
       hsk_chain_log(chain, "failed adding block: %s\n", hsk_strerror(rc));
       return rc;
     }
   }
+
+  return HSK_SUCCESS;
 }
 
 static int

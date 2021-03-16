@@ -8,15 +8,20 @@
 #include "store.h"
 #include "errno.h"
 
+#define HSK_HEADERS_BIN "/tmp/hnsd.bin";
+
 int
 hsk_store_init(hsk_store_t *store, const uv_loop_t *loop) {
   store->loop = (uv_loop_t *)loop;
   store->fd = -1;
   store->init = false;
   store->map = NULL;
-  store->location = "/tmp/hnsd.bin";
+  store->location = HSK_HEADERS_BIN;
   store->headers = malloc(sizeof(hsk_store_t));
+  if (!store->headers)
+    return HSK_ENOMEM;
   store->timer = NULL;
+  return HSK_SUCCESS;
 }
 
 int hsk_store_uninit(hsk_store_t *store) {
@@ -28,6 +33,7 @@ int hsk_store_uninit(hsk_store_t *store) {
     close(store->fd);
     return HSK_EFAILURE;
   }
+  return HSK_SUCCESS;
 }
 
 static void
@@ -44,6 +50,8 @@ hsk_store_timer(hsk_store_t *store) {
 
 int
 hsk_store_open(hsk_store_t *store) {
+  // TODO: hardcoded for 65536 blocks. Should auto re-size if we see more than
+  // 65536 blocks.
   store->size = 65536 * 236;
   store->fd = open(store->location, O_RDWR | O_CREAT | O_TRUNC | O_EXCL, (mode_t)0600);
 
@@ -85,6 +93,7 @@ hsk_store_write(hsk_store_t *store, uint8_t *data, size_t len) {
     store->map[i+store->pos] = data[i];
   }
   store->pos += len;
+  return HSK_SUCCESS;
 }
 
 int
@@ -95,15 +104,17 @@ hsk_store_read(hsk_store_t *store, int height, hsk_header_t *header) {
   }
   hsk_header_decode(data, 236, header);
   free(data);
+  return HSK_SUCCESS;
 }
 
 int
 hsk_store_sync(hsk_store_t *store) {
   if(msync(store->map, store->size, MS_SYNC) == -1)
   {
-    close(store->map);
+    close(store->fd);
     return HSK_EFAILURE;
   }
+  return HSK_SUCCESS;
 }
 
 int

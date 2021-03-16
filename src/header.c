@@ -48,7 +48,8 @@ hsk_header_init(hsk_header_t *hdr) {
 hsk_header_t *
 hsk_header_alloc(void) {
   hsk_header_t *hdr = malloc(sizeof(hsk_header_t));
-  hsk_header_init(hdr);
+  if (hdr)
+    hsk_header_init(hdr);
   return hdr;
 }
 
