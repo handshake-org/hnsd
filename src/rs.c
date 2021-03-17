@@ -56,6 +56,9 @@ static void
 after_worker_stop(void *data);
 
 static void
+after_fallback_worker_stop(void *data);
+
+static void
 after_send(uv_udp_send_t *req, int status);
 
 static void
@@ -359,7 +362,7 @@ hsk_rs_open(hsk_rs_t *ns, const struct sockaddr *addr) {
         return HSK_EFAILURE;
 
     ns->fallback_worker = hsk_rs_worker_alloc(ns->loop, (void *)ns,
-                                              after_worker_stop);
+                                              after_fallback_worker_stop);
     if (!ns->fallback_worker)
       return HSK_EFAILURE;
 
@@ -378,15 +381,17 @@ hsk_rs_close(hsk_rs_t *ns, void *stop_data, void (*stop_callback)(void *)) {
   ns->stop_data = stop_data;
   ns->stop_callback = stop_callback;
 
+  if(ns->fallback_worker && hsk_rs_worker_is_open(ns->fallback_worker))
+    hsk_rs_worker_close(ns->fallback_worker);
+  else
+    after_fallback_worker_stop((void*)ns);
+
   // If the worker is running, stop it, after_worker_stop is called
   // asynchronously.  Otherwise, just call it directly.
   if(ns->rs_worker && hsk_rs_worker_is_open(ns->rs_worker))
     hsk_rs_worker_close(ns->rs_worker);
   else
     after_worker_stop((void *)ns);
-
-  if(ns->fallback_worker && hsk_rs_worker_is_open(ns->fallback_worker))
-    hsk_rs_worker_close(ns->fallback_worker);
 
   return HSK_SUCCESS;
 }
@@ -696,11 +701,6 @@ after_worker_stop(void *data) {
     ns->rs_worker = NULL;
   }
 
-  if (ns->fallback_worker) {
-    hsk_rs_worker_free(ns->fallback_worker);
-    ns->fallback_worker = NULL;
-  }
-
   if (ns->receiving) {
     uv_udp_recv_stop(ns->socket);
     ns->receiving = false;
@@ -723,6 +723,21 @@ after_worker_stop(void *data) {
   ns->stop_callback = NULL;
 
   stop_callback(stop_data);
+}
+
+static void
+after_fallback_worker_stop(void *data) {
+  hsk_rs_t *ns = (hsk_rs_t *)data;
+
+  if (ns->fallback_worker) {
+    hsk_rs_worker_free(ns->fallback_worker);
+    ns->fallback_worker = NULL;
+  }
+
+  if (ns->fallback) {
+    ub_ctx_delete(ns->fallback);
+    ns->fallback = NULL;
+  }
 }
 
 static void
