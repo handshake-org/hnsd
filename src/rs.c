@@ -494,9 +494,9 @@ done:
 static void
 hsk_rs_respond(
   hsk_rs_t *ns,
-  const hsk_dns_req_t *req,
+  hsk_dns_req_t *req,
   int status,
-  const struct ub_result *result
+  struct ub_result *result
 ) {
   hsk_dns_msg_t *msg = NULL;
   uint8_t *wire = NULL;
@@ -509,10 +509,25 @@ hsk_rs_respond(
 
   hsk_rs_log(ns, "received answer for: %s\n", req->name);
 
-  if (result->rcode == HSK_DNS_SERVFAIL) {
-    hsk_rs_log(ns, "received SERVFAIL for: %s\n", req->name);
+  if (ns->upstream && result->rcode == HSK_DNS_SERVFAIL) {
+    hsk_rs_log(ns, "redirecting lookup to fallback for: %s\n", req->name);
 
-    // TODO: Try same lookup again with fallback resolver
+    // Try same lookup again with fallback resolver
+    int rc;
+    rc = hsk_rs_worker_resolve(
+      ns->fallback_worker,
+      req->name,
+      req->type,
+      req->class,
+      (void *)req,
+      after_resolve
+    );
+
+    if (rc == HSK_SUCCESS) {
+      return;
+    } else {
+      goto fail;
+    }
   }
 
   if (result->canonname)
@@ -586,6 +601,8 @@ fail:
 
 done:
   hsk_rs_send(ns, wire, wire_len, req->addr, true);
+  ub_resolve_free(result);
+  hsk_dns_req_free(req);
 }
 
 static int
@@ -771,11 +788,13 @@ after_resolve(void *data, int status, struct ub_result *result) {
 
   assert(ns);
 
-  // If the request is aborted, result is NULL, we just need to free req in that
-  // case
+  // If the request is aborted, result is NULL.
+  // We just need to free req in that case.
+  // hsk_rs_respond() will free both result and req
+  // when it is completely done (may recurse if using fallback).
   if (result) {
     hsk_rs_respond(ns, req, status, result);
-    ub_resolve_free(result);
+  } else {
+    hsk_dns_req_free(req);
   }
-  hsk_dns_req_free(req);
 }
