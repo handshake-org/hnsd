@@ -471,7 +471,7 @@ hsk_daemon_init(hsk_daemon_t *daemon, uv_loop_t *loop, hsk_options_t *opt) {
     }
   }
 
-  daemon->rs = hsk_rs_alloc(loop, opt->ns_host);
+  daemon->rs = hsk_rs_alloc(loop, opt->ns_host, opt->upstream);
 
   if (!daemon->rs) {
     fprintf(stderr, "failed initializing rns\n");

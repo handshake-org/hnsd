@@ -75,7 +75,12 @@ after_resolve(void *data, int status, struct ub_result *result);
  */
 
 int
-hsk_rs_init(hsk_rs_t *ns, const uv_loop_t *loop, const struct sockaddr *stub) {
+hsk_rs_init(
+  hsk_rs_t *ns,
+  const uv_loop_t *loop,
+  const struct sockaddr *stub,
+  const char *upstream
+) {
   if (!ns || !loop)
     return HSK_EBADARGS;
 
@@ -110,6 +115,9 @@ hsk_rs_init(hsk_rs_t *ns, const uv_loop_t *loop, const struct sockaddr *stub) {
   memset(ns->read_buffer, 0x00, sizeof(ns->read_buffer));
   ns->receiving = false;
   ns->stop_callback = NULL;
+  ns->fallback = NULL;
+  ns->fallback_worker = NULL;
+  ns->upstream = (char *)upstream;
 
   if (stub) {
     err = HSK_EFAILURE;
@@ -119,6 +127,22 @@ hsk_rs_init(hsk_rs_t *ns, const uv_loop_t *loop, const struct sockaddr *stub) {
 
     if (!hsk_sa_localize(ns->stub))
       goto fail;
+  }
+
+  if (upstream) {
+    err = HSK_EFAILURE;
+
+    struct ub_ctx *fallback = NULL;
+
+    fallback = ub_ctx_create();
+
+    if (!fallback)
+      goto fail;
+
+    if (ub_ctx_async(fallback, 1) != 0)
+      goto fail;
+
+    ns->fallback = fallback;
   }
 
   return HSK_SUCCESS;
@@ -248,6 +272,43 @@ hsk_rs_inject_options(hsk_rs_t *ns) {
   return true;
 }
 
+static bool
+hsk_rs_configure_fallback(hsk_rs_t *ns) {
+  if (ub_ctx_set_option(ns->fallback, "logfile:", "") != 0)
+    return false;
+
+  if (ub_ctx_set_option(ns->fallback, "use-syslog:", "no") != 0)
+    return false;
+
+  ub_ctx_set_option(ns->fallback, "trust-anchor-signaling:", "no");
+
+  if (ub_ctx_set_option(ns->fallback, "edns-buffer-size:", "4096") != 0)
+    return false;
+
+  if (ub_ctx_set_option(ns->fallback, "max-udp-size:", "4096") != 0)
+    return false;
+
+  ub_ctx_set_option(ns->fallback, "qname-minimisation:", "yes");
+
+  if (ub_ctx_set_option(ns->fallback, "root-hints:", "") != 0)
+    return false;
+
+  if (ub_ctx_set_option(ns->fallback, "do-tcp:", "no") != 0)
+    return false;
+
+
+  if (ub_ctx_set_fwd(ns->fallback, ns->upstream) != 0)
+    return false;
+
+  // Use a thread instead of forking for libunbound's async work.  Threads work
+  // on all platforms, but forking does not work on Windows.
+  ub_ctx_async(ns->fallback, 1);
+
+  hsk_rs_log(ns, "fallback resolver pointing to: %s\n", ns->upstream);
+
+  return true;
+}
+
 int
 hsk_rs_open(hsk_rs_t *ns, const struct sockaddr *addr) {
   if (!ns || !addr)
@@ -293,6 +354,19 @@ hsk_rs_open(hsk_rs_t *ns, const struct sockaddr *addr) {
 
   hsk_rs_log(ns, "recursive nameserver listening on: %s\n", host);
 
+  if (ns->upstream) {
+    if (!hsk_rs_configure_fallback(ns))
+        return HSK_EFAILURE;
+
+    ns->fallback_worker = hsk_rs_worker_alloc(ns->loop, (void *)ns,
+                                              after_worker_stop);
+    if (!ns->fallback_worker)
+      return HSK_EFAILURE;
+
+    if (hsk_rs_worker_open(ns->fallback_worker, ns->fallback) != HSK_SUCCESS)
+      return HSK_EFAILURE;
+  }
+
   return HSK_SUCCESS;
 }
 
@@ -311,17 +385,24 @@ hsk_rs_close(hsk_rs_t *ns, void *stop_data, void (*stop_callback)(void *)) {
   else
     after_worker_stop((void *)ns);
 
+  if(ns->fallback_worker && hsk_rs_worker_is_open(ns->fallback_worker))
+    hsk_rs_worker_close(ns->fallback_worker);
+
   return HSK_SUCCESS;
 }
 
 hsk_rs_t *
-hsk_rs_alloc(const uv_loop_t *loop, const struct sockaddr *stub) {
+hsk_rs_alloc(
+  const uv_loop_t *loop,
+  const struct sockaddr *stub,
+  const char *upstream
+) {
   hsk_rs_t *ns = malloc(sizeof(hsk_rs_t));
 
   if (!ns)
     return NULL;
 
-  if (hsk_rs_init(ns, loop, stub) != HSK_SUCCESS) {
+  if (hsk_rs_init(ns, loop, stub, upstream) != HSK_SUCCESS) {
     free(ns);
     return NULL;
   }
@@ -427,6 +508,12 @@ hsk_rs_respond(
   }
 
   hsk_rs_log(ns, "received answer for: %s\n", req->name);
+
+  if (result->rcode == HSK_DNS_SERVFAIL) {
+    hsk_rs_log(ns, "received SERVFAIL for: %s\n", req->name);
+
+    // TODO: Try same lookup again with fallback resolver
+  }
 
   if (result->canonname)
     hsk_rs_log(ns, "  canonname: %s\n", result->canonname);
@@ -590,6 +677,11 @@ after_worker_stop(void *data) {
   if (ns->rs_worker) {
     hsk_rs_worker_free(ns->rs_worker);
     ns->rs_worker = NULL;
+  }
+
+  if (ns->fallback_worker) {
+    hsk_rs_worker_free(ns->fallback_worker);
+    ns->fallback_worker = NULL;
   }
 
   if (ns->receiving) {
