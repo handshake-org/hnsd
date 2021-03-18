@@ -9,6 +9,7 @@
 #include "cache.h"
 #include "ec.h"
 #include "pool.h"
+#include "rs.h"
 
 /*
  * Defs
@@ -33,6 +34,8 @@ typedef struct {
   uint8_t pubkey[33];
   uint8_t read_buffer[HSK_UDP_BUFFER];
   bool receiving;
+  bool upstream;
+  hsk_rs_t *rs;
 } hsk_ns_t;
 
 /*
@@ -40,7 +43,12 @@ typedef struct {
  */
 
 int
-hsk_ns_init(hsk_ns_t *ns, const uv_loop_t *loop, const hsk_pool_t *pool);
+hsk_ns_init(
+  hsk_ns_t *ns,
+  const uv_loop_t *loop,
+  const hsk_pool_t *pool,
+  const bool upstream
+);
 
 void
 hsk_ns_uninit(hsk_ns_t *ns);
@@ -52,13 +60,17 @@ bool
 hsk_ns_set_key(hsk_ns_t *ns, const uint8_t *key);
 
 int
-hsk_ns_open(hsk_ns_t *ns, const struct sockaddr *addr);
+hsk_ns_open(hsk_ns_t *ns, const struct sockaddr *addr, hsk_rs_t *rs);
 
 int
 hsk_ns_close(hsk_ns_t *ns);
 
 hsk_ns_t *
-hsk_ns_alloc(const uv_loop_t *loop, const hsk_pool_t *pool);
+hsk_ns_alloc(
+  const uv_loop_t *loop,
+  const hsk_pool_t *pool,
+  const bool upstream
+);
 
 void
 hsk_ns_free(hsk_ns_t *ns);

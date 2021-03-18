@@ -91,6 +91,9 @@ hsk_resource_to_servfail(void);
 hsk_dns_msg_t *
 hsk_resource_to_notimp(void);
 
+hsk_dns_msg_t *
+hsk_resource_to_refused(void);
+
 bool
 hsk_resource_is_ptr(const char *name);
 

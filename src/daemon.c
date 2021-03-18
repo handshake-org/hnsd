@@ -36,6 +36,8 @@ typedef struct hsk_options_s {
   uint8_t *identity_key;
   char *seeds;
   int pool_size;
+  char *upstream;
+  
 } hsk_options_t;
 
 static void
@@ -52,6 +54,7 @@ hsk_options_init(hsk_options_t *opt) {
   opt->identity_key = NULL;
   opt->seeds = NULL;
   opt->pool_size = HSK_POOL_SIZE;
+  opt->upstream = NULL;
 }
 
 static void
@@ -141,6 +144,11 @@ help(int r) {
     "  -l, --log-file <filename>\n"
     "    Redirect output to a log file.\n"
     "\n"
+    "  -t, --upstream <ip[:port]>\n"
+    "    IP address and port to forward queries that fail HNS lookup.\n"
+    "    Example:\n"
+    "      -t 1.1.1.1\n"
+    "\n"
 #ifndef _WIN32
     "  -d, --daemon\n"
     "    Fork and background the process.\n"
@@ -156,7 +164,7 @@ help(int r) {
 
 static void
 parse_arg(int argc, char **argv, hsk_options_t *opt) {
-  const static char *optstring = "c:n:r:i:u:p:k:s:l:h"
+  const static char *optstring = "c:n:r:i:u:p:k:s:l:t:h"
 #ifndef _WIN32
     "d"
 #endif
@@ -172,6 +180,7 @@ parse_arg(int argc, char **argv, hsk_options_t *opt) {
     { "identity-key", required_argument, NULL, 'k' },
     { "seeds", required_argument, NULL, 's' },
     { "log-file", required_argument, NULL, 'l' },
+    { "upstream", required_argument, NULL, 't' },
 #ifndef _WIN32
     { "daemon", no_argument, NULL, 'd' },
 #endif
@@ -307,6 +316,18 @@ parse_arg(int argc, char **argv, hsk_options_t *opt) {
         break;
       }
 
+      case 't': {
+        if (!optarg || strlen(optarg) == 0)
+          return help(1);
+
+        if (opt->upstream)
+          free(opt->upstream);
+
+        opt->upstream = strdup(optarg);
+
+        break;
+      }
+
 #ifndef _WIN32
       case 'd': {
         background = true;
@@ -428,7 +449,7 @@ hsk_daemon_init(hsk_daemon_t *daemon, uv_loop_t *loop, hsk_options_t *opt) {
     goto fail;
   }
 
-  daemon->ns = hsk_ns_alloc(loop, daemon->pool);
+  daemon->ns = hsk_ns_alloc(loop, daemon->pool, (bool)opt->upstream);
 
   if (!daemon->ns) {
     fprintf(stderr, "failed initializing ns\n");
@@ -450,7 +471,7 @@ hsk_daemon_init(hsk_daemon_t *daemon, uv_loop_t *loop, hsk_options_t *opt) {
     }
   }
 
-  daemon->rs = hsk_rs_alloc(loop, opt->ns_host);
+  daemon->rs = hsk_rs_alloc(loop, opt->ns_host, opt->upstream);
 
   if (!daemon->rs) {
     fprintf(stderr, "failed initializing rns\n");
@@ -492,7 +513,7 @@ hsk_daemon_open(hsk_daemon_t *daemon, hsk_options_t *opt) {
     return rc;
   }
 
-  rc = hsk_ns_open(daemon->ns, opt->ns_host);
+  rc = hsk_ns_open(daemon->ns, opt->ns_host, daemon->rs);
 
   if (rc != HSK_SUCCESS) {
     fprintf(stderr, "failed opening ns: %s\n", hsk_strerror(rc));

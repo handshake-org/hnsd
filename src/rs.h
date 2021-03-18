@@ -31,6 +31,9 @@ typedef struct {
   bool receiving;
   void *stop_data;
   void (*stop_callback)(void *);
+  char *upstream;
+  struct ub_ctx *fallback;
+  hsk_rs_worker_t *fallback_worker;
 } hsk_rs_t;
 
 /*
@@ -38,7 +41,12 @@ typedef struct {
  */
 
 int
-hsk_rs_init(hsk_rs_t *ns, const uv_loop_t *loop, const struct sockaddr *stub);
+hsk_rs_init(
+  hsk_rs_t *ns,
+  const uv_loop_t *loop,
+  const struct sockaddr *stub,
+  const char *upstream
+);
 
 void
 hsk_rs_uninit(hsk_rs_t *ns);
@@ -58,7 +66,14 @@ int
 hsk_rs_close(hsk_rs_t *ns, void *stop_data, void (*stop_callback)(void *));
 
 hsk_rs_t *
-hsk_rs_alloc(const uv_loop_t *loop, const struct sockaddr *stub);
+hsk_rs_alloc(
+  const uv_loop_t *loop,
+  const struct sockaddr *stub,
+  const char *upstream
+);
+
+void
+rs_after_resolve(void *data, int status, struct ub_result *result);
 
 void
 hsk_rs_free(hsk_rs_t *ns);
