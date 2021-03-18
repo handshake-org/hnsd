@@ -73,5 +73,8 @@ hsk_rs_alloc(
 );
 
 void
+rs_after_resolve(void *data, int status, struct ub_result *result);
+
+void
 hsk_rs_free(hsk_rs_t *ns);
 #endif

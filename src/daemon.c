@@ -513,7 +513,7 @@ hsk_daemon_open(hsk_daemon_t *daemon, hsk_options_t *opt) {
     return rc;
   }
 
-  rc = hsk_ns_open(daemon->ns, opt->ns_host);
+  rc = hsk_ns_open(daemon->ns, opt->ns_host, daemon->rs);
 
   if (rc != HSK_SUCCESS) {
     fprintf(stderr, "failed opening ns: %s\n", hsk_strerror(rc));

@@ -70,9 +70,6 @@ after_recv(
   unsigned flags
 );
 
-static void
-after_resolve(void *data, int status, struct ub_result *result);
-
 /*
  * Recursive NS
  */
@@ -242,7 +239,10 @@ hsk_rs_inject_options(hsk_rs_t *ns) {
   if (ub_ctx_set_option(ns->ub, "max-udp-size:", "4096") != 0)
     return false;
 
-  ub_ctx_set_option(ns->ub, "qname-minimisation:", "yes");
+  if (ns->upstream)
+    ub_ctx_set_option(ns->ub, "qname-minimisation:", "no");
+  else
+    ub_ctx_set_option(ns->ub, "qname-minimisation:", "yes");
 
   if (ub_ctx_set_option(ns->ub, "root-hints:", "") != 0)
     return false;
@@ -469,7 +469,7 @@ hsk_rs_onrecv(
     req->type,
     req->class,
     (void *)req,
-    after_resolve
+    rs_after_resolve
   );
 
   if (rc == HSK_SUCCESS)
@@ -513,27 +513,6 @@ hsk_rs_respond(
   }
 
   hsk_rs_log(ns, "received answer for: %s\n", req->name);
-
-  if (ns->upstream && result->rcode == HSK_DNS_SERVFAIL) {
-    hsk_rs_log(ns, "redirecting lookup to fallback for: %s\n", req->name);
-
-    // Try same lookup again with fallback resolver
-    int rc;
-    rc = hsk_rs_worker_resolve(
-      ns->fallback_worker,
-      req->name,
-      req->type,
-      req->class,
-      (void *)req,
-      after_resolve
-    );
-
-    if (rc == HSK_SUCCESS) {
-      return;
-    } else {
-      goto fail;
-    }
-  }
 
   if (result->canonname)
     hsk_rs_log(ns, "  canonname: %s\n", result->canonname);
@@ -796,8 +775,8 @@ after_recv(
   );
 }
 
-static void
-after_resolve(void *data, int status, struct ub_result *result) {
+void
+rs_after_resolve(void *data, int status, struct ub_result *result) {
   hsk_dns_req_t *req = (hsk_dns_req_t *)data;
   hsk_rs_t *ns = (hsk_rs_t *)req->ns;
 

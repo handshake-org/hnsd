@@ -24,6 +24,8 @@
 #include "utils.h"
 #include "uv.h"
 #include "dnssec.h"
+#include "rs_worker.h"
+#include "rs.h"
 
 // A RRSIG NSEC
 static const uint8_t hsk_type_map_a[] = {
@@ -127,6 +129,7 @@ hsk_ns_init(
   memset(ns->read_buffer, 0x00, sizeof(ns->read_buffer));
   ns->receiving = false;
   ns->upstream = upstream;
+  ns->rs = NULL;
 
   return HSK_SUCCESS;
 }
@@ -186,7 +189,7 @@ hsk_ns_set_key(hsk_ns_t *ns, const uint8_t *key) {
 }
 
 int
-hsk_ns_open(hsk_ns_t *ns, const struct sockaddr *addr) {
+hsk_ns_open(hsk_ns_t *ns, const struct sockaddr *addr, hsk_rs_t *rs) {
   if (!ns || !addr)
     return HSK_EBADARGS;
 
@@ -220,6 +223,8 @@ hsk_ns_open(hsk_ns_t *ns, const struct sockaddr *addr) {
 
   char host[HSK_MAX_HOST];
   assert(hsk_sa_to_string(addr, host, HSK_MAX_HOST, HSK_NS_PORT));
+
+  ns->rs = rs;
 
   hsk_ns_log(ns, "root nameserver listening on: %s\n", host);
 
@@ -521,16 +526,6 @@ hsk_ns_respond(
   if (status != HSK_SUCCESS) {
     // Pool resolve error.
     hsk_ns_log(ns, "resolve response error: %s\n", hsk_strerror(status));
-
-    // Forward to custom upstream resolver
-    if (status == HSK_EREFUSED) {
-      msg = hsk_resource_to_refused();
-
-      if (!msg)
-        hsk_ns_log(ns, "could not create refused response (%u)\n", req->id);
-      else
-        hsk_ns_log(ns, "sending refused (%u)\n", req->id);
-    }
   } else if (!res) {
     // Doesn't exist.
     //
@@ -749,11 +744,22 @@ after_resolve(
       if (ns->upstream) {
         // User has requested that all non-HNS queries
         // get forwarded to a specific upstream resolver.
-        // Instead of sending NXDOMAIN we respond to the recursive
-        // with a REFUSED error as a special cue.
-        hsk_ns_log(ns, "forwarding to upstream resolver: %s\n", name);
-        status = HSK_EREFUSED;
-        res = NULL;
+        hsk_ns_log(ns, "forwarding to upstream resolver: %s\n", req->name);
+
+        int rc;
+        rc = hsk_rs_worker_resolve(
+          ns->rs->fallback_worker,
+          req->name,
+          req->type,
+          req->class,
+          (void *)req,
+          rs_after_resolve
+        );
+
+        if (res)
+          hsk_resource_free(res);
+
+        return;
       } else {
         const uint8_t *item = hsk_icann_lookup(name);
 
