@@ -414,7 +414,7 @@ hsk_msg_init(hsk_msg_t *msg) {
       m->nonce = 0;
       memset(m->agent, 0, 256);
       m->height = 0;
-      m->no_relay = false;
+      m->no_relay = true;
       break;
     }
     case HSK_MSG_VERACK: {
