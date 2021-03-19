@@ -8,12 +8,14 @@
 #include "map.h"
 #include "header.h"
 #include "timedata.h"
+#include "store.h"
 
 /*
  * Types
  */
 
 typedef struct hsk_chain_s {
+  uv_loop_t *loop;
   int64_t height;
   hsk_header_t *tip;
   hsk_header_t *genesis;
@@ -23,6 +25,7 @@ typedef struct hsk_chain_s {
   hsk_map_t heights;
   hsk_map_t orphans;
   hsk_map_t prevs;
+  hsk_store_t *store;
 } hsk_chain_t;
 
 /*
@@ -30,13 +33,13 @@ typedef struct hsk_chain_s {
  */
 
 int
-hsk_chain_init(hsk_chain_t *chain, const hsk_timedata_t *td);
+hsk_chain_init(hsk_chain_t *chain, const hsk_timedata_t *td, const uv_loop_t *loop);
 
 void
 hsk_chain_uninit(hsk_chain_t *chain);
 
 hsk_chain_t *
-hsk_chain_alloc(const hsk_timedata_t *td);
+hsk_chain_alloc(const hsk_timedata_t *td, const uv_loop_t *loop);
 
 void
 hsk_chain_free(hsk_chain_t *chain);

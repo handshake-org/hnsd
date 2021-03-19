@@ -17,6 +17,7 @@
 #include "msg.h"
 #include "timedata.h"
 #include "utils.h"
+#include "store.h"
 
 /*
  * Prototypes
@@ -57,9 +58,20 @@ qsort_cmp(const void *a, const void *b) {
  * Chain
  */
 
+
+static void
+hsk_chain_log(const hsk_chain_t *chain, const char *fmt, ...) {
+  printf("chain (%u): ", (uint32_t)chain->height);
+
+  va_list args;
+  va_start(args, fmt);
+  vprintf(fmt, args);
+  va_end(args);
+}
+
 int
-hsk_chain_init(hsk_chain_t *chain, const hsk_timedata_t *td) {
-  if (!chain || !td)
+hsk_chain_init(hsk_chain_t *chain, const hsk_timedata_t *td, const uv_loop_t *loop) {
+  if (!chain || !td || !loop)
     return HSK_EBADARGS;
 
   chain->height = 0;
@@ -67,13 +79,52 @@ hsk_chain_init(hsk_chain_t *chain, const hsk_timedata_t *td) {
   chain->genesis = NULL;
   chain->synced = false;
   chain->td = (hsk_timedata_t *)td;
+  chain->loop = (uv_loop_t *)loop;
 
   hsk_map_init_hash_map(&chain->hashes, free);
   hsk_map_init_int_map(&chain->heights, NULL);
   hsk_map_init_hash_map(&chain->orphans, free);
   hsk_map_init_hash_map(&chain->prevs, NULL);
 
-  return hsk_chain_init_genesis(chain);
+  chain->store = hsk_store_alloc(chain->loop);
+
+  if (!chain->store)
+    return HSK_ENOMEM;
+
+  int rc = hsk_store_open(chain->store);
+  if (rc != HSK_SUCCESS) {
+    return rc;
+  }
+
+  rc = hsk_chain_init_genesis(chain);
+  if (rc != HSK_SUCCESS) {
+    return rc;
+  }
+
+  // TODO: hardcoded 65536 because we don't know how many headers we've written
+  // So we read until we hit a header which has garbage data and break
+  // Here we're checking if bits == 0
+  for (int i = 1; i < 65536; i++) {
+    hsk_header_t *hdr = hsk_header_alloc();
+
+    if (!hdr)
+      return HSK_ENOMEM;
+
+    hsk_store_read(chain->store, i, hdr);
+
+    // FIXME: ugly hack ugh!
+    if (hdr->bits == 0) {
+      break;
+    }
+
+    int rc = hsk_chain_add(chain, hdr);
+    if (rc != HSK_SUCCESS) {
+      hsk_chain_log(chain, "failed adding block: %s\n", hsk_strerror(rc));
+      return rc;
+    }
+  }
+
+  return HSK_SUCCESS;
 }
 
 static int
@@ -107,6 +158,8 @@ hsk_chain_init_genesis(hsk_chain_t *chain) {
   chain->tip = tip;
   chain->genesis = tip;
 
+  hsk_store_write(chain->store, data, 236);
+
   hsk_chain_maybe_sync(chain);
 
   return HSK_SUCCESS;
@@ -122,18 +175,21 @@ hsk_chain_uninit(hsk_chain_t *chain) {
   hsk_map_uninit(&chain->prevs);
   hsk_map_uninit(&chain->orphans);
 
+  hsk_store_close(chain->store);
+  hsk_store_uninit(chain->store);
+
   chain->tip = NULL;
   chain->genesis = NULL;
 }
 
 hsk_chain_t *
-hsk_chain_alloc(const hsk_timedata_t *td) {
+hsk_chain_alloc(const hsk_timedata_t *td, const uv_loop_t *loop) {
   hsk_chain_t *chain = malloc(sizeof(hsk_chain_t));
 
   if (!chain)
     return NULL;
 
-  if (hsk_chain_init(chain, td) != HSK_SUCCESS) {
+  if (hsk_chain_init(chain, td, loop) != HSK_SUCCESS) {
     free(chain);
     return NULL;
   }
@@ -148,16 +204,6 @@ hsk_chain_free(hsk_chain_t *chain) {
 
   hsk_chain_uninit(chain);
   free(chain);
-}
-
-static void
-hsk_chain_log(const hsk_chain_t *chain, const char *fmt, ...) {
-  printf("chain (%u): ", (uint32_t)chain->height);
-
-  va_list args;
-  va_start(args, fmt);
-  vprintf(fmt, args);
-  va_end(args);
 }
 
 bool
@@ -718,6 +764,11 @@ hsk_chain_insert(
 
     hsk_chain_maybe_sync(chain);
   }
+
+  uint8_t *data = malloc(236);
+  hsk_header_encode(hdr, data);
+  hsk_store_write(chain->store, data, 236);
+  free(data);
 
   return HSK_SUCCESS;
 }
