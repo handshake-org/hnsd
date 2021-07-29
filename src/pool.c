@@ -1802,7 +1802,14 @@ after_read(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf) {
 
   if (!peer)
     return;
-
+  
+  if (nread < 0) {
+    if (nread != UV_EOF)
+      hsk_peer_log(peer, "read error: %s\n", uv_strerror(nread));
+    hsk_peer_destroy(peer);
+    return;
+  }
+  
   if (peer->brontide != NULL) {
     int r = hsk_brontide_on_read(
         peer->brontide,
@@ -1820,13 +1827,6 @@ after_read(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf) {
         (uint8_t *)buf->base,
         (size_t)nread
         );
-  }
-
-  if (nread < 0) {
-    if (nread != UV_EOF)
-      hsk_peer_log(peer, "read error: %s\n", uv_strerror(nread));
-    hsk_peer_destroy(peer);
-    return;
   }
 }
 
