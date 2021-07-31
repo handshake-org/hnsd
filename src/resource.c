@@ -657,7 +657,13 @@ hsk_resource_to_glue(
         if (!rr)
           return false;
 
-        hsk_dns_rr_set_name(rr, c->name);
+        // Compute the base32 name from the SYNTH IP address.
+        // We are bypassing the checks in hsk_dns_rr_set_name()
+        // which should be fine because the name is being derived, not received.
+        char b32[29];
+        ip_to_b32(c->inet4, b32, 4);
+        sprintf(rr->name, "_%s._synth.", b32);
+
         rr->ttl = res->ttl;
 
         hsk_dns_a_rd_t *rd = rr->rd;
@@ -676,7 +682,10 @@ hsk_resource_to_glue(
         if (!rr)
           return false;
 
-        hsk_dns_rr_set_name(rr, c->name);
+        char b32[29];
+        ip_to_b32(c->inet6, b32, 16);
+        sprintf(rr->name, "_%s._synth.", b32);
+
         rr->ttl = res->ttl;
 
         hsk_dns_aaaa_rd_t *rd = rr->rd;
