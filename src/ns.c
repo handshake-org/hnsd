@@ -337,12 +337,6 @@ hsk_ns_onrecv(
     && req->labels == 2
     && req->name[0] == '_'
   ) {
-    uint8_t ip[16];
-    uint16_t family;
-
-    char synth[HSK_DNS_MAX_LABEL + 1];
-    hsk_dns_label_from(req->name, -2, synth);
-
     msg = hsk_dns_msg_alloc();
 
     if (!msg)
@@ -351,6 +345,11 @@ hsk_ns_onrecv(
     hsk_dns_rrs_t *an = &msg->an;
     hsk_dns_rrs_t *rrns = &msg->ns;
     hsk_dns_rrs_t *ar = &msg->ar;
+
+    uint8_t ip[16];
+    uint16_t family;
+    char synth[HSK_DNS_MAX_LABEL + 1];
+    hsk_dns_label_from(req->name, -2, synth);
 
     if (pointer_to_ip(synth, ip, &family)) {
       bool match = false;
