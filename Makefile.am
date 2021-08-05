@@ -75,5 +75,12 @@ hnsd_LDFLAGS = -static
 hnsd_CFLAGS = -DHSK_BUILD $(INC_UNBOUND) $(AM_CFLAGS)
 hnsd_CPPFLAGS = $(AM_CPPFLAGS)
 
+noinst_PROGRAMS = test_hnsd
+
+test_hnsd_SOURCES = test/hnsd-test.c
+
+test_hnsd_LDADD = $(LIB_UNBOUND)             \
+                  $(top_builddir)/libhsk.la
+
 # pkgconfigdir = $(libdir)/pkgconfig
 # pkgconfig_DATA = @PACKAGE_NAME@.pc
