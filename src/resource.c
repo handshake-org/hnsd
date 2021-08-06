@@ -30,15 +30,6 @@ static const uint8_t hsk_type_map[] = {
 static void
 to_fqdn(char *name);
 
-static void
-ip_size(const uint8_t *ip, size_t *s, size_t *l);
-
-static size_t
-ip_write(const uint8_t *ip, uint8_t *data);
-
-static bool
-ip_read(const uint8_t *data, uint8_t *ip);
-
 /*
  * Resource serialization version 0
  * Record types: read
@@ -511,9 +502,9 @@ hsk_resource_to_ns(
       char b32[29];
 
       if (c->type == HSK_SYNTH4)
-        ip_to_b32(c->inet4, b32, 4);
+        hsk_base32_encode_hex(c->inet4, 4, b32, false);
       else
-        ip_to_b32(c->inet6, b32, 16);
+        hsk_base32_encode_hex(c->inet6, 16, b32, false);
 
       // Magic pseudo-TLD can also be directly resolved by hnsd
       sprintf(nsname, "_%s._synth.", b32);
@@ -648,12 +639,11 @@ hsk_resource_to_glue(
     hsk_record_t *c = res->records[i];
 
     switch (c->type) {
-      case HSK_GLUE4:
+      case HSK_GLUE4: {
         if (!hsk_dns_is_subdomain(tld, c->name))
-          continue;
-      case HSK_SYNTH4: {
-        hsk_dns_rr_t *rr = hsk_dns_rr_create(HSK_DNS_A);
+          break;
 
+        hsk_dns_rr_t *rr = hsk_dns_rr_create(HSK_DNS_A);
         if (!rr)
           return false;
 
@@ -667,16 +657,54 @@ hsk_resource_to_glue(
 
         break;
       }
-      case HSK_GLUE6:
-        if (!hsk_dns_is_subdomain(tld, c->name))
-          continue;
-      case HSK_SYNTH6: {
-        hsk_dns_rr_t *rr = hsk_dns_rr_create(HSK_DNS_AAAA);
+      case HSK_SYNTH4: {
+        hsk_dns_rr_t *rr = hsk_dns_rr_create(HSK_DNS_A);
+        if (!rr)
+          return false;
 
+        // Compute the base32 name from the SYNTH IP address.
+        // We are bypassing the checks in hsk_dns_rr_set_name()
+        // which should be fine because the name is being derived, not received.
+        char b32[29];
+        hsk_base32_encode_hex(c->inet4, 4, b32, false);
+        sprintf(rr->name, "_%s._synth.", b32);
+
+        rr->ttl = res->ttl;
+
+        hsk_dns_a_rd_t *rd = rr->rd;
+        memcpy(&rd->addr[0], &c->inet4[0], 4);
+
+        hsk_dns_rrs_push(an, rr);
+
+        break;
+      }
+      case HSK_GLUE6: {
+        if (!hsk_dns_is_subdomain(tld, c->name))
+          break;
+
+        hsk_dns_rr_t *rr = hsk_dns_rr_create(HSK_DNS_AAAA);
         if (!rr)
           return false;
 
         hsk_dns_rr_set_name(rr, c->name);
+        rr->ttl = res->ttl;
+
+        hsk_dns_aaaa_rd_t *rd = rr->rd;
+        memcpy(&rd->addr[0], &c->inet6[0], 16);
+
+        hsk_dns_rrs_push(an, rr);
+
+        break;
+      }
+      case HSK_SYNTH6: {
+        hsk_dns_rr_t *rr = hsk_dns_rr_create(HSK_DNS_AAAA);
+        if (!rr)
+          return false;
+
+        char b32[29];
+        hsk_base32_encode_hex(c->inet6, 16, b32, false);
+        sprintf(rr->name, "_%s._synth.", b32);
+
         rr->ttl = res->ttl;
 
         hsk_dns_aaaa_rd_t *rd = rr->rd;
@@ -1125,144 +1153,6 @@ to_fqdn(char *name) {
   name[len + 1] = '\0';
 }
 
-static void
-ip_size(const uint8_t *ip, size_t *s, size_t *l) {
-  bool out = true;
-  int last = 0;
-  int i = 0;
-
-  int start = 0;
-  int len = 0;
-
-  for (; i < 16; i++) {
-    uint8_t ch = ip[i];
-    if (out == (ch == 0)) {
-      if (!out && i - last > len) {
-        start = last;
-        len = i - last;
-      }
-      out = !out;
-      last = i;
-    }
-  }
-
-  if (!out && i - last > len) {
-    start = last;
-    len = i - last;
-  }
-
-  // The worst case:
-  // We need at least 2 zeroes in a row to
-  // get any benefit from the compression.
-  if (len == 16) {
-    assert(start == 0);
-    len = 0;
-  }
-
-  assert(start < 16);
-  assert(len < 16);
-  assert(start + len <= 16);
-
-  *s = (size_t)start;
-  *l = (size_t)len;
-}
-
-static size_t
-ip_write(const uint8_t *ip, uint8_t *data) {
-  size_t start, len;
-  ip_size(ip, &start, &len);
-  uint8_t left = 16 - (start + len);
-  data[0] = (start << 4) | len;
-  // Ignore the missing section.
-  memcpy(&data[1], ip, start);
-  memcpy(&data[1 + start], &ip[start + len], left);
-  return 1 + start + left;
-}
-
-static bool
-ip_read(const uint8_t *data, uint8_t *ip) {
-  uint8_t field = data[0];
-
-  uint8_t start = field >> 4;
-  uint8_t len = field & 0x0f;
-
-  if (start + len > 16)
-    return false;
-
-  uint8_t left = 16 - (start + len);
-
-  // Front half.
-  if (ip)
-    memcpy(ip, &data[1], start);
-
-  // Fill in the missing section.
-  if (ip)
-    memset(&ip[start], 0x00, len);
-
-  // Back half.
-  if (ip)
-    memcpy(&ip[start + len], &data[1 + start], left);
-
-  return true;
-}
-
-void
-ip_to_b32(const uint8_t *ip, char *dst, uint8_t family) {
-  uint8_t mapped[16];
-
-  if (family == 4) {
-    // https://tools.ietf.org/html/rfc4291#section-2.5.5.2
-    memset(&mapped[0], 0x00, 10);
-    memset(&mapped[10], 0xff, 2);
-    memcpy(&mapped[12], ip, 4);
-  } else {
-    memcpy(&mapped[0], ip, 16);
-  }
-
-  uint8_t data[17];
-
-  size_t size = ip_write(mapped, data);
-  assert(size <= 17);
-
-  size_t b32_size = hsk_base32_encode_hex_size(data, size, false);
-  assert(b32_size <= 29);
-
-  hsk_base32_encode_hex(data, size, dst, false);
-}
-
-bool
-b32_to_ip(const char *str, uint8_t *ip, uint16_t *family) {
-  size_t size = hsk_base32_decode_hex_size(str);
-
-  if (size == 0 || size > 17)
-    return false;
-
-  uint8_t data[17];
-  assert(hsk_base32_decode_hex(str, data, false));
-
-  if (!ip_read(data, ip))
-    return false;
-
-  if (ip) {
-    static const uint8_t mapped[12] = {
-      0x00, 0x00, 0x00, 0x00,
-      0x00, 0x00, 0x00, 0x00,
-      0x00, 0x00, 0xff, 0xff
-    };
-
-    if (memcmp(ip, (void *)&mapped[0], 12) == 0) {
-      memcpy(&ip[0], &ip[12], 4);
-      if (family)
-        *family = HSK_DNS_A;
-    } else {
-      if (family)
-        *family = HSK_DNS_AAAA;
-    }
-  }
-
-  return true;
-}
-
 bool
 pointer_to_ip(const char *name, uint8_t *ip, uint16_t *family) {
   char label[HSK_DNS_MAX_LABEL + 1];
@@ -1271,7 +1161,20 @@ pointer_to_ip(const char *name, uint8_t *ip, uint16_t *family) {
   if (len < 2 || len > 29 || label[0] != '_')
     return false;
 
-  return b32_to_ip(&label[1], ip, family);
+  int j = hsk_base32_decode_hex(&label[1], ip, false);
+  assert(j);
+
+  if (j == 4) {
+    if (family)
+      *family = HSK_DNS_A;
+  } else if (j == 16) {
+    if (family)
+      *family = HSK_DNS_AAAA;
+  } else {
+    return false;
+  }
+
+  return true;
 }
 
 bool
