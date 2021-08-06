@@ -332,12 +332,10 @@ hsk_ns_onrecv(
   // with a name that encodes an IP address: _[base32]._synth.
   // The synth name then resolves to an A/AAAA record that is derived
   // by decoding the name itself (it does not have to be looked up).
-  if (
-    strcmp(req->tld, "_synth") == 0
-    && req->labels == 2
-    && req->name[0] == '_'
-  ) {
+  bool synth = false;
+  if (strcmp(req->tld, "_synth") == 0 && req->labels <= 2) {
     msg = hsk_dns_msg_alloc();
+    synth = true;
 
     if (!msg)
       goto fail;
@@ -351,6 +349,13 @@ hsk_ns_onrecv(
     char synth[HSK_DNS_MAX_LABEL + 1];
     hsk_dns_label_from(req->name, -2, synth);
 
+    if (req->labels == 1) {
+      hsk_resource_to_empty(req->tld, NULL, 0, rrns);
+      hsk_dnssec_sign_zsk(rrns, HSK_DNS_NSEC);
+      hsk_resource_root_to_soa(rrns);
+      hsk_dnssec_sign_zsk(rrns, HSK_DNS_SOA);
+    }
+  
     if (pointer_to_ip(synth, ip, &family)) {
       bool match = false;
 
@@ -468,7 +473,8 @@ hsk_ns_onrecv(
     goto fail;
   }
 
-  hsk_cache_insert(&ns->cache, req, msg);
+  if (!synth)
+    hsk_cache_insert(&ns->cache, req, msg);
 
   if (!hsk_dns_msg_finalize(&msg, req, ns->ec, ns->key, &wire, &wire_len)) {
     hsk_ns_log(ns, "could not reply\n");
