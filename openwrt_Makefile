@@ -1,0 +1,53 @@
+#
+# Copyright (C) 2021 Aleksei Lednov
+# 
+# With best regards to the hnsd team :)
+# 
+# As always, you can do what you want with it without any warranty.
+#
+
+include $(TOPDIR)/rules.mk
+
+PKG_NAME:=hnsd
+PKG_VERSION:=1
+PKG_RELEASE:=1
+
+PKG_SOURCE_PROTO:=git
+PKG_SOURCE_URL:=https://github.com/handshake-org/hnsd.git
+PKG_SOURCE_VERSION:=c60b2b49adf6de92f028670f1608493dbbad1578
+PKG_MIRROR_HASH:=d2990a59bf091dda43a939ef76c5733be1fc1e727783c27b488fc49908e165ad
+
+PKG_BUILD_DIR:=$(BUILD_DIR)/$(PKG_NAME)-$(PKG_VERSION)
+PKG_BUILD_DEPENDS:=libunbound libuv
+
+PKG_LICENSE:=MIT
+PKG_LICENSE_FILES:=LICENSE
+
+PKG_INSTALL:=1
+PKG_BUILD_PARALLEL:=1
+
+include $(INCLUDE_DIR)/package.mk
+
+define Package/hnsd
+  SECTION:=net
+  CATEGORY:=Network 
+  TITLE:=hnsd
+  URL:=https://hnsd.org/
+  DEPENDS:=+libunbound
+endef
+
+define Package/hnsd/description
+ SPV resolver daemon for the Handshake network.
+endef
+
+define Build/Prepare
+	$(Build/Prepare/Default)
+	$(PKG_BUILD_DIR)/autogen.sh
+endef
+
+define Package/hnsd/install
+	$(INSTALL_DIR) $(1)/usr/bin/
+	$(INSTALL_BIN) $(PKG_INSTALL_DIR)/usr/bin/hnsd $(1)/usr/bin/
+endef
+
+$(eval $(call BuildPackage,hnsd))
