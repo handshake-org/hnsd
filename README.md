@@ -287,7 +287,7 @@ $ docker stop hnsd
 
 To build hnsd as an OpenWRT package you'll need to rename `openwrt_Makefile` to `Makefile` 
 and put it to `your_openwrt_dir/package/net/hnsd` before building.
-Then you can use your `menuconfig` and select it. 
+Then you can use your `menuconfig` and select it.  
 Or you can use this command if you want to build on your SDK this package only:
 
 ```bash
