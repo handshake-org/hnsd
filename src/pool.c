@@ -802,6 +802,10 @@ hsk_peer_init(hsk_peer_t *peer, hsk_pool_t *pool, bool encrypted) {
   peer->brontide = NULL;
   if (encrypted) {
     peer->brontide = malloc(sizeof(hsk_brontide_t));
+
+    if (!peer->brontide)
+      goto fail;
+
     hsk_brontide_init(peer->brontide, pool->ec);
     peer->brontide->connect_cb = after_brontide_connect;
     peer->brontide->connect_arg = (void *)peer;
@@ -843,6 +847,12 @@ hsk_peer_init(hsk_peer_t *peer, hsk_pool_t *pool, bool encrypted) {
   return HSK_SUCCESS;
 
 fail:
+  if (peer->brontide) {
+    hsk_brontide_uninit(peer->brontide);
+    free(peer->brontide);
+    peer->brontide = NULL;
+  }
+
   if (peer->msg) {
     free(peer->msg);
     peer->msg = NULL;
@@ -856,8 +866,11 @@ hsk_peer_uninit(hsk_peer_t *peer) {
   if (!peer)
     return;
 
-  if (peer->brontide != NULL)
+  if (peer->brontide != NULL) {
     hsk_brontide_uninit(peer->brontide);
+    free(peer->brontide);
+    peer->brontide = NULL;
+  }
 
   hsk_map_uninit(&peer->names);
 
@@ -888,6 +901,7 @@ hsk_peer_free(hsk_peer_t *peer) {
     return;
 
   hsk_peer_uninit(peer);
+
   free(peer);
 }
 
