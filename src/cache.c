@@ -81,8 +81,10 @@ hsk_cache_insert_data(
   hsk_cache_item_t *cache = hsk_map_get(&c->map, &ck);
 
   if (cache) {
-    if (hsk_now() < cache->time + 6 * 60 * 60)
+    if (hsk_now() < cache->time + 6 * 60 * 60) {
+      free(wire);
       return true;
+    }
 
     hsk_map_del(&c->map, &ck);
     hsk_cache_item_free(cache);
@@ -105,7 +107,8 @@ hsk_cache_insert_data(
   item->time = hsk_now();
 
   if (!hsk_map_set(&c->map, &item->key, item)) {
-    free(item->msg);
+    // hsk_cache_insert will free msg on false
+    item->msg = NULL;
     free(item);
     return false;
   }
@@ -129,6 +132,7 @@ hsk_cache_insert(
 
   if (!hsk_cache_insert_data(c, req->name, req->type, wire, wire_len)) {
     hsk_cache_log(c, "could not insert cache\n");
+    free(wire);
     return false;
   }
 
