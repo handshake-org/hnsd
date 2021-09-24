@@ -1666,11 +1666,15 @@ hsk_dns_rd_read(
         if (!txt)
           goto fail_txt;
 
-        if (!read_u8(data, data_len, &txt->data_len))
+        if (!read_u8(data, data_len, &txt->data_len)) {
+          hsk_dns_txt_free(txt);
           goto fail_txt;
+        }
 
-        if (!read_bytes(data, data_len, txt->data, txt->data_len))
+        if (!read_bytes(data, data_len, txt->data, txt->data_len)) {
+          hsk_dns_txt_free(txt);
           goto fail_txt;
+        }
 
         hsk_dns_txts_push(&r->txts, txt);
       }
