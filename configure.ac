@@ -165,6 +165,12 @@ AC_ARG_WITH([asm],
   [req_asm=$withval],
   [req_asm=auto])
 
+AC_ARG_WITH([daemon],
+  [AS_HELP_STRING([--with-daemon],
+  [build hnsd daemon (default=yes)])],
+  [build_hnsd=$withval],
+  [build_hnsd=yes])
+
 AC_ARG_WITH([unbound],
   [AS_HELP_STRING(
     [--with-unbound=path]
@@ -339,6 +345,7 @@ if test x"$use_external_asm" = x"yes"; then
     [Define this symbol if an external assembly implementation is used])
 fi
 
+if test x"$build_hnsd" = x"yes"; then
 dnl Find libunbound, and define LIB_UNBOUND/INC_UNBOUND for hnsd.
 dnl Don't add these to the default libs/includes, they're not needed by the
 dnl other targets.
@@ -359,6 +366,7 @@ case $libunbound_path in
 esac
 AC_SUBST(LIB_UNBOUND, ${LIB_UNBOUND})
 AC_SUBST(INC_UNBOUND, ${INC_UNBOUND})
+fi
 
 dnl Platform-specific libraries
 case "${host_os}" in
@@ -372,8 +380,11 @@ AC_MSG_NOTICE([Using static precomputation: $use_precomp])
 AC_MSG_NOTICE([Using assembly optimizations: $set_asm])
 AC_MSG_NOTICE([Using field implementation: $set_field])
 AC_MSG_NOTICE([Using scalar implementation: $set_scalar])
+
+if test x"$build_hnsd" = x"yes"; then
 AC_MSG_NOTICE([Linker flags for libunbound: $LIB_UNBOUND])
 AC_MSG_NOTICE([Compiler flags for libunbound: $INC_UNBOUND])
+fi
 
 AM_CONDITIONAL(
   [HSK_USE_ECMULT_STATIC_PRECOMPUTATION],
@@ -381,6 +392,7 @@ AM_CONDITIONAL(
 
 AM_CONDITIONAL([HSK_USE_EXTERNAL_ASM], [test x"$use_external_asm" = x"yes"])
 AM_CONDITIONAL([HSK_USE_ASM_ARM], [test x"$set_asm" = x"arm"])
+AM_CONDITIONAL(BUILD_HNSD, [test x"$build_hnsd" = x"yes"])
 
 dnl
 dnl /Secp256k1
