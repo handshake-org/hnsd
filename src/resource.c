@@ -293,6 +293,10 @@ hsk_record_free(hsk_record_t *r) {
     }
     case HSK_TEXT: {
       hsk_txt_record_t *rec = (hsk_txt_record_t *)r;
+
+      int i;
+      for (i = 0; i < rec->txts.size; i++)
+        hsk_dns_txt_free(rec->txts.items[i]);
       free(rec);
       break;
     }
