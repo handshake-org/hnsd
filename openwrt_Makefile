@@ -1,0 +1,60 @@
+#
+# Copyright (C) 2021 Aleksei Lednov
+# 
+# With best regards to the hnsd team :)
+# 
+# As always, you can do what you want with it without any warranty.
+#
+
+include $(TOPDIR)/rules.mk
+
+PKG_NAME:=hnsd
+
+# Should match latest release version in configure.ac
+PKG_VERSION:=1.0.0
+
+# Version of THIS makefile (bump with every update)
+PKG_RELEASE:=1
+
+PKG_SOURCE:=v$(PKG_VERSION).tar.gz
+PKG_SOURCE_URL:=https://github.com/handshake-org/hnsd/archive/refs/tags
+
+# sha256 of tarball of git archive at specific version, create with (example):
+#   wget https://github.com/handshake-org/hnsd/archive/refs/tags/v1.0.0.tar.gz
+#   shasum -a 256 v1.0.0.tar.gz 
+PKG_HASH:=c2fe479d26e1ea827bbbe091f3308ddb65f9f9a15bb44e1dbda4cee41cfb46a0
+
+PKG_BUILD_DIR:=$(BUILD_DIR)/$(PKG_NAME)-$(PKG_VERSION)
+PKG_BUILD_DEPENDS:=libunbound libuv
+
+PKG_LICENSE:=MIT
+PKG_LICENSE_FILES:=LICENSE
+
+PKG_INSTALL:=1
+PKG_BUILD_PARALLEL:=1
+
+include $(INCLUDE_DIR)/package.mk
+
+define Package/hnsd
+  SECTION:=net
+  CATEGORY:=Network 
+  TITLE:=hnsd
+  URL:=https://handshake.org/
+  DEPENDS:=+libunbound
+endef
+
+define Package/hnsd/description
+ SPV resolver daemon for the Handshake network.
+endef
+
+define Build/Prepare
+	$(Build/Prepare/Default)
+	$(PKG_BUILD_DIR)/autogen.sh
+endef
+
+define Package/hnsd/install
+	$(INSTALL_DIR) $(1)/usr/bin/
+	$(INSTALL_BIN) $(PKG_BUILD_DIR)/hnsd $(1)/usr/bin/
+endef
+
+$(eval $(call BuildPackage,hnsd))
