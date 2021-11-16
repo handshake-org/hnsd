@@ -54,7 +54,7 @@ endef
 
 define Package/hnsd/install
 	$(INSTALL_DIR) $(1)/usr/bin/
-	$(INSTALL_BIN) $(PKG_INSTALL_DIR)/usr/bin/hnsd $(1)/usr/bin/
+	$(INSTALL_BIN) $(PKG_BUILD_DIR)/hnsd $(1)/usr/bin/
 endef
 
 $(eval $(call BuildPackage,hnsd))
