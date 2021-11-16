@@ -9,13 +9,20 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=hnsd
-PKG_VERSION:=1
+
+# Should match latest release version in configure.ac
+PKG_VERSION:=1.0.0
+
+# Version of THIS makefile (bump with every update)
 PKG_RELEASE:=1
 
-PKG_SOURCE_PROTO:=git
-PKG_SOURCE_URL:=https://github.com/handshake-org/hnsd.git
-PKG_SOURCE_VERSION:=c60b2b49adf6de92f028670f1608493dbbad1578
-PKG_MIRROR_HASH:=d2990a59bf091dda43a939ef76c5733be1fc1e727783c27b488fc49908e165ad
+PKG_SOURCE:=v$(PKG_VERSION).tar.gz
+PKG_SOURCE_URL:=https://github.com/handshake-org/hnsd/archive/refs/tags
+
+# sha256 of tarball of git archive at specific version, create with (example):
+#   wget https://github.com/handshake-org/hnsd/archive/refs/tags/v1.0.0.tar.gz
+#   shasum -a 256 v1.0.0.tar.gz 
+PKG_HASH:=c2fe479d26e1ea827bbbe091f3308ddb65f9f9a15bb44e1dbda4cee41cfb46a0
 
 PKG_BUILD_DIR:=$(BUILD_DIR)/$(PKG_NAME)-$(PKG_VERSION)
 PKG_BUILD_DEPENDS:=libunbound libuv
@@ -32,7 +39,7 @@ define Package/hnsd
   SECTION:=net
   CATEGORY:=Network 
   TITLE:=hnsd
-  URL:=https://hnsd.org/
+  URL:=https://handshake.org/
   DEPENDS:=+libunbound
 endef
 
