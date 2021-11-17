@@ -79,6 +79,9 @@ noinst_PROGRAMS = test_hnsd
 
 test_hnsd_SOURCES = test/hnsd-test.c
 
+test_hnsd_LDFLAGS = -static
+test_hnsd_CPPFLAGS = $(AM_CPPFLAGS)
+
 test_hnsd_LDADD = $(LIB_UNBOUND)             \
                   $(top_builddir)/libhsk.la
 
