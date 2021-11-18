@@ -16,18 +16,6 @@
 #include "resource.h"
 #include "utils.h"
 
-// NS SOA RRSIG NSEC DNSKEY
-// Possibly add A, AAAA, and DS
-static const uint8_t hsk_type_map[] = {
-  0x00, 0x07, 0x22, 0x00, 0x00,
-  0x00, 0x00, 0x03, 0x80
-};
-
-// NS RRSIG NSEC
-static const uint8_t hsk_type_map_ns[] = {
-  0x00, 0x06, 0x20, 0x00, 0x00, 0x00, 0x00, 0x03
-};
-
 /*
  * Helpers
  */
