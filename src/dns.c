@@ -7,6 +7,7 @@
 #include <strings.h>
 #include <stdint.h>
 #include <stdbool.h>
+#include <ctype.h>
 
 #include "bio.h"
 #include "dns.h"
@@ -2224,6 +2225,7 @@ hsk_dns_name_serialize(
   int size;
   int i;
   char *s;
+  int size_byte;
 
   for (s = (char *)name, i = 0; *s; s++, i++) {
     if (name[i] == '.') {
@@ -2244,7 +2246,8 @@ hsk_dns_name_serialize(
           *len = off;
           return false;
         }
-        data[off] = size;
+        // Size will be written here once we know what size is
+        size_byte = off;
       }
 
       if (cmp) {
@@ -2272,6 +2275,23 @@ hsk_dns_name_serialize(
         int j;
         for (j = begin; j < i; j++) {
           char ch = name[j];
+          if (ch == '\\') {
+            // Read the next three digits and form a single byte
+            if (!isdigit(name[j + 1]) ||
+                !isdigit(name[j + 2]) ||
+                !isdigit(name[j + 3])) {
+              *len = off;
+              return false;
+            }
+
+            uint16_t value = (name[++j] - 0x30) * 100;
+            value += (name[++j] - 0x30) * 10;
+            value += (name[++j] - 0x30);
+
+            data[off++] = byte;
+            size -= 3;
+            continue;
+          }
 
           // 0xff -> NUL
           if (ch == -1)
@@ -2283,6 +2303,8 @@ hsk_dns_name_serialize(
 
           data[off++] = ch;
         }
+
+        data[size_byte] = size;
       } else {
         off += size;
       }
