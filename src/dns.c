@@ -7,6 +7,7 @@
 #include <strings.h>
 #include <stdint.h>
 #include <stdbool.h>
+#include <ctype.h>
 
 #include "bio.h"
 #include "dns.h"
@@ -2133,15 +2134,30 @@ hsk_dns_name_parse(
         for (j = off; j < off + c; j++) {
           uint8_t b = data[j];
 
-          // Hack because we're
-          // using c-strings.
-          if (b == 0x00)
-            b = 0xff;
+          switch (b) {
+            // Escape special characters
+            case 0x2e /*.*/:
+            case 0x28 /*(*/:
+            case 0x29 /*)*/:
+            case 0x3b /*;*/:
+            case 0x20 /* */:
+            case 0x40 /*@*/:
+            case 0x22 /*"*/:
+            case 0x5c /*\\*/:
+              if (name)
+                sprintf(&name[noff], "\\%c", (char)b);
 
-          // This allows for double-dots
-          // too easily in our design.
-          if (b == 0x2e)
-            b = 0xfe;
+              noff += 2;
+              continue;
+            default:
+              if (b < 0x20 || b > 0x7e) {
+                if (name)
+                  sprintf(&name[noff], "\\%03d", b);
+
+                noff += 4;
+              continue;
+            }
+          }
 
           if (name)
             name[noff] = b;
@@ -2224,15 +2240,59 @@ hsk_dns_name_serialize(
   int size;
   int i;
   char *s;
+  int size_adjust = 0;
+  bool escaped = false;
+  size_t max = strlen(name) - 1;
 
   for (s = (char *)name, i = 0; *s; s++, i++) {
+    // Check for escaped byte codes and adjust length measurement.
+    if (name[i] == '\\') {
+      // Check the next three bytes (if within string length)
+      // for three-digit code which must encode a one-byte value.
+      if (i + 3 <= max &&
+          isdigit(name[i + 1]) &&
+          isdigit(name[i + 2]) &&
+          isdigit(name[i + 3])) {
+        uint16_t value = (name[i + 1] - 0x30) * 100;
+        value += (name[i + 2] - 0x30) * 10;
+        value += (name[i + 3] - 0x30);
+
+        // Bad escape, byte code out of range.
+        if (value > 0xff) {
+          *len = off;
+          return false;
+        }
+
+        // The next three characters don't count towards final size.
+        size_adjust += 2;
+        s += 2;
+        i += 2;
+
+        // Escaped dot by byte code
+        if (value == 0x2e)
+          escaped = true;
+      }
+
+      // Literal escaped dot
+      if (i + 1 <= max && name[i + 1] == 0x2e)
+        escaped = true;
+
+      // Remove single slash and skip next character.
+      size_adjust += 1;
+      s += 1;
+      i += 1;
+
+      continue;
+    }
+
     if (name[i] == '.') {
-      if (i > 0 && name[i - 1] == '.') {
+      if (i > 0 && name[i - 1] == '.' && !escaped) {
+        // Multiple dots (escaped dot is ok)
         *len = off;
         return false;
       }
 
-      size = i - begin;
+      size = i - begin - size_adjust;
 
       if (size > HSK_DNS_MAX_LABEL) {
         *len = off;
@@ -2272,14 +2332,35 @@ hsk_dns_name_serialize(
         int j;
         for (j = begin; j < i; j++) {
           char ch = name[j];
+          // Check for escaped byte codes and process into output result
+          if (ch == '\\') {
+            // Check the next three bytes (if within label length)
+            // for three-digit code which must encode a one-byte value.
+            if (j + 3 <= i &&
+                isdigit(name[j + 1]) &&
+                isdigit(name[j + 2]) &&
+                isdigit(name[j + 3])) {
+              // Compute byte from next three characters.
+              uint16_t value = (name[++j] - 0x30) * 100;
+              value += (name[++j] - 0x30) * 10;
+              value += (name[++j] - 0x30);
 
-          // 0xff -> NUL
-          if (ch == -1)
-            ch = '\0';
+              // Bad escape, byte code out of range.
+              if (value > 0xff) {
+                *len = off;
+                return false;
+              }
 
-          // 0xfe -> .
-          if (ch == -2)
-            ch = '.';
+              // Write
+              data[off++] = value;
+              continue;
+            } else {
+              // Remove single slash and write next character
+              // as long as there is a next character.
+              if (j + 1 < i)
+                ch = name[++j];
+            }
+          }
 
           data[off++] = ch;
         }
@@ -2288,7 +2369,10 @@ hsk_dns_name_serialize(
       }
 
       begin = i + 1;
+      size_adjust = 0;
     }
+
+    escaped = false;
   }
 
   if (i > HSK_DNS_MAX_NAME) {
