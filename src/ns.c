@@ -340,8 +340,8 @@ hsk_ns_onrecv(
     hsk_dns_label_from(req->name, -2, synth);
 
     if (req->labels == 1) {
-      hsk_resource_to_empty(req->tld, NULL, 0, rrns);
-      hsk_dnssec_sign_zsk(rrns, HSK_DNS_NSEC);
+      // TLD '._synth' is being queried on its own, send SOA
+      // so recursive asks again with complete synth record.
       hsk_resource_root_to_soa(rrns);
       hsk_dnssec_sign_zsk(rrns, HSK_DNS_SOA);
     }
@@ -366,14 +366,14 @@ hsk_ns_onrecv(
         // TODO: Make the reverse pointers TLDs.
         // Empty proof:
         if (family == HSK_DNS_A) {
-          hsk_resource_to_empty(
+          hsk_resource_to_nsec(
             req->name,
             hsk_type_map_a,
             sizeof(hsk_type_map_a),
             rrns
           );
         } else {
-          hsk_resource_to_empty(
+          hsk_resource_to_nsec(
             req->name,
             hsk_type_map_aaaa,
             sizeof(hsk_type_map_aaaa),

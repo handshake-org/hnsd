@@ -126,7 +126,7 @@ bool
 hsk_resource_is_ptr(const char *name);
 
 bool
-hsk_resource_to_empty(
+hsk_resource_to_nsec(
   const char *name,
   const uint8_t *type_map,
   size_t type_map_len,

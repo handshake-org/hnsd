@@ -5,6 +5,7 @@
 #include "dns.h"
 #include "dns.c"
 #include "data/name_serialization_vectors.h"
+#include "data/resource_vectors.h"
 
 /**
  * UTILITY
@@ -98,6 +99,34 @@ test_name_serialize() {
   }
 }
 
+void
+test_decode_resource() {
+  printf("test_decode_resource\n");
+
+  for (int i = 0; i < 10; i++) {
+    resource_vector_t resource_vector = resource_vectors[i];
+
+    hsk_resource_t *res = NULL;
+    hsk_resource_decode(
+      resource_vector.data,
+      resource_vector.data_len,
+      &res
+    );
+
+    for (int t = 0; t < 4; t++) {
+      type_vector_t type_vector = resource_vector.type_vectors[t];
+
+      hsk_dns_msg_t *msg = NULL;
+      msg = hsk_resource_to_dns(res, resource_vector.name, type_vector.type);
+
+      printf(" %s %s \n", resource_vector.name, type_vector.type_string);
+      assert(msg->an.size == type_vector.an_size);
+      assert(msg->ns.size == type_vector.ns_size);
+      assert(msg->ar.size == type_vector.ar_size);
+    }
+  }
+}
+
 /*
  * TEST RUNNER
  */
@@ -108,6 +137,7 @@ main() {
   test_base32();
   test_pointer_to_ip();
   test_name_serialize();
+  test_decode_resource();
 
   printf("ok\n");
 
