@@ -384,12 +384,12 @@ hsk_ns_onrecv(
       }
 
       if (!match) {
-        // Needs SOA.
-        // TODO: Make the reverse pointers TLDs.
-        // Empty proof:
+        char next[HSK_DNS_MAX_NAME] = "\\000.";
+        memcpy(&next[6], req->name, strlen(req->name));
         if (family == HSK_DNS_A) {
           hsk_resource_to_nsec(
             req->name,
+            next,
             hsk_type_map_a,
             sizeof(hsk_type_map_a),
             rrns
@@ -397,6 +397,7 @@ hsk_ns_onrecv(
         } else {
           hsk_resource_to_nsec(
             req->name,
+            next,
             hsk_type_map_aaaa,
             sizeof(hsk_type_map_aaaa),
             rrns
@@ -457,7 +458,7 @@ hsk_ns_onrecv(
         || strcmp(req->tld, "onion") == 0 // Tor
         || strcmp(req->tld, "tor") == 0 // OnioNS
         || strcmp(req->tld, "zkey") == 0) { // GNS
-      msg = hsk_resource_to_nx();
+      msg = hsk_resource_to_nx(req->tld);
     } else {
       req->ns = (void *)ns;
 
@@ -550,9 +551,12 @@ hsk_ns_respond(
     // not possible for SPV nodes since they
     // can't arbitrarily iterate over the tree.
     //
-    // Instead, we give a phony proof, which
-    // makes the root zone look empty.
-    msg = hsk_resource_to_nx();
+    // Instead, we give a minimally covering
+    // NSEC record based on rfc4470
+    // https://tools.ietf.org/html/rfc4470
+
+    // Proving the name doesn't exist
+    msg = hsk_resource_to_nx(req->tld);
 
     if (!msg)
       hsk_ns_log(ns, "could not create nx response (%u)\n", req->id);

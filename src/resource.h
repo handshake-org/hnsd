@@ -114,7 +114,7 @@ hsk_dns_msg_t *
 hsk_resource_root(uint16_t type, const hsk_addr_t *addr);
 
 hsk_dns_msg_t *
-hsk_resource_to_nx(void);
+hsk_resource_to_nx(const char *tld);
 
 hsk_dns_msg_t *
 hsk_resource_to_servfail(void);
@@ -131,6 +131,7 @@ hsk_resource_is_ptr(const char *name);
 bool
 hsk_resource_to_nsec(
   const char *name,
+  const char *next,
   const uint8_t *type_map,
   size_t type_map_len,
   hsk_dns_rrs_t *an
