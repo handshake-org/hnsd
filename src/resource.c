@@ -908,37 +908,6 @@ hsk_resource_to_nsec(
   return true;
 }
 
-static bool
-hsk_resource_root_to_nsec(hsk_dns_rrs_t *an) {
-  hsk_dns_rr_t *rr = hsk_dns_rr_create(HSK_DNS_NSEC);
-
-  if (!rr)
-    return false;
-
-  uint8_t *bitmap = malloc(sizeof(hsk_type_map));
-
-  if (!bitmap) {
-    hsk_dns_rr_free(rr);
-    return false;
-  }
-
-  memcpy(bitmap, &hsk_type_map[0], sizeof(hsk_type_map));
-
-  rr->ttl = 86400;
-
-  hsk_dns_rr_set_name(rr, ".");
-
-  hsk_dns_nsec_rd_t *rd = rr->rd;
-
-  strcpy(rd->next_domain, ".");
-  rd->type_map = bitmap;
-  rd->type_map_len = sizeof(hsk_type_map);
-
-  hsk_dns_rrs_push(an, rr);
-
-  return true;
-}
-
 hsk_dns_msg_t *
 hsk_resource_to_dns(const hsk_resource_t *rs, const char *name, uint16_t type) {
   assert(hsk_dns_name_is_fqdn(name));
@@ -1142,9 +1111,14 @@ hsk_resource_root(uint16_t type, const hsk_addr_t *addr) {
       hsk_dnssec_sign_ksk(an, HSK_DNS_DNSKEY);
       break;
     default:
-      // Empty Proof:
-      // Show all the types that we signed.
-      hsk_resource_root_to_nsec(ns);
+      // Minimally covering NSEC proof:
+      hsk_resource_to_nsec(
+        ".",
+        "\\000.",
+        hsk_type_map_root,
+        sizeof(hsk_type_map_root),
+        ns
+      );
       hsk_dnssec_sign_zsk(ns, HSK_DNS_NSEC);
       hsk_resource_root_to_soa(ns);
       hsk_dnssec_sign_zsk(ns, HSK_DNS_SOA);
