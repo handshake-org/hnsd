@@ -756,7 +756,7 @@ hsk_resource_root_to_soa(hsk_dns_rrs_t *an) {
   rd->refresh = 1800;
   rd->retry = 900;
   rd->expire = 604800;
-  rd->minttl = 86400;
+  rd->minttl = HSK_DEFAULT_TTL;
 
   hsk_dns_rrs_push(an, rr);
 
@@ -878,7 +878,7 @@ hsk_resource_to_nsec(
   if (!rr)
     return false;
 
-  rr->ttl = 86400;
+  rr->ttl = HSK_DEFAULT_TTL;
 
   hsk_dns_rr_set_name(rr, name);
 
