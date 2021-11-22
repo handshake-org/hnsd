@@ -726,9 +726,6 @@ hsk_dns_rr_set_name(hsk_dns_rr_t *rr, const char *name) {
   if (!hsk_dns_name_verify(name))
     return false;
 
-  if (hsk_dns_name_dirty(name))
-    return false;
-
   if (hsk_dns_name_is_fqdn(name))
     strcpy(rr->name, name);
   else
@@ -2225,7 +2222,7 @@ hsk_dns_name_serialize(
   int size;
   int i;
   char *s;
-  int size_byte;
+  int size_byte = 0;
 
   for (s = (char *)name, i = 0; *s; s++, i++) {
     if (name[i] == '.') {
@@ -2288,7 +2285,12 @@ hsk_dns_name_serialize(
             value += (name[++j] - 0x30) * 10;
             value += (name[++j] - 0x30);
 
-            data[off++] = byte;
+            if (value > 0xff) {
+              *len = off;
+              return false;
+            }
+
+            data[off++] = value;
             size -= 3;
             continue;
           }

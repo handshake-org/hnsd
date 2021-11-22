@@ -6,6 +6,7 @@ typedef struct name_serializtion_vector {
   char *name;
   uint8_t expected_data[24];
   int expected_len;
+  bool success;
 } name_serializtion_vector_t;
 
 
@@ -19,21 +20,24 @@ static const name_serializtion_vector_t name_serializtion_vectors[7] = {
     {
       0x06, 0x61, 0x62, 0x63, 0x64, 0x65, 0x66, 0x00
     },
-    8
+    8,
+    true
   },
   {
     "abc.def.",
     {
       0x03, 0x61, 0x62, 0x63, 0x03, 0x64, 0x65, 0x66, 0x00
     },
-    9
+    9,
+    true
   },
   {
     "abcdef\\000.",
     {
       0x07, 0x61, 0x62, 0x63, 0x64, 0x65, 0x66, 0x00, 0x00
     },
-    9
+    9,
+    true
   },
   {
     "abcdef\\255.",

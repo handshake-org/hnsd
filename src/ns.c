@@ -287,6 +287,10 @@ hsk_ns_onrecv(
   const struct sockaddr *addr,
   uint32_t flags
 ) {
+  uint8_t *wire = NULL;
+  size_t wire_len = 0;
+  hsk_dns_msg_t *msg = NULL;
+
   hsk_dns_req_t *req = hsk_dns_req_create(data, data_len, addr);
 
   if (!req) {
@@ -296,9 +300,27 @@ hsk_ns_onrecv(
 
   hsk_dns_req_print(req, "ns: ");
 
-  uint8_t *wire = NULL;
-  size_t wire_len = 0;
-  hsk_dns_msg_t *msg = NULL;
+  // Send REFUSED if name is dirty
+  // (contains escaped byte codes or special characters)
+  if (hsk_dns_name_dirty(req->tld)) {
+    msg = hsk_resource_to_refused();
+
+    if (!msg) {
+      hsk_ns_log(ns, "failed creating refused\n");
+      goto fail;
+    }
+
+    if (!hsk_dns_msg_finalize(&msg, req, ns->ec, ns->key, &wire, &wire_len)) {
+      hsk_ns_log(ns, "could not reply\n");
+      goto done;
+    }
+
+    hsk_ns_log(ns, "refusing query for msg (%u): %u\n", req->id, wire_len);
+
+    hsk_ns_send(ns, wire, wire_len, addr, true);
+
+    goto done;
+  }
 
   // Hit cache first.
   msg = hsk_cache_get(&ns->cache, req);

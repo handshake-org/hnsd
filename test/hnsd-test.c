@@ -86,14 +86,15 @@ test_name_serialize() {
     uint8_t data[24] = {0};
     int len;
 
-    hsk_dns_name_serialize(
+    printf(" %s\n", name_serializtion_vector.name);
+
+    bool success = hsk_dns_name_serialize(
       name_serializtion_vector.name,
       data,
       &len,
       NULL
     );
-
-    printf(" %s\n", name_serializtion_vector.name);
+    assert(name_serializtion_vector.success == success);
     assert(len == name_serializtion_vector.expected_len);
     assert(memcmp(data, name_serializtion_vector.expected_data, len) == 0);
   }
