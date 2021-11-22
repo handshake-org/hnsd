@@ -26,6 +26,9 @@ to_fqdn(char *name);
 static void
 next_name(const char *name, char *next);
 
+static void
+prev_name(const char *name, char *prev);
+
 /*
  * Resource serialization version 0
  * Record types: read
@@ -1219,8 +1222,20 @@ next_name(const char *name, char *next) {
     memcpy(&next[len], "\\000.", 6);
   } else {
     next[len - 1]++;
-    next[len] = '.';
-    next[len + 1] = '\0';
+  }
+}
+
+static void
+prev_name(const char *name, char *prev) {
+  size_t len = strlen(name);
+  if (name[len - 1] == '.')
+    len--;
+
+  strcpy(prev, name);
+  prev[len - 1]--;
+
+  if (len < 63) {
+    memcpy(&prev[len], "\\255.", 6);
   }
 }
 
