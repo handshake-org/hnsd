@@ -1141,10 +1141,6 @@ hsk_resource_root(uint16_t type, const hsk_addr_t *addr) {
       hsk_resource_root_to_dnskey(an);
       hsk_dnssec_sign_ksk(an, HSK_DNS_DNSKEY);
       break;
-    case HSK_DNS_DS:
-      hsk_resource_root_to_ds(an);
-      hsk_dnssec_sign_zsk(an, HSK_DNS_DS);
-      break;
     default:
       // Empty Proof:
       // Show all the types that we signed.
