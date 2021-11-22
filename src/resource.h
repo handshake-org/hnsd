@@ -27,7 +27,7 @@ static const uint8_t hsk_type_map_aaaa[] = {
 };
 
 // NS SOA RRSIG NSEC DNSKEY
-static const uint8_t hsk_type_map[] = {
+static const uint8_t hsk_type_map_root[] = {
   0x00, 0x07, 0x22, 0x00, 0x00,
   0x00, 0x00, 0x03, 0x80
 };
