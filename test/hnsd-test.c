@@ -124,6 +124,36 @@ test_decode_resource() {
       assert(msg->an.size == type_vector.an_size);
       assert(msg->ns.size == type_vector.ns_size);
       assert(msg->ar.size == type_vector.ar_size);
+
+      // Sanity check: NSEC never appears in ANSWER or ADDITIONAL
+      for (int i = 0; i < msg->an.size; i++) {
+        hsk_dns_rr_t *rr = msg->an.items[i];
+        assert(rr->type != HSK_DNS_NSEC);
+      }
+      for (int i = 0; i < msg->ar.size; i++) {
+        hsk_dns_rr_t *rr = msg->ar.items[i];
+        assert(rr->type != HSK_DNS_NSEC);
+      }
+
+      // Check NSEC in AUTHORITY when appropriate and verify type map
+      for (int i = 0; i < msg->ns.size; i++) {
+        hsk_dns_rr_t *rr = msg->ns.items[i];
+        if (rr->type != HSK_DNS_NSEC)
+          continue;
+
+        // NSEC is expected
+        assert(type_vector.nsec);
+
+        // Type map is correct
+        hsk_dns_nsec_rd_t *rd = rr->rd;
+        assert(resource_vector.type_map_len == rd->type_map_len);
+        assert(memcmp(
+          resource_vector.type_map,
+          rd->type_map,
+          rd->type_map_len
+        ) == 0);
+      }
+
     }
   }
 }
