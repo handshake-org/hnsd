@@ -89,6 +89,9 @@ hsk_dns_msg_t *
 hsk_resource_to_servfail(void);
 
 hsk_dns_msg_t *
+hsk_resource_to_refused(void);
+
+hsk_dns_msg_t *
 hsk_resource_to_notimp(void);
 
 bool
