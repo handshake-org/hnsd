@@ -11,6 +11,7 @@ typedef struct type_vector {
   uint8_t ns_size;
   uint8_t ar_size;
   bool nsec;
+  bool aa;
 } type_vector_t;
 
 typedef struct resource_vector {
@@ -43,10 +44,10 @@ static const resource_vector_t resource_vectors[10] = {
     },
     6,
     {
-      {HSK_DNS_DS,  "DS",  0, 4, 1, true},
-      {HSK_DNS_NS,  "NS",  0, 2, 1, false},
-      {HSK_DNS_TXT, "TXT", 0, 4, 1, true},
-      {HSK_DNS_A,   "A",   0, 4, 1, true}
+      {HSK_DNS_DS,  "DS",  0, 4, 0, true, true},
+      {HSK_DNS_NS,  "NS",  0, 3, 1, true, false},
+      {HSK_DNS_TXT, "TXT", 0, 3, 1, true, false},
+      {HSK_DNS_A,   "A",   0, 3, 1, true, false}
     },
     sizeof(hsk_type_map_ns),
     hsk_type_map_ns
@@ -68,10 +69,10 @@ static const resource_vector_t resource_vectors[10] = {
     },
     18,
     {
-      {HSK_DNS_DS,  "DS",  0, 4, 1, true},
-      {HSK_DNS_NS,  "NS",  0, 2, 1, false},
-      {HSK_DNS_TXT, "TXT", 0, 4, 1, true},
-      {HSK_DNS_A,   "A",   0, 4, 1, true}
+      {HSK_DNS_DS,  "DS",  0, 4, 0, true, true},
+      {HSK_DNS_NS,  "NS",  0, 3, 1, true, false},
+      {HSK_DNS_TXT, "TXT", 0, 3, 1, true, false},
+      {HSK_DNS_A,   "A",   0, 3, 1, true, false}
     },
     sizeof(hsk_type_map_ns),
     hsk_type_map_ns
@@ -94,10 +95,10 @@ static const resource_vector_t resource_vectors[10] = {
     },
     15,
     {
-      {HSK_DNS_DS,  "DS",  0, 4, 0, true},
-      {HSK_DNS_NS,  "NS",  0, 2, 0, false},
-      {HSK_DNS_TXT, "TXT", 0, 4, 0, true},
-      {HSK_DNS_A,   "A",   0, 4, 0, true}
+      {HSK_DNS_DS,  "DS",  0, 4, 0, true, true},
+      {HSK_DNS_NS,  "NS",  0, 3, 0, true, false},
+      {HSK_DNS_TXT, "TXT", 0, 3, 0, true, false},
+      {HSK_DNS_A,   "A",   0, 3, 0, true, false}
     },
     sizeof(hsk_type_map_ns),
     hsk_type_map_ns
@@ -121,10 +122,10 @@ static const resource_vector_t resource_vectors[10] = {
     },
     27,
     {
-      {HSK_DNS_DS,  "DS",  0, 4, 1, true},
-      {HSK_DNS_NS,  "NS",  0, 2, 1, false},
-      {HSK_DNS_TXT, "TXT", 0, 4, 1, true},
-      {HSK_DNS_A,   "A",   0, 4, 1, true}
+      {HSK_DNS_DS,  "DS",  0, 4, 0, true, true},
+      {HSK_DNS_NS,  "NS",  0, 3, 1, true, false},
+      {HSK_DNS_TXT, "TXT", 0, 3, 1, true, false},
+      {HSK_DNS_A,   "A",   0, 3, 1, true, false}
     },
     sizeof(hsk_type_map_ns),
     hsk_type_map_ns
@@ -148,10 +149,10 @@ static const resource_vector_t resource_vectors[10] = {
     },
     27,
     {
-      {HSK_DNS_DS,  "DS",  0, 4, 0, true},
-      {HSK_DNS_NS,  "NS",  0, 2, 0, false},
-      {HSK_DNS_TXT, "TXT", 0, 4, 0, true},
-      {HSK_DNS_A,   "A",   0, 4, 0, true}
+      {HSK_DNS_DS,  "DS",  0, 4, 0, true, true},
+      {HSK_DNS_NS,  "NS",  0, 3, 0, true, false},
+      {HSK_DNS_TXT, "TXT", 0, 3, 0, true, false},
+      {HSK_DNS_A,   "A",   0, 3, 0, true, false}
     },
     sizeof(hsk_type_map_ns),
     hsk_type_map_ns
@@ -176,10 +177,10 @@ static const resource_vector_t resource_vectors[10] = {
     },
     39,
     {
-      {HSK_DNS_DS,  "DS",  0, 4, 1, true},
-      {HSK_DNS_NS,  "NS",  0, 2, 1, false},
-      {HSK_DNS_TXT, "TXT", 0, 4, 1, true},
-      {HSK_DNS_A,   "A",   0, 4, 1, true}
+      {HSK_DNS_DS,  "DS",  0, 4, 0, true, true},
+      {HSK_DNS_NS,  "NS",  0, 3, 1, true, false},
+      {HSK_DNS_TXT, "TXT", 0, 3, 1, true, false},
+      {HSK_DNS_A,   "A",   0, 3, 1, true, false}
     },
     sizeof(hsk_type_map_ns),
     hsk_type_map_ns
@@ -200,10 +201,10 @@ static const resource_vector_t resource_vectors[10] = {
     },
     11,
     {
-      {HSK_DNS_DS,  "DS",  0, 4, 0, true},
-      {HSK_DNS_NS,  "NS",  0, 2, 0, false},
-      {HSK_DNS_TXT, "TXT", 0, 4, 0, true},
-      {HSK_DNS_A,   "A",   0, 4, 0, true}
+      {HSK_DNS_DS,  "DS",  0, 4, 0, true, true},
+      {HSK_DNS_NS,  "NS",  0, 3, 0, true, false},
+      {HSK_DNS_TXT, "TXT", 0, 3, 0, true, false},
+      {HSK_DNS_A,   "A",   0, 3, 0, true, false}
     },
     sizeof(hsk_type_map_ns),
     hsk_type_map_ns
@@ -225,10 +226,10 @@ static const resource_vector_t resource_vectors[10] = {
     },
     20,
     {
-      {HSK_DNS_DS,  "DS",  0, 4, 0, true},
-      {HSK_DNS_NS,  "NS",  0, 2, 0, false},
-      {HSK_DNS_TXT, "TXT", 0, 4, 0, true},
-      {HSK_DNS_A,   "A",   0, 4, 0, true}
+      {HSK_DNS_DS,  "DS",  0, 4, 0, true, true},
+      {HSK_DNS_NS,  "NS",  0, 3, 0, true, false},
+      {HSK_DNS_TXT, "TXT", 0, 3, 0, true, false},
+      {HSK_DNS_A,   "A",   0, 3, 0, true, false}
     },
     sizeof(hsk_type_map_ns),
     hsk_type_map_ns
@@ -255,10 +256,10 @@ static const resource_vector_t resource_vectors[10] = {
     },
     39,
     {
-      {HSK_DNS_DS,  "DS",  2, 0, 0, false},
-      {HSK_DNS_NS,  "NS",  0, 4, 0, true},
-      {HSK_DNS_TXT, "TXT", 0, 4, 0, true},
-      {HSK_DNS_A,   "A",   0, 4, 0, true}
+      {HSK_DNS_DS,  "DS",  2, 0, 0, false, true},
+      {HSK_DNS_NS,  "NS",  0, 4, 0, true, true},
+      {HSK_DNS_TXT, "TXT", 0, 4, 0, true, true},
+      {HSK_DNS_A,   "A",   0, 4, 0, true, true}
     },
     sizeof(hsk_type_map_empty),
     hsk_type_map_empty
@@ -284,10 +285,10 @@ static const resource_vector_t resource_vectors[10] = {
     },
     27,
     {
-      {HSK_DNS_DS,  "DS",  0, 4, 0, true},
-      {HSK_DNS_NS,  "NS",  0, 4, 0, true},
-      {HSK_DNS_TXT, "TXT", 2, 0, 0, false},
-      {HSK_DNS_A,   "A",   0, 4, 0, true}
+      {HSK_DNS_DS,  "DS",  0, 4, 0, true, true},
+      {HSK_DNS_NS,  "NS",  0, 4, 0, true, true},
+      {HSK_DNS_TXT, "TXT", 2, 0, 0, false, true},
+      {HSK_DNS_A,   "A",   0, 4, 0, true, true}
     },
     sizeof(hsk_type_map_txt),
     hsk_type_map_txt

@@ -974,6 +974,9 @@ hsk_resource_to_dns(const hsk_resource_t *rs, const char *name, uint16_t type) {
           ns
         );
       }
+
+      msg->flags |= HSK_DNS_AA;
+
       hsk_dnssec_sign_zsk(ns, HSK_DNS_NSEC);
       // Needs SOA.
       hsk_resource_root_to_soa(ns);
@@ -986,32 +989,27 @@ hsk_resource_to_dns(const hsk_resource_t *rs, const char *name, uint16_t type) {
   // Record types actually on-chain for HNS TLDs.
   switch (type) {
     case HSK_DNS_DS:
+      msg->flags |= HSK_DNS_AA;
       hsk_resource_to_ds(rs, name, an);
       hsk_dnssec_sign_zsk(an, HSK_DNS_DS);
       break;
-    case HSK_DNS_NS:
-      // Includes SYNTH and GLUE records.
-      hsk_resource_to_ns(rs, name, ns);
-      hsk_resource_to_glue(rs, name, ar);
-      hsk_dnssec_sign_zsk(ns, HSK_DNS_NS);
-      break;
     case HSK_DNS_TXT:
-      hsk_resource_to_txt(rs, name, an);
-      hsk_dnssec_sign_zsk(an, HSK_DNS_TXT);
+      if (!hsk_resource_has_ns(rs)) {
+        msg->flags |= HSK_DNS_AA;
+        hsk_resource_to_txt(rs, name, an);
+        hsk_dnssec_sign_zsk(an, HSK_DNS_TXT);
+      }
       break;
   }
 
-  if (an->size > 0)
-    msg->flags |= HSK_DNS_AA;
-
   // Attempt to force a referral if we don't have an answer.
   if (an->size == 0 && ns->size == 0) {
-    if (hsk_resource_has_ns(rs)) {
+    // No referrals for DS or without NS to refer to!
+    if (hsk_resource_has_ns(rs) && type != HSK_DNS_DS) {
       hsk_resource_to_ns(rs, name, ns);
       hsk_resource_to_ds(rs, name, ns);
       hsk_resource_to_glue(rs, name, ar);
       if (!hsk_resource_has(rs, HSK_DS)) {
-          hsk_dnssec_sign_zsk(ns, HSK_DNS_NS);
           // No DS proof:
           // This allows unbound to treat the zone as unsigned (and not bogus)
           hsk_resource_to_nsec(
@@ -1026,9 +1024,17 @@ hsk_resource_to_dns(const hsk_resource_t *rs, const char *name, uint16_t type) {
           hsk_dnssec_sign_zsk(ns, HSK_DNS_DS);
       }
     } else {
-      // Domain has no NS
-      // We can prove there is a TXT or empty and sign NSEC
-      if (hsk_resource_has(rs, HSK_TEXT)) {
+      if (hsk_resource_has_ns(rs)) {
+        // If NS is present, prove it
+        hsk_resource_to_nsec(
+          tld,
+          next,
+          hsk_type_map_ns,
+          sizeof(hsk_type_map_ns),
+          ns
+        );
+      } else if (hsk_resource_has(rs, HSK_TEXT)) {
+        // No NS means we can prove TXT if applicable
         hsk_resource_to_nsec(
           tld,
           next,
@@ -1037,6 +1043,7 @@ hsk_resource_to_dns(const hsk_resource_t *rs, const char *name, uint16_t type) {
           ns
         );
       } else {
+        // Otherwise, we prove there is nothing
         hsk_resource_to_nsec(
           tld,
           next,
@@ -1047,6 +1054,7 @@ hsk_resource_to_dns(const hsk_resource_t *rs, const char *name, uint16_t type) {
       }
       hsk_dnssec_sign_zsk(ns, HSK_DNS_NSEC);
       // Needs SOA.
+      msg->flags |= HSK_DNS_AA;
       hsk_resource_root_to_soa(ns);
       hsk_dnssec_sign_zsk(ns, HSK_DNS_SOA);
     }

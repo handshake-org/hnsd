@@ -125,6 +125,9 @@ test_decode_resource() {
       assert(msg->ns.size == type_vector.ns_size);
       assert(msg->ar.size == type_vector.ar_size);
 
+      // Check `aa` bit
+      assert((bool)(msg->flags & HSK_DNS_AA) == type_vector.aa);
+
       // Sanity check: NSEC never appears in ANSWER or ADDITIONAL
       for (int i = 0; i < msg->an.size; i++) {
         hsk_dns_rr_t *rr = msg->an.items[i];
