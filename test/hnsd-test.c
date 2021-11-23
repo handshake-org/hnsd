@@ -104,7 +104,7 @@ void
 test_decode_resource() {
   printf("test_decode_resource\n");
 
-  for (int i = 0; i < 10; i++) {
+  for (int i = 0; i < 11; i++) {
     resource_vector_t resource_vector = resource_vectors[i];
 
     hsk_resource_t *res = NULL;

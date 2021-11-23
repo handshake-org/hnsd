@@ -28,7 +28,7 @@ typedef struct resource_vector {
  * Vectors
  */
 
-static const resource_vector_t resource_vectors[10] = {
+static const resource_vector_t resource_vectors[11] = {
   // {
   //   "records": [
   //     {
@@ -292,5 +292,47 @@ static const resource_vector_t resource_vectors[10] = {
     },
     sizeof(hsk_type_map_txt),
     hsk_type_map_txt
+  },
+
+  // {
+  //   "records": [
+  //     {
+  //       "type": "DS",
+  //       "keyTag": 57355,
+  //       "algorithm": 8,
+  //       "digestType": 2,
+  //       "digest": "95a57c3bab7849dbcddf7c72ada71a88146b141110318ca5be672057e865c3e2"
+  //     },
+  //     {
+  //       "type": "GLUE6",
+  //       "ns": "ns1.test-all.",
+  //       "address": "4:8:15:16:23:42:108:815"
+  //     },
+  //     {
+  //       "type": "TXT",
+  //       "txt": [":-)"]
+  //     }
+  //   ]
+  // }
+  {
+    "test-all.",
+    {
+      0x00, 0x00, 0xe0, 0x0b, 0x08, 0x02, 0x20, 0x95, 0xa5, 0x7c, 0x3b, 0xab,
+      0x78, 0x49, 0xdb, 0xcd, 0xdf, 0x7c, 0x72, 0xad, 0xa7, 0x1a, 0x88, 0x14,
+      0x6b, 0x14, 0x11, 0x10, 0x31, 0x8c, 0xa5, 0xbe, 0x67, 0x20, 0x57, 0xe8,
+      0x65, 0xc3, 0xe2, 0x03, 0x03, 0x6e, 0x73, 0x31, 0x08, 0x74, 0x65, 0x73,
+      0x74, 0x2d, 0x61, 0x6c, 0x6c, 0x00, 0x00, 0x04, 0x00, 0x08, 0x00, 0x15,
+      0x00, 0x16, 0x00, 0x23, 0x00, 0x42, 0x01, 0x08, 0x08, 0x15, 0x06, 0x01,
+      0x03, 0x3a, 0x2d, 0x29
+    },
+    76,
+    {
+      {HSK_DNS_DS,  "DS",  2, 0, 0, false, true},
+      {HSK_DNS_NS,  "NS",  0, 3, 1, false, false},
+      {HSK_DNS_TXT, "TXT", 0, 3, 1, false, false},
+      {HSK_DNS_A,   "A",   0, 3, 1, false, false}
+    },
+    0,
+    NULL
   }
 };
