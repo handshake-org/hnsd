@@ -343,6 +343,12 @@ $ hnsd [options]
   Help message.
 ```
 
+## Testing
+
+The `make` command will output two binaries into the root directory: `hnsd`
+and `test_hnsd`, which is compiled from unit tests in the `test/` directory.
+Run the tests with `./test_hnsd`.
+
 ## License
 
 - Copyright (c) 2018, Christopher Jeffrey (MIT License).

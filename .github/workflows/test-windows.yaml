@@ -1,0 +1,34 @@
+name: Test - Windows
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+jobs:
+  build:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: msys2 {0}
+
+    steps:
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          update: true
+          install: git mingw-w64-x86_64-toolchain base-devel mingw-w64-x86_64-unbound
+
+      - run: git config --global core.autocrlf input
+        shell: bash
+
+      - uses: actions/checkout@v2
+
+      - name: Build
+        run: ./autogen.sh && ./configure && make
+
+      - name: Unit Tests
+        run: ./test_hnsd
+
+    # TODO: Install nodejs, intall hsd and test end-to-end integration.
