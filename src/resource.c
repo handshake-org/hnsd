@@ -929,6 +929,9 @@ hsk_resource_to_dns(const hsk_resource_t *rs, const char *name, uint16_t type) {
   hsk_dns_rrs_t *ns = &msg->ns; // authority
   hsk_dns_rrs_t *ar = &msg->ar; // additional
 
+  // Even though the name here is a single label (the TLD)
+  // we use a larger buffer size of 255 (instead of 63)
+  // to allow escaped byte codes like /000
   char next[HSK_DNS_MAX_NAME];
   next_name(tld, next);
 
@@ -1160,7 +1163,10 @@ hsk_resource_to_nx(const char *tld) {
   hsk_dns_rr_t *rr1 = hsk_dns_rrs_pop(ns);
   hsk_dns_rr_t *rr2 = hsk_dns_rrs_pop(ns);
 
-  // Prove the name doesn't exist
+  // Prove the name doesn't exist.
+  // Even though the name here is a single label (the TLD)
+  // we use a larger buffer size of 255 (instead of 63)
+  // to allow escaped byte codes like /000
   char next[HSK_DNS_MAX_NAME];
   char prev[HSK_DNS_MAX_NAME];
   next_name(tld, next);
@@ -1245,6 +1251,7 @@ next_name(const char *name, char *next) {
     memcpy(&next[len], "\\000.", 6);
   } else {
     next[len - 1]++;
+    memcpy(&next[len], ".", 2);
   }
 }
 

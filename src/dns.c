@@ -2222,16 +2222,28 @@ hsk_dns_name_serialize(
   int size;
   int i;
   char *s;
-  int size_byte = 0;
+  int size_adjust = 0;
 
   for (s = (char *)name, i = 0; *s; s++, i++) {
+    if (name[i] == '\\') {
+      if (!isdigit(name[++i]) ||
+          !isdigit(name[++i]) ||
+          !isdigit(name[++i])) {
+        *len = off;
+        return false;
+      }
+
+      size_adjust += 3;
+      s += 3;
+    }
+
     if (name[i] == '.') {
       if (i > 0 && name[i - 1] == '.') {
         *len = off;
         return false;
       }
 
-      size = i - begin;
+      size = i - begin - size_adjust;
 
       if (size > HSK_DNS_MAX_LABEL) {
         *len = off;
@@ -2243,8 +2255,7 @@ hsk_dns_name_serialize(
           *len = off;
           return false;
         }
-        // Size will be written here once we know what size is
-        size_byte = off;
+        data[off] = size;
       }
 
       if (cmp) {
@@ -2274,13 +2285,6 @@ hsk_dns_name_serialize(
           char ch = name[j];
           if (ch == '\\') {
             // Read the next three digits and form a single byte
-            if (!isdigit(name[j + 1]) ||
-                !isdigit(name[j + 2]) ||
-                !isdigit(name[j + 3])) {
-              *len = off;
-              return false;
-            }
-
             uint16_t value = (name[++j] - 0x30) * 100;
             value += (name[++j] - 0x30) * 10;
             value += (name[++j] - 0x30);
@@ -2305,13 +2309,12 @@ hsk_dns_name_serialize(
 
           data[off++] = ch;
         }
-
-        data[size_byte] = size;
       } else {
         off += size;
       }
 
       begin = i + 1;
+      size_adjust = 0;
     }
   }
 
