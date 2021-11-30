@@ -14,7 +14,7 @@ typedef struct name_serializtion_vector {
  * Vectors
  */
 
-static const name_serializtion_vector_t name_serializtion_vectors[7] = {
+static const name_serializtion_vector_t name_serializtion_vectors[] = {
   {
     "abcdef.",
     {

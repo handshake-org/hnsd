@@ -7,6 +7,8 @@
 #include "data/name_serialization_vectors.h"
 #include "data/resource_vectors.h"
 
+#define ARRAY_SIZE(x) ((sizeof(x))/(sizeof(x[0])))
+
 /**
  * UTILITY
  */
@@ -80,7 +82,7 @@ void
 test_name_serialize() {
   printf("test_name_serialize\n");
 
-  for (int i = 0; i < 7; i++) {
+  for (int i = 0; i < ARRAY_SIZE(name_serializtion_vectors); i++) {
     name_serializtion_vector_t name_serializtion_vector = name_serializtion_vectors[i];
 
     uint8_t data[24] = {0};
@@ -104,7 +106,7 @@ void
 test_decode_resource() {
   printf("test_decode_resource\n");
 
-  for (int i = 0; i < 11; i++) {
+  for (int i = 0; i < ARRAY_SIZE(resource_vectors); i++) {
     resource_vector_t resource_vector = resource_vectors[i];
 
     hsk_resource_t *res = NULL;
@@ -114,7 +116,7 @@ test_decode_resource() {
       &res
     );
 
-    for (int t = 0; t < 4; t++) {
+    for (int t = 0; t < ARRAY_SIZE(resource_vector.type_vectors); t++) {
       type_vector_t type_vector = resource_vector.type_vectors[t];
 
       hsk_dns_msg_t *msg = NULL;

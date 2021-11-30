@@ -28,7 +28,7 @@ typedef struct resource_vector {
  * Vectors
  */
 
-static const resource_vector_t resource_vectors[11] = {
+static const resource_vector_t resource_vectors[] = {
   // {
   //   "records": [
   //     {
