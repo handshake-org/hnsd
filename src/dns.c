@@ -2431,26 +2431,31 @@ hsk_dns_name_alloc(
 
 bool
 hsk_dns_name_dirty(const char *name) {
-  char *s = (char *)name;
+  int len = strlen(name);
+  if (len > HSK_DNS_MAX_LABEL)
+    return true;
 
-  while (*s) {
-    uint8_t c = (uint8_t)*s;
+  for (int i = 0; i < len; i++) {
+    uint8_t c = name[i];
+
+    if (c >= 0x41 && c <= 0x5a)
+      c ^= 0x20;
 
     switch (c) {
-      case 0x28 /*(*/:
-      case 0x29 /*)*/:
-      case 0x3b /*;*/:
-      case 0x20 /* */:
-      case 0x40 /*@*/:
-      case 0x22 /*"*/:
-      case 0x5c /*\\*/:
-        return true;
+      case 0x5f: /* _ */
+      case 0x2d: /* - */
+        if (i == 0 || i == len - 1) {
+          return true;
+        } else {
+          continue;
+        }
     }
 
-    if (c < 0x20 || c > 0x7e)
+    if (c < 0x30 ||
+       (c > 0x39 && c < 0x61) ||
+        c > 0x7a) {
       return true;
-
-    s += 1;
+    }
   }
 
   return false;
