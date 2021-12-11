@@ -45,8 +45,11 @@
 #define HSK_EBADSIZE 30
 #define HSK_EBADTAG 31
 
+// DNS
+#define HSK_EREFUSED 32
+
 // Max
-#define HSK_MAXERROR 32
+#define HSK_MAXERROR 33
 
 const char *
 hsk_strerror(int code);

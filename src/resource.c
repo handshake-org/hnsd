@@ -1145,6 +1145,18 @@ hsk_resource_to_notimp(void) {
   return msg;
 }
 
+hsk_dns_msg_t *
+hsk_resource_to_refused(void) {
+  hsk_dns_msg_t *msg = hsk_dns_msg_alloc();
+
+  if (!msg)
+    return NULL;
+
+  msg->code = HSK_DNS_REFUSED;
+
+  return msg;
+}
+
 /*
  * Helpers
  */

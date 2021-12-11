@@ -24,6 +24,8 @@
 #include "utils.h"
 #include "uv.h"
 #include "dnssec.h"
+#include "rs_worker.h"
+#include "rs.h"
 
 // A RRSIG NSEC
 static const uint8_t hsk_type_map_a[] = {
@@ -100,7 +102,12 @@ hsk_icann_lookup(const char *name);
  */
 
 int
-hsk_ns_init(hsk_ns_t *ns, const uv_loop_t *loop, const hsk_pool_t *pool) {
+hsk_ns_init(
+  hsk_ns_t *ns,
+  const uv_loop_t *loop,
+  const hsk_pool_t *pool,
+  const bool upstream
+) {
   if (!ns || !loop || !pool)
     return HSK_EBADARGS;
 
@@ -121,6 +128,8 @@ hsk_ns_init(hsk_ns_t *ns, const uv_loop_t *loop, const hsk_pool_t *pool) {
   memset(ns->pubkey, 0x00, sizeof(ns->pubkey));
   memset(ns->read_buffer, 0x00, sizeof(ns->read_buffer));
   ns->receiving = false;
+  ns->upstream = upstream;
+  ns->rs = NULL;
 
   return HSK_SUCCESS;
 }
@@ -180,7 +189,7 @@ hsk_ns_set_key(hsk_ns_t *ns, const uint8_t *key) {
 }
 
 int
-hsk_ns_open(hsk_ns_t *ns, const struct sockaddr *addr) {
+hsk_ns_open(hsk_ns_t *ns, const struct sockaddr *addr, hsk_rs_t *rs) {
   if (!ns || !addr)
     return HSK_EBADARGS;
 
@@ -215,6 +224,8 @@ hsk_ns_open(hsk_ns_t *ns, const struct sockaddr *addr) {
   char host[HSK_MAX_HOST];
   assert(hsk_sa_to_string(addr, host, HSK_MAX_HOST, HSK_NS_PORT));
 
+  ns->rs = rs;
+
   hsk_ns_log(ns, "root nameserver listening on: %s\n", host);
 
   return HSK_SUCCESS;
@@ -241,13 +252,17 @@ hsk_ns_close(hsk_ns_t *ns) {
 }
 
 hsk_ns_t *
-hsk_ns_alloc(const uv_loop_t *loop, const hsk_pool_t *pool) {
+hsk_ns_alloc(
+  const uv_loop_t *loop,
+  const hsk_pool_t *pool,
+  const bool upstream
+) {
   hsk_ns_t *ns = malloc(sizeof(hsk_ns_t));
 
   if (!ns)
     return NULL;
 
-  if (hsk_ns_init(ns, loop, pool) != HSK_SUCCESS) {
+  if (hsk_ns_init(ns, loop, pool, upstream) != HSK_SUCCESS) {
     free(ns);
     return NULL;
   }
@@ -740,16 +755,37 @@ after_resolve(
 
   if (status == HSK_SUCCESS) {
     if (!exists || data_len == 0) {
-      const uint8_t *item = hsk_icann_lookup(name);
+      if (ns->upstream) {
+        // User has requested that all non-HNS queries
+        // get forwarded to a specific upstream resolver.
+        hsk_ns_log(ns, "forwarding to upstream resolver: %s\n", req->name);
 
-      if (item) {
-        const uint8_t *raw = &item[2];
-        size_t raw_len = (((size_t)item[1]) << 8) | ((size_t)item[0]);
+        int rc;
+        rc = hsk_rs_worker_resolve(
+          ns->rs->fallback_worker,
+          req->name,
+          req->type,
+          req->class,
+          (void *)req,
+          rs_after_resolve
+        );
 
-        if (!hsk_resource_decode(raw, raw_len, &res)) {
-          hsk_ns_log(ns, "could not decode root resource for: %s\n", name);
-          status = HSK_EFAILURE;
-          res = NULL;
+        if (res)
+          hsk_resource_free(res);
+
+        return;
+      } else {
+        const uint8_t *item = hsk_icann_lookup(name);
+
+        if (item) {
+          const uint8_t *raw = &item[2];
+          size_t raw_len = (((size_t)item[1]) << 8) | ((size_t)item[0]);
+
+          if (!hsk_resource_decode(raw, raw_len, &res)) {
+            hsk_ns_log(ns, "could not decode root resource for: %s\n", name);
+            status = HSK_EFAILURE;
+            res = NULL;
+          }
         }
       }
     } else {

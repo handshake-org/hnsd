@@ -38,6 +38,7 @@ static const char *errstrs[] = {
   "EACTTHREE",
   "EBADSIZE",
   "EBADTAG",
+  "EREFUSED",
   "EUNKNOWN"
 };
 
