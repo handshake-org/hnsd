@@ -323,7 +323,9 @@ hsk_ns_onrecv(
   // The synth name then resolves to an A/AAAA record that is derived
   // by decoding the name itself (it does not have to be looked up).
   bool should_cache = true;
-  if (strcmp(req->tld, "_synth") == 0 && req->labels <= 2) {
+  if (strcmp(req->tld, "_synth") == 0 &&
+      req->labels <= 2 &&
+      req->name[0] == '_') {
     msg = hsk_dns_msg_alloc();
     should_cache = false;
 
@@ -332,7 +334,6 @@ hsk_ns_onrecv(
 
     hsk_dns_rrs_t *an = &msg->an;
     hsk_dns_rrs_t *rrns = &msg->ns;
-    hsk_dns_rrs_t *ar = &msg->ar;
 
     uint8_t ip[16];
     uint16_t family;
@@ -344,6 +345,15 @@ hsk_ns_onrecv(
       // so recursive asks again with complete synth record.
       hsk_resource_root_to_soa(rrns);
       hsk_dnssec_sign_zsk(rrns, HSK_DNS_SOA);
+      // Empty non-terminal proof:
+      hsk_resource_to_nsec(
+        "_synth.",
+        "\\000._synth.",
+        hsk_type_map_empty,
+        sizeof(hsk_type_map_empty),
+        rrns
+      );
+      hsk_dnssec_sign_zsk(rrns, HSK_DNS_NSEC);
     }
   
     if (pointer_to_ip(synth, ip, &family)) {
@@ -409,7 +419,7 @@ hsk_ns_onrecv(
 
         hsk_dns_rrs_push(an, rr);
 
-        hsk_dnssec_sign_zsk(ar, rrtype);
+        hsk_dnssec_sign_zsk(an, rrtype);
       }
     }
 
