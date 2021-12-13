@@ -300,28 +300,6 @@ hsk_ns_onrecv(
 
   hsk_dns_req_print(req, "ns: ");
 
-  // Send REFUSED if name is dirty
-  // (contains escaped byte codes or special characters)
-  if (hsk_dns_name_dirty(req->tld)) {
-    msg = hsk_resource_to_refused();
-
-    if (!msg) {
-      hsk_ns_log(ns, "failed creating refused\n");
-      goto fail;
-    }
-
-    if (!hsk_dns_msg_finalize(&msg, req, ns->ec, ns->key, &wire, &wire_len)) {
-      hsk_ns_log(ns, "could not reply\n");
-      goto done;
-    }
-
-    hsk_ns_log(ns, "refusing query for msg (%u): %u\n", req->id, wire_len);
-
-    hsk_ns_send(ns, wire, wire_len, addr, true);
-
-    goto done;
-  }
-
   // Hit cache first.
   msg = hsk_cache_get(&ns->cache, req);
 
@@ -354,7 +332,6 @@ hsk_ns_onrecv(
 
     hsk_dns_rrs_t *an = &msg->an;
     hsk_dns_rrs_t *rrns = &msg->ns;
-    hsk_dns_rrs_t *ar = &msg->ar;
 
     uint8_t ip[16];
     uint16_t family;
@@ -366,6 +343,15 @@ hsk_ns_onrecv(
       // so recursive asks again with complete synth record.
       hsk_resource_root_to_soa(rrns);
       hsk_dnssec_sign_zsk(rrns, HSK_DNS_SOA);
+      // Empty non-terminal proof:
+      hsk_resource_to_nsec(
+        "_synth.",
+        "\\000._synth.",
+        hsk_type_map_empty,
+        sizeof(hsk_type_map_empty),
+        rrns
+      );
+      hsk_dnssec_sign_zsk(rrns, HSK_DNS_NSEC);
     }
   
     if (pointer_to_ip(synth, ip, &family)) {
@@ -385,7 +371,7 @@ hsk_ns_onrecv(
 
       if (!match) {
         char next[HSK_DNS_MAX_NAME] = "\\000.";
-        memcpy(&next[6], req->name, strlen(req->name));
+        memcpy(&next[5], req->name, strlen(req->name));
         if (family == HSK_DNS_A) {
           hsk_resource_to_nsec(
             req->name,
@@ -431,7 +417,7 @@ hsk_ns_onrecv(
 
         hsk_dns_rrs_push(an, rr);
 
-        hsk_dnssec_sign_zsk(ar, rrtype);
+        hsk_dnssec_sign_zsk(an, rrtype);
       }
     }
 
@@ -441,6 +427,28 @@ hsk_ns_onrecv(
     }
 
     hsk_ns_log(ns, "sending synthesized msg (%u): %u\n", req->id, wire_len);
+
+    hsk_ns_send(ns, wire, wire_len, addr, true);
+
+    goto done;
+  }
+
+  // Send REFUSED if name is dirty
+  // (contains escaped byte codes or special characters)
+  if (hsk_dns_name_dirty(req->tld)) {
+    msg = hsk_resource_to_refused();
+
+    if (!msg) {
+      hsk_ns_log(ns, "failed creating refused\n");
+      goto fail;
+    }
+
+    if (!hsk_dns_msg_finalize(&msg, req, ns->ec, ns->key, &wire, &wire_len)) {
+      hsk_ns_log(ns, "could not reply\n");
+      goto done;
+    }
+
+    hsk_ns_log(ns, "refusing query for msg (%u): %u\n", req->id, wire_len);
 
     hsk_ns_send(ns, wire, wire_len, addr, true);
 
