@@ -36,6 +36,7 @@ typedef struct hsk_options_s {
   uint8_t *identity_key;
   char *seeds;
   int pool_size;
+  char *user_agent;
 } hsk_options_t;
 
 static void
@@ -52,6 +53,7 @@ hsk_options_init(hsk_options_t *opt) {
   opt->identity_key = NULL;
   opt->seeds = NULL;
   opt->pool_size = HSK_POOL_SIZE;
+  opt->user_agent = NULL;
 }
 
 static void
@@ -141,6 +143,9 @@ help(int r) {
     "  -l, --log-file <filename>\n"
     "    Redirect output to a log file.\n"
     "\n"
+    "  -a, --user-agent <string>\n"
+    "    Add supplemental user agent string in p2p version message.\n"
+    "\n"
 #ifndef _WIN32
     "  -d, --daemon\n"
     "    Fork and background the process.\n"
@@ -156,9 +161,9 @@ help(int r) {
 
 static void
 parse_arg(int argc, char **argv, hsk_options_t *opt) {
-  const static char *optstring = "c:n:r:i:u:p:k:s:l:h"
+  const static char *optstring = "c:n:r:i:u:p:k:s:l:h:a"
 #ifndef _WIN32
-    "d"
+    ":d"
 #endif
     ;
 
@@ -172,6 +177,7 @@ parse_arg(int argc, char **argv, hsk_options_t *opt) {
     { "identity-key", required_argument, NULL, 'k' },
     { "seeds", required_argument, NULL, 's' },
     { "log-file", required_argument, NULL, 'l' },
+    { "user-agent", required_argument, NULL, 'a' },
 #ifndef _WIN32
     { "daemon", no_argument, NULL, 'd' },
 #endif
@@ -307,6 +313,18 @@ parse_arg(int argc, char **argv, hsk_options_t *opt) {
         break;
       }
 
+      case 'a': {
+        if (!optarg || strlen(optarg) == 0)
+          return help(1);
+
+        if (opt->user_agent)
+          free(opt->user_agent);
+
+        opt->user_agent = strdup(optarg);
+
+        break;
+      }
+
 #ifndef _WIN32
       case 'd': {
         background = true;
@@ -424,6 +442,12 @@ hsk_daemon_init(hsk_daemon_t *daemon, uv_loop_t *loop, hsk_options_t *opt) {
 
   if (!hsk_pool_set_seeds(daemon->pool, opt->seeds)) {
     fprintf(stderr, "failed adding seeds\n");
+    rc = HSK_EFAILURE;
+    goto fail;
+  }
+
+  if (!hsk_pool_set_agent(daemon->pool, opt->user_agent)) {
+    fprintf(stderr, "failed adding user agent\n");
     rc = HSK_EFAILURE;
     goto fail;
   }

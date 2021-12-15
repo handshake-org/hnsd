@@ -104,6 +104,7 @@ typedef struct hsk_pool_s {
   int pending_count;
   int64_t block_time;
   int64_t getheaders_time;
+  char *user_agent;
 } hsk_pool_t;
 
 /*
@@ -124,6 +125,9 @@ hsk_pool_set_size(hsk_pool_t *pool, int max_size);
 
 bool
 hsk_pool_set_seeds(hsk_pool_t *pool, const char *seeds);
+
+bool
+hsk_pool_set_agent(hsk_pool_t *pool, const char *user_agent);
 
 hsk_pool_t *
 hsk_pool_alloc(const uv_loop_t *loop);

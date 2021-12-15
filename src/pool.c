@@ -173,6 +173,8 @@ hsk_pool_init(hsk_pool_t *pool, const uv_loop_t *loop) {
   pool->pending_count = 0;
   pool->block_time = 0;
   pool->getheaders_time = 0;
+  pool->user_agent = (char *)malloc(255);
+  strcpy(pool->user_agent, HSK_USER_AGENT);
 
   return HSK_SUCCESS;
 }
@@ -206,6 +208,11 @@ hsk_pool_uninit(hsk_pool_t *pool) {
   hsk_chain_uninit(&pool->chain);
   hsk_addrman_uninit(&pool->am);
   hsk_timedata_uninit(&pool->td);
+
+  if (pool->user_agent) {
+    free(pool->user_agent);
+    pool->user_agent = NULL;
+  }
 }
 
 bool
@@ -284,6 +291,25 @@ hsk_pool_set_seeds(hsk_pool_t *pool, const char *seeds) {
       start = i + 1;
     }
   }
+
+  return true;
+}
+
+bool
+hsk_pool_set_agent(hsk_pool_t *pool, const char *user_agent) {
+  assert(pool);
+
+  if (!user_agent)
+    return true;
+
+  size_t len = strlen(pool->user_agent);  
+  len += strlen(user_agent);
+
+  // Agent size in p2p version message is 1 byte
+  if (len > 0xff)
+    return false;
+
+  pool->user_agent = strcat(pool->user_agent, user_agent);
 
   return true;
 }
@@ -1205,7 +1231,7 @@ hsk_peer_send_version(hsk_peer_t *peer) {
   hsk_addr_copy(&msg.remote.addr, &peer->addr);
 
   msg.nonce = hsk_nonce();
-  strcpy(msg.agent, HSK_USER_AGENT);
+  strcpy(msg.agent, pool->user_agent);
   msg.height = (uint32_t)pool->chain.height;
 
   peer->version_time = hsk_now();
