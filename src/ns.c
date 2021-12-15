@@ -371,7 +371,7 @@ hsk_ns_onrecv(
 
       if (!match) {
         char next[HSK_DNS_MAX_NAME] = "\\000.";
-        memcpy(&next[5], req->name, strlen(req->name));
+        strcat(next, req->name);
         if (family == HSK_DNS_A) {
           hsk_resource_to_nsec(
             req->name,
