@@ -399,6 +399,8 @@ static void
 hsk_daemon_after_close(void *data);
 static void
 hsk_daemon_signal_shutdown(void *data);
+static void
+hsk_daemon_uninit(hsk_daemon_t *data);
 
 int
 hsk_daemon_init(hsk_daemon_t *daemon, uv_loop_t *loop, hsk_options_t *opt) {
@@ -501,8 +503,34 @@ hsk_daemon_init(hsk_daemon_t *daemon, uv_loop_t *loop, hsk_options_t *opt) {
   return HSK_SUCCESS;
 
 fail:
-  hsk_daemon_after_close((void *)daemon);
+  hsk_daemon_uninit(daemon);
   return rc;
+}
+
+void
+hsk_daemon_uninit(hsk_daemon_t *daemon) {
+  if (!daemon)
+    return;
+
+  if (daemon->signals) {
+    hsk_signals_free(daemon->signals);
+    daemon->signals = NULL;
+  }
+
+  if (daemon->rs) {
+    hsk_rs_free(daemon->rs);
+    daemon->rs = NULL;
+  }
+
+  if (daemon->pool) {
+    hsk_pool_free(daemon->pool);
+    daemon->pool = NULL;
+  }
+
+  if (daemon->ns) {
+    hsk_ns_free(daemon->ns);
+    daemon->ns = NULL;
+  }
 }
 
 int
@@ -564,25 +592,21 @@ static void
 hsk_daemon_after_close(void *data) {
   hsk_daemon_t *daemon = (hsk_daemon_t *)data;
 
-  if (daemon->rs) {
-    hsk_rs_free(daemon->rs);
-    daemon->rs = NULL;
-  }
-
   if (daemon->ns) {
-    hsk_ns_destroy(daemon->ns);
-    daemon->ns = NULL;
+    int rc = hsk_ns_close(daemon->ns);
+
+    if (rc != HSK_SUCCESS)
+      fprintf(stderr, "failed to close ns: %s\n", hsk_strerror(rc));
   }
 
   if (daemon->pool) {
-    hsk_pool_destroy(daemon->pool);
-    daemon->pool = NULL;
+    int rc = hsk_pool_close(daemon->pool);
+
+    if (rc != HSK_SUCCESS)
+      fprintf(stderr, "failed to close pool: %s\n", hsk_strerror(rc));
   }
 
-  if (daemon->signals) {
-    hsk_signals_free(daemon->signals);
-    daemon->signals = NULL;
-  }
+  hsk_daemon_uninit(daemon);
 }
 
 static void
