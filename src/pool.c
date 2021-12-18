@@ -173,7 +173,7 @@ hsk_pool_init(hsk_pool_t *pool, const uv_loop_t *loop) {
   pool->pending_count = 0;
   pool->block_time = 0;
   pool->getheaders_time = 0;
-  pool->user_agent = (char *)malloc(255);
+  pool->user_agent = (char *)malloc(256);
   strcpy(pool->user_agent, HSK_USER_AGENT);
 
   return HSK_SUCCESS;
@@ -302,7 +302,7 @@ hsk_pool_set_agent(hsk_pool_t *pool, const char *user_agent) {
   if (!user_agent)
     return true;
 
-  size_t len = strlen(pool->user_agent);  
+  size_t len = strlen(pool->user_agent);
   len += strlen(user_agent);
 
   // Agent size in p2p version message is 1 byte
