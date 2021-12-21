@@ -5,8 +5,9 @@
 typedef struct name_serializtion_vector {
   char *name;
   uint8_t expected_data[24];
-  int expected_len;
+  size_t expected_len;
   bool success;
+  char *parsed;
 } name_serializtion_vector_t;
 
 
@@ -21,7 +22,8 @@ static const name_serializtion_vector_t name_serializtion_vectors[] = {
       0x06, 0x61, 0x62, 0x63, 0x64, 0x65, 0x66, 0x00
     },
     8,
-    true
+    true,
+    "abcdef."
   },
   {
     "abc.def.",
@@ -29,7 +31,8 @@ static const name_serializtion_vector_t name_serializtion_vectors[] = {
       0x03, 0x61, 0x62, 0x63, 0x03, 0x64, 0x65, 0x66, 0x00
     },
     9,
-    true
+    true,
+    "abc.def."
   },
   {
     "abcdef\\000.",
@@ -37,7 +40,8 @@ static const name_serializtion_vector_t name_serializtion_vectors[] = {
       0x07, 0x61, 0x62, 0x63, 0x64, 0x65, 0x66, 0x00, 0x00
     },
     9,
-    true
+    true,
+    "abcdef\\000."
   },
   {
     "abcdef\\255.",
@@ -45,28 +49,111 @@ static const name_serializtion_vector_t name_serializtion_vectors[] = {
       0x07, 0x61, 0x62, 0x63, 0x64, 0x65, 0x66, 0xff, 0x00
     },
     9,
-    true
+    true,
+    "abcdef\\255."
   },
   {
     "abcdef\\256.",
-    {
-      0x07, 0x61, 0x62, 0x63, 0x64, 0x65, 0x66
-    },
-    7,
-    false
+    {},
+    0,
+    false, // bad escape (value > 0xff)
+    NULL
   },
   {
     "abcdef\\LOL.",
-    {},
-    0,
-    false
+    {
+      0x09, 0x61, 0x62, 0x63, 0x64, 0x65, 0x66, 0x4c, 0x4f, 0x4c, 0x00
+    },
+    11,
+    true,
+    "abcdefLOL."
   },
   {
-    "abc\\032def.",
+    "abc\\031def.",
     {
-      0x07, 0x61, 0x62, 0x63, 0x20, 0x64, 0x65, 0x66, 0x00
+      0x07, 0x61, 0x62, 0x63, 0x1f, 0x64, 0x65, 0x66, 0x00
     },
     9,
-    true
+    true,
+    "abc\\031def."
+  },
+  {
+    "abc\\\\def.",
+    {
+      0x07, 0x61, 0x62, 0x63, 0x5c, 0x64, 0x65, 0x66, 0x00
+    },
+    9,
+    true,
+    "abc\\\\def."
+  },
+  {
+    "\\999.",
+    {},
+    0,
+    false, // bad escape (value > 0xff)
+    NULL
+  },
+  {
+    "\\\\999.",
+    {
+      0x04, 0x5c, 0x39, 0x39, 0x39, 0x00
+    },
+    6,
+    true,
+    "\\\\999."
+  },
+  {
+    "\\\\222.",
+    {
+      0x04, 0x5c, 0x32, 0x32, 0x32, 0x00
+    },
+    6,
+    true,
+    "\\\\222."
+  },
+  {
+    "abc\\\\999.",
+    {
+      0x07, 0x61, 0x62, 0x63, 0x5c, 0x39, 0x39, 0x39, 0x00
+    },
+    9,
+    true,
+    "abc\\\\999."
+  },
+  {
+    "abc\\\\99.",
+    {
+      0x06, 0x61, 0x62, 0x63, 0x5c, 0x39, 0x39, 0x00
+    },
+    8,
+    true,
+    "abc\\\\99."
+  },
+  {
+    "abc\\\\.",
+    {
+      0x04, 0x61, 0x62, 0x63, 0x5c, 0x00
+    },
+    6,
+    true,
+    "abc\\\\."
+  },
+  {
+    "\\..",
+    {
+      0x01, 0x2e, 0x00
+    },
+    3,
+    true,
+    "\\.."
+  },
+  {
+    "\\046.",
+    {
+      0x01, 0x2e, 0x00
+    },
+    3,
+    true,
+    "\\.."
   }
 };

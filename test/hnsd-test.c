@@ -86,7 +86,7 @@ test_name_serialize() {
     name_serializtion_vector_t name_serializtion_vector = name_serializtion_vectors[i];
 
     uint8_t data[24] = {0};
-    int len;
+    int len = 0;
 
     printf(" %s\n", name_serializtion_vector.name);
 
@@ -96,9 +96,43 @@ test_name_serialize() {
       &len,
       NULL
     );
+
+
+    // printf("len: %d expected_len: %d\n",len,name_serializtion_vector.expected_len);
+    // print_array(name_serializtion_vector.expected_data, name_serializtion_vector.expected_len);
+    // print_array(data, name_serializtion_vector.expected_len);
+
     assert(name_serializtion_vector.success == success);
     assert(len == name_serializtion_vector.expected_len);
     assert(memcmp(data, name_serializtion_vector.expected_data, len) == 0);
+  }
+}
+
+void
+test_name_parse() {
+  printf("test_name_parse\n");
+
+  for (int i = 0; i < ARRAY_SIZE(name_serializtion_vectors); i++) {
+    name_serializtion_vector_t name_serializtion_vector = name_serializtion_vectors[i];
+
+    char name[255];
+
+    if (!name_serializtion_vector.parsed)
+      continue;
+
+    printf(" %s\n", name_serializtion_vector.name);
+
+    uint8_t *ptr = (uint8_t *)&name_serializtion_vector.expected_data;
+    size_t len = name_serializtion_vector.expected_len;
+
+    int ret = hsk_dns_name_parse(
+      (uint8_t **)&ptr,
+      &len,
+      NULL,
+      name
+    );
+    assert(ret == strlen(name_serializtion_vector.parsed));
+    assert(strcmp(name_serializtion_vector.parsed, name) == 0);
   }
 }
 
@@ -239,6 +273,7 @@ main() {
   test_base32();
   test_pointer_to_ip();
   test_name_serialize();
+  test_name_parse();
   test_decode_resource();
   test_next_name();
   test_prev_name();
