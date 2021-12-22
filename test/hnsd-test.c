@@ -2,6 +2,11 @@
 #include "base32.h"
 #include "resource.h"
 #include "resource.c"
+#include "dns.h"
+#include "dns.c"
+#include "data/resource_vectors.h"
+
+#define ARRAY_SIZE(x) ((sizeof(x))/(sizeof(x[0])))
 
 void
 print_array(uint8_t *arr, size_t size){
@@ -104,6 +109,66 @@ test_prev_name() {
   ) == 0);
 }
 
+void
+test_decode_resource() {
+  printf("test_decode_resource\n");
+
+  for (int i = 0; i < ARRAY_SIZE(resource_vectors); i++) {
+    resource_vector_t resource_vector = resource_vectors[i];
+
+    hsk_resource_t *res = NULL;
+    hsk_resource_decode(
+      resource_vector.data,
+      resource_vector.data_len,
+      &res
+    );
+
+    for (int t = 0; t < ARRAY_SIZE(resource_vector.type_vectors); t++) {
+      type_vector_t type_vector = resource_vector.type_vectors[t];
+
+      hsk_dns_msg_t *msg = NULL;
+      msg = hsk_resource_to_dns(res, resource_vector.name, type_vector.type);
+
+      printf(" %s %s \n", resource_vector.name, type_vector.type_string);
+      assert(msg->an.size == type_vector.an_size);
+      assert(msg->ns.size == type_vector.ns_size);
+      assert(msg->ar.size == type_vector.ar_size);
+
+      // Check `aa` bit
+      assert((bool)(msg->flags & HSK_DNS_AA) == type_vector.aa);
+
+      // Sanity check: NSEC never appears in ANSWER or ADDITIONAL
+      for (int i = 0; i < msg->an.size; i++) {
+        hsk_dns_rr_t *rr = msg->an.items[i];
+        assert(rr->type != HSK_DNS_NSEC);
+      }
+      for (int i = 0; i < msg->ar.size; i++) {
+        hsk_dns_rr_t *rr = msg->ar.items[i];
+        assert(rr->type != HSK_DNS_NSEC);
+      }
+
+      // Check NSEC in AUTHORITY when appropriate and verify type map
+      for (int i = 0; i < msg->ns.size; i++) {
+        hsk_dns_rr_t *rr = msg->ns.items[i];
+        if (rr->type != HSK_DNS_NSEC)
+          continue;
+
+        // NSEC is expected
+        assert(type_vector.nsec);
+
+        // Type map is correct
+        hsk_dns_nsec_rd_t *rd = rr->rd;
+        assert(resource_vector.type_map_len == rd->type_map_len);
+        assert(memcmp(
+          resource_vector.type_map,
+          rd->type_map,
+          rd->type_map_len
+        ) == 0);
+      }
+    }
+  }
+}
+
 int
 main() {
   printf("Testing hnsd...\n");
@@ -111,6 +176,7 @@ main() {
   test_pointer_to_ip();
   test_next_name();
   test_prev_name();
+  test_decode_resource();
 
   printf("ok\n");
 

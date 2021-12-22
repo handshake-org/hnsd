@@ -866,7 +866,7 @@ hsk_resource_root_to_ds(hsk_dns_rrs_t *an) {
 }
 
 bool
-hsk_resource_to_empty(
+hsk_resource_to_nsec(
   const char *name,
   const uint8_t *type_map,
   size_t type_map_len,
@@ -883,7 +883,10 @@ hsk_resource_to_empty(
 
   hsk_dns_nsec_rd_t *rd = rr->rd;
 
-  strcpy(rd->next_domain, ".");
+  char next[HSK_DNS_MAX_NAME];
+  next_name(name, next);
+  strcpy(rd->next_domain, next);
+
   rd->type_map = NULL;
   rd->type_map_len = 0;
 
@@ -964,15 +967,41 @@ hsk_resource_to_dns(const hsk_resource_t *rs, const char *name, uint16_t type) {
       hsk_resource_to_ns(rs, tld, ns);
       hsk_resource_to_ds(rs, tld, ns);
       hsk_resource_to_glue(rs, tld, ar);
-      if (!hsk_resource_has(rs, HSK_DS))
-        hsk_dnssec_sign_zsk(ns, HSK_DNS_NS);
-      else
+      if (!hsk_resource_has(rs, HSK_DS)) {
+        // Prove there is an NS but no DS and sign NSEC
+        // Root doesn't sign NS for anything other than "."
+        hsk_resource_to_nsec(
+          tld,
+          hsk_type_map_ns,
+          sizeof(hsk_type_map_ns),
+          ns
+        );
+        hsk_dnssec_sign_zsk(ns, HSK_DNS_NSEC);
+      } else {
+        // Domain has a DS and an NS
+        // Root only signs the DS
         hsk_dnssec_sign_zsk(ns, HSK_DNS_DS);
+      }
     } else {
-      // Needs SOA.
-      // Empty proof:
-      hsk_resource_to_empty(tld, NULL, 0, ns);
+      // Domain has no NS
+      // We can prove there is a TXT or empty and sign NSEC
+      if (hsk_resource_has(rs, HSK_TEXT)) {
+        hsk_resource_to_nsec(
+          tld,
+          hsk_type_map_txt,
+          sizeof(hsk_type_map_txt),
+          ns
+        );
+      } else {
+        hsk_resource_to_nsec(
+          tld,
+          hsk_type_map_empty,
+          sizeof(hsk_type_map_empty),
+          ns
+        );
+      }
       hsk_dnssec_sign_zsk(ns, HSK_DNS_NSEC);
+      // Needs SOA.
       hsk_resource_root_to_soa(ns);
       hsk_dnssec_sign_zsk(ns, HSK_DNS_SOA);
     }
@@ -1011,16 +1040,36 @@ hsk_resource_to_dns(const hsk_resource_t *rs, const char *name, uint16_t type) {
           hsk_dnssec_sign_zsk(ns, HSK_DNS_NS);
           // No DS proof:
           // This allows unbound to treat the zone as unsigned (and not bogus)
-          hsk_resource_to_empty(name, hsk_type_map_ns, sizeof(hsk_type_map_ns), ns);
+          hsk_resource_to_nsec(
+            name,
+            hsk_type_map_ns,
+            sizeof(hsk_type_map_ns),
+            ns
+          );
           hsk_dnssec_sign_zsk(ns, HSK_DNS_NSEC);
       } else {
           hsk_dnssec_sign_zsk(ns, HSK_DNS_DS);
       }
     } else {
-      // Needs SOA.
-      // Empty proof:
-      hsk_resource_to_empty(name, NULL, 0, ns);
+      // Domain has no NS
+      // We can prove there is a TXT or empty and sign NSEC
+      if (hsk_resource_has(rs, HSK_TEXT)) {
+        hsk_resource_to_nsec(
+          tld,
+          hsk_type_map_txt,
+          sizeof(hsk_type_map_txt),
+          ns
+        );
+      } else {
+        hsk_resource_to_nsec(
+          tld,
+          hsk_type_map_empty,
+          sizeof(hsk_type_map_empty),
+          ns
+        );
+      }
       hsk_dnssec_sign_zsk(ns, HSK_DNS_NSEC);
+      // Needs SOA.
       hsk_resource_root_to_soa(ns);
       hsk_dnssec_sign_zsk(ns, HSK_DNS_SOA);
     }
