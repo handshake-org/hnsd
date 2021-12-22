@@ -26,9 +26,16 @@ jobs:
       - uses: actions/checkout@v2
 
       - name: Build
-        run: ./autogen.sh && ./configure && make
+        run: ./autogen.sh && ./configure --with-network=regtest && make
 
       - name: Unit Tests
         run: ./test_hnsd
 
-    # TODO: Install nodejs, intall hsd and test end-to-end integration.
+      - name: Setup Integration
+        uses: actions/setup-node@v1
+
+      - name: Integration Tests
+        working-directory: ./test/integration
+        run:  |
+              npm install
+              ./node_modules/bmocha/bin/bmocha --reporter spec hnsd-integration-test.js
