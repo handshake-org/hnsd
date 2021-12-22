@@ -60,11 +60,57 @@ test_pointer_to_ip() {
   assert(family6 == HSK_DNS_AAAA);
 }
 
+void
+test_next_name() {
+  printf("test_next_name\n");
+
+  const char *name1 = "icecream.";
+  const char *name2 = "this-domain-name-has-sixty-three-octets-taking-max-label-length.";
+  char next1[HSK_DNS_MAX_NAME];
+  char next2[HSK_DNS_MAX_NAME];
+
+  next_name(name1, next1);
+  next_name(name2, next2);
+
+  assert(strcmp(
+    next1,
+    "icecream\\000."
+  ) == 0);
+  assert(strcmp(
+    next2,
+    "this-domain-name-has-sixty-three-octets-taking-max-label-lengti."
+  ) == 0);
+}
+
+void
+test_prev_name() {
+  printf("test_prev_name\n");
+
+  const char *name1 = "icecream.";
+  const char *name2 = "this-domain-name-has-sixty-three-octets-taking-max-label-length.";
+  char prev1[HSK_DNS_MAX_NAME];
+  char prev2[HSK_DNS_MAX_NAME];
+
+  prev_name(name1, prev1);
+  prev_name(name2, prev2);
+
+  assert(strcmp(
+    prev1,
+    "icecreal\\255."
+  ) == 0);
+  assert(strcmp(
+    prev2,
+    "this-domain-name-has-sixty-three-octets-taking-max-label-lengtg."
+  ) == 0);
+}
+
 int
 main() {
   printf("Testing hnsd...\n");
   test_base32();
   test_pointer_to_ip();
+  test_next_name();
+  test_prev_name();
 
   printf("ok\n");
 
