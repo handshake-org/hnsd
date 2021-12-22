@@ -323,7 +323,9 @@ hsk_ns_onrecv(
   // The synth name then resolves to an A/AAAA record that is derived
   // by decoding the name itself (it does not have to be looked up).
   bool should_cache = true;
-  if (strcmp(req->tld, "_synth") == 0 && req->labels <= 2) {
+  if (strcmp(req->tld, "_synth") == 0 &&
+      req->labels <= 2 &&
+      req->name[0] == '_') {
     msg = hsk_dns_msg_alloc();
     should_cache = false;
 
