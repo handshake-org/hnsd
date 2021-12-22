@@ -18,7 +18,7 @@ jobs:
         with:
           msystem: MINGW64
           update: true
-          install: git mingw-w64-x86_64-toolchain base-devel mingw-w64-x86_64-unbound
+          install: git mingw-w64-x86_64-toolchain base-devel mingw-w64-x86_64-unbound autotools
 
       - run: git config --global core.autocrlf input
         shell: bash
