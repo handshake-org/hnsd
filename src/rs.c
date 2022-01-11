@@ -439,7 +439,11 @@ hsk_rs_respond(
 
   if (result->bogus) {
     hsk_rs_log(ns, "  why_bogus: %s\n", result->why_bogus);
-    goto fail;
+
+    if (req->cd)
+      hsk_rs_log(ns, "  (checking disabled)\n");
+    else
+      goto fail;
   }  
 
   uint8_t *data = result->answer_packet;
