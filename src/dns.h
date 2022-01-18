@@ -203,7 +203,6 @@ typedef struct {
 // Constants
 #define HSK_DNS_MAX_NAME 255
 #define HSK_DNS_MAX_LABEL 63
-#define HSK_DNS_MAX_SANITIZED 1009
 #define HSK_DNS_MAX_LABELS 128
 #define HSK_DNS_MAX_UDP 512
 #define HSK_DNS_STD_EDNS 1280
@@ -627,9 +626,6 @@ hsk_dns_name_alloc(
 
 bool
 hsk_dns_name_dirty(const char *name);
-
-void
-hsk_dns_name_sanitize(const char *name, char *out);
 
 bool
 hsk_dns_name_verify(const char *name);

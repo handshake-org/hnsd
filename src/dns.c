@@ -2513,53 +2513,6 @@ hsk_dns_name_dirty(const char *name) {
   return false;
 }
 
-void
-hsk_dns_name_sanitize(const char *name, char *out) {
-  char *s = (char *)name;
-  int off = 0;
-
-  while (*s && off < HSK_DNS_MAX_SANITIZED) {
-    uint8_t c = (uint8_t)*s;
-
-    switch (c) {
-      case 0xfe: {
-        c = 0x2e;
-        ; // fall through
-      }
-      case 0x28 /*(*/:
-      case 0x29 /*)*/:
-      case 0x3b /*;*/:
-      case 0x20 /* */:
-      case 0x40 /*@*/:
-      case 0x22 /*"*/:
-      case 0x5c /*\\*/: {
-        out[off++] = '\\';
-        out[off++] = c;
-        break;
-      }
-      case 0xff: {
-        c = 0x00;
-        ; // fall through
-      }
-      default: {
-        if (c < 0x20 || c > 0x7e) {
-          out[off++] = '\\';
-          out[off++] = (c / 100) + 0x30;
-          out[off++] = (c / 10) + 0x30;
-          out[off++] = (c % 10) + 0x30;
-        } else {
-          out[off++] = c;
-        }
-        break;
-      }
-    }
-
-    s += 1;
-  }
-
-  out[off] = '\0';
-}
-
 bool
 hsk_dns_name_verify(const char *name) {
   if (name == NULL)
