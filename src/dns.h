@@ -208,6 +208,12 @@ typedef struct {
 #define HSK_DNS_STD_EDNS 1280
 #define HSK_DNS_MAX_EDNS 4096
 #define HSK_DNS_MAX_TCP 65535
+// If every label byte takes four characters (\\DDD)
+//    3 * ((4 * 63) + 1)    // max label plus dot
+//    1 * ((4 * 61) + 1)    // remainder of max name plus dot
+#define HSK_DNS_MAX_NAME_STRING 1004
+// Simply 4 * HSK_DNS_MAX_LABEL
+#define HSK_DNS_MAX_LABEL_STRING 252
 
 // Opcodes
 #define HSK_DNS_QUERY 0

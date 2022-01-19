@@ -2103,31 +2103,42 @@ hsk_dns_name_parse(
 ) {
   uint8_t *data = *data_;
   size_t data_len = *data_len_;
+  // Offset of "data" being parsed (bytes)
   int off = 0;
+  // Offset of "name" output string (characters, potentially \\DDD-encoded)
   int noff = 0;
   int res = 0;
-  int max = HSK_DNS_MAX_NAME;
   int ptr = 0;
+  // Start total by accounting for the final terminator \0
+  uint16_t total = 1;
 
   for (;;) {
     if (off >= data_len)
       return -1;
 
+    // First byte (size of label)
     uint8_t c = data[off];
     off += 1;
 
+    // Only occurs at end of name (zero label)
     if (c == 0x00)
       break;
 
     switch (c & 0xc0) {
+      // Uncompressed label
       case 0x00: {
+        // Label size can not exceed maximum
         if (c > HSK_DNS_MAX_LABEL)
           return -1;
 
+        // Label size can not exceed length of data we are parsing
         if (off + c > data_len)
-          return -1; // EOF
+          return -1;
 
-        if (noff + c + 1 > max)
+        // Label can not extend full name past maximum including length byte
+        // and resolved compression pointers. 
+        total += c + 1;
+        if (total > HSK_DNS_MAX_NAME)
           return -1;
 
         int j;
@@ -2174,6 +2185,7 @@ hsk_dns_name_parse(
         break;
       }
 
+      // Compression pointer
       case 0xc0: {
         if (!dmp)
           return -1;
@@ -2185,6 +2197,9 @@ hsk_dns_name_parse(
 
         off += 1;
 
+        // If this is the first pointer, save the "resume"
+        // address so after the pointer is resolved the
+        // rest of the packet read continues from here.
         if (ptr == 0)
           res = off;
 
@@ -2207,6 +2222,7 @@ hsk_dns_name_parse(
     }
   }
 
+  // No pointers were used, resume from current offset.
   if (ptr == 0)
     res = off;
 
@@ -2375,7 +2391,7 @@ hsk_dns_name_serialize(
     escaped = false;
   }
 
-  if (i > HSK_DNS_MAX_NAME) {
+  if (i > HSK_DNS_MAX_NAME_STRING) {
     *len = off;
     return false;
   }
