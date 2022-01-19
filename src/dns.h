@@ -623,14 +623,6 @@ hsk_dns_name_read_size(
 );
 
 bool
-hsk_dns_name_alloc(
-  uint8_t **data,
-  size_t *data_len,
-  const hsk_dns_dmp_t *dmp,
-  char **name
-);
-
-bool
 hsk_dns_name_dirty(const char *name);
 
 bool

@@ -2479,30 +2479,6 @@ hsk_dns_name_read_size(
 }
 
 bool
-hsk_dns_name_alloc(
-  uint8_t **data,
-  size_t *data_len,
-  const hsk_dns_dmp_t *dmp,
-  char **name
-) {
-  int size = hsk_dns_name_read_size(*data, *data_len, dmp);
-
-  if (size == -1)
-    return false;
-
-  char *n = malloc(size + 1);
-
-  if (!n)
-    return false;
-
-  assert(hsk_dns_name_read(data, data_len, dmp, n));
-
-  *name = n;
-
-  return true;
-}
-
-bool
 hsk_dns_name_dirty(const char *name) {
   char *s = (char *)name;
 
