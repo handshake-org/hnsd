@@ -2259,6 +2259,8 @@ hsk_dns_name_serialize(
   int size_adjust = 0;
   bool escaped = false;
   size_t max = strlen(name) - 1;
+  // Start total by accounting for the final terminator \0
+  uint16_t total = 1;
 
   for (s = (char *)name, i = 0; *s; s++, i++) {
     // Check for escaped byte codes and adjust length measurement.
@@ -2315,6 +2317,12 @@ hsk_dns_name_serialize(
         return false;
       }
 
+      total += size + 1;
+      if (total > HSK_DNS_MAX_NAME) {
+        *len = off;
+        return false;
+      }
+
       if (data) {
         if (off + 1 + size > data_len) {
           *len = off;
@@ -2323,18 +2331,33 @@ hsk_dns_name_serialize(
         data[off] = size;
       }
 
+      // Label compression
       if (cmp) {
+        // Get remainder of name
         char *sub = (char *)&name[begin];
+        // Don't compress single dot
         if (strcmp(sub, ".") != 0) {
+          // Add remainder of name to map if it's not there already
           size_t p = (size_t)hsk_map_get(&cmp->map, sub);
           if (p == 0) {
             size_t o = (size_t)(&data[off] - cmp->msg);
             if (o < (2 << 13))
               hsk_map_set(&cmp->map, sub, (void *)o);
           } else {
+            // If the string was already in the map, point to it
+            // instead of repeating the string.
             if (ptr == -1) {
               ptr = p;
               pos = off;
+
+              // Ensure remainder of string won't exceed limit
+              total += strlen(s) - 1;
+              if (total > HSK_DNS_MAX_NAME) {
+                *len = off;
+                return false;
+              }
+
+              // Advance through end of duplicate string
               i += strlen(s);
               break;
             }

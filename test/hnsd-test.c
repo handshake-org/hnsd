@@ -5,6 +5,7 @@
 #include "dns.h"
 #include "dns.c"
 #include "data/name_serialization_vectors.h"
+#include "data/record_read_vectors.h"
 
 #define ARRAY_SIZE(x) ((sizeof(x))/(sizeof(x[0])))
 
@@ -137,6 +138,161 @@ test_name_parse() {
   }
 }
 
+bool
+test_record_write(record_read_vector_t record_read_vector, void *rd) {
+  char data[HSK_DNS_MAX_NAME_STRING] = "";
+  uint8_t *ptr = (uint8_t *)data;
+
+  // populate the compression map
+  hsk_dns_cmp_t cmp;
+  hsk_map_init_str_map(&cmp.map, NULL);
+  cmp.msg = (uint8_t *)data;
+  int len;
+  bool success = hsk_dns_name_serialize(
+    record_read_msg_qname,
+    (uint8_t *)&data[0x0c],
+    &len,
+    &cmp
+  );
+
+  if (!success)
+    return false;
+
+  hsk_dns_rd_write(rd, record_read_vector.type, &ptr, &cmp);
+  return strcmp(data, record_read_vector.data) == 0;
+}
+
+void
+test_record_read() {
+  printf("test_record_read_and_write\n");
+
+  for (int i = 0; i < ARRAY_SIZE(record_read_vectors_valid); i++) {
+    record_read_vector_t record_read_vector = record_read_vectors_valid[i];
+    printf(" TYPE:%d %s\n",record_read_vector.type, record_read_vector.name1);
+
+    // Create a message dump prefixed with query name "rec.test."
+    // for label compression.
+    size_t prefix_len = ARRAY_SIZE(record_read_msg);
+    uint8_t msg[prefix_len + HSK_DNS_MAX_NAME_STRING];
+    memcpy(msg, record_read_msg, prefix_len);
+    memcpy(msg + prefix_len, record_read_vector.data, HSK_DNS_MAX_NAME_STRING);
+    hsk_dns_dmp_t dmp;
+    dmp.msg = msg;
+    dmp.msg_len = prefix_len + HSK_DNS_MAX_NAME_STRING;
+
+    void *rd = hsk_dns_rd_alloc(record_read_vector.type);
+    size_t len = HSK_DNS_MAX_NAME_STRING; // overkill but doesn't matter
+    uint8_t *ptr = (uint8_t *)record_read_vector.data;
+
+    bool success = hsk_dns_rd_read(
+      &ptr,
+      &len,
+      &dmp,
+      rd,
+      record_read_vector.type
+    );
+
+    assert(success);
+
+    // check name reads are correct, check name writes are correct
+    // only for simplest record data types (names only).
+    switch (record_read_vector.type) {
+      case HSK_DNS_NS: {
+        hsk_dns_ns_rd_t *r = (hsk_dns_ns_rd_t *)rd;
+        assert(strcmp(r->ns, record_read_vector.name1) == 0);
+        assert(test_record_write(record_read_vector, rd));
+        break;
+      }
+      case HSK_DNS_CNAME: {
+        hsk_dns_cname_rd_t *r = (hsk_dns_cname_rd_t *)rd;
+        assert(strcmp(r->target, record_read_vector.name1) == 0);
+        assert(test_record_write(record_read_vector, rd));
+        break;
+      }
+      case HSK_DNS_SOA: {
+        hsk_dns_soa_rd_t *r = (hsk_dns_soa_rd_t *)rd;
+        assert(strcmp(r->ns, record_read_vector.name1) == 0);
+        assert(strcmp(r->mbox, record_read_vector.name2) == 0);
+        break;
+      }
+      case HSK_DNS_PTR: {
+        hsk_dns_ptr_rd_t *r = (hsk_dns_ptr_rd_t *)rd;
+        assert(strcmp(r->ptr, record_read_vector.name1) == 0);
+        assert(test_record_write(record_read_vector, rd));
+        break;
+      }
+      case HSK_DNS_MX: {
+        hsk_dns_mx_rd_t *r = (hsk_dns_mx_rd_t *)rd;
+        assert(strcmp(r->mx, record_read_vector.name1) == 0);
+        assert(test_record_write(record_read_vector, rd));
+        break;
+      }
+      case HSK_DNS_RP: {
+        hsk_dns_rp_rd_t *r = (hsk_dns_rp_rd_t *)rd;
+        assert(strcmp(r->mbox, record_read_vector.name1) == 0);
+        assert(strcmp(r->txt, record_read_vector.name2) == 0);
+        break;
+      }
+      case HSK_DNS_SRV: {
+        hsk_dns_srv_rd_t *r = (hsk_dns_srv_rd_t *)rd;
+        assert(strcmp(r->target, record_read_vector.name1) == 0);
+        break;
+      }
+      case HSK_DNS_RRSIG: {
+        hsk_dns_rrsig_rd_t *r = (hsk_dns_rrsig_rd_t *)rd;
+        assert(strcmp(r->signer_name, record_read_vector.name1) == 0);
+        break;
+      }
+      case HSK_DNS_NSEC: {
+        hsk_dns_nsec_rd_t *r = (hsk_dns_nsec_rd_t *)rd;
+        assert(strcmp(r->next_domain, record_read_vector.name1) == 0);
+        break;
+      }
+    }
+
+    hsk_dns_rd_free(rd, record_read_vector.type);
+  }
+
+  for (int i = 0; i < ARRAY_SIZE(record_read_vectors_invalid); i++) {
+    record_read_vector_t record_read_vector = record_read_vectors_invalid[i];
+    printf(" TYPE:%d %s\n",record_read_vector.type, record_read_vector.name1);
+
+    // Create a message dump prefixed with query name "rec.test."
+    // for label compression.
+    size_t prefix_len = ARRAY_SIZE(record_read_msg);
+    uint8_t msg[prefix_len + HSK_DNS_MAX_NAME_STRING];
+    memcpy(msg, record_read_msg, prefix_len);
+    memcpy(msg + prefix_len, record_read_vector.data, HSK_DNS_MAX_NAME_STRING);
+    hsk_dns_dmp_t dmp;
+    dmp.msg = msg;
+    dmp.msg_len = prefix_len + HSK_DNS_MAX_NAME_STRING;
+
+    void *rd = hsk_dns_rd_alloc(record_read_vector.type);
+    size_t len = HSK_DNS_MAX_NAME_STRING; // overkill but doesn't matter
+    uint8_t *ptr = (uint8_t *)record_read_vector.data;
+
+    bool success = hsk_dns_rd_read(
+      &ptr,
+      &len,
+      &dmp,
+      rd,
+      record_read_vector.type
+    );
+
+    assert(!success);
+    hsk_dns_rd_free(rd, record_read_vector.type);
+
+    switch(record_read_vector.type) {
+      case HSK_DNS_CNAME: {
+        hsk_dns_cname_rd_t rd_cname;
+        strcpy(rd_cname.target, record_read_vector.name1);
+        assert(!test_record_write(record_read_vector, &rd_cname));
+        break;
+      }
+    }
+  }
+}
+
 /*
  * TEST RUNNER
  */
@@ -148,6 +304,7 @@ main() {
   test_pointer_to_ip();
   test_name_serialize();
   test_name_parse();
+  test_record_read();
 
   printf("ok\n");
 
