@@ -333,7 +333,9 @@ hsk_ns_onrecv(
   // The synth name then resolves to an A/AAAA record that is derived
   // by decoding the name itself (it does not have to be looked up).
   bool should_cache = true;
-  if (strcmp(req->tld, "_synth") == 0 && req->labels <= 2) {
+  if (memcmp(req->tld, "\x06""_synth", 7) == 0
+      && req->labels <= 2
+      && req->name[1] == '_') {
     msg = hsk_dns_msg_alloc();
     should_cache = false;
 
@@ -344,17 +346,23 @@ hsk_ns_onrecv(
     hsk_dns_rrs_t *rrns = &msg->ns;
     hsk_dns_rrs_t *ar = &msg->ar;
 
-    uint8_t ip[16];
-    uint16_t family;
-    char synth[HSK_DNS_MAX_LABEL + 1];
-    hsk_dns_label_from(req->name, -2, synth);
-
+    // TLD '._synth' is being queried on its own, send SOA
+    // so recursive asks again with complete synth record.
     if (req->labels == 1) {
-      hsk_resource_to_empty(req->tld, NULL, 0, rrns);
+      hsk_resource_to_empty(req->name, NULL, 0, rrns);
       hsk_dnssec_sign_zsk(rrns, HSK_DNS_NSEC);
       hsk_resource_root_to_soa(rrns);
       hsk_dnssec_sign_zsk(rrns, HSK_DNS_SOA);
+
+      goto finalize;
     }
+
+    uint8_t ip[16];
+    uint16_t family;
+    uint8_t synth[HSK_DNS_MAX_NAME] = {0};
+    // Will buffer underflow if req->name doesn't
+    // have at least 2 labels.
+    hsk_dns_label_from(req->name, -2, synth);
   
     if (pointer_to_ip(synth, ip, &family)) {
       bool match = false;
@@ -422,6 +430,7 @@ hsk_ns_onrecv(
       }
     }
 
+finalize:
     if (!hsk_dns_msg_finalize(&msg, req, ns->ec, ns->key, &wire, &wire_len)) {
       hsk_ns_log(ns, "could not reply\n");
       goto fail;
@@ -441,14 +450,14 @@ hsk_ns_onrecv(
   // Requesting a lookup.
   if (req->labels > 0) {
     // Check blacklist.
-    if (strcmp(req->tld, "bit") == 0 // Namecoin
-        || strcmp(req->tld, "eth") == 0 // ENS
-        || strcmp(req->tld, "exit") == 0 // Tor
-        || strcmp(req->tld, "gnu") == 0 // GNUnet (GNS)
-        || strcmp(req->tld, "i2p") == 0 // Invisible Internet Project
-        || strcmp(req->tld, "onion") == 0 // Tor
-        || strcmp(req->tld, "tor") == 0 // OnioNS
-        || strcmp(req->tld, "zkey") == 0) { // GNS
+    if (memcmp(req->tld, "\x03""bit", 4) == 0 // Namecoin
+        || memcmp(req->tld, "\x03""eth", 4) == 0 // ENS
+        || memcmp(req->tld, "\x03""exit", 5) == 0 // Tor
+        || memcmp(req->tld, "\x03""gnu", 4) == 0 // GNUnet (GNS)
+        || memcmp(req->tld, "\x03""i2p", 4) == 0 // Invisible Internet Project
+        || memcmp(req->tld, "\x03""onion", 6) == 0 // Tor
+        || memcmp(req->tld, "\x03""tor", 4) == 0 // OnioNS
+        || memcmp(req->tld, "\x03""zkey", 5) == 0) { // GNS
       msg = hsk_resource_to_nx();
     } else {
       req->ns = (void *)ns;
