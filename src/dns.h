@@ -461,7 +461,7 @@ void
 hsk_dns_qs_free(hsk_dns_qs_t *qs);
 
 void
-hsk_dns_qs_set(hsk_dns_qs_t *qs, const char *name, uint16_t type);
+hsk_dns_qs_set(hsk_dns_qs_t *qs, const uint8_t *name, uint16_t type);
 
 int
 hsk_dns_qs_write(const hsk_dns_qs_t *qs, uint8_t **data, hsk_dns_cmp_t *cmp);
@@ -490,7 +490,7 @@ void
 hsk_dns_rr_free(hsk_dns_rr_t *rr);
 
 bool
-hsk_dns_rr_set_name(hsk_dns_rr_t *rr, const char *name);
+hsk_dns_rr_set_name(hsk_dns_rr_t *rr, const uint8_t *name);
 
 int
 hsk_dns_rr_write(const hsk_dns_rr_t *rr, uint8_t **data, hsk_dns_cmp_t *cmp);
@@ -662,17 +662,17 @@ bool
 hsk_dns_name_from_string(const char *namestr, uint8_t *name);
 
 int
-hsk_dns_name_pack(const char *name, uint8_t *data);
+hsk_dns_name_pack(const uint8_t *name, uint8_t *data);
 
 int
-hsk_dns_name_write(const char *name, uint8_t **data, hsk_dns_cmp_t *cmp);
+hsk_dns_name_write(const uint8_t *name, uint8_t **data, hsk_dns_cmp_t *cmp);
 
 bool
 hsk_dns_name_read(
   uint8_t **data,
   size_t *data_len,
   const hsk_dns_dmp_t *dmp,
-  char *name
+  uint8_t *name
 );
 
 int
@@ -782,7 +782,7 @@ bool
 hsk_dns_rrsig_tbs(hsk_dns_rrsig_rd_t *rrsig, uint8_t **data, size_t *data_len);
 
 hsk_dns_rr_t *
-hsk_dns_dnskey_create(const char *zone, const uint8_t *priv, bool ksk);
+hsk_dns_dnskey_create(const uint8_t *name, const uint8_t *priv, bool ksk);
 
 hsk_dns_rr_t *
 hsk_dns_ds_create(const hsk_dns_rr_t *key);
@@ -823,6 +823,6 @@ hsk_dns_rrs_clean(hsk_dns_rrs_t *rrs, uint16_t type);
  */
 
 bool
-hsk_dns_is_subdomain(const char *parent, const char *child);
+hsk_dns_is_subdomain(const uint8_t *parent, const uint8_t *child);
 
 #endif

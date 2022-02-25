@@ -185,7 +185,7 @@ hsk_dns_msg_write(const hsk_dns_msg_t *msg, uint8_t **data) {
   if (enabled) {
     hsk_dns_rr_t rr = { .type = HSK_DNS_OPT };
     hsk_dns_opt_rd_t rd;
-    strcpy(rr.name, ".");
+    rr.name[0] = 0x00; // "."
     rr.ttl = 0;
     rr.ttl |= ((uint32_t)ecode) << 24;
     rr.ttl |= ((uint32_t)msg->edns.version) << 16;
@@ -630,7 +630,7 @@ hsk_dns_qs_init(hsk_dns_qs_t *qs) {
   assert(qs);
 
   memset(qs->name, 0, sizeof(qs->name));
-  strcpy(qs->name, ".");
+  qs->name[0] = 0x00; // "."
   qs->type = HSK_DNS_UNKNOWN;
   qs->class = HSK_DNS_IN;
   qs->ttl = 0;
@@ -657,10 +657,9 @@ hsk_dns_qs_free(hsk_dns_qs_t *qs) {
 }
 
 void
-hsk_dns_qs_set(hsk_dns_qs_t *qs, const char *name, uint16_t type) {
+hsk_dns_qs_set(hsk_dns_qs_t *qs, const uint8_t *name, uint16_t type) {
   assert(qs && name);
-  assert(strlen(name) <= 255);
-  strcpy(qs->name, name);
+  memcpy(qs->name, name, HSK_DNS_MAX_NAME);
   qs->type = type;
 }
 
@@ -701,7 +700,7 @@ hsk_dns_rr_init(hsk_dns_rr_t *rr) {
   assert(rr);
 
   memset(rr->name, 0, sizeof(rr->name));
-  strcpy(rr->name, ".");
+  rr->name[0] = 0x00; // "."
   rr->type = HSK_DNS_UNKNOWN;
   rr->class = HSK_DNS_IN;
   rr->ttl = 0;
@@ -755,10 +754,10 @@ hsk_dns_rr_free(hsk_dns_rr_t *rr) {
 }
 
 bool
-hsk_dns_rr_set_name(hsk_dns_rr_t *rr, const char *name) {
+hsk_dns_rr_set_name(hsk_dns_rr_t *rr, const uint8_t *name) {
   assert(rr);
 
-    strcpy(rr->name, name);
+  memcpy(rr->name, name, HSK_DNS_MAX_NAME);
 
   return true;
 }
@@ -927,8 +926,6 @@ hsk_dns_rd_init(void *rd, uint16_t type) {
       hsk_dns_soa_rd_t *r = (hsk_dns_soa_rd_t *)rd;
       memset(r->ns, 0, sizeof(r->ns));
       memset(r->mbox, 0, sizeof(r->mbox));
-      strcpy(r->ns, ".");
-      strcpy(r->mbox, ".");
       r->serial = 0;
       r->refresh = 0;
       r->retry = 0;
@@ -960,32 +957,27 @@ hsk_dns_rd_init(void *rd, uint16_t type) {
     case HSK_DNS_CNAME: {
       hsk_dns_cname_rd_t *r = (hsk_dns_cname_rd_t *)rd;
       memset(r->target, 0, sizeof(r->target));
-      strcpy(r->target, ".");
       break;
     }
     case HSK_DNS_DNAME: {
       hsk_dns_dname_rd_t *r = (hsk_dns_dname_rd_t *)rd;
       memset(r->target, 0, sizeof(r->target));
-      strcpy(r->target, ".");
       break;
     }
     case HSK_DNS_NS: {
       hsk_dns_ns_rd_t *r = (hsk_dns_ns_rd_t *)rd;
       memset(r->ns, 0, sizeof(r->ns));
-      strcpy(r->ns, ".");
       break;
     }
     case HSK_DNS_MX: {
       hsk_dns_mx_rd_t *r = (hsk_dns_mx_rd_t *)rd;
       r->preference = 0;
       memset(r->mx, 0, sizeof(r->mx));
-      strcpy(r->mx, ".");
       break;
     }
     case HSK_DNS_PTR: {
       hsk_dns_ptr_rd_t *r = (hsk_dns_ptr_rd_t *)rd;
       memset(r->ptr, 0, sizeof(r->ptr));
-      strcpy(r->ptr, ".");
       break;
     }
     case HSK_DNS_SRV: {
@@ -994,7 +986,6 @@ hsk_dns_rd_init(void *rd, uint16_t type) {
       r->weight = 0;
       r->port = 0;
       memset(r->target, 0, sizeof(r->target));
-      strcpy(r->target, ".");
       break;
     }
     case HSK_DNS_TXT: {
@@ -1076,14 +1067,11 @@ hsk_dns_rd_init(void *rd, uint16_t type) {
       hsk_dns_rp_rd_t *r = (hsk_dns_rp_rd_t *)rd;
       memset(r->mbox, 0, sizeof(r->mbox));
       memset(r->txt, 0, sizeof(r->txt));
-      strcpy(r->mbox, ".");
-      strcpy(r->txt, ".");
       break;
     }
     case HSK_DNS_NSEC: {
       hsk_dns_nsec_rd_t *r = (hsk_dns_nsec_rd_t *)rd;
       memset(r->next_domain, 0, sizeof(r->next_domain));
-      strcpy(r->next_domain, ".");
       r->type_map_len = 0;
       r->type_map = NULL;
       break;
@@ -2450,7 +2438,7 @@ hsk_dns_name_from_string(const char *namestr, uint8_t *name) {
 }
 
 int
-hsk_dns_name_pack(const char *name, uint8_t *data) {
+hsk_dns_name_pack(const uint8_t *name, uint8_t *data) {
   int len;
   if (!hsk_dns_name_serialize(name, data, &len, NULL))
     return 0;
@@ -2458,7 +2446,7 @@ hsk_dns_name_pack(const char *name, uint8_t *data) {
 }
 
 int
-hsk_dns_name_write(const char *name, uint8_t **data, hsk_dns_cmp_t *cmp) {
+hsk_dns_name_write(const uint8_t *name, uint8_t **data, hsk_dns_cmp_t *cmp) {
   uint8_t *buf = data ? *data : NULL;
   int len;
 
@@ -2475,7 +2463,7 @@ hsk_dns_name_read(
   uint8_t **data,
   size_t *data_len,
   const hsk_dns_dmp_t *dmp,
-  char *name
+  uint8_t *name
 ) {
   return hsk_dns_name_parse(data, data_len, dmp, name) != -1;
 }
@@ -2751,8 +2739,8 @@ hsk_dns_dnskey_keytag(const hsk_dns_dnskey_rd_t *rd) {
 
 bool
 hsk_dns_rrsig_tbs(hsk_dns_rrsig_rd_t *rrsig, uint8_t **data, size_t *data_len) {
-  char signer_name[HSK_DNS_MAX_NAME + 1];
-  strcpy(signer_name, rrsig->signer_name);
+  uint8_t signer_name[HSK_DNS_MAX_NAME];
+  memcpy(signer_name, rrsig->signer_name, sizeof(rrsig->signer_name));
 
   uint8_t *signature = rrsig->signature;
   size_t signature_len = rrsig->signature_len;
@@ -2763,7 +2751,7 @@ hsk_dns_rrsig_tbs(hsk_dns_rrsig_rd_t *rrsig, uint8_t **data, size_t *data_len) {
 
   bool ret = hsk_dns_rd_encode(rrsig, HSK_DNS_RRSIG, data, data_len);
 
-  strcpy(rrsig->signer_name, signer_name);
+  memcpy(rrsig->signer_name, signer_name, HSK_DNS_MAX_NAME);
   rrsig->signature = signature;
   rrsig->signature_len = signature_len;
 
@@ -2771,7 +2759,7 @@ hsk_dns_rrsig_tbs(hsk_dns_rrsig_rd_t *rrsig, uint8_t **data, size_t *data_len) {
 }
 
 hsk_dns_rr_t *
-hsk_dns_dnskey_create(const char *zone, const uint8_t *priv, bool ksk) {
+hsk_dns_dnskey_create(const uint8_t *name, const uint8_t *priv, bool ksk) {
   hsk_dns_rr_t *key = hsk_dns_rr_create(HSK_DNS_DNSKEY);
 
   if (!key)
@@ -2792,7 +2780,7 @@ hsk_dns_dnskey_create(const char *zone, const uint8_t *priv, bool ksk) {
     return NULL;
   }
 
-  strcpy(key->name, zone);
+  memcpy(key->name, name, HSK_DNS_MAX_NAME);
   hsk_to_lower(key->name);
   key->type = HSK_DNS_DNSKEY;
   key->class = HSK_DNS_IN;
@@ -2835,7 +2823,7 @@ hsk_dns_ds_create(const hsk_dns_rr_t *key) {
     return NULL;
   }
 
-  strcpy(ds->name, key->name);
+  memcpy(ds->name, key->name, HSK_DNS_MAX_NAME);
   hsk_to_lower(ds->name);
   ds->type = HSK_DNS_DS;
   ds->class = key->class;
@@ -2855,7 +2843,7 @@ hsk_dns_ds_create(const hsk_dns_rr_t *key) {
     return NULL;
   }
 
-  uint8_t owner[HSK_DNS_MAX_NAME + 1];
+  uint8_t owner[HSK_DNS_MAX_NAME];
   size_t owner_len = hsk_dns_name_pack(ds->name, owner);
 
   hsk_sha256_ctx ctx;
@@ -2934,14 +2922,14 @@ hsk_dns_sign_rrset(
     return NULL;
   }
 
-  strcpy(sig->name, rrset->items[0]->name);
+  memcpy(sig->name, rrset->items[0]->name, HSK_DNS_MAX_NAME);
   hsk_to_lower(sig->name);
   sig->type = HSK_DNS_RRSIG;
   sig->class = key->class;
   sig->ttl = key->ttl;
 
   rrsig->key_tag = key_tag;
-  strcpy(rrsig->signer_name, key->name);
+  memcpy(rrsig->signer_name, key->name, HSK_DNS_MAX_NAME);
   hsk_to_lower(rrsig->signer_name);
   rrsig->algorithm = dnskey->algorithm;
   rrsig->inception = hsk_now() - (14 * 24 * 60 * 60);
@@ -3191,7 +3179,7 @@ hsk_dns_rrs_clean(hsk_dns_rrs_t *rrs, uint16_t type) {
  */
 
 bool
-hsk_dns_is_subdomain(const char *parent, const char *child) {
+hsk_dns_is_subdomain(const uint8_t *parent, const uint8_t *child) {
   int parent_count = hsk_dns_label_count(parent);
   int child_count = hsk_dns_label_count(child);
 
@@ -3201,10 +3189,10 @@ hsk_dns_is_subdomain(const char *parent, const char *child) {
   uint8_t child_labels[child_count];
   hsk_dns_label_split(child, child_labels, child_count);
 
-  char sub[HSK_DNS_MAX_LABEL + 1];
+  uint8_t sub[HSK_DNS_MAX_NAME] = {0};
   hsk_dns_label_from2(child, child_labels, child_count, parent_count * -1, sub);
 
-  return strcmp(sub, parent) == 0;
+  return hsk_dns_name_cmp(sub, parent) == 0;
 }
 
 static int
