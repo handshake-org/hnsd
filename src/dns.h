@@ -618,24 +618,7 @@ hsk_dns_name_read_size(
 );
 
 bool
-hsk_dns_name_alloc(
-  uint8_t **data,
-  size_t *data_len,
-  const hsk_dns_dmp_t *dmp,
-  char **name
-);
-
-bool
-hsk_dns_name_dirty(const char *name);
-
-void
-hsk_dns_name_sanitize(const char *name, char *out);
-
-bool
 hsk_dns_name_verify(const char *name);
-
-bool
-hsk_dns_name_is_fqdn(const char *name);
 
 int
 hsk_dns_name_cmp(const char *a, const char *b);
@@ -712,30 +695,6 @@ hsk_dns_label_get2(
  */
 int
 hsk_dns_label_get(const char *name, int index, char *ret);
-
-bool
-hsk_dns_label_decode_srv(const char *name, char *protocol, char *service);
-
-bool
-hsk_dns_label_is_srv(const char *name);
-
-bool
-hsk_dns_label_decode_tlsa(const char *name, char *protocol, uint16_t *port);
-
-bool
-hsk_dns_label_is_tlsa(const char *name);
-
-bool
-hsk_dns_label_decode_smimea(const char *name, uint8_t *hash);
-
-bool
-hsk_dns_label_is_smimea(const char *name);
-
-bool
-hsk_dns_label_decode_openpgpkey(const char *name, uint8_t *hash);
-
-bool
-hsk_dns_label_is_openpgpkey(const char *name);
 
 /*
  * DNSSEC

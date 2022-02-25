@@ -24,13 +24,6 @@ static const uint8_t hsk_type_map[] = {
 };
 
 /*
- * Helpers
- */
-
-static void
-to_fqdn(char *name);
-
-/*
  * Resource serialization version 0
  * Record types: read
  */
@@ -514,7 +507,6 @@ hsk_resource_to_ns(
       sprintf(nsname, "_%s._synth.", b32);
     } else {
       // NS and GLUE records have the NS names ready to go.
-      assert(hsk_dns_name_is_fqdn(c->name));
       strcpy(nsname, c->name);
     }
 
@@ -1148,14 +1140,6 @@ hsk_resource_to_notimp(void) {
 /*
  * Helpers
  */
-
-static void
-to_fqdn(char *name) {
-  size_t len = strlen(name);
-  assert(len <= 63);
-  name[len] = '.';
-  name[len + 1] = '\0';
-}
 
 bool
 pointer_to_ip(const char *name, uint8_t *ip, uint16_t *family) {

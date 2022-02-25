@@ -722,16 +722,7 @@ bool
 hsk_dns_rr_set_name(hsk_dns_rr_t *rr, const char *name) {
   assert(rr);
 
-  if (!hsk_dns_name_verify(name))
-    return false;
-
-  if (hsk_dns_name_dirty(name))
-    return false;
-
-  if (hsk_dns_name_is_fqdn(name))
     strcpy(rr->name, name);
-  else
-    sprintf(rr->name, "%s.", name);
 
   return true;
 }
@@ -2379,102 +2370,12 @@ hsk_dns_name_read_size(
 }
 
 bool
-hsk_dns_name_alloc(
-  uint8_t **data,
-  size_t *data_len,
-  const hsk_dns_dmp_t *dmp,
-  char **name
-) {
-  int size = hsk_dns_name_read_size(*data, *data_len, dmp);
-
-  if (size == -1)
     return false;
 
-  char *n = malloc(size + 1);
-
-  if (!n)
-    return false;
-
-  assert(hsk_dns_name_read(data, data_len, dmp, n));
-
-  *name = n;
-
-  return true;
-}
-
-bool
-hsk_dns_name_dirty(const char *name) {
-  char *s = (char *)name;
-
-  while (*s) {
-    uint8_t c = (uint8_t)*s;
-
-    switch (c) {
-      case 0x28 /*(*/:
-      case 0x29 /*)*/:
-      case 0x3b /*;*/:
-      case 0x20 /* */:
-      case 0x40 /*@*/:
-      case 0x22 /*"*/:
-      case 0x5c /*\\*/:
-        return true;
-    }
-
-    if (c < 0x20 || c > 0x7e)
-      return true;
-
-    s += 1;
-  }
-
-  return false;
-}
-
-void
-hsk_dns_name_sanitize(const char *name, char *out) {
-  char *s = (char *)name;
   int off = 0;
 
-  while (*s && off < HSK_DNS_MAX_SANITIZED) {
-    uint8_t c = (uint8_t)*s;
 
-    switch (c) {
-      case 0xfe: {
-        c = 0x2e;
-        ; // fall through
-      }
-      case 0x28 /*(*/:
-      case 0x29 /*)*/:
-      case 0x3b /*;*/:
-      case 0x20 /* */:
-      case 0x40 /*@*/:
-      case 0x22 /*"*/:
-      case 0x5c /*\\*/: {
-        out[off++] = '\\';
-        out[off++] = c;
-        break;
-      }
-      case 0xff: {
-        c = 0x00;
-        ; // fall through
-      }
-      default: {
-        if (c < 0x20 || c > 0x7e) {
-          out[off++] = '\\';
-          out[off++] = (c / 100) + 0x30;
-          out[off++] = (c / 10) + 0x30;
-          out[off++] = (c % 10) + 0x30;
-        } else {
-          out[off++] = c;
-        }
-        break;
-      }
-    }
 
-    s += 1;
-  }
-
-  out[off] = '\0';
-}
 
 bool
 hsk_dns_name_verify(const char *name) {
@@ -2502,16 +2403,6 @@ hsk_dns_name_verify(const char *name) {
 
   return hsk_dns_name_pack(n, NULL) != 0;
 }
-
-bool
-hsk_dns_name_is_fqdn(const char *name) {
-  if (name == NULL)
-    return false;
-
-  size_t len = strlen(name);
-
-  if (len == 0 || name[len - 1] != '.')
-    return false;
 
   return true;
 }
@@ -2705,176 +2596,6 @@ hsk_dns_label_get(const char *name, int index, char *ret) {
   assert(hsk_dns_label_split(name, labels, count) == count);
 
   return hsk_dns_label_get2(name, labels, count, index, ret);
-}
-
-bool
-hsk_dns_label_decode_srv(const char *name, char *protocol, char *service) {
-  int count = hsk_dns_label_count(name);
-
-  if (count < 3)
-    return false;
-
-  uint8_t labels[count];
-
-  assert(hsk_dns_label_split(name, labels, count) == count);
-
-  char label[HSK_DNS_MAX_LABEL + 1];
-  int len;
-
-  len = hsk_dns_label_get2(name, labels, count, 1, label);
-
-  if (len < 2)
-    return false;
-
-  if (label[0] != '_')
-    return false;
-
-  if (protocol) {
-    strcpy(protocol, &label[1]);
-    hsk_to_lower(protocol);
-  }
-
-  len = hsk_dns_label_get2(name, labels, count, 0, label);
-
-  if (len < 2)
-    return false;
-
-  if (label[0] != '_')
-    return false;
-
-  if (service) {
-    strcpy(service, &label[1]);
-    hsk_to_lower(service);
-  }
-
-  return true;
-}
-
-bool
-hsk_dns_label_is_srv(const char *name) {
-  return hsk_dns_label_decode_srv(name, NULL, NULL);
-}
-
-bool
-hsk_dns_label_decode_tlsa(const char *name, char *protocol, uint16_t *port) {
-  int count = hsk_dns_label_count(name);
-
-  if (count < 3)
-    return false;
-
-  uint8_t labels[count];
-
-  assert(hsk_dns_label_split(name, labels, count) == count);
-
-  char label[HSK_DNS_MAX_LABEL + 1];
-  int len;
-
-  len = hsk_dns_label_get2(name, labels, count, 1, label);
-
-  if (len < 2)
-    return false;
-
-  if (label[0] != '_')
-    return false;
-
-  if (protocol) {
-    strcpy(protocol, &label[1]);
-    hsk_to_lower(protocol);
-  }
-
-  len = hsk_dns_label_get2(name, labels, count, 0, label);
-
-  if (len < 2 || len > 6)
-    return false;
-
-  if (label[0] != '_')
-    return false;
-
-  uint32_t word = 0;
-  char *s = &label[1];
-
-  while (*s) {
-    int ch = ((int)*s) - 0x30;
-
-    if (ch < 0 || ch > 9)
-      return false;
-
-    word *= 10;
-    word += ch;
-
-    if (word > 0xffff)
-      return false;
-
-    s += 1;
-  }
-
-  if (port)
-    *port = (uint16_t)word;
-
-  return true;
-}
-
-bool
-hsk_dns_label_is_tlsa(const char *name) {
-  return hsk_dns_label_decode_tlsa(name, NULL, NULL);
-}
-
-static bool
-hsk_dns_label_decode_dane(const char *tag, const char *name, uint8_t *hash) {
-  int count = hsk_dns_label_count(name);
-
-  if (count < 3)
-    return false;
-
-  uint8_t labels[count];
-
-  assert(hsk_dns_label_split(name, labels, count) == count);
-
-  char label[HSK_DNS_MAX_LABEL + 1];
-  int len;
-
-  len = hsk_dns_label_get2(name, labels, count, 1, label);
-
-  if (len < 2)
-    return false;
-
-  if (strcasecmp(label, tag) != 0)
-    return false;
-
-  len = hsk_dns_label_get2(name, labels, count, 0, label);
-
-  if (len != 56)
-    return false;
-
-  if (!hsk_hex_decode(&label[0], hash))
-    return false;
-
-  return true;
-}
-
-static bool
-hsk_dns_label_is_dane(const char *tag, const char *name) {
-  return hsk_dns_label_decode_dane(tag, name, NULL);
-}
-
-bool
-hsk_dns_label_decode_smimea(const char *name, uint8_t *hash) {
-  return hsk_dns_label_decode_dane("_smimecert", name, hash);
-}
-
-bool
-hsk_dns_label_is_smimea(const char *name) {
-  return hsk_dns_label_is_dane("_smimecert", name);
-}
-
-bool
-hsk_dns_label_decode_openpgpkey(const char *name, uint8_t *hash) {
-  return hsk_dns_label_decode_dane("_openpgpkey", name, hash);
-}
-
-bool
-hsk_dns_label_is_openpgpkey(const char *name) {
-  return hsk_dns_label_is_dane("_openpgpkey", name);
 }
 
 /*
