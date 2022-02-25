@@ -2089,87 +2089,96 @@ hsk_dns_name_parse(
   uint8_t **data_,
   size_t *data_len_,
   const hsk_dns_dmp_t *dmp,
-  char *name
+  uint8_t *name
 ) {
+  // Local copies of message read pointers
   uint8_t *data = *data_;
   size_t data_len = *data_len_;
+  // Offset of `data` array being parsed
   int off = 0;
+  // Offset of `name` output array
   int noff = 0;
+  // Message read resume location after name read
   int res = 0;
-  int max = HSK_DNS_MAX_NAME;
+  // Pointer count
   int ptr = 0;
 
   for (;;) {
+    // Can not read past end of input array
     if (off >= data_len)
       return -1;
 
+    // Leading byte (size of label or compression pointer)
     uint8_t c = data[off];
-    off += 1;
 
-    if (c == 0x00)
+    // Only occurs at end of name (zero-length label aka ".")
+    if (c == 0x00) {
+      if (name)
+        name[noff] = 0x00;
+
+      off++;
+      noff++;
       break;
+    }
 
     switch (c & 0xc0) {
+      // Uncompressed label
       case 0x00: {
+        // Label size can not exceed maximum
         if (c > HSK_DNS_MAX_LABEL)
           return -1;
 
+        // Label size can not exceed length of data we are parsing
         if (off + c > data_len)
-          return -1; // EOF
-
-        if (noff + c + 1 > max)
           return -1;
 
-        int j;
-        for (j = off; j < off + c; j++) {
-          uint8_t b = data[j];
+        // Label can not extend full name past maximum including length byte
+        // and resolved compression pointers.
+        if (noff + c + 1 > HSK_DNS_MAX_NAME)
+          return -1;
 
-          // Hack because we're
-          // using c-strings.
-          if (b == 0x00)
-            b = 0xff;
-
-          // This allows for double-dots
-          // too easily in our design.
-          if (b == 0x2e)
-            b = 0xfe;
-
-          if (name)
-            name[noff] = b;
-
-          noff += 1;
-        }
-
+        // Copy uncompressed label to destination
+        // (including the length byte)
         if (name)
-          name[noff] = '.';
+          memcpy(&name[noff], &data[off], c + 1);
 
-        noff += 1;
-        off += c;
-
+        noff += c + 1;
+        off += c + 1;
         break;
       }
 
+      // Compression pointer
       case 0xc0: {
+        // Must have reference data for pointers to work
         if (!dmp)
           return -1;
 
-        if (off >= data_len)
-          return -1;
-
-        uint8_t c1 = data[off];
-
+        // Pointers are last 14 bits after 0xc0, this is the second byte
         off += 1;
+        uint8_t c1 = data[off++];
 
+        // If this is the first pointer, save the "resume"
+        // address so after the pointer is resolved the
+        // rest of the message read continues from here.
+        // There is only one pointer allowed per name but the
+        // data we are pointing *to* may contain another pointer.
         if (ptr == 0)
           res = off;
 
+        // Don't allow more than 10 pointers.
+        // I think this is a bit of a hack to prevent infinite loops.
+        // knot-dns simply requires that pointers always point backwards
+        // in the message stream. We can't do that with this function's
+        // inputs because we don't actually know where `data` appears in `dmp`.
         ptr += 1;
-
         if (ptr > 10)
           return -1;
 
+        // Compute the new read position (in `dmp`)
+        // from the last 14 bits of the pointer
         off = (((int)(c ^ 0xc0)) << 8) | c1;
 
+        // Read from `dmp` instead of `data` to the end of the name
         data = dmp->msg;
         data_len = dmp->msg_len;
 
@@ -2182,21 +2191,15 @@ hsk_dns_name_parse(
     }
   }
 
+  // If no pointers were used, resume from current offset
   if (ptr == 0)
     res = off;
 
-  if (noff == 0) {
-    if (name)
-      name[noff] = '.';
-    noff += 1;
-  }
-
-  if (name)
-    name[noff] = '\0';
-
+  // Move message read pointer in data stream
   *data_ += res;
   *data_len_ -= res;
 
+  // Return length written
   return noff;
 }
 

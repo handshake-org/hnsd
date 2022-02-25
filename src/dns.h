@@ -605,12 +605,22 @@ hsk_dns_txt_alloc(void);
 void
 hsk_dns_txt_free(hsk_dns_txt_t *txt);
 
+/**
+ * Returns: length of uncompressed name
+ * In:      data_:      pointer to the beginning of a compressed wire-formatted
+ *                      name in a DNS message
+ *          data_len_:  pointer to remaining length of data in the `data_`
+ *                      byte array
+ *          dmp:        complete copy of the DNS message for pointer reference
+ * Out:     name:       (optional) the uncompressed name read from `data_`
+ *                      as a byte array, serialized in DNS wire format
+ */
 int
 hsk_dns_name_parse(
   uint8_t **data_,
   size_t *data_len_,
   const hsk_dns_dmp_t *dmp,
-  char *name
+  uint8_t *name
 );
 
 int
