@@ -16,7 +16,7 @@ typedef struct hsk_cache_s {
 } hsk_cache_t;
 
 typedef struct hsk_cache_key_s {
-  uint8_t name[HSK_DNS_MAX_NAME + 1];
+  uint8_t name[HSK_DNS_MAX_NAME];
   size_t name_len;
   uint16_t type;
   bool ref;

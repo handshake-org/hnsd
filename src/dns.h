@@ -6,202 +6,11 @@
 #include <stdlib.h>
 #include "map.h"
 
-typedef struct hsk_dns_rr_s {
-  char name[256];
-  uint16_t type;
-  uint16_t class;
-  uint32_t ttl;
-  void *rd;
-} hsk_dns_rr_t;
-
-typedef hsk_dns_rr_t hsk_dns_qs_t;
-
-typedef struct hsk_dns_rrs_s {
-  size_t size;
-  hsk_dns_rr_t *items[255];
-} hsk_dns_rrs_t;
-
-typedef struct hsk_dns_msg_s {
-  uint16_t id;
-  uint8_t opcode;
-  uint16_t code;
-  uint16_t flags;
-  hsk_dns_rrs_t qd;
-  hsk_dns_rrs_t an;
-  hsk_dns_rrs_t ns;
-  hsk_dns_rrs_t ar;
-  struct {
-    bool enabled;
-    uint8_t version;
-    uint16_t flags;
-    uint16_t size;
-    uint8_t code;
-    size_t rd_len;
-    uint8_t *rd;
-  } edns;
-} hsk_dns_msg_t;
-
-typedef struct hsk_dns_txt_s {
-  uint8_t data_len;
-  uint8_t data[255];
-} hsk_dns_txt_t;
-
-typedef struct hsk_dns_txts_s {
-  size_t size;
-  hsk_dns_txt_t *items[255];
-} hsk_dns_txts_t;
-
-typedef struct {
-  size_t rd_len;
-  uint8_t *rd;
-} hsk_dns_unknown_rd_t;
-
-typedef struct {
-  char ns[256];
-  char mbox[256];
-  uint32_t serial;
-  uint32_t refresh;
-  uint32_t retry;
-  uint32_t expire;
-  uint32_t minttl;
-} hsk_dns_soa_rd_t;
-
-typedef struct {
-  uint8_t addr[4];
-} hsk_dns_a_rd_t;
-
-typedef struct {
-  uint8_t addr[16];
-} hsk_dns_aaaa_rd_t;
-
-typedef struct {
-  uint8_t version;
-  uint8_t size;
-  uint8_t horiz_pre;
-  uint8_t vert_pre;
-  uint32_t latitude;
-  uint32_t longitude;
-  uint32_t altitude;
-} hsk_dns_loc_rd_t;
-
-typedef struct {
-  char target[256];
-} hsk_dns_cname_rd_t;
-
-typedef struct {
-  char target[256];
-} hsk_dns_dname_rd_t;
-
-typedef struct {
-  char ns[256];
-} hsk_dns_ns_rd_t;
-
-typedef struct {
-  uint16_t preference;
-  char mx[256];
-} hsk_dns_mx_rd_t;
-
-typedef struct {
-  char ptr[256];
-} hsk_dns_ptr_rd_t;
-
-typedef struct {
-  uint16_t priority;
-  uint16_t weight;
-  uint16_t port;
-  char target[256];
-} hsk_dns_srv_rd_t;
-
-typedef struct {
-  hsk_dns_txts_t txts;
-} hsk_dns_txt_rd_t;
-
-typedef struct {
-  uint16_t key_tag;
-  uint8_t algorithm;
-  uint8_t digest_type;
-  size_t digest_len;
-  uint8_t *digest;
-} hsk_dns_ds_rd_t;
-
-typedef struct {
-  uint8_t usage;
-  uint8_t selector;
-  uint8_t matching_type;
-  size_t certificate_len;
-  uint8_t *certificate;
-} hsk_dns_tlsa_rd_t;
-
-#define hsk_dns_smimea_rd_t hsk_dns_tlsa_rd_t
-
-typedef struct {
-  uint8_t algorithm;
-  uint8_t digest_type;
-  size_t fingerprint_len;
-  uint8_t *fingerprint;
-} hsk_dns_sshfp_rd_t;
-
-typedef struct {
-  size_t pubkey_len;
-  uint8_t *pubkey;
-} hsk_dns_openpgpkey_rd_t;
-
-typedef struct {
-  size_t rd_len;
-  uint8_t *rd;
-} hsk_dns_opt_rd_t;
-
-typedef struct {
-  uint16_t flags;
-  uint8_t protocol;
-  uint8_t algorithm;
-  size_t pubkey_len;
-  uint8_t *pubkey;
-} hsk_dns_dnskey_rd_t;
-
-typedef struct {
-  uint16_t type_covered;
-  uint8_t algorithm;
-  uint8_t labels;
-  uint32_t orig_ttl;
-  uint32_t expiration;
-  uint32_t inception;
-  uint16_t key_tag;
-  char signer_name[256];
-  size_t signature_len;
-  uint8_t *signature;
-} hsk_dns_rrsig_rd_t;
-
-typedef struct {
-  uint16_t priority;
-  uint16_t weight;
-  uint8_t data_len;
-  uint8_t data[255];
-} hsk_dns_uri_rd_t;
-
-typedef struct {
-  char mbox[256];
-  char txt[256];
-} hsk_dns_rp_rd_t;
-
-typedef struct {
-  char next_domain[256];
-  size_t type_map_len;
-  uint8_t *type_map;
-} hsk_dns_nsec_rd_t;
-
-typedef struct {
-  hsk_map_t map;
-  uint8_t *msg;
-} hsk_dns_cmp_t;
-
-typedef struct {
-  uint8_t *msg;
-  size_t msg_len;
-} hsk_dns_dmp_t;
-
 // Constants
+// HSK_DNS_MAX_NAME includes all length bytes and final 0x00
 #define HSK_DNS_MAX_NAME 255
+// Byte arrays that include a length byte and final 0x00 (".")
+// will need to be size HSK_DNS_MAX_LABEL + 2
 #define HSK_DNS_MAX_LABEL 63
 #define HSK_DNS_MAX_SANITIZED 1009
 #define HSK_DNS_MAX_LABELS 128
@@ -209,6 +18,20 @@ typedef struct {
 #define HSK_DNS_STD_EDNS 1280
 #define HSK_DNS_MAX_EDNS 4096
 #define HSK_DNS_MAX_TCP 65535
+/*
+ * Bytes:     (3 x (0x3f + max label))
+ *          + (1 x (0x3d + remainder label))
+ *          + (0x00)
+ *
+ * String:    (3 x (max label + '.'))
+ *          + (1 x (remainder label + '.'))
+ *          + '\0'
+ *
+ * Each byte takes either 1 or 4 characters (\\DDD if unprintable)
+ *
+ *          = (3 * (63 * 4 + 1)) + ((61 * 4 + 1)) + 1
+ */
+#define HSK_DNS_MAX_NAME_STRING 1005
 
 // Opcodes
 #define HSK_DNS_QUERY 0
@@ -370,6 +193,200 @@ typedef struct {
 #define HSK_DNS_OPT_LOCAL 65001 // Beginning of local/experimental use
 #define HSK_DNS_OPT_LOCALSTART 65001 // Beginning of local/experimental use
 #define HSK_DNS_OPT_LOCALEND 65534 // End of local/experimental use
+
+typedef struct hsk_dns_rr_s {
+  uint8_t name[HSK_DNS_MAX_NAME];
+  uint16_t type;
+  uint16_t class;
+  uint32_t ttl;
+  void *rd;
+} hsk_dns_rr_t;
+
+typedef hsk_dns_rr_t hsk_dns_qs_t;
+
+typedef struct hsk_dns_rrs_s {
+  size_t size;
+  hsk_dns_rr_t *items[255];
+} hsk_dns_rrs_t;
+
+typedef struct hsk_dns_msg_s {
+  uint16_t id;
+  uint8_t opcode;
+  uint16_t code;
+  uint16_t flags;
+  hsk_dns_rrs_t qd;
+  hsk_dns_rrs_t an;
+  hsk_dns_rrs_t ns;
+  hsk_dns_rrs_t ar;
+  struct {
+    bool enabled;
+    uint8_t version;
+    uint16_t flags;
+    uint16_t size;
+    uint8_t code;
+    size_t rd_len;
+    uint8_t *rd;
+  } edns;
+} hsk_dns_msg_t;
+
+typedef struct hsk_dns_txt_s {
+  uint8_t data_len;
+  uint8_t data[255];
+} hsk_dns_txt_t;
+
+typedef struct hsk_dns_txts_s {
+  size_t size;
+  hsk_dns_txt_t *items[255];
+} hsk_dns_txts_t;
+
+typedef struct {
+  size_t rd_len;
+  uint8_t *rd;
+} hsk_dns_unknown_rd_t;
+
+typedef struct {
+  uint8_t ns[HSK_DNS_MAX_NAME];
+  uint8_t mbox[HSK_DNS_MAX_NAME];
+  uint32_t serial;
+  uint32_t refresh;
+  uint32_t retry;
+  uint32_t expire;
+  uint32_t minttl;
+} hsk_dns_soa_rd_t;
+
+typedef struct {
+  uint8_t addr[4];
+} hsk_dns_a_rd_t;
+
+typedef struct {
+  uint8_t addr[16];
+} hsk_dns_aaaa_rd_t;
+
+typedef struct {
+  uint8_t version;
+  uint8_t size;
+  uint8_t horiz_pre;
+  uint8_t vert_pre;
+  uint32_t latitude;
+  uint32_t longitude;
+  uint32_t altitude;
+} hsk_dns_loc_rd_t;
+
+typedef struct {
+  uint8_t target[HSK_DNS_MAX_NAME];
+} hsk_dns_cname_rd_t;
+
+typedef struct {
+  uint8_t target[HSK_DNS_MAX_NAME];
+} hsk_dns_dname_rd_t;
+
+typedef struct {
+  uint8_t ns[HSK_DNS_MAX_NAME];
+} hsk_dns_ns_rd_t;
+
+typedef struct {
+  uint16_t preference;
+  uint8_t mx[HSK_DNS_MAX_NAME];
+} hsk_dns_mx_rd_t;
+
+typedef struct {
+  uint8_t ptr[HSK_DNS_MAX_NAME];
+} hsk_dns_ptr_rd_t;
+
+typedef struct {
+  uint16_t priority;
+  uint16_t weight;
+  uint16_t port;
+  uint8_t target[HSK_DNS_MAX_NAME];
+} hsk_dns_srv_rd_t;
+
+typedef struct {
+  hsk_dns_txts_t txts;
+} hsk_dns_txt_rd_t;
+
+typedef struct {
+  uint16_t key_tag;
+  uint8_t algorithm;
+  uint8_t digest_type;
+  size_t digest_len;
+  uint8_t *digest;
+} hsk_dns_ds_rd_t;
+
+typedef struct {
+  uint8_t usage;
+  uint8_t selector;
+  uint8_t matching_type;
+  size_t certificate_len;
+  uint8_t *certificate;
+} hsk_dns_tlsa_rd_t;
+
+#define hsk_dns_smimea_rd_t hsk_dns_tlsa_rd_t
+
+typedef struct {
+  uint8_t algorithm;
+  uint8_t digest_type;
+  size_t fingerprint_len;
+  uint8_t *fingerprint;
+} hsk_dns_sshfp_rd_t;
+
+typedef struct {
+  size_t pubkey_len;
+  uint8_t *pubkey;
+} hsk_dns_openpgpkey_rd_t;
+
+typedef struct {
+  size_t rd_len;
+  uint8_t *rd;
+} hsk_dns_opt_rd_t;
+
+typedef struct {
+  uint16_t flags;
+  uint8_t protocol;
+  uint8_t algorithm;
+  size_t pubkey_len;
+  uint8_t *pubkey;
+} hsk_dns_dnskey_rd_t;
+
+typedef struct {
+  uint16_t type_covered;
+  uint8_t algorithm;
+  uint8_t labels;
+  uint32_t orig_ttl;
+  uint32_t expiration;
+  uint32_t inception;
+  uint16_t key_tag;
+  uint8_t signer_name[HSK_DNS_MAX_NAME];
+  size_t signature_len;
+  uint8_t *signature;
+} hsk_dns_rrsig_rd_t;
+
+typedef struct {
+  uint16_t priority;
+  uint16_t weight;
+  uint8_t data_len;
+  uint8_t data[255];
+} hsk_dns_uri_rd_t;
+
+typedef struct {
+  uint8_t mbox[HSK_DNS_MAX_NAME];
+  uint8_t txt[HSK_DNS_MAX_NAME];
+} hsk_dns_rp_rd_t;
+
+typedef struct {
+  uint8_t next_domain[HSK_DNS_MAX_NAME];
+  size_t type_map_len;
+  uint8_t *type_map;
+} hsk_dns_nsec_rd_t;
+
+typedef struct {
+  hsk_map_t map;
+  uint8_t *msg;
+} hsk_dns_cmp_t;
+
+typedef struct {
+  uint8_t *msg;
+  size_t msg_len;
+} hsk_dns_dmp_t;
 
 void
 hsk_dns_msg_init(hsk_dns_msg_t *msg);

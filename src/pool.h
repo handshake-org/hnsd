@@ -10,6 +10,7 @@
 #include "addrmgr.h"
 #include "brontide.h"
 #include "chain.h"
+#include "dns.h"
 #include "ec.h"
 #include "header.h"
 #include "map.h"
@@ -33,7 +34,7 @@
  */
 
 typedef void (*hsk_resolve_cb)(
-  const char *name,
+  const uint8_t *tld,
   int status,
   bool exists,
   const uint8_t *data,
@@ -42,7 +43,7 @@ typedef void (*hsk_resolve_cb)(
 );
 
 typedef struct hsk_name_req_s {
-  char name[256];
+  uint8_t tld[HSK_DNS_MAX_LABEL + 2];
   uint8_t hash[32];
   uint8_t root[32];
   hsk_resolve_cb callback;

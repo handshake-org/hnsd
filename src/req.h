@@ -17,7 +17,7 @@ typedef struct {
   // DNS stuff
   uint16_t id;
   size_t labels;
-  char name[HSK_DNS_MAX_NAME + 1];
+  uint8_t name[HSK_DNS_MAX_NAME];
   uint16_t type;
   uint16_t class;
   bool rd;
@@ -27,8 +27,11 @@ typedef struct {
   size_t max_size;
   bool dnssec;
 
+  // For Unbound
+  char namestr[HSK_DNS_MAX_NAME_STRING];
+
   // HSK stuff
-  char tld[HSK_DNS_MAX_LABEL + 1];
+  uint8_t tld[HSK_DNS_MAX_LABEL + 2];
 
   // Who it's from.
   struct sockaddr_storage ss;
