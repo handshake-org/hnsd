@@ -65,7 +65,7 @@ hsk_cache_prune(hsk_cache_t *c) {
 bool
 hsk_cache_insert_data(
   hsk_cache_t *c,
-  const char *name,
+  const uint8_t *name,
   uint16_t type,
   uint8_t *wire,
   size_t wire_len
@@ -142,7 +142,7 @@ hsk_cache_insert(
 bool
 hsk_cache_get_data(
   hsk_cache_t *c,
-  const char *name,
+  const uint8_t *name,
   uint16_t type,
   uint8_t **wire,
   size_t *wire_len
@@ -181,7 +181,9 @@ hsk_cache_get(hsk_cache_t *c, const hsk_dns_req_t *req) {
   if (!hsk_cache_get_data(c, req->name, req->type, &data, &data_len))
     return NULL;
 
-  hsk_cache_log(c, "cache hit for: %s\n", req->name);
+  char namestr[HSK_DNS_MAX_NAME_STRING] = {0};
+  assert(hsk_dns_name_to_string(req->name, namestr));
+  hsk_cache_log(c, "cache hit for: %s\n", namestr);
 
   if (!hsk_dns_msg_decode(data, data_len, &msg)) {
     hsk_cache_log(c, "could not deserialize cached item\n");
@@ -256,7 +258,7 @@ hsk_cache_key_equal(const void *a, const void *b) {
 }
 
 bool
-hsk_cache_key_set(hsk_cache_key_t *ck, const char *name, uint16_t type) {
+hsk_cache_key_set(hsk_cache_key_t *ck, const uint8_t *name, uint16_t type) {
   assert(ck);
 
   int labels = hsk_dns_label_count(name);
@@ -278,8 +280,8 @@ hsk_cache_key_set(hsk_cache_key_t *ck, const char *name, uint16_t type) {
   if (ref)
     labels = 1;
 
-  ck->name_len = hsk_dns_label_from(name, -labels, (char *)ck->name);
-  hsk_to_lower((char *)ck->name);
+  ck->name_len = hsk_dns_label_from(name, -labels, ck->name);
+  hsk_to_lower(ck->name);
   ck->ref = ref;
   ck->type = type;
 
