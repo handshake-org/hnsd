@@ -77,7 +77,7 @@ bool
 hsk_resource_has_ns(const hsk_resource_t *res);
 
 hsk_dns_msg_t *
-hsk_resource_to_dns(const hsk_resource_t *rs, const char *name, uint16_t type);
+hsk_resource_to_dns(const hsk_resource_t *rs, const uint8_t *name, uint16_t type);
 
 hsk_dns_msg_t *
 hsk_resource_root(uint16_t type, const hsk_addr_t *addr);
@@ -96,7 +96,7 @@ hsk_resource_is_ptr(const uint8_t *name);
 
 bool
 hsk_resource_to_empty(
-  const char *name,
+  const uint8_t *name,
   const uint8_t *type_map,
   size_t type_map_len,
   hsk_dns_rrs_t *an
