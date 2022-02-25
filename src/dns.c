@@ -2205,131 +2205,83 @@ hsk_dns_name_parse(
 
 static bool
 hsk_dns_name_serialize(
-  const char *name,
+  const uint8_t *name,
   uint8_t *data,
   int *len,
   hsk_dns_cmp_t *cmp
 ) {
+  // Offset of `name` input array being read
+  int noff = 0;
+  // Offset of `data` array being written
   int off = 0;
-  int pos = -1;
-  int ptr = -1;
-  int begin = 0;
-  size_t data_len = 256;
-  int size;
-  int i;
-  char *s;
 
-  for (s = (char *)name, i = 0; *s; s++, i++) {
-    if (name[i] == '.') {
-      if (i > 0 && name[i - 1] == '.') {
-        *len = off;
-        return false;
-      }
+  for (;;) {
+    uint8_t label = name[noff];
 
-      size = i - begin;
+    // End of name "."
+    if (label == 0x00) {
+      if (data)
+        data[off] = 0x00;
 
-      if (size > HSK_DNS_MAX_LABEL) {
-        *len = off;
-        return false;
-      }
-
-      if (data) {
-        if (off + 1 + size > data_len) {
-          *len = off;
-          return false;
-        }
-        data[off] = size;
-      }
-
-      if (cmp) {
-        char *sub = (char *)&name[begin];
-        if (strcmp(sub, ".") != 0) {
-          size_t p = (size_t)hsk_map_get(&cmp->map, sub);
-          if (p == 0) {
-            size_t o = (size_t)(&data[off] - cmp->msg);
-            if (o < (2 << 13))
-              hsk_map_set(&cmp->map, sub, (void *)o);
-          } else {
-            if (ptr == -1) {
-              ptr = p;
-              pos = off;
-              i += strlen(s);
-              break;
-            }
-          }
-        }
-      }
-
-      off += 1;
-
-      if (data) {
-        int j;
-        for (j = begin; j < i; j++) {
-          char ch = name[j];
-
-          // 0xff -> NUL
-          if (ch == -1)
-            ch = '\0';
-
-          // 0xfe -> .
-          if (ch == -2)
-            ch = '.';
-
-          data[off++] = ch;
-        }
-      } else {
-        off += size;
-      }
-
-      begin = i + 1;
-    }
-  }
-
-  if (i > HSK_DNS_MAX_NAME) {
-    *len = off;
-    return false;
-  }
-
-  if (i == 0 || name[i - 1] != '.') {
-    *len = off;
-    return false;
-  }
-
-  if (i == 1 && name[0] == '.') {
-    *len = off;
-    return true;
-  }
-
-  if (ptr != -1) {
-    off = pos;
-
-    if (data) {
-      if (off + 2 > data_len)
-        return false;
-      ptr ^= 0xc000;
-      data[off] = (ptr >> 8) & 0xff;
-      data[off + 1] = ptr & 0xff;
+      off++;
+      *len = off;
+      return true;
     }
 
-    off += 2;
-    *len = off;
-
-    return true;
-  }
-
-  if (data) {
-    if (off >= data_len) {
+    // Label size can not exceed maximum
+    if (label > HSK_DNS_MAX_LABEL) {
       *len = off;
       return false;
     }
-    data[off] = 0;
+
+    // Label plus size byte can not extend full name past maximum
+    if (label + 1 + noff > HSK_DNS_MAX_NAME) {
+      *len = off;
+      return false;
+    }
+
+    // Label compression
+    if (cmp) {
+      // Check label map for remainder of name
+      size_t p = (size_t)hsk_map_get(&cmp->map, &name[noff]);
+
+      // Add remainder of name to map if it's not there already
+      if (p == 0) {
+        size_t o = (size_t)(&data[off] - cmp->msg);
+
+        if (o < (2 << 13))
+          hsk_map_set(&cmp->map, &name[noff], (void *)o);
+      } else {
+        // If the string was already in the map,
+        // point to it instead of repeating the string.
+        // Ensure enough room for 2-byte pointer, this should only
+        // be an issue if we are pointing to a 1-byte label...!
+        if (2 + noff > HSK_DNS_MAX_NAME) {
+          *len = off;
+          return false;
+        }
+
+        if (data) {
+          // Encode and write pointer
+          p ^= 0xc000;
+          data[off] = (p >> 8) & 0xff;
+          data[off + 1] = p & 0xff;
+        }
+
+        // Done: pointers are always last
+        off += 2;
+        *len = off;
+        return true;
+      }
+    }
+
+    // Compression is off, or the label is new: write it raw
+    if (data)
+      memcpy(&data[off], &name[noff], label + 1);
+
+    off += label + 1;
+    noff += label + 1;
   }
-
-  off += 1;
-
-  *len = off;
-
-  return true;
 }
 
 int

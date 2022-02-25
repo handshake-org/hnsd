@@ -623,6 +623,23 @@ hsk_dns_name_parse(
   uint8_t *name
 );
 
+/**
+ * Returns: boolean (success)
+ * In:      name:  pointer to uncompressed wire-formatted name in a byte array
+ * Out:     data:  (optional) pointer to beginning of destination for compressed
+ *                 name in a DNS message serialized as a byte array
+ *          len:   length of data written (compressed length)
+ *          cmp:   (optional) map of labels and their position in the DNS
+ *                 message for label compression
+ */
+static bool
+hsk_dns_name_serialize(
+  const uint8_t *name,
+  uint8_t *data,
+  int *len,
+  hsk_dns_cmp_t *cmp
+);
+
 int
 hsk_dns_name_pack(const char *name, uint8_t *data);
 
