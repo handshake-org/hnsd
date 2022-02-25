@@ -31,6 +31,7 @@ hsk_dns_req_init(hsk_dns_req_t *req) {
   req->edns = false;
   req->dnssec = false;
   memset(req->tld, 0x00, sizeof(req->tld));
+  memset(req->namestr, 0x00, sizeof(req->namestr));
   memset(&req->ss, 0x00, sizeof(struct sockaddr_storage));
   req->addr = (struct sockaddr *)&req->ss;
 }
@@ -83,11 +84,15 @@ hsk_dns_req_create(
   // Grab the first question.
   hsk_dns_qs_t *qs = msg->qd.items[0];
 
-  // Check for a TLD.
-  hsk_dns_label_get(qs->name, -1, req->tld);
+  // Grab the TLD -- still in DNS wire format
+  uint8_t tld[HSK_DNS_MAX_LABEL + 2] = {0};
+  hsk_dns_label_get(qs->name, -1, tld);
 
   // Lowercase.
-  hsk_to_lower(req->tld);
+  hsk_to_lower(tld);
+
+  // Store the TLD inlcuding the leading length byte
+  memcpy(req->tld, &tld, tld[0] + 1);
 
   // Reference.
   req->ns = NULL;
@@ -95,7 +100,7 @@ hsk_dns_req_create(
   // DNS stuff.
   req->id = msg->id;
   req->labels = hsk_dns_label_count(qs->name);
-  strcpy(req->name, qs->name);
+  memcpy(req->name, qs->name, sizeof(qs->name));
   req->type = qs->type;
   req->class = qs->class;
   req->rd = (msg->flags & HSK_DNS_RD) != 0;
@@ -133,18 +138,22 @@ hsk_dns_req_print(const hsk_dns_req_t *req, const char *prefix) {
   assert(req);
 
   char addr[HSK_MAX_HOST];
-
   assert(hsk_sa_to_string(req->addr, addr, HSK_MAX_HOST, 1));
+
+  char namestr[HSK_DNS_MAX_NAME_STRING] = {0};
+  assert(hsk_dns_name_to_string(req->name, namestr));
+  char tldstr[HSK_DNS_MAX_NAME_STRING] = {0};
+  assert(hsk_dns_name_to_string(req->tld, tldstr));
 
   printf("%squery\n", prefix);
   printf("%s  id=%d\n", prefix, req->id);
   printf("%s  labels=%u\n", prefix, (uint32_t)req->labels);
-  printf("%s  name=%s\n", prefix, req->name);
+  printf("%s  name=%s\n", prefix, namestr);
   printf("%s  type=%d\n", prefix, req->type);
   printf("%s  class=%d\n", prefix, req->class);
   printf("%s  edns=%d\n", prefix, (int)req->edns);
   printf("%s  dnssec=%d\n", prefix, (int)req->dnssec);
-  printf("%s  tld=%s\n", prefix, req->tld);
+  printf("%s  tld=%s\n", prefix, tldstr);
   printf("%s  addr=%s\n", prefix, addr);
 }
 
