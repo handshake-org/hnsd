@@ -2586,76 +2586,77 @@ hsk_dns_name_equal(const void *a, const void *b) {
  */
 
 int
-hsk_dns_label_split(const char *name, uint8_t *labels, size_t size) {
-  char *s = (char *)name;
-  bool dot = true;
-  int count = 0;
-  int i;
-
+hsk_dns_label_split(const uint8_t *name, uint8_t *labels, size_t size) {
   if (!labels)
     size = HSK_DNS_MAX_LABELS;
 
-  for (i = 0; *s && count < size; s++, i++) {
-    if (*s == '.') {
-      dot = true;
-      continue;
-    }
+  int count = 0;
+  int off = 0;
 
-    if (dot) {
-      if (labels)
-        labels[count] = i;
-      count += 1;
-      dot = false;
-      continue;
-    }
+  while (count < size) {
+    uint8_t label = name[off];
+
+    // Final "."
+    if (label == 0)
+      return count;
+
+    if (labels)
+      labels[count] = off;
+
+    count++;
+
+    off += label + 1;
   }
 
+  // We didn't make it to the end of the name
+  // but we hit the `size` limit anyway.
   return count;
 }
 
 int
-hsk_dns_label_count(const char *name) {
+hsk_dns_label_count(const uint8_t *name) {
   return hsk_dns_label_split(name, NULL, 0);
 }
 
 int
 hsk_dns_label_from2(
-  const char *name,
+  const uint8_t *name,
   uint8_t *labels,
   int count,
   int index,
-  char *ret
+  uint8_t *ret
 ) {
   if (index < 0)
     index += count;
 
   if (index >= count) {
-    ret[0] = '\0';
+    ret[0] = 0x00;
     return 0;
   }
 
-  size_t start = (size_t)labels[index];
-  size_t end = strlen(name);
-  size_t len = end - start;
+  int len = 0;
+  for (; index < count; index++) {
+    int start = labels[index];
+    uint8_t label = name[start];
 
-  if (len == 0 || len > HSK_DNS_MAX_NAME) {
-    ret[0] = '\0';
-    return 0;
+    ret[len++] = label;
+    memcpy(&ret[len], &name[start + 1], label);
+    len += label;
   }
 
-  memcpy(ret, &name[start], len);
-
-  ret[len] = '\0';
+  // Reached the final "."
+  assert(index == count);
+  ret[len++] = 0x00;
 
   return len;
 }
 
 int
-hsk_dns_label_from(const char *name, int index, char *ret) {
+hsk_dns_label_from(const uint8_t *name, int index, uint8_t *ret) {
   int count = hsk_dns_label_count(name);
 
   if (count == 0) {
-    ret[0] = '\0';
+    ret[0] = 0x00;
     return 0;
   }
 
@@ -2668,51 +2669,44 @@ hsk_dns_label_from(const char *name, int index, char *ret) {
 
 int
 hsk_dns_label_get2(
-  const char *name,
+  const uint8_t *name,
   uint8_t *labels,
   int count,
   int index,
-  char *ret
+  uint8_t *ret
 ) {
   if (index < 0)
     index += count;
 
   if (index >= count) {
-    ret[0] = '\0';
+    ret[0] = 0x00;
     return 0;
   }
 
-  size_t start = (size_t)labels[index];
-  size_t end;
-
-  if (index + 1 >= count) {
-    end = strlen(name) - 1;
-    if (name[end] != '.')
-      end += 1;
-  } else {
-    end = ((size_t)labels[index + 1]) - 1;
-  }
-
-  size_t len = end - start;
+  uint8_t start = labels[index];
+  uint8_t len = name[start];
 
   if (len == 0 || len > HSK_DNS_MAX_LABEL) {
-    ret[0] = '\0';
+    ret[0] = 0x00;
     return 0;
   }
 
-  memcpy(ret, &name[start], len);
+  // Include leading byte (label length)
+  memcpy(ret, &name[start], len + 1);
 
-  ret[len] = '\0';
+  // Terminate with 0x00 aka final "."
+  ret[len + 1] = 0x00;
 
+  // Return length of label excluding leading and trailing bytes
   return len;
 }
 
 int
-hsk_dns_label_get(const char *name, int index, char *ret) {
+hsk_dns_label_get(const uint8_t *name, int index, uint8_t *ret) {
   int count = hsk_dns_label_count(name);
 
   if (count == 0) {
-    ret[0] = '\0';
+    ret[0] = 0x00;
     return 0;
   }
 

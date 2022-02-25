@@ -696,76 +696,80 @@ hsk_dns_name_equal(const void *a, const void *b);
 
 /**
  * Returns: number of labels found in the name
- * In:      name:   pointer to string containing full domain name
-            size:   max number of labels expected in the name
+ * In:      name:   pointer to byte array containing full domain name
+ *          size:   max number of labels expected in the name
  * Out:     labels: if present, array is filled with offset (in bytes)
  *                  of starting point of each label in name
  */
 int
-hsk_dns_label_split(const char *name, uint8_t *labels, size_t size);
+hsk_dns_label_split(const uint8_t *name, uint8_t *labels, size_t size);
 
 /**
  * Returns: number of labels in the name
- * In:      name:   pointer to string containing full domain name
+ * In:      name:   pointer to byte array containing full domain name
  */
 int
-hsk_dns_label_count(const char *name);
+hsk_dns_label_count(const uint8_t *name);
 
 /**
- * Returns: length of string from requested label through end of name
- * In:      name:   pointer to string containing full domain name
+ * Returns: length of byte array from requested label through end of name
+ *          this includes all length bytes and terminal 0x00 byte.
+ * In:      name:   pointer to byte array containing full domain name
  *          labels: pointer to array of offsets of each label in name
  *          count:  number of labels in the name
  *          index:  index of starting label in name to return
  *                  (-1 = last label, TLD)
- * Out:     ret:    pointer to string to be filled with name from
- *                  specified label through end of name
+ * Out:     ret:    pointer to byte array to be filled with name from
+ *                  specified label through end of name including final 0x00
  */
 int
 hsk_dns_label_from2(
-  const char *name,
+  const uint8_t *name,
   uint8_t *labels,
   int count,
   int index,
-  char *ret
+  uint8_t *ret
 );
 
 /**
- * Returns: length of string from requested label through end of name
- * In:      name:   pointer to string containing full domain name
+ * Returns: length of byte array from requested label through end of name
+ *          this includes all length bytes and terminal 0x00 byte.
+ * In:      name:   pointer to byte array containing full domain name
  *          index:  index of starting label in name to return
  *                  (-1 = last label, TLD)
- * Out:     ret:    pointer to string to be filled with name from
- *                  specified label through end of name
+ * Out:     ret:    pointer to byte array to be filled with name from
+ *                  specified label through end of name including final 0x00
  */
 int
-hsk_dns_label_from(const char *name, int index, char *ret);
+hsk_dns_label_from(const uint8_t *name, int index, uint8_t *ret);
 
 /**
- * Returns: length of requested label
- * In:      name:   pointer to string containing full domain name
+ * Returns: length of requested label (without length byte)
+ * In:      name:   pointer to byte array containing full domain name
  *          labels: pointer to array of offsets of each label in name
  *          count:  number of labels in the name
  *          index:  index of label in name to return (-1 = last label, TLD)
- * Out:     ret:    pointer to string to be filled with requested label
+ * Out:     ret:    pointer to byte array to be filled with requested label
+ *                  with length byte and trailing 0x00 (".")
  */
 int
 hsk_dns_label_get2(
-  const char *name,
+  const uint8_t *name,
   uint8_t *labels,
   int count,
   int index,
-  char *ret
+  uint8_t *ret
 );
 
 /**
- * Returns: length of requested label
- * In:      name:   pointer to string containing full domain name
+ * Returns: length of requested label (without length byte)
+ * In:      name:   pointer to byte array containing full domain name
  *          index:  index of label in name to return (-1 = last label, TLD)
- * Out:     ret:    pointer to string to be filled with requested label
+ * Out:     ret:    pointer to byte array to be filled with requested label
+ *                  with length byte and trailing 0x00 (".")
  */
 int
-hsk_dns_label_get(const char *name, int index, char *ret);
+hsk_dns_label_get(const uint8_t *name, int index, uint8_t *ret);
 
 /*
  * DNSSEC
