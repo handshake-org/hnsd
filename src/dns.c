@@ -27,6 +27,41 @@ static bool
 raw_rr_equal(const hsk_dns_raw_rr_t *a, const hsk_dns_raw_rr_t *b);
 
 /*
+ * Label Map (for compression)
+ */
+
+uint32_t
+hsk_dns_hash_name(const void *key) {
+  uint8_t *s = (uint8_t *)key;
+
+  uint32_t hash = 5381;
+
+  for (;;) {
+    // read label length byte
+    hash = ((hash << 5) + hash) + ((uint32_t)*s);
+
+    // end of name (0-length label aka ".")
+    if (!*s)
+      break;
+
+    // read label
+    for (int i = *s; i > 0; i--) {
+      s++;
+      hash = ((hash << 5) + hash) + ((uint32_t)*s);
+    }
+
+    s++;
+  };
+
+  return hash;
+}
+
+void
+hsk_dns_init_name_map(hsk_map_t *map) {
+  hsk_map_init_map(map, hsk_dns_hash_name, hsk_dns_name_equal, NULL);
+}
+
+/*
  * Message
  */
 
@@ -108,7 +143,7 @@ hsk_dns_msg_write(const hsk_dns_msg_t *msg, uint8_t **data) {
 
   if (data) {
     cmp = &cmp_;
-    hsk_map_init_str_map(&cmp->map, NULL);
+    hsk_dns_init_name_map(&cmp->map);
     cmp->msg = *data;
   }
 
@@ -2363,7 +2398,7 @@ hsk_dns_name_verify(const char *name) {
 }
 
 int
-hsk_dns_name_cmp(const char *a, const char *b) {
+hsk_dns_name_cmp(const uint8_t *a, const uint8_t *b) {
   if (!a && !b)
     return 0;
 
@@ -2373,42 +2408,45 @@ hsk_dns_name_cmp(const char *a, const char *b) {
   if (!b)
     return 1;
 
-  size_t alen = strlen(a);
-  size_t blen = strlen(b);
+  uint8_t off = 0;
 
-  if (alen > 0 && a[alen - 1] == '.')
-    alen -= 1;
+  for (;;) {
+    // compare label length bytes
+    uint8_t labela = a[off];
+    uint8_t labelb = b[off];
 
-  if (blen > 0 && b[blen - 1] == '.')
-    blen -= 1;
-
-  size_t len = alen < blen ? alen : blen;
-
-  int i;
-  for (i = 0; i < len; i++) {
-    uint8_t x = (uint8_t)a[i];
-    uint8_t y = (uint8_t)b[i];
-
-    if (x >= 0x41 && x <= 0x5a)
-      x |= 0x20;
-
-    if (y >= 0x41 && y <= 0x5a)
-      y |= 0x20;
-
-    if (x < y)
+    if (labela < labelb)
       return -1;
 
-    if (x > y)
+    if (labela > labelb)
       return 1;
+
+    if (labela == 0)
+      return 0;
+
+    // labels are equal non-zero length: compare label
+    for (; labela > 0; labela--) {
+      off++;
+
+      if (a[off] > b[off])
+        return 1;
+
+      if (a[off] < b[off])
+        return -1;
+    }
+
+    off++;
   }
 
-  if (alen < blen)
-    return -1;
-
-  if (alen > blen)
-    return 1;
-
   return 0;
+}
+
+bool
+hsk_dns_name_equal(const void *a, const void *b) {
+  uint8_t *x = (uint8_t *)a;
+  uint8_t *y = (uint8_t *)b;
+
+  return hsk_dns_name_cmp(x, y) == 0;
 }
 
 /*

@@ -663,9 +663,11 @@ hsk_dns_name_read_size(
 
 bool
 hsk_dns_name_verify(const char *name);
-
 int
-hsk_dns_name_cmp(const char *a, const char *b);
+hsk_dns_name_cmp(const uint8_t *a, const uint8_t *b);
+
+bool
+hsk_dns_name_equal(const void *a, const void *b);
 
 /**
  * Returns: number of labels found in the name
