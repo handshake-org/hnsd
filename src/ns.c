@@ -54,7 +54,7 @@ hsk_ns_log(hsk_ns_t *ns, const char *fmt, ...);
 
 static void
 after_resolve(
-  const char *name,
+  const uint8_t *tld,
   int status,
   bool exists,
   const uint8_t *data,
@@ -90,10 +90,10 @@ static void
 after_close(uv_handle_t *handle);
 
 static int
-hsk_tld_index(const char *name);
+hsk_tld_index(const uint8_t *tld);
 
 static const uint8_t *
-hsk_icann_lookup(const char *name);
+hsk_icann_lookup(const uint8_t *tld);
 
 /*
  * Root Nameserver
@@ -740,7 +740,7 @@ after_recv(
 
 static void
 after_resolve(
-  const char *name,
+  const uint8_t *tld,
   int status,
   bool exists,
   const uint8_t *data,
@@ -752,22 +752,25 @@ after_resolve(
   hsk_resource_t *res = NULL;
 
   if (status == HSK_SUCCESS) {
+    char namestr[HSK_DNS_MAX_NAME_STRING] = {0};
+    assert(hsk_dns_name_to_string(tld, namestr));
+
     if (!exists || data_len == 0) {
-      const uint8_t *item = hsk_icann_lookup(name);
+      const uint8_t *item = hsk_icann_lookup(tld);
 
       if (item) {
         const uint8_t *raw = &item[2];
         size_t raw_len = (((size_t)item[1]) << 8) | ((size_t)item[0]);
 
         if (!hsk_resource_decode(raw, raw_len, &res)) {
-          hsk_ns_log(ns, "could not decode root resource for: %s\n", name);
+          hsk_ns_log(ns, "could not decode root resource for: %s\n", namestr);
           status = HSK_EFAILURE;
           res = NULL;
         }
       }
     } else {
       if (!hsk_resource_decode(data, data_len, &res)) {
-        hsk_ns_log(ns, "could not decode resource for: %s\n", name);
+        hsk_ns_log(ns, "could not decode resource for: %s\n", namestr);
         status = HSK_EFAILURE;
         res = NULL;
       }
@@ -783,13 +786,13 @@ after_resolve(
 }
 
 static int
-hsk_tld_index(const char *name) {
+hsk_tld_index(const uint8_t *tld) {
   int start = 0;
   int end = HSK_TLD_SIZE - 1;
 
   while (start <= end) {
     int pos = (start + end) >> 1;
-    int cmp = strcasecmp(HSK_TLD_NAMES[pos], name);
+    int cmp = strcmp(HSK_TLD_NAMES[pos], (char *)&tld[1]);
 
     if (cmp == 0)
       return pos;
@@ -804,8 +807,8 @@ hsk_tld_index(const char *name) {
 }
 
 static const uint8_t *
-hsk_icann_lookup(const char *name) {
-  int index = hsk_tld_index(name);
+hsk_icann_lookup(const uint8_t *tld) {
+  int index = hsk_tld_index(tld);
 
   if (index == -1)
     return NULL;
