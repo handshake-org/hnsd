@@ -42,15 +42,15 @@ typedef void (*hsk_resolve_cb)(
   const void *arg
 );
 
-typedef struct hsk_name_req_s {
+typedef struct hsk_tld_req_s {
   uint8_t tld[HSK_DNS_MAX_LABEL + 2];
   uint8_t hash[32];
   uint8_t root[32];
   hsk_resolve_cb callback;
   void *arg;
   int64_t time;
-  struct hsk_name_req_s *next;
-} hsk_name_req_t;
+  struct hsk_tld_req_s *next;
+} hsk_tld_req_t;
 
 typedef struct hsk_peer_s {
   void *pool;
@@ -101,7 +101,7 @@ typedef struct hsk_pool_s {
   hsk_peer_t *tail;
   int size;
   int max_size;
-  hsk_name_req_t *pending;
+  hsk_tld_req_t *pending;
   int pending_count;
   int64_t block_time;
   int64_t getheaders_time;
