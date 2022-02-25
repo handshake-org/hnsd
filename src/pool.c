@@ -502,11 +502,13 @@ hsk_pool_pick_prover(hsk_pool_t *pool, const uint8_t *name_hash) {
 int
 hsk_pool_resolve(
   hsk_pool_t *pool,
-  const char *name,
+  const uint8_t *tld,
   hsk_resolve_cb callback,
   const void *arg
 ) {
-  hsk_pool_log(pool, "sending proof request for: %s.\n", name);
+  char namestr[HSK_DNS_MAX_NAME_STRING] = {0};
+  assert(hsk_dns_name_to_string(tld, namestr));
+  hsk_pool_log(pool, "sending proof request for: %s\n", namestr);
 
   if (!hsk_chain_synced(&pool->chain)) {
     hsk_pool_log(pool, "cannot send proof request: chain not synced.\n");
@@ -519,7 +521,8 @@ hsk_pool_resolve(
   if (!req)
     return HSK_ENOMEM;
 
-  strcpy(req->name, name);
+  // Copy length byte, label bytes, and terminal 0x00 (".")
+  memcpy(req->tld, tld, tld[0] + 2);
 
   hsk_hash_tld(tld, req->hash);
 
@@ -549,13 +552,13 @@ hsk_pool_resolve(
   }
 
   if (head) {
-    hsk_peer_log(peer, "already requesting proof for: %s.\n", name);
+    hsk_peer_log(peer, "already requesting proof for: %s\n", namestr);
     req->next = head;
     req->time = head->time;
     return HSK_SUCCESS;
   }
 
-  hsk_peer_log(peer, "sending proof request for: %s.\n", name);
+  hsk_peer_log(peer, "sending proof request for: %s\n", namestr);
 
   return hsk_peer_send_getproof(peer, req->hash, root);
 }
@@ -1530,7 +1533,9 @@ hsk_peer_handle_proof(hsk_peer_t *peer, const hsk_proof_msg_t *msg) {
     return HSK_EBADARGS;
   }
 
-  hsk_peer_log(peer, "received proof for: %s\n", reqs->name);
+  char namestr[HSK_DNS_MAX_NAME_STRING] = {0};
+  assert(hsk_dns_name_to_string(reqs->tld, namestr));
+  hsk_peer_log(peer, "received proof for: %s\n", namestr);
 
   if (memcmp(msg->root, reqs->root, 32) != 0) {
     hsk_peer_log(peer, "proof hash mismatch (why?)\n");

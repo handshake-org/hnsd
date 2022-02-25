@@ -148,7 +148,7 @@ hsk_pool_destroy(hsk_pool_t *pool);
 int
 hsk_pool_resolve(
   hsk_pool_t *pool,
-  const char *name,
+  const uint8_t *tld,
   hsk_resolve_cb callback,
   const void *arg
 );
