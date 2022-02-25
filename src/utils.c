@@ -215,15 +215,23 @@ hsk_hex_decode(const char *str, uint8_t *data) {
 }
 
 void
-hsk_to_lower(char *name) {
+hsk_to_lower(uint8_t *name) {
   assert(name);
 
-  char *s = name;
+  uint8_t off = 0;
 
-  while (*s) {
-    if (*s >= 'A' && *s <= 'Z')
-      *s += ' ';
-    s += 1;
+  for (;;) {
+    uint8_t label = name[off++];
+
+    if (label == 0x00)
+      return;
+
+    for (; label > 0; label--) {
+      if (name[off] >= 'A' && name[off] <= 'Z')
+        name[off] += ' ';
+
+      off++;
+    }
   }
 }
 
