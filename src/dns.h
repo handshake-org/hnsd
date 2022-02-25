@@ -640,6 +640,27 @@ hsk_dns_name_serialize(
   hsk_dns_cmp_t *cmp
 );
 
+/**
+ * Returns: boolean (success)
+ * In:      name:  pointer to uncompressed wire-formatted name in a byte array.
+ *                 This function does NO CHECKS. Input must be valid length,
+ *                 all lower-case, etc.
+ * Out:  namestr:  pointer to destination string for domain name in presentation
+ *                 format (printable characters with dots and ending in \0).
+ */
+bool
+hsk_dns_name_to_string(const uint8_t *name, char *namestr);
+
+/**
+ * Returns: boolean (success)
+ * In:   namestr:  pointer to source string for domain name in presentation
+ *                 format (printable characters with dots and ending in \0).
+ * Out:     name:  pointer to destination byte array for domain name in
+ *                 uncompressed wire format.
+ */
+bool
+hsk_dns_name_from_string(const char *namestr, uint8_t *name);
+
 int
 hsk_dns_name_pack(const char *name, uint8_t *data);
 

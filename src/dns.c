@@ -7,6 +7,7 @@
 #include <strings.h>
 #include <stdint.h>
 #include <stdbool.h>
+#include <ctype.h>
 
 #include "bio.h"
 #include "dns.h"
@@ -2317,6 +2318,135 @@ hsk_dns_name_serialize(
     off += label + 1;
     noff += label + 1;
   }
+}
+
+bool
+hsk_dns_name_to_string(const uint8_t *name, char *namestr) {
+  // Offset of `name` array being read
+  int off = 0;
+  // Offset of output `namestr` string being written
+  int noff = 0;
+
+  for (;;) {
+    uint8_t label = name[off];
+
+    if (label == 0x00) {
+      if (noff == 0) {
+        // Only one label and it's root
+        namestr[noff++] = '.';
+        namestr[noff] = '\0';
+      } else {
+        namestr[noff] = '\0';
+      }
+      return true;
+    }
+
+    for (; label > 0; label--) {
+      off++;
+      uint8_t c = name[off];
+
+      switch (c) {
+        // Escape special characters
+        case 0x2e /*.*/:
+        case 0x28 /*(*/:
+        case 0x29 /*)*/:
+        case 0x3b /*;*/:
+        case 0x20 /* */:
+        case 0x40 /*@*/:
+        case 0x22 /*"*/:
+        case 0x5c /*\\*/:
+          sprintf(&namestr[noff], "\\%c", (char)c);
+          noff += 2;
+          continue;
+        default:
+          // Write escaped, three-digit byte code
+          if (c < 0x20 || c > 0x7e) {
+            sprintf(&namestr[noff], "\\%03d", c);
+            noff += 4;
+            continue;
+          }
+      }
+
+      // Boring, printable character
+      namestr[noff++] = c;
+    }
+
+    // End of label
+    namestr[noff++] = '.';
+    off++;
+  }
+}
+
+bool
+hsk_dns_name_from_string(const char *namestr, uint8_t *name) {
+  // Offset of `name` array being written
+  int off = 0;
+  // Write each label to a buffer to determine length before writing
+  uint8_t label = 0;
+  uint8_t buffer[HSK_DNS_MAX_LABEL] = {0};
+
+  for (char *s = (char *)namestr; *s; s++) {
+    // End of label reached, flush buffer to output
+    if (*s == '.') {
+      if (off + label + 1 > HSK_DNS_MAX_NAME)
+        return false;
+
+      name[off++] = label;
+      memcpy(&name[off], &buffer, label);
+      off += label;
+
+      // reset
+      memset(&buffer, 0x00, sizeof(buffer));
+      label = 0;
+      continue;
+    }
+
+    // Escaped character
+    if (*s == '\\') {
+      // Check if next three characters represent a byte < 255
+      if (strlen(s) > 3
+          && isdigit(*(s + 1))
+          && isdigit(*(s + 2))
+          && isdigit(*(s + 3))) {
+        uint16_t value = 0;
+        value += (*(s + 1) - 0x30) * 100;
+        value += (*(s + 2) - 0x30) * 10;
+        value += (*(s + 3) - 0x30);
+
+        // Bad escape, byte code out of range.
+        if (value > 0xff)
+          return false;
+
+        if (label + 1 > HSK_DNS_MAX_LABEL)
+          return false;
+
+        // Write encoded byte to buffer, increment length and advance pointer
+        buffer[label++] = value;
+        s += 3;
+      } else {
+        // No next character
+        if (strlen(s) < 2)
+          return false;
+
+        if (label + 1 > HSK_DNS_MAX_LABEL)
+          return false;
+
+        // Only a single character has been escaped, write it and advance
+        s++;
+        buffer[label++] = *s;
+      }
+
+      continue;
+    }
+
+    // Boring, printable character
+    if (label + 1 > HSK_DNS_MAX_LABEL)
+      return false;
+
+    buffer[label++] = *s;
+  }
+
+  return true;
 }
 
 int
