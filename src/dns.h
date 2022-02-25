@@ -682,8 +682,12 @@ hsk_dns_name_read_size(
   const hsk_dns_dmp_t *dmp
 );
 
+/**
+ * Verify a single label (TLD) follows Handshake protocol rules
+ */
 bool
-hsk_dns_name_verify(const char *name);
+hsk_dns_name_verify(const uint8_t *name);
+
 int
 hsk_dns_name_cmp(const uint8_t *a, const uint8_t *b);
 

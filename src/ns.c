@@ -434,6 +434,10 @@ hsk_ns_onrecv(
     goto done;
   }
 
+  // TLD must pass HNS rules, if not root or synth
+  if (req->tld[0] != 0x00 && !hsk_dns_name_verify(req->tld))
+    goto fail;
+
   // Requesting a lookup.
   if (req->labels > 0) {
     // Check blacklist.

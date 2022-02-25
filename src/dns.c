@@ -2490,39 +2490,41 @@ hsk_dns_name_read_size(
 }
 
 bool
-    return false;
-
-  int off = 0;
-
-
-
-
-bool
-hsk_dns_name_verify(const char *name) {
+hsk_dns_name_verify(const uint8_t *name) {
   if (name == NULL)
     return false;
 
-  char *n = (char *)name;
-  size_t len = strlen(n);
-  char buf[HSK_DNS_MAX_NAME + 1];
+  int off = 0;
+  uint8_t label = name[off++];
 
-  if (len == 0 || n[len - 1] != '.') {
-    if (len + 1 > HSK_DNS_MAX_NAME)
-      return false;
-
-    memcpy(&buf[0], n, len);
-    n = &buf[0];
-    n[len + 0] = '.';
-    n[len + 1] = '\0';
-
-    len += 1;
-  }
-
-  if (len > HSK_DNS_MAX_NAME)
+  if (label == 0)
     return false;
 
-  return hsk_dns_name_pack(n, NULL) != 0;
-}
+  if (label > HSK_DNS_MAX_LABEL)
+    return false;
+
+  // One label only, must be followed by final "."
+  if (name[label + 1] != 0)
+    return false;
+
+  // First and last char can not be - or _
+  if (name[off] == '-' ||
+      name[off] == '_' ||
+      name[label] == '-' ||
+      name[label] == '_')
+    return false;
+
+  for (; off <= label; off++) {
+    uint8_t c = name[off];
+
+    if (!((c >= 0x30 && c <= 0x39)        // 0-9
+          || (c >= 0x61 && c <= 0x7a)     // a-z
+          || c == 0x2d                    // -
+          || c == 0x5f))                  // _
+      return false;
+  }
+
+  // hsd would check against a blacklist here, skip for now
 
   return true;
 }
