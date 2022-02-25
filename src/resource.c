@@ -466,6 +466,15 @@ hsk_resource_has_ns(const hsk_resource_t *res) {
   return false;
 }
 
+void
+hsk_resource_write_synth(char *b32, uint8_t *name) {
+  int len = strlen(b32);
+  name[0] = len + 1;                          // first label length byte
+  sprintf((char *)&name[1], "_%s", b32);      // base32-encoded IP data
+  name[len + 2] = strlen("_synth");           // second label (TLD) length byte
+  sprintf((char *)&name[len + 3], "_synth");  // pseudo-TLD, followed by 0x00
+}
+
 static bool
 hsk_resource_to_ns(
   const hsk_resource_t *res,
@@ -492,24 +501,6 @@ hsk_resource_to_ns(
         continue;
     }
 
-    if (synth) {
-      // SYNTH records only actually contain an IP address
-      // for the adiditonal section. The NS name must
-      // be computed on the fly by encoding the IP into base32.
-      char b32[29];
-
-      if (c->type == HSK_SYNTH4)
-        hsk_base32_encode_hex(c->inet4, 4, b32, false);
-      else
-        hsk_base32_encode_hex(c->inet6, 16, b32, false);
-
-      // Magic pseudo-TLD can also be directly resolved by hnsd
-      sprintf(nsname, "_%s._synth.", b32);
-    } else {
-      // NS and GLUE records have the NS names ready to go.
-      strcpy(nsname, c->name);
-    }
-
     hsk_dns_rr_t *rr = hsk_dns_rr_create(HSK_DNS_NS);
 
     if (!rr)
@@ -519,7 +510,23 @@ hsk_resource_to_ns(
     rr->ttl = res->ttl;
 
     hsk_dns_ns_rd_t *rd = rr->rd;
-    strcpy(rd->ns, nsname);
+
+    if (synth) {
+      // SYNTH records only actually contain an IP address
+      // for the adiditonal section. The NS name must
+      // be computed on the fly by encoding the IP into base32.
+      char b32[29];
+      if (c->type == HSK_SYNTH4)
+        hsk_base32_encode_hex(c->inet4, 4, b32, false);
+      else
+        hsk_base32_encode_hex(c->inet6, 16, b32, false);
+
+      // Magic pseudo-TLD can also be directly resolved by hnsd
+      hsk_resource_write_synth(b32, rd->ns);
+    } else {
+      // NS and GLUE records have the NS names ready to go.
+      strcpy(nsname, c->name);
+    }
 
     hsk_dns_rrs_push(an, rr);
   }
@@ -663,7 +670,7 @@ hsk_resource_to_glue(
         // which should be fine because the name is being derived, not received.
         char b32[29];
         hsk_base32_encode_hex(c->inet4, 4, b32, false);
-        sprintf(rr->name, "_%s._synth.", b32);
+        hsk_resource_write_synth(b32, rr->name);
 
         rr->ttl = res->ttl;
 
@@ -699,7 +706,7 @@ hsk_resource_to_glue(
 
         char b32[29];
         hsk_base32_encode_hex(c->inet6, 16, b32, false);
-        sprintf(rr->name, "_%s._synth.", b32);
+        hsk_resource_write_synth(b32, rr->name);
 
         rr->ttl = res->ttl;
 
@@ -1142,14 +1149,23 @@ hsk_resource_to_notimp(void) {
  */
 
 bool
-pointer_to_ip(const char *name, uint8_t *ip, uint16_t *family) {
-  char label[HSK_DNS_MAX_LABEL + 1];
-  size_t len = hsk_dns_label_get(name, 0, label);
+pointer_to_ip(const uint8_t *name, uint8_t *ip, uint16_t *family) {
+  uint8_t label[HSK_DNS_MAX_LABEL + 2] = {0};
+  int len = hsk_dns_label_get(name, 0, label);
 
-  if (len < 2 || len > 29 || label[0] != '_')
+  // label is currently a wire-format serialized byte array,
+  // including the leading length byte.
+  if (len < 2 || len > 29 || label[1] != '_')
     return false;
 
-  int j = hsk_base32_decode_hex(&label[1], ip, false);
+  // We can cast label to a string for the base32 function
+  // safely because it's shorter than max length and shouldn't
+  // contain a 0x00 mid-label.
+  // We add the 0x00 to the end so that str functions will work.
+  label[len + 1] = 0x00;
+
+  // label[0] is length, label[1] is '_', base32 starts at label[2]
+  int j = hsk_base32_decode_hex((char *)&label[2], ip, false);
   assert(j);
 
   if (j == 4) {
@@ -1166,6 +1182,6 @@ pointer_to_ip(const char *name, uint8_t *ip, uint16_t *family) {
 }
 
 bool
-hsk_resource_is_ptr(const char *name) {
+hsk_resource_is_ptr(const uint8_t *name) {
   return pointer_to_ip(name, NULL, NULL);
 }

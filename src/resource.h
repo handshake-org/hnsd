@@ -92,7 +92,7 @@ hsk_dns_msg_t *
 hsk_resource_to_notimp(void);
 
 bool
-hsk_resource_is_ptr(const char *name);
+hsk_resource_is_ptr(const uint8_t *name);
 
 bool
 hsk_resource_to_empty(
@@ -112,5 +112,5 @@ bool
 b32_to_ip(const char *str, uint8_t *ip, uint16_t *family);
 
 bool
-pointer_to_ip(const char *name, uint8_t *ip, uint16_t *family);
+pointer_to_ip(const uint8_t *name, uint8_t *ip, uint16_t *family);
 #endif
