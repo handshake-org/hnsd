@@ -1374,7 +1374,8 @@ hsk_dns_rd_write(
     case HSK_DNS_DNAME: {
       hsk_dns_dname_rd_t *r = (hsk_dns_dname_rd_t *)rd;
 
-      size += hsk_dns_name_write(r->target, data, cmp);
+      // no label compression
+      size += hsk_dns_name_write(r->target, data, NULL);
 
       break;
     }
@@ -1406,7 +1407,8 @@ hsk_dns_rd_write(
       size += write_u16be(data, r->priority);
       size += write_u16be(data, r->weight);
       size += write_u16be(data, r->port);
-      size += hsk_dns_name_write(r->target, data, cmp);
+      // no label compression
+      size += hsk_dns_name_write(r->target, data, NULL);
 
       break;
     }
@@ -1487,7 +1489,8 @@ hsk_dns_rd_write(
       size += write_u32be(data, r->expiration);
       size += write_u32be(data, r->inception);
       size += write_u16be(data, r->key_tag);
-      size += hsk_dns_name_write(r->signer_name, data, cmp);
+      // no label compression
+      size += hsk_dns_name_write(r->signer_name, data, NULL);
       size += write_bytes(data, r->signature, r->signature_len);
 
       break;
@@ -1505,15 +1508,17 @@ hsk_dns_rd_write(
     case HSK_DNS_RP: {
       hsk_dns_rp_rd_t *r = (hsk_dns_rp_rd_t *)rd;
 
-      size += hsk_dns_name_write(r->mbox, data, cmp);
-      size += hsk_dns_name_write(r->txt, data, cmp);
+      // no label compression
+      size += hsk_dns_name_write(r->mbox, data, NULL);
+      size += hsk_dns_name_write(r->txt, data, NULL);
 
       break;
     }
     case HSK_DNS_NSEC: {
       hsk_dns_nsec_rd_t *r = (hsk_dns_nsec_rd_t *)rd;
 
-      size += hsk_dns_name_write(r->next_domain, data, cmp);
+      // no label compression
+      size += hsk_dns_name_write(r->next_domain, data, NULL);
       size += write_bytes(data, r->type_map, r->type_map_len);
 
       break;

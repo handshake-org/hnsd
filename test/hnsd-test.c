@@ -255,7 +255,6 @@ test_hsk_dns_msg_write(){
       case HSK_DNS_SRV:
       case HSK_DNS_RRSIG:
       case HSK_DNS_NSEC:
-      case HSK_DNS_RP:
         // Only testing simple records with just names
         hsk_dns_msg_free(msg);
         continue;
@@ -274,12 +273,12 @@ test_hsk_dns_msg_write(){
         hsk_dns_name_from_string(record_read_vector.name1, ptr->ptr);
         break;
       }
-      // case HSK_DNS_RP: {
-      //   hsk_dns_rp_rd_t *rp = rr->rd;
-      //   hsk_dns_name_from_string(record_read_vector.name1, rp->mbox);
-      //   hsk_dns_name_from_string(record_read_vector.name2, rp->txt);
-      //   break;
-      // }
+      case HSK_DNS_RP: {
+        hsk_dns_rp_rd_t *rp = rr->rd;
+        hsk_dns_name_from_string(record_read_vector.name1, rp->mbox);
+        hsk_dns_name_from_string(record_read_vector.name2, rp->txt);
+        break;
+      }
     }
 
     printf("   TYPE:%02d %s\n",record_read_vector.type, record_read_vector.name1);
