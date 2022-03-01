@@ -298,7 +298,7 @@ test_hsk_dns_msg_write() {
 
     printf("   TYPE:%02d %s\n",record_read_vector.type, record_read_vector.name1);
 
-    uint8_t actual[total_len];
+    uint8_t actual[1024]; // enough for invalid message
     uint8_t *actual_ = (uint8_t *)&actual;
     int written = hsk_dns_msg_write(msg, &actual_);
 

@@ -404,10 +404,10 @@ hsk_dns_msg_read(uint8_t **data, size_t *data_len, hsk_dns_msg_t *msg) {
     if (!qs)
       goto fail;
 
+    hsk_dns_rrs_push(&msg->qd, qs);
+
     if (!hsk_dns_qs_read(data, data_len, &dmp, qs))
       goto fail;
-
-    hsk_dns_rrs_push(&msg->qd, qs);
   }
 
   for (i = 0; i < ancount; i++) {
@@ -419,10 +419,10 @@ hsk_dns_msg_read(uint8_t **data, size_t *data_len, hsk_dns_msg_t *msg) {
     if (!rr)
       goto fail;
 
+    hsk_dns_rrs_push(&msg->an, rr);
+
     if (!hsk_dns_rr_read(data, data_len, &dmp, rr))
       goto fail;
-
-    hsk_dns_rrs_push(&msg->an, rr);
   }
 
   for (i = 0; i < nscount; i++) {
@@ -434,10 +434,10 @@ hsk_dns_msg_read(uint8_t **data, size_t *data_len, hsk_dns_msg_t *msg) {
     if (!rr)
       goto fail;
 
+    hsk_dns_rrs_push(&msg->ns, rr);
+
     if (!hsk_dns_rr_read(data, data_len, &dmp, rr))
       goto fail;
-
-    hsk_dns_rrs_push(&msg->ns, rr);
   }
 
   for (i = 0; i < arcount; i++) {
@@ -448,6 +448,8 @@ hsk_dns_msg_read(uint8_t **data, size_t *data_len, hsk_dns_msg_t *msg) {
 
     if (!rr)
       goto fail;
+
+    hsk_dns_rrs_push(&msg->ar, rr);
 
     if (!hsk_dns_rr_read(data, data_len, &dmp, rr))
       goto fail;
@@ -467,13 +469,13 @@ hsk_dns_msg_read(uint8_t **data, size_t *data_len, hsk_dns_msg_t *msg) {
       msg->edns.rd = opt->rd;
       msg->code |= msg->edns.code << 4;
 
+      hsk_dns_rr_t *popped = hsk_dns_rrs_pop(&msg->ar);
+      assert(popped == rr);
       free(rr->rd);
       free(rr);
 
       continue;
     }
-
-    hsk_dns_rrs_push(&msg->ar, rr);
   }
 
   return true;
