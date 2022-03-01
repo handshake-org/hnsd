@@ -2142,6 +2142,10 @@ hsk_dns_name_parse(
 
     // Only occurs at end of name (zero-length label aka ".")
     if (c == 0x00) {
+      // Almost made it! Last byte exceeds max.
+      if (noff + 1 > HSK_DNS_MAX_NAME)
+        return -1;
+
       if (name)
         name[noff] = 0x00;
 
@@ -2249,6 +2253,12 @@ hsk_dns_name_serialize(
 
     // End of name "."
     if (label == 0x00) {
+      // Almost made it! Last byte exceeds max
+      if (1 + noff > HSK_DNS_MAX_NAME) {
+        *len = off;
+        return false;
+      }
+
       if (data)
         data[off] = 0x00;
 

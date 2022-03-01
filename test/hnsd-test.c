@@ -115,8 +115,8 @@ void
 test_hsk_dns_msg_read() {
   printf("  test_dns_msg_read\n");
 
-  for (int i = 0; i < ARRAY_SIZE(record_read_vectors_valid); i++) {
-    record_read_vector_t record_read_vector = record_read_vectors_valid[i];
+  for (int i = 0; i < ARRAY_SIZE(record_read_vectors); i++) {
+    record_read_vector_t record_read_vector = record_read_vectors[i];
     printf("   TYPE:%02d %s\n",record_read_vector.type, record_read_vector.name1);
 
     // Build DNS message from test vector
@@ -136,7 +136,11 @@ test_hsk_dns_msg_read() {
     // Read
     hsk_dns_msg_t *msg = hsk_dns_msg_alloc();
     data_ = (uint8_t *)&data;
-    hsk_dns_msg_read(&data_, &total_len, msg);
+    bool success = hsk_dns_msg_read(&data_, &total_len, msg);
+    assert(success == record_read_vector.valid);
+
+    if (!success)
+      goto done;
 
     // Grab first answer
     hsk_dns_rr_t *rr = msg->an.items[0];
@@ -214,15 +218,16 @@ test_hsk_dns_msg_read() {
       }
     }
 
+done:
     hsk_dns_msg_free(msg);
   }
 }
 
 void
-test_hsk_dns_msg_write(){
+test_hsk_dns_msg_write() {
   printf("  test_hsk_dns_msg_write\n");
-  for (int i = 0; i < ARRAY_SIZE(record_read_vectors_valid); i++) {
-    record_read_vector_t record_read_vector = record_read_vectors_valid[i];
+  for (int i = 0; i < ARRAY_SIZE(record_read_vectors); i++) {
+    record_read_vector_t record_read_vector = record_read_vectors[i];
 
     // Build expected DNS message from test vector
     size_t meta_len = 2 + 2 + 4 + 2; // type, class, ttl, rd size
@@ -245,7 +250,13 @@ test_hsk_dns_msg_write(){
     rr->type = record_read_vector.type;
     rr->class = HSK_DNS_IN;
     rr->ttl = 0;
-    rr->rd = hsk_dns_rd_alloc(record_read_vector.type);
+
+    if (record_read_vector.valid) {
+      rr->rd = hsk_dns_rd_alloc(record_read_vector.type);
+    } else {
+      rr->rd = malloc(sizeof(hsk_dns_invalid_cname_rd_t));
+    }
+
     hsk_dns_rrs_push(&msg->an, rr);
 
     // Write names, convert from presentation format
@@ -265,7 +276,11 @@ test_hsk_dns_msg_write(){
       }
       case HSK_DNS_CNAME: {
         hsk_dns_cname_rd_t *cname = rr->rd;
-        hsk_dns_name_from_string(record_read_vector.name1, cname->target);
+        if (record_read_vector.valid) {
+          hsk_dns_name_from_string(record_read_vector.name1, cname->target);
+        } else {
+          memcpy(cname->target, record_read_vector.invalidname, record_read_vector.invalidname_len);
+        }
         break;
       }
       case HSK_DNS_PTR: {
@@ -285,9 +300,15 @@ test_hsk_dns_msg_write(){
 
     uint8_t actual[total_len];
     uint8_t *actual_ = (uint8_t *)&actual;
-    hsk_dns_msg_write(msg, &actual_);
+    int written = hsk_dns_msg_write(msg, &actual_);
 
-    assert(memcmp(&data, &actual, total_len) == 0);
+    if (record_read_vector.valid) {
+      assert(written == total_len);
+      assert(memcmp(&data, &actual, total_len) == 0);
+    } else {
+      assert(written != total_len);
+      assert(memcmp(&data, &actual, total_len) != 0);
+    }
 
     // Also frees rr and rd
     hsk_dns_msg_free(msg);
