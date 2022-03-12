@@ -10,6 +10,7 @@ ACLOCAL=${ACLOCAL:-aclocal}
 AUTOCONF=${AUTOCONF:-autoconf}
 AUTORECONF=${AUTORECONF:-autoreconf}
 AUTOMAKE=${AUTOMAKE:-automake}
+AUTOHEADER=${AUTOHEADER:-autoheader}
 LIBTOOLIZE=${LIBTOOLIZE:-libtoolize}
 
 set -ex
@@ -23,4 +24,5 @@ popd
 "$LIBTOOLIZE" --copy
 "$ACLOCAL" -I m4
 "$AUTOCONF"
+"$AUTOHEADER"
 "$AUTOMAKE" --add-missing --copy
