@@ -16,6 +16,37 @@
 #include "addr.h"
 #include "dns.h"
 
+// A RRSIG NSEC
+static const uint8_t hsk_type_map_a[] = {
+  0x00, 0x06, 0x40, 0x00, 0x00, 0x00, 0x00, 0x03
+};
+
+// AAAA RRSIG NSEC
+static const uint8_t hsk_type_map_aaaa[] = {
+  0x00, 0x06, 0x00, 0x00, 0x00, 0x08, 0x00, 0x03
+};
+
+// NS SOA RRSIG NSEC DNSKEY
+static const uint8_t hsk_type_map_root[] = {
+  0x00, 0x07, 0x22, 0x00, 0x00,
+  0x00, 0x00, 0x03, 0x80
+};
+
+// NS RRSIG NSEC
+static const uint8_t hsk_type_map_ns[] = {
+  0x00, 0x06, 0x20, 0x00, 0x00, 0x00, 0x00, 0x03
+};
+
+// RRSIG NSEC
+static const uint8_t hsk_type_map_empty[] = {
+  0x00, 0x06, 0x00, 0x00, 0x00, 0x00, 0x00, 0x03
+};
+
+// TXT RRSIG NSEC
+static const uint8_t hsk_type_map_txt[] = {
+  0x00, 0x06, 0x00, 0x00, 0x80, 0x00, 0x00, 0x03
+};
+
 // Dummy record placeholder
 typedef struct hsk_record_s {
   uint8_t type;
@@ -83,7 +114,7 @@ hsk_dns_msg_t *
 hsk_resource_root(uint16_t type, const hsk_addr_t *addr);
 
 hsk_dns_msg_t *
-hsk_resource_to_nx(void);
+hsk_resource_to_nx(const char *tld);
 
 hsk_dns_msg_t *
 hsk_resource_to_servfail(void);
@@ -95,8 +126,9 @@ bool
 hsk_resource_is_ptr(const char *name);
 
 bool
-hsk_resource_to_empty(
+hsk_resource_to_nsec(
   const char *name,
+  const char *next,
   const uint8_t *type_map,
   size_t type_map_len,
   hsk_dns_rrs_t *an

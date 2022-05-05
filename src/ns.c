@@ -25,16 +25,6 @@
 #include "uv.h"
 #include "dnssec.h"
 
-// A RRSIG NSEC
-static const uint8_t hsk_type_map_a[] = {
-  0x00, 0x06, 0x40, 0x00, 0x00, 0x00, 0x00, 0x03
-};
-
-// AAAA RRSIG NSEC
-static const uint8_t hsk_type_map_aaaa[] = {
-  0x00, 0x06, 0x00, 0x00, 0x00, 0x80, 0x00, 0x03
-};
-
 /*
  * Types
  */
@@ -333,7 +323,9 @@ hsk_ns_onrecv(
   // The synth name then resolves to an A/AAAA record that is derived
   // by decoding the name itself (it does not have to be looked up).
   bool should_cache = true;
-  if (strcmp(req->tld, "_synth") == 0 && req->labels <= 2) {
+  if (strcmp(req->tld, "_synth") == 0 &&
+      req->labels <= 2 &&
+      req->name[0] == '_') {
     msg = hsk_dns_msg_alloc();
     should_cache = false;
 
@@ -342,7 +334,6 @@ hsk_ns_onrecv(
 
     hsk_dns_rrs_t *an = &msg->an;
     hsk_dns_rrs_t *rrns = &msg->ns;
-    hsk_dns_rrs_t *ar = &msg->ar;
 
     uint8_t ip[16];
     uint16_t family;
@@ -350,10 +341,19 @@ hsk_ns_onrecv(
     hsk_dns_label_from(req->name, -2, synth);
 
     if (req->labels == 1) {
-      hsk_resource_to_empty(req->tld, NULL, 0, rrns);
-      hsk_dnssec_sign_zsk(rrns, HSK_DNS_NSEC);
+      // TLD '._synth' is being queried on its own, send SOA
+      // so recursive asks again with complete synth record.
       hsk_resource_root_to_soa(rrns);
       hsk_dnssec_sign_zsk(rrns, HSK_DNS_SOA);
+      // Empty non-terminal proof:
+      hsk_resource_to_nsec(
+        "_synth.",
+        "\\000._synth.",
+        hsk_type_map_empty,
+        sizeof(hsk_type_map_empty),
+        rrns
+      );
+      hsk_dnssec_sign_zsk(rrns, HSK_DNS_NSEC);
     }
   
     if (pointer_to_ip(synth, ip, &family)) {
@@ -372,19 +372,20 @@ hsk_ns_onrecv(
       }
 
       if (!match) {
-        // Needs SOA.
-        // TODO: Make the reverse pointers TLDs.
-        // Empty proof:
+        char next[HSK_DNS_MAX_NAME] = "\\000.";
+        strcat(next, req->name);
         if (family == HSK_DNS_A) {
-          hsk_resource_to_empty(
+          hsk_resource_to_nsec(
             req->name,
+            next,
             hsk_type_map_a,
             sizeof(hsk_type_map_a),
             rrns
           );
         } else {
-          hsk_resource_to_empty(
+          hsk_resource_to_nsec(
             req->name,
+            next,
             hsk_type_map_aaaa,
             sizeof(hsk_type_map_aaaa),
             rrns
@@ -418,7 +419,7 @@ hsk_ns_onrecv(
 
         hsk_dns_rrs_push(an, rr);
 
-        hsk_dnssec_sign_zsk(ar, rrtype);
+        hsk_dnssec_sign_zsk(an, rrtype);
       }
     }
 
@@ -445,7 +446,7 @@ hsk_ns_onrecv(
         || strcmp(req->tld, "onion") == 0 // Tor
         || strcmp(req->tld, "tor") == 0 // OnioNS
         || strcmp(req->tld, "zkey") == 0) { // GNS
-      msg = hsk_resource_to_nx();
+      msg = hsk_resource_to_nx(req->tld);
     } else {
       req->ns = (void *)ns;
 
@@ -538,9 +539,12 @@ hsk_ns_respond(
     // not possible for SPV nodes since they
     // can't arbitrarily iterate over the tree.
     //
-    // Instead, we give a phony proof, which
-    // makes the root zone look empty.
-    msg = hsk_resource_to_nx();
+    // Instead, we give a minimally covering
+    // NSEC record based on rfc4470
+    // https://tools.ietf.org/html/rfc4470
+
+    // Proving the name doesn't exist
+    msg = hsk_resource_to_nx(req->tld);
 
     if (!msg)
       hsk_ns_log(ns, "could not create nx response (%u)\n", req->id);

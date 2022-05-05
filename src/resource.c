@@ -16,19 +16,18 @@
 #include "resource.h"
 #include "utils.h"
 
-// NS SOA RRSIG NSEC DNSKEY
-// Possibly add A, AAAA, and DS
-static const uint8_t hsk_type_map[] = {
-  0x00, 0x07, 0x22, 0x00, 0x00,
-  0x00, 0x00, 0x03, 0x80
-};
-
 /*
  * Helpers
  */
 
 static void
 to_fqdn(char *name);
+
+static void
+next_name(const char *name, char *next);
+
+static void
+prev_name(const char *name, char *prev);
 
 /*
  * Resource serialization version 0
@@ -757,7 +756,7 @@ hsk_resource_root_to_soa(hsk_dns_rrs_t *an) {
   rd->refresh = 1800;
   rd->retry = 900;
   rd->expire = 604800;
-  rd->minttl = 86400;
+  rd->minttl = HSK_DEFAULT_TTL;
 
   hsk_dns_rrs_push(an, rr);
 
@@ -867,8 +866,9 @@ hsk_resource_root_to_ds(hsk_dns_rrs_t *an) {
 }
 
 bool
-hsk_resource_to_empty(
+hsk_resource_to_nsec(
   const char *name,
+  const char *next,
   const uint8_t *type_map,
   size_t type_map_len,
   hsk_dns_rrs_t *an
@@ -878,13 +878,14 @@ hsk_resource_to_empty(
   if (!rr)
     return false;
 
-  rr->ttl = 86400;
+  rr->ttl = HSK_DEFAULT_TTL;
 
   hsk_dns_rr_set_name(rr, name);
 
   hsk_dns_nsec_rd_t *rd = rr->rd;
 
-  strcpy(rd->next_domain, ".");
+  strcpy(rd->next_domain, next);
+
   rd->type_map = NULL;
   rd->type_map_len = 0;
 
@@ -901,37 +902,6 @@ hsk_resource_to_empty(
     rd->type_map = buf;
     rd->type_map_len = type_map_len;
   }
-
-  hsk_dns_rrs_push(an, rr);
-
-  return true;
-}
-
-static bool
-hsk_resource_root_to_nsec(hsk_dns_rrs_t *an) {
-  hsk_dns_rr_t *rr = hsk_dns_rr_create(HSK_DNS_NSEC);
-
-  if (!rr)
-    return false;
-
-  uint8_t *bitmap = malloc(sizeof(hsk_type_map));
-
-  if (!bitmap) {
-    hsk_dns_rr_free(rr);
-    return false;
-  }
-
-  memcpy(bitmap, &hsk_type_map[0], sizeof(hsk_type_map));
-
-  rr->ttl = 86400;
-
-  hsk_dns_rr_set_name(rr, ".");
-
-  hsk_dns_nsec_rd_t *rd = rr->rd;
-
-  strcpy(rd->next_domain, ".");
-  rd->type_map = bitmap;
-  rd->type_map_len = sizeof(hsk_type_map);
 
   hsk_dns_rrs_push(an, rr);
 
@@ -959,21 +929,59 @@ hsk_resource_to_dns(const hsk_resource_t *rs, const char *name, uint16_t type) {
   hsk_dns_rrs_t *ns = &msg->ns; // authority
   hsk_dns_rrs_t *ar = &msg->ar; // additional
 
+  // Even though the name here is a single label (the TLD)
+  // we use a larger buffer size of 255 (instead of 63)
+  // to allow escaped byte codes like /000
+  char next[HSK_DNS_MAX_NAME];
+  next_name(tld, next);
+
   // Referral.
   if (labels > 1) {
     if (hsk_resource_has_ns(rs)) {
       hsk_resource_to_ns(rs, tld, ns);
       hsk_resource_to_ds(rs, tld, ns);
       hsk_resource_to_glue(rs, tld, ar);
-      if (!hsk_resource_has(rs, HSK_DS))
-        hsk_dnssec_sign_zsk(ns, HSK_DNS_NS);
-      else
+      if (!hsk_resource_has(rs, HSK_DS)) {
+        // Prove there is an NS but no DS and sign NSEC
+        // Root doesn't sign NS for anything other than "."
+        hsk_resource_to_nsec(
+          tld,
+          next,
+          hsk_type_map_ns,
+          sizeof(hsk_type_map_ns),
+          ns
+        );
+        hsk_dnssec_sign_zsk(ns, HSK_DNS_NSEC);
+      } else {
+        // Domain has a DS and an NS
+        // Root only signs the DS
         hsk_dnssec_sign_zsk(ns, HSK_DNS_DS);
+      }
     } else {
-      // Needs SOA.
-      // Empty proof:
-      hsk_resource_to_empty(tld, NULL, 0, ns);
+      // Domain has no NS
+      // We can prove there is a TXT or empty and sign NSEC
+      if (hsk_resource_has(rs, HSK_TEXT)) {
+        hsk_resource_to_nsec(
+          tld,
+          next,
+          hsk_type_map_txt,
+          sizeof(hsk_type_map_txt),
+          ns
+        );
+      } else {
+        hsk_resource_to_nsec(
+          tld,
+          next,
+          hsk_type_map_empty,
+          sizeof(hsk_type_map_empty),
+          ns
+        );
+      }
+
+      msg->flags |= HSK_DNS_AA;
+
       hsk_dnssec_sign_zsk(ns, HSK_DNS_NSEC);
+      // Needs SOA.
       hsk_resource_root_to_soa(ns);
       hsk_dnssec_sign_zsk(ns, HSK_DNS_SOA);
     }
@@ -984,39 +992,72 @@ hsk_resource_to_dns(const hsk_resource_t *rs, const char *name, uint16_t type) {
   // Record types actually on-chain for HNS TLDs.
   switch (type) {
     case HSK_DNS_DS:
+      msg->flags |= HSK_DNS_AA;
       hsk_resource_to_ds(rs, name, an);
       hsk_dnssec_sign_zsk(an, HSK_DNS_DS);
       break;
-    case HSK_DNS_NS:
-      // Includes SYNTH and GLUE records.
-      hsk_resource_to_ns(rs, name, ns);
-      hsk_resource_to_glue(rs, name, ar);
-      hsk_dnssec_sign_zsk(ns, HSK_DNS_NS);
-      break;
     case HSK_DNS_TXT:
-      hsk_resource_to_txt(rs, name, an);
-      hsk_dnssec_sign_zsk(an, HSK_DNS_TXT);
+      if (!hsk_resource_has_ns(rs)) {
+        msg->flags |= HSK_DNS_AA;
+        hsk_resource_to_txt(rs, name, an);
+        hsk_dnssec_sign_zsk(an, HSK_DNS_TXT);
+      }
       break;
   }
 
-  if (an->size > 0)
-    msg->flags |= HSK_DNS_AA;
-
   // Attempt to force a referral if we don't have an answer.
   if (an->size == 0 && ns->size == 0) {
-    if (hsk_resource_has_ns(rs)) {
+    // No referrals for DS or without NS to refer to!
+    if (hsk_resource_has_ns(rs) && type != HSK_DNS_DS) {
       hsk_resource_to_ns(rs, name, ns);
       hsk_resource_to_ds(rs, name, ns);
       hsk_resource_to_glue(rs, name, ar);
-      if (!hsk_resource_has(rs, HSK_DS))
-        hsk_dnssec_sign_zsk(ns, HSK_DNS_NS);
-      else
-        hsk_dnssec_sign_zsk(ns, HSK_DNS_DS);
+      if (!hsk_resource_has(rs, HSK_DS)) {
+          // No DS proof:
+          // This allows unbound to treat the zone as unsigned (and not bogus)
+          hsk_resource_to_nsec(
+            tld,
+            next,
+            hsk_type_map_ns,
+            sizeof(hsk_type_map_ns),
+            ns
+          );
+          hsk_dnssec_sign_zsk(ns, HSK_DNS_NSEC);
+      } else {
+          hsk_dnssec_sign_zsk(ns, HSK_DNS_DS);
+      }
     } else {
-      // Needs SOA.
-      // Empty proof:
-      hsk_resource_to_empty(name, NULL, 0, ns);
+      if (hsk_resource_has_ns(rs)) {
+        // If NS is present, prove it
+        hsk_resource_to_nsec(
+          tld,
+          next,
+          hsk_type_map_ns,
+          sizeof(hsk_type_map_ns),
+          ns
+        );
+      } else if (hsk_resource_has(rs, HSK_TEXT)) {
+        // No NS means we can prove TXT if applicable
+        hsk_resource_to_nsec(
+          tld,
+          next,
+          hsk_type_map_txt,
+          sizeof(hsk_type_map_txt),
+          ns
+        );
+      } else {
+        // Otherwise, we prove there is nothing
+        hsk_resource_to_nsec(
+          tld,
+          next,
+          hsk_type_map_empty,
+          sizeof(hsk_type_map_empty),
+          ns
+        );
+      }
       hsk_dnssec_sign_zsk(ns, HSK_DNS_NSEC);
+      // Needs SOA.
+      msg->flags |= HSK_DNS_AA;
       hsk_resource_root_to_soa(ns);
       hsk_dnssec_sign_zsk(ns, HSK_DNS_SOA);
     }
@@ -1077,14 +1118,15 @@ hsk_resource_root(uint16_t type, const hsk_addr_t *addr) {
       hsk_resource_root_to_dnskey(an);
       hsk_dnssec_sign_ksk(an, HSK_DNS_DNSKEY);
       break;
-    case HSK_DNS_DS:
-      hsk_resource_root_to_ds(an);
-      hsk_dnssec_sign_zsk(an, HSK_DNS_DS);
-      break;
     default:
-      // Empty Proof:
-      // Show all the types that we signed.
-      hsk_resource_root_to_nsec(ns);
+      // Minimally covering NSEC proof:
+      hsk_resource_to_nsec(
+        ".",
+        "\\000.",
+        hsk_type_map_root,
+        sizeof(hsk_type_map_root),
+        ns
+      );
       hsk_dnssec_sign_zsk(ns, HSK_DNS_NSEC);
       hsk_resource_root_to_soa(ns);
       hsk_dnssec_sign_zsk(ns, HSK_DNS_SOA);
@@ -1095,7 +1137,7 @@ hsk_resource_root(uint16_t type, const hsk_addr_t *addr) {
 }
 
 hsk_dns_msg_t *
-hsk_resource_to_nx(void) {
+hsk_resource_to_nx(const char *tld) {
   hsk_dns_msg_t *msg = hsk_dns_msg_alloc();
 
   if (!msg)
@@ -1106,14 +1148,42 @@ hsk_resource_to_nx(void) {
 
   hsk_dns_rrs_t *ns = &msg->ns;
 
-  // NX Proof:
-  // Just make it look like an
-  // empty zone for the NX proof.
-  // It seems to fool unbound without
-  // breaking anything.
-  hsk_resource_root_to_nsec(ns);
-  hsk_resource_root_to_nsec(ns);
+  // Prove the wildcard doesn't exist
+  hsk_resource_to_nsec(
+    "!.",
+    "+.",
+    hsk_type_map_empty,
+    sizeof(hsk_type_map_empty),
+    ns
+  );
+  // Sign RR set with name `!.`
   hsk_dnssec_sign_zsk(ns, HSK_DNS_NSEC);
+
+  // Pop the NSEC and RRSIG out of the RR set...
+  hsk_dns_rr_t *rr1 = hsk_dns_rrs_pop(ns);
+  hsk_dns_rr_t *rr2 = hsk_dns_rrs_pop(ns);
+
+  // Prove the name doesn't exist.
+  // Even though the name here is a single label (the TLD)
+  // we use a larger buffer size of 255 (instead of 63)
+  // to allow escaped byte codes like /000
+  char next[HSK_DNS_MAX_NAME];
+  char prev[HSK_DNS_MAX_NAME];
+  next_name(tld, next);
+  prev_name(tld, prev);
+  hsk_resource_to_nsec(
+    prev,
+    next,
+    hsk_type_map_empty,
+    sizeof(hsk_type_map_empty),
+    ns
+  );
+  // Sign RR set with name `prev`
+  hsk_dnssec_sign_zsk(ns, HSK_DNS_NSEC);
+
+  // ...now push the first two RRs back in
+  hsk_dns_rrs_push(ns, rr2);
+  hsk_dns_rrs_push(ns, rr1);
 
   hsk_resource_root_to_soa(ns);
   hsk_dnssec_sign_zsk(ns, HSK_DNS_SOA);
@@ -1155,6 +1225,36 @@ to_fqdn(char *name) {
   assert(len <= 63);
   name[len] = '.';
   name[len + 1] = '\0';
+}
+
+static void
+next_name(const char *name, char *next) {
+  size_t len = strlen(name);
+  if (name[len - 1] == '.')
+    len--;
+
+  strcpy(next, name);
+
+  if (len < 63) {
+    memcpy(&next[len], "\\000.", 6);
+  } else {
+    next[len - 1]++;
+    memcpy(&next[len], ".", 2);
+  }
+}
+
+static void
+prev_name(const char *name, char *prev) {
+  size_t len = strlen(name);
+  if (name[len - 1] == '.')
+    len--;
+
+  strcpy(prev, name);
+  prev[len - 1]--;
+
+  if (len < 63) {
+    memcpy(&prev[len], "\\255.", 6);
+  }
 }
 
 bool
