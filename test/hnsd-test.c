@@ -60,11 +60,34 @@ test_pointer_to_ip() {
   assert(family6 == HSK_DNS_AAAA);
 }
 
+void
+test_name_dirty() {
+  printf("test_name_dirty\n");
+
+  assert(!hsk_dns_name_dirty("hello"));
+  assert(!hsk_dns_name_dirty("HELLO"));
+  assert(!hsk_dns_name_dirty("heLLo"));
+  assert(!hsk_dns_name_dirty("HeLl0"));
+  assert(!hsk_dns_name_dirty("hel-lo"));
+  assert(!hsk_dns_name_dirty("1"));
+  assert(!hsk_dns_name_dirty("000_000"));
+  assert(!hsk_dns_name_dirty("this-domain-name-has-sixty-three-octets-taking-max-label-length"));
+  assert(hsk_dns_name_dirty("hel!lo"));
+  assert(hsk_dns_name_dirty("-hello"));
+  assert(hsk_dns_name_dirty("hello_"));
+  assert(hsk_dns_name_dirty("1@1"));
+  assert(hsk_dns_name_dirty("x\\000y"));
+  assert(hsk_dns_name_dirty("H&ELLO"));
+  assert(hsk_dns_name_dirty("3 3"));
+  assert(hsk_dns_name_dirty("this-domain-name-has-sixtyfour-octets-exceeding-max-label-length"));
+}
+
 int
 main() {
   printf("Testing hnsd...\n");
   test_base32();
   test_pointer_to_ip();
+  test_name_dirty();
 
   printf("ok\n");
 
