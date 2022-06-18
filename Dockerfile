@@ -4,7 +4,7 @@ COPY . /
 FROM base AS build
 RUN apk add --no-cache \
   build-base \
-  git \
+  bash \
   automake \
   autoconf \
   libtool \
