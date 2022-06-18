@@ -1,7 +1,6 @@
-FROM alpine AS base
+FROM alpine AS build
 COPY . /
 
-FROM base AS build
 RUN apk add --no-cache \
   build-base \
   bash \
@@ -11,7 +10,7 @@ RUN apk add --no-cache \
   unbound-dev
 RUN ./autogen.sh && ./configure && make
 
-FROM base
+FROM alpine
 RUN apk add --no-cache unbound-libs
 COPY --from=build /hnsd /usr/local/bin/hnsd
 
