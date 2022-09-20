@@ -46,6 +46,46 @@ test_base32() {
  */
 
 void
+test_hsk_dns_is_subdomain() {
+  printf("  test_hsk_dns_is_subdomain\n");
+
+  typedef struct {
+    uint8_t parent[HSK_DNS_MAX_NAME];
+    uint8_t child[HSK_DNS_MAX_NAME];
+    bool result;
+  } hsk_dns_is_subdomain_t;
+
+  const hsk_dns_is_subdomain_t tests[] = {
+    {
+      "\x09""handshake""\x03""org""\x00",
+      "\x04""hnsd""\x09""handshake""\x03""org""\x00",
+      true
+    },
+    {
+      "\x04""hnsd""\x09""handshake""\x03""org""\x00",
+      "\x09""handshake""\x03""org""\x00",
+      false
+    },
+    {
+      "\x09""handshake""\x03""org""\x00",
+      "\x09""handshake""\x03""org""\x00",
+      true
+    },
+    {
+      "\x09""handshake""\x03""org""\x00",
+      "\x04""test""\x03""org""\x00",
+      false
+    }
+  };
+
+  for (int i = 0; i < ARRAY_SIZE(tests); i++) {
+    const hsk_dns_is_subdomain_t test = tests[i];
+    bool result = hsk_dns_is_subdomain(test.parent, test.child);
+    assert(result == test.result);
+  }
+}
+
+void
 test_hsk_dns_label_split() {
   printf("  test_hsk_dns_label_split\n");
 
@@ -433,6 +473,7 @@ main() {
   test_base32();
 
   printf(" dns\n");
+  test_hsk_dns_is_subdomain();
   test_hsk_dns_label_split();
   test_hsk_dns_msg_read();
   test_hsk_dns_msg_write();

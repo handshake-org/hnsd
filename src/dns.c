@@ -3200,7 +3200,7 @@ hsk_dns_is_subdomain(const uint8_t *parent, const uint8_t *child) {
   int parent_count = hsk_dns_label_count(parent);
   int child_count = hsk_dns_label_count(child);
 
-  if (parent_count >= child_count)
+  if (parent_count > child_count)
     return false;
 
   uint8_t child_labels[child_count];
