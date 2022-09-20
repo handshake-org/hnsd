@@ -92,11 +92,6 @@ hsk_map_init_hash160_set(hsk_map_t *map) {
 }
 
 void
-hsk_map_init_str_map(hsk_map_t *map, hsk_map_free_func free_func) {
-  hsk_map_init_map(map, hsk_map_hash_str, hsk_map_equal_str, free_func);
-}
-
-void
 hsk_map_init_str_set(hsk_map_t *map) {
   hsk_map_init_set(map, hsk_map_hash_str, hsk_map_equal_str);
 }

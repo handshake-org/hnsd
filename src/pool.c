@@ -661,7 +661,7 @@ hsk_pool_merge_reqs(hsk_pool_t *pool, hsk_map_t *map) {
       next = req->next;
 
       req->callback(
-        (uint8_t *)req->tld,
+        req->tld,
         HSK_ETIMEOUT,
         false,
         NULL,
@@ -696,7 +696,7 @@ hsk_peer_timeout_reqs(hsk_peer_t *peer) {
       next = req->next;
 
       req->callback(
-        (uint8_t *)req->tld,
+        req->tld,
         HSK_ETIMEOUT,
         false,
         NULL,
@@ -1568,7 +1568,7 @@ hsk_peer_handle_proof(hsk_peer_t *peer, const hsk_proof_msg_t *msg) {
     next = req->next;
 
     req->callback(
-      (uint8_t *)req->tld,
+      req->tld,
       HSK_SUCCESS,
       exists,
       data,

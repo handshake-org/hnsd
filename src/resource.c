@@ -468,11 +468,15 @@ hsk_resource_has_ns(const hsk_resource_t *res) {
 
 void
 hsk_resource_write_synth(char *b32, uint8_t *name) {
+  static const uint8_t synth[] = "_synth";
+
   int len = strlen(b32);
-  name[0] = len + 1;                          // first label length byte
-  sprintf((char *)&name[1], "_%s", b32);      // base32-encoded IP data
-  name[len + 2] = strlen("_synth");           // second label (TLD) length byte
-  sprintf((char *)&name[len + 3], "_synth");  // pseudo-TLD, followed by 0x00
+  name[0] = len + 1;                // first label length byte
+  name[1] = '_';
+  memcpy(&name[2], b32, len);       // base32-encoded IP data
+  name[len + 2] = 6;                // second label (TLD) length byte
+  memcpy(&name[len + 3], synth, 6); // pseudo-TLD "_synth"
+  name[len + 3 + 6] = 0x00;         // terminating 0x00
 }
 
 static bool
@@ -524,7 +528,7 @@ hsk_resource_to_ns(
       hsk_resource_write_synth(b32, rd->ns);
     } else {
       // NS and GLUE records have the NS names ready to go.
-      memcpy(rd->ns, c->name, sizeof(c->name));
+      memcpy(rd->ns, c->name, HSK_DNS_MAX_NAME);
     }
 
     hsk_dns_rrs_push(an, rr);

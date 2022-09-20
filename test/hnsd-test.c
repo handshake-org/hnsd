@@ -439,6 +439,17 @@ test_pointer_to_ip() {
     assert(ip6[i] == expected6[i]);
   }
   assert(family6 == HSK_DNS_AAAA);
+
+  // Test the reverse functions, found in hsk_resource_to_ns()
+  char b32[29];
+  uint8_t ns[HSK_DNS_MAX_NAME];
+  hsk_base32_encode_hex(expected4, 4, b32, false);
+  hsk_resource_write_synth(b32, ns);
+  assert(memcmp(str4, ns, sizeof(str4) - 1) == 0);
+
+  hsk_base32_encode_hex(expected6, 16, b32, false);
+  hsk_resource_write_synth(b32, ns);
+  assert(memcmp(str6, ns, sizeof(str6) - 1) == 0);
 }
 
 

@@ -100,7 +100,7 @@ hsk_dns_req_create(
   // DNS stuff.
   req->id = msg->id;
   req->labels = hsk_dns_label_count(qs->name);
-  memcpy(req->name, qs->name, sizeof(qs->name));
+  memcpy(req->name, qs->name, HSK_DNS_MAX_NAME);
   req->type = qs->type;
   req->class = qs->class;
   req->rd = (msg->flags & HSK_DNS_RD) != 0;

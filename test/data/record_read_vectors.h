@@ -270,6 +270,54 @@ static const record_read_vector_t record_read_vectors[] = {
     true
   },
 
+  // just normal name
+  {
+    HSK_DNS_CNAME,
+    "123.",
+    "",
+    "\x03""123\x00",
+    5,
+    true,
+    "\x03""123\x00",
+    5
+  },
+
+  // There's no space left for another label length (e.g. 0x00)
+  {
+    HSK_DNS_CNAME,
+    "123.",
+    "",
+    "\x04""123\x00",
+    5,
+    false,
+    "\x04""123\x00",
+    5
+  },
+
+  // Label length is bigger then the data left after label size.
+  {
+    HSK_DNS_CNAME,
+    "123.",
+    "",
+    "\x05""123\x00",
+    5,
+    false,
+    "\x05""123\x00",
+    5
+  },
+
+  // Label is bigger than the data
+  {
+    HSK_DNS_CNAME,
+    "123.",
+    "",
+    "\x06""123\x00",
+    5,
+    false,
+    "\x06""123\x00",
+    5
+  },
+
   // TODO: Fix the 255-byte limit on URI record tarets
   // {
   //   HSK_DNS_URI,

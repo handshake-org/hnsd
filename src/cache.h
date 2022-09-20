@@ -87,7 +87,7 @@ hsk_cache_key_hash(const void *key);
 bool
 hsk_cache_key_equal(const void *a, const void *b);
 
-bool
+void
 hsk_cache_key_set(hsk_cache_key_t *ck, const uint8_t *name, uint16_t type);
 
 void

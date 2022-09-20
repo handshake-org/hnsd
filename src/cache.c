@@ -75,8 +75,7 @@ hsk_cache_insert_data(
   hsk_cache_key_t ck;
   hsk_cache_key_init(&ck);
 
-  if (!hsk_cache_key_set(&ck, name, type))
-    return false;
+  hsk_cache_key_set(&ck, name, type);
 
   hsk_cache_item_t *cache = hsk_map_get(&c->map, &ck);
 
@@ -152,8 +151,7 @@ hsk_cache_get_data(
   hsk_cache_key_t ck;
   hsk_cache_key_init(&ck);
 
-  if (!hsk_cache_key_set(&ck, name, type))
-    return false;
+  hsk_cache_key_set(&ck, name, type);
 
   hsk_cache_item_t *cache = hsk_map_get(&c->map, &ck);
 
@@ -257,7 +255,7 @@ hsk_cache_key_equal(const void *a, const void *b) {
   return true;
 }
 
-bool
+void
 hsk_cache_key_set(hsk_cache_key_t *ck, const uint8_t *name, uint16_t type) {
   assert(ck);
 
@@ -285,7 +283,7 @@ hsk_cache_key_set(hsk_cache_key_t *ck, const uint8_t *name, uint16_t type) {
   ck->ref = ref;
   ck->type = type;
 
-  return true;
+  return;
 }
 
 void

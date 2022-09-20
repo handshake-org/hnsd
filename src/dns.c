@@ -631,7 +631,7 @@ void
 hsk_dns_qs_init(hsk_dns_qs_t *qs) {
   assert(qs);
 
-  memset(qs->name, 0, sizeof(qs->name));
+  memset(qs->name, 0, HSK_DNS_MAX_NAME);
   qs->name[0] = 0x00; // "."
   qs->type = HSK_DNS_UNKNOWN;
   qs->class = HSK_DNS_IN;
@@ -755,13 +755,13 @@ hsk_dns_rr_free(hsk_dns_rr_t *rr) {
   free(rr);
 }
 
-bool
+void
 hsk_dns_rr_set_name(hsk_dns_rr_t *rr, const uint8_t *name) {
   assert(rr);
 
   memcpy(rr->name, name, HSK_DNS_MAX_NAME);
 
-  return true;
+  return;
 }
 
 int
@@ -2156,20 +2156,21 @@ hsk_dns_name_parse(
       break;
     }
 
-    switch (c & 0xc0) {
+    switch (c & HSK_DNS_POINTER) {
       // Uncompressed label
       case 0x00: {
         // Label size can not exceed maximum
         if (c > HSK_DNS_MAX_LABEL)
           return -1;
 
-        // Label size can not exceed length of data we are parsing
-        if (off + c > data_len)
+        // Label size can not exceed length of data we are parsing,
+        // including length byte and at least one byte for the NEXT label
+        if (off + c + 2 > data_len)
           return -1;
 
-        // Label can not extend full name past maximum including length byte
-        // and resolved compression pointers.
-        if (noff + c + 1 > HSK_DNS_MAX_NAME)
+        // Label can not extend full name past maximum including length byte,
+        // final 0x00 and resolved compression pointers.
+        if (noff + c + 2 > HSK_DNS_MAX_NAME)
           return -1;
 
         // Copy uncompressed label to destination
@@ -2183,7 +2184,7 @@ hsk_dns_name_parse(
       }
 
       // Compression pointer
-      case 0xc0: {
+      case HSK_DNS_POINTER: {
         // Must have reference data for pointers to work
         if (!dmp)
           return -1;
@@ -2211,7 +2212,7 @@ hsk_dns_name_parse(
 
         // Compute the new read position (in `dmp`)
         // from the last 14 bits of the pointer
-        off = (((int)(c ^ 0xc0)) << 8) | c1;
+        off = (((int)(c ^ HSK_DNS_POINTER)) << 8) | c1;
 
         // Read from `dmp` instead of `data` to the end of the name
         data = dmp->msg;
@@ -2256,7 +2257,7 @@ hsk_dns_name_serialize(
     // End of name "."
     if (label == 0x00) {
       // Almost made it! Last byte exceeds max
-      if (1 + noff > HSK_DNS_MAX_NAME) {
+      if (noff + 1 > HSK_DNS_MAX_NAME) {
         *len = off;
         return false;
       }
@@ -2275,8 +2276,8 @@ hsk_dns_name_serialize(
       return false;
     }
 
-    // Label plus size byte can not extend full name past maximum
-    if (label + 1 + noff > HSK_DNS_MAX_NAME) {
+    // Label plus size byte plus final 0x00 can not extend name past maximum
+    if (label + noff + 2  > HSK_DNS_MAX_NAME) {
       *len = off;
       return false;
     }
@@ -2290,21 +2291,21 @@ hsk_dns_name_serialize(
       if (p == 0) {
         size_t o = (size_t)(&data[off] - cmp->msg);
 
-        if (o < (2 << 13))
+        if (o <= HSK_DNS_POINTER_MAX)
           hsk_map_set(&cmp->map, &name[noff], (void *)o);
       } else {
         // If the string was already in the map,
         // point to it instead of repeating the string.
         // Ensure enough room for 2-byte pointer, this should only
         // be an issue if we are pointing to a 1-byte label...!
-        if (2 + noff > HSK_DNS_MAX_NAME) {
+        if (noff + 2 > HSK_DNS_MAX_NAME) {
           *len = off;
           return false;
         }
 
         if (data) {
           // Encode and write pointer
-          p ^= 0xc000;
+          p ^= HSK_DNS_POINTER_BASE;
           data[off] = (p >> 8) & 0xff;
           data[off + 1] = p & 0xff;
         }
@@ -2369,11 +2370,11 @@ hsk_dns_name_to_string(const uint8_t *name, char *namestr) {
             sprintf(&namestr[noff], "\\%03d", c);
             noff += 4;
             continue;
-          }
+          } else {
+          // Boring, printable character
+          namestr[noff++] = c;
+        }
       }
-
-      // Boring, printable character
-      namestr[noff++] = c;
     }
 
     // End of label

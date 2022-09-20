@@ -32,6 +32,11 @@
  *          = (3 * (63 * 4 + 1)) + ((61 * 4 + 1)) + 1
  */
 #define HSK_DNS_MAX_NAME_STRING 1005
+#define HSK_DNS_POINTER 0xc0
+#define HSK_DNS_POINTER_BASE 0xc000
+// Pointers are flagged by setting two top bits (0xc000)
+// therefore this is the maximum pointer position value 
+#define HSK_DNS_POINTER_MAX 0x3fff
 
 // Opcodes
 #define HSK_DNS_QUERY 0
@@ -489,7 +494,7 @@ hsk_dns_rr_create(uint16_t type);
 void
 hsk_dns_rr_free(hsk_dns_rr_t *rr);
 
-bool
+void
 hsk_dns_rr_set_name(hsk_dns_rr_t *rr, const uint8_t *name);
 
 int
@@ -621,23 +626,6 @@ hsk_dns_name_parse(
   size_t *data_len_,
   const hsk_dns_dmp_t *dmp,
   uint8_t *name
-);
-
-/**
- * Returns: boolean (success)
- * In:      name:  pointer to uncompressed wire-formatted name in a byte array
- * Out:     data:  (optional) pointer to beginning of destination for compressed
- *                 name in a DNS message serialized as a byte array
- *          len:   length of data written (compressed length)
- *          cmp:   (optional) map of labels and their position in the DNS
- *                 message for label compression
- */
-static bool
-hsk_dns_name_serialize(
-  const uint8_t *name,
-  uint8_t *data,
-  int *len,
-  hsk_dns_cmp_t *cmp
 );
 
 /**

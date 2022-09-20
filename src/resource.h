@@ -76,6 +76,9 @@ hsk_resource_has(const hsk_resource_t *res, uint8_t type);
 bool
 hsk_resource_has_ns(const hsk_resource_t *res);
 
+void
+hsk_resource_write_synth(char *b32, uint8_t *name);
+
 hsk_dns_msg_t *
 hsk_resource_to_dns(const hsk_resource_t *rs, const uint8_t *name, uint16_t type);
 
