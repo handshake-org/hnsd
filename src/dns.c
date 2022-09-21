@@ -2390,10 +2390,15 @@ hsk_dns_name_from_string(const char *namestr, uint8_t *name) {
   // Write each label to a buffer to determine length before writing
   uint8_t label = 0;
   uint8_t buffer[HSK_DNS_MAX_LABEL] = {0};
+  uint8_t len = strlen(namestr);
 
-  for (char *s = (char *)namestr; *s; s++) {
+  int i;
+  char ch;
+  for (i = 0; i < len; i++) {
+    ch = namestr[i];
+
     // End of label reached, flush buffer to output
-    if (*s == '.') {
+    if (ch == '.') {
       if (off + label + 1 > HSK_DNS_MAX_NAME)
         return false;
 
@@ -2408,16 +2413,17 @@ hsk_dns_name_from_string(const char *namestr, uint8_t *name) {
     }
 
     // Escaped character
-    if (*s == '\\') {
+    if (ch == '\\') {
       // Check if next three characters represent a byte < 255
-      if (strlen(s) > 3
-          && isdigit(*(s + 1))
-          && isdigit(*(s + 2))
-          && isdigit(*(s + 3))) {
+      if (i + 3 < len
+          && isdigit(namestr[i + 1])
+          && isdigit(namestr[i + 2])
+          && isdigit(namestr[i + 3])) {
         uint16_t value = 0;
-        value += (*(s + 1) - 0x30) * 100;
-        value += (*(s + 2) - 0x30) * 10;
-        value += (*(s + 3) - 0x30);
+        value += namestr[i + 1] - 0x30 * 100;
+        value += namestr[i + 2] - 0x30 * 10;
+        value += namestr[i + 3] - 0x30;
+        i += 3;
 
         // Bad escape, byte code out of range.
         if (value > 0xff)
@@ -2426,20 +2432,18 @@ hsk_dns_name_from_string(const char *namestr, uint8_t *name) {
         if (label + 1 > HSK_DNS_MAX_LABEL)
           return false;
 
-        // Write encoded byte to buffer, increment length and advance pointer
+        // Write encoded byte to buffer and increment length
         buffer[label++] = value;
-        s += 3;
       } else {
         // No next character
-        if (strlen(s) < 2)
+        if (i + 2 < len)
           return false;
 
         if (label + 1 > HSK_DNS_MAX_LABEL)
           return false;
 
         // Only a single character has been escaped, write it and advance
-        s++;
-        buffer[label++] = *s;
+        buffer[label++] = ch;
       }
 
       continue;
@@ -2449,7 +2453,7 @@ hsk_dns_name_from_string(const char *namestr, uint8_t *name) {
     if (label + 1 > HSK_DNS_MAX_LABEL)
       return false;
 
-    buffer[label++] = *s;
+    buffer[label++] = ch;
   }
 
   return true;
