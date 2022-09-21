@@ -792,8 +792,7 @@ hsk_tld_index(const uint8_t *tld) {
 
   while (start <= end) {
     int pos = (start + end) >> 1;
-    int cmp = strcmp(HSK_TLD_NAMES[pos], (char *)&tld[1]);
-
+    int cmp = hsk_dns_name_cmp((const uint8_t *)HSK_TLD_NAMES[pos], tld);
     if (cmp == 0)
       return pos;
 

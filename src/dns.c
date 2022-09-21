@@ -2553,34 +2553,33 @@ hsk_dns_name_cmp(const uint8_t *a, const uint8_t *b) {
   uint8_t off = 0;
 
   for (;;) {
-    // compare label length bytes
     uint8_t labela = a[off];
     uint8_t labelb = b[off];
 
-    if (labela < labelb)
-      return -1;
-
-    if (labela > labelb)
-      return 1;
-
-    if (labela == 0)
+    if (labelb == 0 && labela == 0)
       return 0;
 
-    // labels are equal non-zero length: compare label
-    for (; labela > 0; labela--) {
+    for (; labela >= 0; labela--, labelb--) {
       off++;
 
+      if (labela == 0 && labelb != 0)
+          return -1; // name b is longer
+
+      if (labelb == 0 && labela != 0)
+          return 1; // name a is longer
+
+      if (labelb == 0 && labela == 0)
+        break; // labels are the same
+
+      // neither label is 0 length, 
+      // compare characters until one label runs out
       if (a[off] > b[off])
         return 1;
 
       if (a[off] < b[off])
         return -1;
     }
-
-    off++;
   }
-
-  return 0;
 }
 
 bool

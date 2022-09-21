@@ -355,6 +355,60 @@ test_hsk_dns_msg_write() {
   }
 }
 
+void
+test_hsk_dns_name_cmp() {
+  printf("  test_hsk_dns_name_cmp\n");
+
+  assert(
+    hsk_dns_name_cmp(
+      (uint8_t *)"\x00",
+      (uint8_t *)"\x00"
+    ) == 0
+  );
+
+  assert(
+    hsk_dns_name_cmp(
+      (uint8_t *)"\x01\x00\x00",
+      (uint8_t *)"\x00"
+    ) == 1
+  );
+
+  assert(
+    hsk_dns_name_cmp(
+      (uint8_t *)"\x03""abc""\x00",
+      (uint8_t *)"\x03""abc""\x00"
+    ) == 0
+  );
+
+  assert(
+    hsk_dns_name_cmp(
+      (uint8_t *)"\x03""abd""\x00",
+      (uint8_t *)"\x03""abc""\x00"
+    ) == 1
+  );
+
+  assert(
+    hsk_dns_name_cmp(
+      (uint8_t *)"\x03""abc""\x00",
+      (uint8_t *)"\x03""abd""\x00"
+    ) == -1
+  );
+
+  assert(
+    hsk_dns_name_cmp(
+      (uint8_t *)"\x06""abcdef""\x00",
+      (uint8_t *)"\x03""abc""\x00"
+    ) == 1
+  );
+
+  assert(
+    hsk_dns_name_cmp(
+      (uint8_t *)"\x03""abc""\x00",
+      (uint8_t *)"\x03""abc""\x03""abc""\x00"
+    ) == -1
+  );
+}
+
 /*
  * hash
  */
@@ -488,6 +542,7 @@ main() {
   test_hsk_dns_label_split();
   test_hsk_dns_msg_read();
   test_hsk_dns_msg_write();
+  test_hsk_dns_name_cmp();
 
   printf(" hash\n");
   test_hsk_hash_tld();
