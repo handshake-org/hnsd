@@ -31,7 +31,6 @@ hsk_dns_req_init(hsk_dns_req_t *req) {
   req->edns = false;
   req->dnssec = false;
   memset(req->tld, 0x00, sizeof(req->tld));
-  memset(req->namestr, 0x00, sizeof(req->namestr));
   memset(&req->ss, 0x00, sizeof(struct sockaddr_storage));
   req->addr = (struct sockaddr *)&req->ss;
 }

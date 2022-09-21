@@ -27,9 +27,6 @@ typedef struct {
   size_t max_size;
   bool dnssec;
 
-  // For Unbound
-  char namestr[HSK_DNS_MAX_NAME_STRING];
-
   // HSK stuff
   uint8_t tld[HSK_DNS_MAX_LABEL + 2];
 

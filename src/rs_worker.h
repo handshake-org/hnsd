@@ -144,7 +144,7 @@ hsk_rs_worker_close(hsk_rs_worker_t *worker);
 // to libunbound.  The result callback occurs in the libuv event loop.  When the
 // callback occurs, ownership of the ub_result is passed to the callback.
 int
-hsk_rs_worker_resolve(hsk_rs_worker_t *worker, char *name, int rrtype,
+hsk_rs_worker_resolve(hsk_rs_worker_t *worker, uint8_t *name, int rrtype,
                       int rrclass, void *data, ub_callback_type callback);
 
 #endif

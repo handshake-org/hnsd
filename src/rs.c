@@ -377,15 +377,9 @@ hsk_rs_onrecv(
     goto fail;
   }
 
-  // Unbound's name resolution API expects a single null-terminated string.
-  // Since 0x00 is a valid byte mid-label in wire format we need to
-  // convert `req->name` to presentation format (i.e. "\000" for 0x00)
-  if (!hsk_dns_name_to_string(req->name, req->namestr))
-    goto fail;
-
   rc = hsk_rs_worker_resolve(
     ns->rs_worker,
-    req->namestr,
+    req->name,
     req->type,
     req->class,
     (void *)req,
