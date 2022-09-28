@@ -16,7 +16,8 @@ hsk_dnssec_get_ksk(void) {
 
   const uint8_t *ksk = &hsk_dnssec_ksk[0];
 
-  ksk_key = hsk_dns_dnskey_create(".", ksk, true);
+  uint8_t root[HSK_DNS_MAX_NAME] = {0};
+  ksk_key = hsk_dns_dnskey_create(root, ksk, true);
   assert(ksk_key);
 
   return (const hsk_dns_rr_t *)ksk_key;
@@ -29,7 +30,8 @@ hsk_dnssec_get_zsk(void) {
 
   const uint8_t *zsk = &hsk_dnssec_zsk[0];
 
-  zsk_key = hsk_dns_dnskey_create(".", zsk, false);
+  uint8_t root[HSK_DNS_MAX_NAME] = {0};
+  zsk_key = hsk_dns_dnskey_create(root, zsk, false);
   assert(zsk_key);
 
   return (const hsk_dns_rr_t *)zsk_key;

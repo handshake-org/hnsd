@@ -426,7 +426,9 @@ hsk_rs_respond(
     goto fail;
   }
 
-  hsk_rs_log(ns, "received answer for: %s\n", req->name);
+  char namestr[HSK_DNS_MAX_NAME_STRING] = {0};
+  assert(hsk_dns_name_to_string(req->name, namestr));
+  hsk_rs_log(ns, "received answer for: %s\n", namestr);
 
   if (result->canonname)
     hsk_rs_log(ns, "  canonname: %s\n", result->canonname);

@@ -54,7 +54,7 @@ hsk_ns_log(hsk_ns_t *ns, const char *fmt, ...);
 
 static void
 after_resolve(
-  const char *name,
+  const uint8_t *tld,
   int status,
   bool exists,
   const uint8_t *data,
@@ -90,10 +90,10 @@ static void
 after_close(uv_handle_t *handle);
 
 static int
-hsk_tld_index(const char *name);
+hsk_tld_index(const uint8_t *tld);
 
 static const uint8_t *
-hsk_icann_lookup(const char *name);
+hsk_icann_lookup(const uint8_t *tld);
 
 /*
  * Root Nameserver
@@ -333,7 +333,9 @@ hsk_ns_onrecv(
   // The synth name then resolves to an A/AAAA record that is derived
   // by decoding the name itself (it does not have to be looked up).
   bool should_cache = true;
-  if (strcmp(req->tld, "_synth") == 0 && req->labels <= 2) {
+  if (memcmp(req->tld, "\x06""_synth""\x00", 8) == 0
+      && req->labels <= 2
+      && req->name[1] == '_') {
     msg = hsk_dns_msg_alloc();
     should_cache = false;
 
@@ -344,17 +346,23 @@ hsk_ns_onrecv(
     hsk_dns_rrs_t *rrns = &msg->ns;
     hsk_dns_rrs_t *ar = &msg->ar;
 
-    uint8_t ip[16];
-    uint16_t family;
-    char synth[HSK_DNS_MAX_LABEL + 1];
-    hsk_dns_label_from(req->name, -2, synth);
-
+    // TLD '._synth' is being queried on its own, send SOA
+    // so recursive asks again with complete synth record.
     if (req->labels == 1) {
-      hsk_resource_to_empty(req->tld, NULL, 0, rrns);
+      hsk_resource_to_empty(req->name, NULL, 0, rrns);
       hsk_dnssec_sign_zsk(rrns, HSK_DNS_NSEC);
       hsk_resource_root_to_soa(rrns);
       hsk_dnssec_sign_zsk(rrns, HSK_DNS_SOA);
+
+      goto finalize;
     }
+
+    uint8_t ip[16];
+    uint16_t family;
+    uint8_t synth[HSK_DNS_MAX_NAME] = {0};
+    // Will buffer underflow if req->name doesn't
+    // have at least 2 labels.
+    hsk_dns_label_from(req->name, -2, synth);
   
     if (pointer_to_ip(synth, ip, &family)) {
       bool match = false;
@@ -422,6 +430,7 @@ hsk_ns_onrecv(
       }
     }
 
+finalize:
     if (!hsk_dns_msg_finalize(&msg, req, ns->ec, ns->key, &wire, &wire_len)) {
       hsk_ns_log(ns, "could not reply\n");
       goto fail;
@@ -434,17 +443,21 @@ hsk_ns_onrecv(
     goto done;
   }
 
+  // TLD must pass HNS rules, if not root or synth
+  if (req->tld[0] != 0x00 && !hsk_dns_name_verify(req->tld))
+    goto fail;
+
   // Requesting a lookup.
   if (req->labels > 0) {
     // Check blacklist.
-    if (strcmp(req->tld, "bit") == 0 // Namecoin
-        || strcmp(req->tld, "eth") == 0 // ENS
-        || strcmp(req->tld, "exit") == 0 // Tor
-        || strcmp(req->tld, "gnu") == 0 // GNUnet (GNS)
-        || strcmp(req->tld, "i2p") == 0 // Invisible Internet Project
-        || strcmp(req->tld, "onion") == 0 // Tor
-        || strcmp(req->tld, "tor") == 0 // OnioNS
-        || strcmp(req->tld, "zkey") == 0) { // GNS
+    if (   memcmp(req->tld, "\x03""bit",   4) == 0 // Namecoin
+        || memcmp(req->tld, "\x03""eth",   4) == 0 // ENS
+        || memcmp(req->tld, "\x04""exit",  5) == 0 // Tor
+        || memcmp(req->tld, "\x03""gnu",   4) == 0 // GNUnet (GNS)
+        || memcmp(req->tld, "\x03""i2p",   4) == 0 // Invisible Internet Project
+        || memcmp(req->tld, "\x05""onion", 6) == 0 // Tor
+        || memcmp(req->tld, "\x03""tor",   4) == 0 // OnioNS
+        || memcmp(req->tld, "\x04""zkey",  5) == 0) { // GNS
       msg = hsk_resource_to_nx();
     } else {
       req->ns = (void *)ns;
@@ -727,7 +740,7 @@ after_recv(
 
 static void
 after_resolve(
-  const char *name,
+  const uint8_t *tld,
   int status,
   bool exists,
   const uint8_t *data,
@@ -739,22 +752,25 @@ after_resolve(
   hsk_resource_t *res = NULL;
 
   if (status == HSK_SUCCESS) {
+    char namestr[HSK_DNS_MAX_NAME_STRING] = {0};
+    assert(hsk_dns_name_to_string(tld, namestr));
+
     if (!exists || data_len == 0) {
-      const uint8_t *item = hsk_icann_lookup(name);
+      const uint8_t *item = hsk_icann_lookup(tld);
 
       if (item) {
         const uint8_t *raw = &item[2];
         size_t raw_len = (((size_t)item[1]) << 8) | ((size_t)item[0]);
 
         if (!hsk_resource_decode(raw, raw_len, &res)) {
-          hsk_ns_log(ns, "could not decode root resource for: %s\n", name);
+          hsk_ns_log(ns, "could not decode root resource for: %s\n", namestr);
           status = HSK_EFAILURE;
           res = NULL;
         }
       }
     } else {
       if (!hsk_resource_decode(data, data_len, &res)) {
-        hsk_ns_log(ns, "could not decode resource for: %s\n", name);
+        hsk_ns_log(ns, "could not decode resource for: %s\n", namestr);
         status = HSK_EFAILURE;
         res = NULL;
       }
@@ -770,14 +786,13 @@ after_resolve(
 }
 
 static int
-hsk_tld_index(const char *name) {
+hsk_tld_index(const uint8_t *tld) {
   int start = 0;
   int end = HSK_TLD_SIZE - 1;
 
   while (start <= end) {
     int pos = (start + end) >> 1;
-    int cmp = strcasecmp(HSK_TLD_NAMES[pos], name);
-
+    int cmp = hsk_dns_name_cmp((const uint8_t *)HSK_TLD_NAMES[pos], tld);
     if (cmp == 0)
       return pos;
 
@@ -791,8 +806,8 @@ hsk_tld_index(const char *name) {
 }
 
 static const uint8_t *
-hsk_icann_lookup(const char *name) {
-  int index = hsk_tld_index(name);
+hsk_icann_lookup(const uint8_t *tld) {
+  int index = hsk_tld_index(tld);
 
   if (index == -1)
     return NULL;

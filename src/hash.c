@@ -141,9 +141,10 @@ hsk_hash_sha3_key(
 }
 
 void
-hsk_hash_name(const char *name, uint8_t *hash) {
-  assert(name && hash);
-  hsk_hash_sha3((uint8_t *)name, strlen(name), hash);
+hsk_hash_tld(const uint8_t *tld, uint8_t *hash) {
+  assert(tld && hash);
+  // First byte is length
+  hsk_hash_sha3(&tld[1], tld[0], hash);
 }
 
 void

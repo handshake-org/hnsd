@@ -16,7 +16,7 @@ typedef struct hsk_cache_s {
 } hsk_cache_t;
 
 typedef struct hsk_cache_key_s {
-  uint8_t name[HSK_DNS_MAX_NAME + 1];
+  uint8_t name[HSK_DNS_MAX_NAME];
   size_t name_len;
   uint16_t type;
   bool ref;
@@ -44,7 +44,7 @@ hsk_cache_free(hsk_cache_t *c);
 bool
 hsk_cache_insert_data(
   hsk_cache_t *c,
-  const char *name,
+  const uint8_t *name,
   uint16_t type,
   uint8_t *wire,
   size_t wire_len
@@ -60,7 +60,7 @@ hsk_cache_insert(
 bool
 hsk_cache_get_data(
   hsk_cache_t *c,
-  const char *name,
+  const uint8_t *name,
   uint16_t type,
   uint8_t **wire,
   size_t *wire_len
@@ -87,8 +87,8 @@ hsk_cache_key_hash(const void *key);
 bool
 hsk_cache_key_equal(const void *a, const void *b);
 
-bool
-hsk_cache_key_set(hsk_cache_key_t *ck, const char *name, uint16_t type);
+void
+hsk_cache_key_set(hsk_cache_key_t *ck, const uint8_t *name, uint16_t type);
 
 void
 hsk_cache_item_init(hsk_cache_item_t *ci);

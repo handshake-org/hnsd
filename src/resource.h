@@ -19,7 +19,7 @@
 // Dummy record placeholder
 typedef struct hsk_record_s {
   uint8_t type;
-  char name[256];
+  uint8_t name[HSK_DNS_MAX_NAME];
   uint8_t inet4[4];
   uint8_t inet6[16];
 } hsk_record_t;
@@ -76,8 +76,11 @@ hsk_resource_has(const hsk_resource_t *res, uint8_t type);
 bool
 hsk_resource_has_ns(const hsk_resource_t *res);
 
+void
+hsk_resource_write_synth(char *b32, uint8_t *name);
+
 hsk_dns_msg_t *
-hsk_resource_to_dns(const hsk_resource_t *rs, const char *name, uint16_t type);
+hsk_resource_to_dns(const hsk_resource_t *rs, const uint8_t *name, uint16_t type);
 
 hsk_dns_msg_t *
 hsk_resource_root(uint16_t type, const hsk_addr_t *addr);
@@ -92,11 +95,11 @@ hsk_dns_msg_t *
 hsk_resource_to_notimp(void);
 
 bool
-hsk_resource_is_ptr(const char *name);
+hsk_resource_is_ptr(const uint8_t *name);
 
 bool
 hsk_resource_to_empty(
-  const char *name,
+  const uint8_t *name,
   const uint8_t *type_map,
   size_t type_map_len,
   hsk_dns_rrs_t *an
@@ -112,5 +115,5 @@ bool
 b32_to_ip(const char *str, uint8_t *ip, uint16_t *family);
 
 bool
-pointer_to_ip(const char *name, uint8_t *ip, uint16_t *family);
+pointer_to_ip(const uint8_t *name, uint8_t *ip, uint16_t *family);
 #endif

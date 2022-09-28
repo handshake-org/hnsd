@@ -7,6 +7,7 @@
 #include <strings.h>
 #include <stdint.h>
 #include <stdbool.h>
+#include <ctype.h>
 
 #include "bio.h"
 #include "dns.h"
@@ -25,6 +26,41 @@ raw_rr_cmp(const void *a, const void *b);
 
 static bool
 raw_rr_equal(const hsk_dns_raw_rr_t *a, const hsk_dns_raw_rr_t *b);
+
+/*
+ * Label Map (for compression)
+ */
+
+uint32_t
+hsk_dns_hash_name(const void *key) {
+  uint8_t *s = (uint8_t *)key;
+
+  uint32_t hash = 5381;
+
+  for (;;) {
+    // read label length byte
+    hash = ((hash << 5) + hash) + ((uint32_t)*s);
+
+    // end of name (0-length label aka ".")
+    if (!*s)
+      break;
+
+    // read label
+    for (int i = *s; i > 0; i--) {
+      s++;
+      hash = ((hash << 5) + hash) + ((uint32_t)*s);
+    }
+
+    s++;
+  };
+
+  return hash;
+}
+
+void
+hsk_dns_init_name_map(hsk_map_t *map) {
+  hsk_map_init_map(map, hsk_dns_hash_name, hsk_dns_name_equal, NULL);
+}
 
 /*
  * Message
@@ -108,7 +144,7 @@ hsk_dns_msg_write(const hsk_dns_msg_t *msg, uint8_t **data) {
 
   if (data) {
     cmp = &cmp_;
-    hsk_map_init_str_map(&cmp->map, NULL);
+    hsk_dns_init_name_map(&cmp->map);
     cmp->msg = *data;
   }
 
@@ -149,7 +185,7 @@ hsk_dns_msg_write(const hsk_dns_msg_t *msg, uint8_t **data) {
   if (enabled) {
     hsk_dns_rr_t rr = { .type = HSK_DNS_OPT };
     hsk_dns_opt_rd_t rd;
-    strcpy(rr.name, ".");
+    rr.name[0] = 0x00; // "."
     rr.ttl = 0;
     rr.ttl |= ((uint32_t)ecode) << 24;
     rr.ttl |= ((uint32_t)msg->edns.version) << 16;
@@ -368,10 +404,10 @@ hsk_dns_msg_read(uint8_t **data, size_t *data_len, hsk_dns_msg_t *msg) {
     if (!qs)
       goto fail;
 
+    hsk_dns_rrs_push(&msg->qd, qs);
+
     if (!hsk_dns_qs_read(data, data_len, &dmp, qs))
       goto fail;
-
-    hsk_dns_rrs_push(&msg->qd, qs);
   }
 
   for (i = 0; i < ancount; i++) {
@@ -383,10 +419,10 @@ hsk_dns_msg_read(uint8_t **data, size_t *data_len, hsk_dns_msg_t *msg) {
     if (!rr)
       goto fail;
 
+    hsk_dns_rrs_push(&msg->an, rr);
+
     if (!hsk_dns_rr_read(data, data_len, &dmp, rr))
       goto fail;
-
-    hsk_dns_rrs_push(&msg->an, rr);
   }
 
   for (i = 0; i < nscount; i++) {
@@ -398,10 +434,10 @@ hsk_dns_msg_read(uint8_t **data, size_t *data_len, hsk_dns_msg_t *msg) {
     if (!rr)
       goto fail;
 
+    hsk_dns_rrs_push(&msg->ns, rr);
+
     if (!hsk_dns_rr_read(data, data_len, &dmp, rr))
       goto fail;
-
-    hsk_dns_rrs_push(&msg->ns, rr);
   }
 
   for (i = 0; i < arcount; i++) {
@@ -412,6 +448,8 @@ hsk_dns_msg_read(uint8_t **data, size_t *data_len, hsk_dns_msg_t *msg) {
 
     if (!rr)
       goto fail;
+
+    hsk_dns_rrs_push(&msg->ar, rr);
 
     if (!hsk_dns_rr_read(data, data_len, &dmp, rr))
       goto fail;
@@ -431,13 +469,13 @@ hsk_dns_msg_read(uint8_t **data, size_t *data_len, hsk_dns_msg_t *msg) {
       msg->edns.rd = opt->rd;
       msg->code |= msg->edns.code << 4;
 
+      hsk_dns_rr_t *popped = hsk_dns_rrs_pop(&msg->ar);
+      assert(popped == rr);
       free(rr->rd);
       free(rr);
 
       continue;
     }
-
-    hsk_dns_rrs_push(&msg->ar, rr);
   }
 
   return true;
@@ -593,8 +631,8 @@ void
 hsk_dns_qs_init(hsk_dns_qs_t *qs) {
   assert(qs);
 
-  memset(qs->name, 0, sizeof(qs->name));
-  strcpy(qs->name, ".");
+  memset(qs->name, 0, HSK_DNS_MAX_NAME);
+  qs->name[0] = 0x00; // "."
   qs->type = HSK_DNS_UNKNOWN;
   qs->class = HSK_DNS_IN;
   qs->ttl = 0;
@@ -621,10 +659,9 @@ hsk_dns_qs_free(hsk_dns_qs_t *qs) {
 }
 
 void
-hsk_dns_qs_set(hsk_dns_qs_t *qs, const char *name, uint16_t type) {
+hsk_dns_qs_set(hsk_dns_qs_t *qs, const uint8_t *name, uint16_t type) {
   assert(qs && name);
-  assert(strlen(name) <= 255);
-  strcpy(qs->name, name);
+  memcpy(qs->name, name, HSK_DNS_MAX_NAME);
   qs->type = type;
 }
 
@@ -665,7 +702,7 @@ hsk_dns_rr_init(hsk_dns_rr_t *rr) {
   assert(rr);
 
   memset(rr->name, 0, sizeof(rr->name));
-  strcpy(rr->name, ".");
+  rr->name[0] = 0x00; // "."
   rr->type = HSK_DNS_UNKNOWN;
   rr->class = HSK_DNS_IN;
   rr->ttl = 0;
@@ -718,22 +755,13 @@ hsk_dns_rr_free(hsk_dns_rr_t *rr) {
   free(rr);
 }
 
-bool
-hsk_dns_rr_set_name(hsk_dns_rr_t *rr, const char *name) {
+void
+hsk_dns_rr_set_name(hsk_dns_rr_t *rr, const uint8_t *name) {
   assert(rr);
 
-  if (!hsk_dns_name_verify(name))
-    return false;
+  memcpy(rr->name, name, HSK_DNS_MAX_NAME);
 
-  if (hsk_dns_name_dirty(name))
-    return false;
-
-  if (hsk_dns_name_is_fqdn(name))
-    strcpy(rr->name, name);
-  else
-    sprintf(rr->name, "%s.", name);
-
-  return true;
+  return;
 }
 
 int
@@ -900,8 +928,6 @@ hsk_dns_rd_init(void *rd, uint16_t type) {
       hsk_dns_soa_rd_t *r = (hsk_dns_soa_rd_t *)rd;
       memset(r->ns, 0, sizeof(r->ns));
       memset(r->mbox, 0, sizeof(r->mbox));
-      strcpy(r->ns, ".");
-      strcpy(r->mbox, ".");
       r->serial = 0;
       r->refresh = 0;
       r->retry = 0;
@@ -933,32 +959,27 @@ hsk_dns_rd_init(void *rd, uint16_t type) {
     case HSK_DNS_CNAME: {
       hsk_dns_cname_rd_t *r = (hsk_dns_cname_rd_t *)rd;
       memset(r->target, 0, sizeof(r->target));
-      strcpy(r->target, ".");
       break;
     }
     case HSK_DNS_DNAME: {
       hsk_dns_dname_rd_t *r = (hsk_dns_dname_rd_t *)rd;
       memset(r->target, 0, sizeof(r->target));
-      strcpy(r->target, ".");
       break;
     }
     case HSK_DNS_NS: {
       hsk_dns_ns_rd_t *r = (hsk_dns_ns_rd_t *)rd;
       memset(r->ns, 0, sizeof(r->ns));
-      strcpy(r->ns, ".");
       break;
     }
     case HSK_DNS_MX: {
       hsk_dns_mx_rd_t *r = (hsk_dns_mx_rd_t *)rd;
       r->preference = 0;
       memset(r->mx, 0, sizeof(r->mx));
-      strcpy(r->mx, ".");
       break;
     }
     case HSK_DNS_PTR: {
       hsk_dns_ptr_rd_t *r = (hsk_dns_ptr_rd_t *)rd;
       memset(r->ptr, 0, sizeof(r->ptr));
-      strcpy(r->ptr, ".");
       break;
     }
     case HSK_DNS_SRV: {
@@ -967,7 +988,6 @@ hsk_dns_rd_init(void *rd, uint16_t type) {
       r->weight = 0;
       r->port = 0;
       memset(r->target, 0, sizeof(r->target));
-      strcpy(r->target, ".");
       break;
     }
     case HSK_DNS_TXT: {
@@ -1049,14 +1069,11 @@ hsk_dns_rd_init(void *rd, uint16_t type) {
       hsk_dns_rp_rd_t *r = (hsk_dns_rp_rd_t *)rd;
       memset(r->mbox, 0, sizeof(r->mbox));
       memset(r->txt, 0, sizeof(r->txt));
-      strcpy(r->mbox, ".");
-      strcpy(r->txt, ".");
       break;
     }
     case HSK_DNS_NSEC: {
       hsk_dns_nsec_rd_t *r = (hsk_dns_nsec_rd_t *)rd;
       memset(r->next_domain, 0, sizeof(r->next_domain));
-      strcpy(r->next_domain, ".");
       r->type_map_len = 0;
       r->type_map = NULL;
       break;
@@ -1359,7 +1376,8 @@ hsk_dns_rd_write(
     case HSK_DNS_DNAME: {
       hsk_dns_dname_rd_t *r = (hsk_dns_dname_rd_t *)rd;
 
-      size += hsk_dns_name_write(r->target, data, cmp);
+      // no label compression
+      size += hsk_dns_name_write(r->target, data, NULL);
 
       break;
     }
@@ -1391,7 +1409,8 @@ hsk_dns_rd_write(
       size += write_u16be(data, r->priority);
       size += write_u16be(data, r->weight);
       size += write_u16be(data, r->port);
-      size += hsk_dns_name_write(r->target, data, cmp);
+      // no label compression
+      size += hsk_dns_name_write(r->target, data, NULL);
 
       break;
     }
@@ -1472,7 +1491,8 @@ hsk_dns_rd_write(
       size += write_u32be(data, r->expiration);
       size += write_u32be(data, r->inception);
       size += write_u16be(data, r->key_tag);
-      size += hsk_dns_name_write(r->signer_name, data, cmp);
+      // no label compression
+      size += hsk_dns_name_write(r->signer_name, data, NULL);
       size += write_bytes(data, r->signature, r->signature_len);
 
       break;
@@ -1490,15 +1510,17 @@ hsk_dns_rd_write(
     case HSK_DNS_RP: {
       hsk_dns_rp_rd_t *r = (hsk_dns_rp_rd_t *)rd;
 
-      size += hsk_dns_name_write(r->mbox, data, cmp);
-      size += hsk_dns_name_write(r->txt, data, cmp);
+      // no label compression
+      size += hsk_dns_name_write(r->mbox, data, NULL);
+      size += hsk_dns_name_write(r->txt, data, NULL);
 
       break;
     }
     case HSK_DNS_NSEC: {
       hsk_dns_nsec_rd_t *r = (hsk_dns_nsec_rd_t *)rd;
 
-      size += hsk_dns_name_write(r->next_domain, data, cmp);
+      // no label compression
+      size += hsk_dns_name_write(r->next_domain, data, NULL);
       size += write_bytes(data, r->type_map, r->type_map_len);
 
       break;
@@ -2098,87 +2120,101 @@ hsk_dns_name_parse(
   uint8_t **data_,
   size_t *data_len_,
   const hsk_dns_dmp_t *dmp,
-  char *name
+  uint8_t *name
 ) {
+  // Local copies of message read pointers
   uint8_t *data = *data_;
   size_t data_len = *data_len_;
+  // Offset of `data` array being parsed
   int off = 0;
+  // Offset of `name` output array
   int noff = 0;
+  // Message read resume location after name read
   int res = 0;
-  int max = HSK_DNS_MAX_NAME;
+  // Pointer count
   int ptr = 0;
 
   for (;;) {
+    // Can not read past end of input array
     if (off >= data_len)
       return -1;
 
+    // Leading byte (size of label or compression pointer)
     uint8_t c = data[off];
-    off += 1;
 
-    if (c == 0x00)
+    // Only occurs at end of name (zero-length label aka ".")
+    if (c == 0x00) {
+      // Almost made it! Last byte exceeds max.
+      if (noff + 1 > HSK_DNS_MAX_NAME)
+        return -1;
+
+      if (name)
+        name[noff] = 0x00;
+
+      off++;
+      noff++;
       break;
+    }
 
-    switch (c & 0xc0) {
+    switch (c & HSK_DNS_POINTER) {
+      // Uncompressed label
       case 0x00: {
+        // Label size can not exceed maximum
         if (c > HSK_DNS_MAX_LABEL)
           return -1;
 
-        if (off + c > data_len)
-          return -1; // EOF
-
-        if (noff + c + 1 > max)
+        // Label size can not exceed length of data we are parsing,
+        // including length byte and at least one byte for the NEXT label
+        if (off + c + 2 > data_len)
           return -1;
 
-        int j;
-        for (j = off; j < off + c; j++) {
-          uint8_t b = data[j];
+        // Label can not extend full name past maximum including length byte,
+        // final 0x00 and resolved compression pointers.
+        if (noff + c + 2 > HSK_DNS_MAX_NAME)
+          return -1;
 
-          // Hack because we're
-          // using c-strings.
-          if (b == 0x00)
-            b = 0xff;
-
-          // This allows for double-dots
-          // too easily in our design.
-          if (b == 0x2e)
-            b = 0xfe;
-
-          if (name)
-            name[noff] = b;
-
-          noff += 1;
-        }
-
+        // Copy uncompressed label to destination
+        // (including the length byte)
         if (name)
-          name[noff] = '.';
+          memcpy(&name[noff], &data[off], c + 1);
 
-        noff += 1;
-        off += c;
-
+        noff += c + 1;
+        off += c + 1;
         break;
       }
 
-      case 0xc0: {
+      // Compression pointer
+      case HSK_DNS_POINTER: {
+        // Must have reference data for pointers to work
         if (!dmp)
           return -1;
 
-        if (off >= data_len)
-          return -1;
-
-        uint8_t c1 = data[off];
-
+        // Pointers are last 14 bits after 0xc0, this is the second byte
         off += 1;
+        uint8_t c1 = data[off++];
 
+        // If this is the first pointer, save the "resume"
+        // address so after the pointer is resolved the
+        // rest of the message read continues from here.
+        // There is only one pointer allowed per name but the
+        // data we are pointing *to* may contain another pointer.
         if (ptr == 0)
           res = off;
 
+        // Don't allow more than 10 pointers.
+        // I think this is a bit of a hack to prevent infinite loops.
+        // knot-dns simply requires that pointers always point backwards
+        // in the message stream. We can't do that with this function's
+        // inputs because we don't actually know where `data` appears in `dmp`.
         ptr += 1;
-
         if (ptr > 10)
           return -1;
 
-        off = (((int)(c ^ 0xc0)) << 8) | c1;
+        // Compute the new read position (in `dmp`)
+        // from the last 14 bits of the pointer
+        off = (((int)(c ^ HSK_DNS_POINTER)) << 8) | c1;
 
+        // Read from `dmp` instead of `data` to the end of the name
         data = dmp->msg;
         data_len = dmp->msg_len;
 
@@ -2191,155 +2227,240 @@ hsk_dns_name_parse(
     }
   }
 
+  // If no pointers were used, resume from current offset
   if (ptr == 0)
     res = off;
 
-  if (noff == 0) {
-    if (name)
-      name[noff] = '.';
-    noff += 1;
-  }
-
-  if (name)
-    name[noff] = '\0';
-
+  // Move message read pointer in data stream
   *data_ += res;
   *data_len_ -= res;
 
+  // Return length written
   return noff;
 }
 
 static bool
 hsk_dns_name_serialize(
-  const char *name,
+  const uint8_t *name,
   uint8_t *data,
   int *len,
   hsk_dns_cmp_t *cmp
 ) {
+  // Offset of `name` input array being read
+  int noff = 0;
+  // Offset of `data` array being written
   int off = 0;
-  int pos = -1;
-  int ptr = -1;
-  int begin = 0;
-  size_t data_len = 256;
-  int size;
-  int i;
-  char *s;
 
-  for (s = (char *)name, i = 0; *s; s++, i++) {
-    if (name[i] == '.') {
-      if (i > 0 && name[i - 1] == '.') {
+  for (;;) {
+    uint8_t label = name[noff];
+
+    // End of name "."
+    if (label == 0x00) {
+      // Almost made it! Last byte exceeds max
+      if (noff + 1 > HSK_DNS_MAX_NAME) {
         *len = off;
         return false;
       }
 
-      size = i - begin;
+      if (data)
+        data[off] = 0x00;
 
-      if (size > HSK_DNS_MAX_LABEL) {
-        *len = off;
-        return false;
-      }
-
-      if (data) {
-        if (off + 1 + size > data_len) {
-          *len = off;
-          return false;
-        }
-        data[off] = size;
-      }
-
-      if (cmp) {
-        char *sub = (char *)&name[begin];
-        if (strcmp(sub, ".") != 0) {
-          size_t p = (size_t)hsk_map_get(&cmp->map, sub);
-          if (p == 0) {
-            size_t o = (size_t)(&data[off] - cmp->msg);
-            if (o < (2 << 13))
-              hsk_map_set(&cmp->map, sub, (void *)o);
-          } else {
-            if (ptr == -1) {
-              ptr = p;
-              pos = off;
-              i += strlen(s);
-              break;
-            }
-          }
-        }
-      }
-
-      off += 1;
-
-      if (data) {
-        int j;
-        for (j = begin; j < i; j++) {
-          char ch = name[j];
-
-          // 0xff -> NUL
-          if (ch == -1)
-            ch = '\0';
-
-          // 0xfe -> .
-          if (ch == -2)
-            ch = '.';
-
-          data[off++] = ch;
-        }
-      } else {
-        off += size;
-      }
-
-      begin = i + 1;
-    }
-  }
-
-  if (i > HSK_DNS_MAX_NAME) {
-    *len = off;
-    return false;
-  }
-
-  if (i == 0 || name[i - 1] != '.') {
-    *len = off;
-    return false;
-  }
-
-  if (i == 1 && name[0] == '.') {
-    *len = off;
-    return true;
-  }
-
-  if (ptr != -1) {
-    off = pos;
-
-    if (data) {
-      if (off + 2 > data_len)
-        return false;
-      ptr ^= 0xc000;
-      data[off] = (ptr >> 8) & 0xff;
-      data[off + 1] = ptr & 0xff;
+      off++;
+      *len = off;
+      return true;
     }
 
-    off += 2;
-    *len = off;
-
-    return true;
-  }
-
-  if (data) {
-    if (off >= data_len) {
+    // Label size can not exceed maximum
+    if (label > HSK_DNS_MAX_LABEL) {
       *len = off;
       return false;
     }
-    data[off] = 0;
+
+    // Label plus size byte plus final 0x00 can not extend name past maximum
+    if (label + noff + 2  > HSK_DNS_MAX_NAME) {
+      *len = off;
+      return false;
+    }
+
+    // Label compression
+    if (cmp) {
+      // Check label map for remainder of name
+      size_t p = (size_t)hsk_map_get(&cmp->map, &name[noff]);
+
+      // Add remainder of name to map if it's not there already
+      if (p == 0) {
+        size_t o = (size_t)(&data[off] - cmp->msg);
+
+        if (o <= HSK_DNS_POINTER_MAX)
+          hsk_map_set(&cmp->map, &name[noff], (void *)o);
+      } else {
+        // If the string was already in the map,
+        // point to it instead of repeating the string.
+        // Ensure enough room for 2-byte pointer, this should only
+        // be an issue if we are pointing to a 1-byte label...!
+        if (noff + 2 > HSK_DNS_MAX_NAME) {
+          *len = off;
+          return false;
+        }
+
+        if (data) {
+          // Encode and write pointer
+          p ^= HSK_DNS_POINTER_BASE;
+          data[off] = (p >> 8) & 0xff;
+          data[off + 1] = p & 0xff;
+        }
+
+        // Done: pointers are always last
+        off += 2;
+        *len = off;
+        return true;
+      }
+    }
+
+    // Compression is off, or the label is new: write it raw
+    if (data)
+      memcpy(&data[off], &name[noff], label + 1);
+
+    off += label + 1;
+    noff += label + 1;
   }
+}
 
-  off += 1;
+bool
+hsk_dns_name_to_string(const uint8_t *name, char *namestr) {
+  // Offset of `name` array being read
+  int off = 0;
+  // Offset of output `namestr` string being written
+  int noff = 0;
 
-  *len = off;
+  for (;;) {
+    uint8_t label = name[off];
+
+    if (label == 0x00) {
+      if (noff == 0) {
+        // Only one label and it's root
+        namestr[noff++] = '.';
+        namestr[noff] = '\0';
+      } else {
+        namestr[noff] = '\0';
+      }
+      return true;
+    }
+
+    for (; label > 0; label--) {
+      off++;
+      uint8_t c = name[off];
+
+      switch (c) {
+        // Escape special characters
+        case 0x2e /*.*/:
+        case 0x28 /*(*/:
+        case 0x29 /*)*/:
+        case 0x3b /*;*/:
+        case 0x20 /* */:
+        case 0x40 /*@*/:
+        case 0x22 /*"*/:
+        case 0x5c /*\\*/:
+          sprintf(&namestr[noff], "\\%c", (char)c);
+          noff += 2;
+          continue;
+        default:
+          // Write escaped, three-digit byte code
+          if (c < 0x20 || c > 0x7e) {
+            sprintf(&namestr[noff], "\\%03d", c);
+            noff += 4;
+            continue;
+          } else {
+          // Boring, printable character
+          namestr[noff++] = c;
+        }
+      }
+    }
+
+    // End of label
+    namestr[noff++] = '.';
+    off++;
+  }
+}
+
+bool
+hsk_dns_name_from_string(const char *namestr, uint8_t *name) {
+  // Offset of `name` array being written
+  int off = 0;
+  // Write each label to a buffer to determine length before writing
+  uint8_t label = 0;
+  uint8_t buffer[HSK_DNS_MAX_LABEL] = {0};
+  uint8_t len = strlen(namestr);
+
+  int i;
+  char ch;
+  for (i = 0; i < len; i++) {
+    ch = namestr[i];
+
+    // End of label reached, flush buffer to output
+    if (ch == '.') {
+      if (off + label + 1 > HSK_DNS_MAX_NAME)
+        return false;
+
+      name[off++] = label;
+      memcpy(&name[off], &buffer, label);
+      off += label;
+
+      // reset
+      memset(&buffer, 0x00, sizeof(buffer));
+      label = 0;
+      continue;
+    }
+
+    // Escaped character
+    if (ch == '\\') {
+      // Check if next three characters represent a byte < 255
+      if (i + 3 < len
+          && isdigit(namestr[i + 1])
+          && isdigit(namestr[i + 2])
+          && isdigit(namestr[i + 3])) {
+        uint16_t value = 0;
+        value += namestr[i + 1] - 0x30 * 100;
+        value += namestr[i + 2] - 0x30 * 10;
+        value += namestr[i + 3] - 0x30;
+        i += 3;
+
+        // Bad escape, byte code out of range.
+        if (value > 0xff)
+          return false;
+
+        if (label + 1 > HSK_DNS_MAX_LABEL)
+          return false;
+
+        // Write encoded byte to buffer and increment length
+        buffer[label++] = value;
+      } else {
+        // No next character
+        if (i + 2 < len)
+          return false;
+
+        if (label + 1 > HSK_DNS_MAX_LABEL)
+          return false;
+
+        // Only a single character has been escaped, write it and advance
+        buffer[label++] = ch;
+      }
+
+      continue;
+    }
+
+    // Boring, printable character
+    if (label + 1 > HSK_DNS_MAX_LABEL)
+      return false;
+
+    buffer[label++] = ch;
+  }
 
   return true;
 }
 
 int
-hsk_dns_name_pack(const char *name, uint8_t *data) {
+hsk_dns_name_pack(const uint8_t *name, uint8_t *data) {
   int len;
   if (!hsk_dns_name_serialize(name, data, &len, NULL))
     return 0;
@@ -2347,7 +2468,7 @@ hsk_dns_name_pack(const char *name, uint8_t *data) {
 }
 
 int
-hsk_dns_name_write(const char *name, uint8_t **data, hsk_dns_cmp_t *cmp) {
+hsk_dns_name_write(const uint8_t *name, uint8_t **data, hsk_dns_cmp_t *cmp) {
   uint8_t *buf = data ? *data : NULL;
   int len;
 
@@ -2364,7 +2485,7 @@ hsk_dns_name_read(
   uint8_t **data,
   size_t *data_len,
   const hsk_dns_dmp_t *dmp,
-  char *name
+  uint8_t *name
 ) {
   return hsk_dns_name_parse(data, data_len, dmp, name) != -1;
 }
@@ -2379,145 +2500,47 @@ hsk_dns_name_read_size(
 }
 
 bool
-hsk_dns_name_alloc(
-  uint8_t **data,
-  size_t *data_len,
-  const hsk_dns_dmp_t *dmp,
-  char **name
-) {
-  int size = hsk_dns_name_read_size(*data, *data_len, dmp);
-
-  if (size == -1)
+hsk_dns_name_verify(const uint8_t *name) {
+  if (name == NULL)
     return false;
 
-  char *n = malloc(size + 1);
-
-  if (!n)
-    return false;
-
-  assert(hsk_dns_name_read(data, data_len, dmp, n));
-
-  *name = n;
-
-  return true;
-}
-
-bool
-hsk_dns_name_dirty(const char *name) {
-  char *s = (char *)name;
-
-  while (*s) {
-    uint8_t c = (uint8_t)*s;
-
-    switch (c) {
-      case 0x28 /*(*/:
-      case 0x29 /*)*/:
-      case 0x3b /*;*/:
-      case 0x20 /* */:
-      case 0x40 /*@*/:
-      case 0x22 /*"*/:
-      case 0x5c /*\\*/:
-        return true;
-    }
-
-    if (c < 0x20 || c > 0x7e)
-      return true;
-
-    s += 1;
-  }
-
-  return false;
-}
-
-void
-hsk_dns_name_sanitize(const char *name, char *out) {
-  char *s = (char *)name;
   int off = 0;
+  uint8_t label = name[off++];
 
-  while (*s && off < HSK_DNS_MAX_SANITIZED) {
-    uint8_t c = (uint8_t)*s;
-
-    switch (c) {
-      case 0xfe: {
-        c = 0x2e;
-        ; // fall through
-      }
-      case 0x28 /*(*/:
-      case 0x29 /*)*/:
-      case 0x3b /*;*/:
-      case 0x20 /* */:
-      case 0x40 /*@*/:
-      case 0x22 /*"*/:
-      case 0x5c /*\\*/: {
-        out[off++] = '\\';
-        out[off++] = c;
-        break;
-      }
-      case 0xff: {
-        c = 0x00;
-        ; // fall through
-      }
-      default: {
-        if (c < 0x20 || c > 0x7e) {
-          out[off++] = '\\';
-          out[off++] = (c / 100) + 0x30;
-          out[off++] = (c / 10) + 0x30;
-          out[off++] = (c % 10) + 0x30;
-        } else {
-          out[off++] = c;
-        }
-        break;
-      }
-    }
-
-    s += 1;
-  }
-
-  out[off] = '\0';
-}
-
-bool
-hsk_dns_name_verify(const char *name) {
-  if (name == NULL)
+  if (label == 0)
     return false;
 
-  char *n = (char *)name;
-  size_t len = strlen(n);
-  char buf[HSK_DNS_MAX_NAME + 1];
+  if (label > HSK_DNS_MAX_LABEL)
+    return false;
 
-  if (len == 0 || n[len - 1] != '.') {
-    if (len + 1 > HSK_DNS_MAX_NAME)
+  // One label only, must be followed by final "."
+  if (name[label + 1] != 0)
+    return false;
+
+  // First and last char can not be - or _
+  if (name[off] == '-' ||
+      name[off] == '_' ||
+      name[label] == '-' ||
+      name[label] == '_')
+    return false;
+
+  for (; off <= label; off++) {
+    uint8_t c = name[off];
+
+    if (!((c >= 0x30 && c <= 0x39)        // 0-9
+          || (c >= 0x61 && c <= 0x7a)     // a-z
+          || c == 0x2d                    // -
+          || c == 0x5f))                  // _
       return false;
-
-    memcpy(&buf[0], n, len);
-    n = &buf[0];
-    n[len + 0] = '.';
-    n[len + 1] = '\0';
-
-    len += 1;
   }
 
-  if (len > HSK_DNS_MAX_NAME)
-    return false;
-
-  return hsk_dns_name_pack(n, NULL) != 0;
-}
-
-bool
-hsk_dns_name_is_fqdn(const char *name) {
-  if (name == NULL)
-    return false;
-
-  size_t len = strlen(name);
-
-  if (len == 0 || name[len - 1] != '.')
-    return false;
+  // hsd would check against a blacklist here, skip for now
 
   return true;
 }
 
 int
-hsk_dns_name_cmp(const char *a, const char *b) {
+hsk_dns_name_cmp(const uint8_t *a, const uint8_t *b) {
   if (!a && !b)
     return 0;
 
@@ -2527,42 +2550,44 @@ hsk_dns_name_cmp(const char *a, const char *b) {
   if (!b)
     return 1;
 
-  size_t alen = strlen(a);
-  size_t blen = strlen(b);
+  uint8_t off = 0;
 
-  if (alen > 0 && a[alen - 1] == '.')
-    alen -= 1;
+  for (;;) {
+    uint8_t labela = a[off];
+    uint8_t labelb = b[off];
 
-  if (blen > 0 && b[blen - 1] == '.')
-    blen -= 1;
+    if (labelb == 0 && labela == 0)
+      return 0;
 
-  size_t len = alen < blen ? alen : blen;
+    for (; labela >= 0; labela--, labelb--) {
+      off++;
 
-  int i;
-  for (i = 0; i < len; i++) {
-    uint8_t x = (uint8_t)a[i];
-    uint8_t y = (uint8_t)b[i];
+      if (labela == 0 && labelb != 0)
+          return -1; // name b is longer
 
-    if (x >= 0x41 && x <= 0x5a)
-      x |= 0x20;
+      if (labelb == 0 && labela != 0)
+          return 1; // name a is longer
 
-    if (y >= 0x41 && y <= 0x5a)
-      y |= 0x20;
+      if (labelb == 0 && labela == 0)
+        break; // labels are the same
 
-    if (x < y)
-      return -1;
+      // neither label is 0 length, 
+      // compare characters until one label runs out
+      if (a[off] > b[off])
+        return 1;
 
-    if (x > y)
-      return 1;
+      if (a[off] < b[off])
+        return -1;
+    }
   }
+}
 
-  if (alen < blen)
-    return -1;
+bool
+hsk_dns_name_equal(const void *a, const void *b) {
+  uint8_t *x = (uint8_t *)a;
+  uint8_t *y = (uint8_t *)b;
 
-  if (alen > blen)
-    return 1;
-
-  return 0;
+  return hsk_dns_name_cmp(x, y) == 0;
 }
 
 /*
@@ -2570,76 +2595,77 @@ hsk_dns_name_cmp(const char *a, const char *b) {
  */
 
 int
-hsk_dns_label_split(const char *name, uint8_t *labels, size_t size) {
-  char *s = (char *)name;
-  bool dot = true;
-  int count = 0;
-  int i;
-
+hsk_dns_label_split(const uint8_t *name, uint8_t *labels, size_t size) {
   if (!labels)
     size = HSK_DNS_MAX_LABELS;
 
-  for (i = 0; *s && count < size; s++, i++) {
-    if (*s == '.') {
-      dot = true;
-      continue;
-    }
+  int count = 0;
+  int off = 0;
 
-    if (dot) {
-      if (labels)
-        labels[count] = i;
-      count += 1;
-      dot = false;
-      continue;
-    }
+  while (count < size) {
+    uint8_t label = name[off];
+
+    // Final "."
+    if (label == 0)
+      return count;
+
+    if (labels)
+      labels[count] = off;
+
+    count++;
+
+    off += label + 1;
   }
 
+  // We didn't make it to the end of the name
+  // but we hit the `size` limit anyway.
   return count;
 }
 
 int
-hsk_dns_label_count(const char *name) {
+hsk_dns_label_count(const uint8_t *name) {
   return hsk_dns_label_split(name, NULL, 0);
 }
 
 int
 hsk_dns_label_from2(
-  const char *name,
+  const uint8_t *name,
   uint8_t *labels,
   int count,
   int index,
-  char *ret
+  uint8_t *ret
 ) {
   if (index < 0)
     index += count;
 
   if (index >= count) {
-    ret[0] = '\0';
+    ret[0] = 0x00;
     return 0;
   }
 
-  size_t start = (size_t)labels[index];
-  size_t end = strlen(name);
-  size_t len = end - start;
+  int len = 0;
+  for (; index < count; index++) {
+    int start = labels[index];
+    uint8_t label = name[start];
 
-  if (len == 0 || len > HSK_DNS_MAX_NAME) {
-    ret[0] = '\0';
-    return 0;
+    ret[len++] = label;
+    memcpy(&ret[len], &name[start + 1], label);
+    len += label;
   }
 
-  memcpy(ret, &name[start], len);
-
-  ret[len] = '\0';
+  // Reached the final "."
+  assert(index == count);
+  ret[len++] = 0x00;
 
   return len;
 }
 
 int
-hsk_dns_label_from(const char *name, int index, char *ret) {
+hsk_dns_label_from(const uint8_t *name, int index, uint8_t *ret) {
   int count = hsk_dns_label_count(name);
 
   if (count == 0) {
-    ret[0] = '\0';
+    ret[0] = 0x00;
     return 0;
   }
 
@@ -2652,51 +2678,44 @@ hsk_dns_label_from(const char *name, int index, char *ret) {
 
 int
 hsk_dns_label_get2(
-  const char *name,
+  const uint8_t *name,
   uint8_t *labels,
   int count,
   int index,
-  char *ret
+  uint8_t *ret
 ) {
   if (index < 0)
     index += count;
 
   if (index >= count) {
-    ret[0] = '\0';
+    ret[0] = 0x00;
     return 0;
   }
 
-  size_t start = (size_t)labels[index];
-  size_t end;
-
-  if (index + 1 >= count) {
-    end = strlen(name) - 1;
-    if (name[end] != '.')
-      end += 1;
-  } else {
-    end = ((size_t)labels[index + 1]) - 1;
-  }
-
-  size_t len = end - start;
+  uint8_t start = labels[index];
+  uint8_t len = name[start];
 
   if (len == 0 || len > HSK_DNS_MAX_LABEL) {
-    ret[0] = '\0';
+    ret[0] = 0x00;
     return 0;
   }
 
-  memcpy(ret, &name[start], len);
+  // Include leading byte (label length)
+  memcpy(ret, &name[start], len + 1);
 
-  ret[len] = '\0';
+  // Terminate with 0x00 aka final "."
+  ret[len + 1] = 0x00;
 
+  // Return length of label excluding leading and trailing bytes
   return len;
 }
 
 int
-hsk_dns_label_get(const char *name, int index, char *ret) {
+hsk_dns_label_get(const uint8_t *name, int index, uint8_t *ret) {
   int count = hsk_dns_label_count(name);
 
   if (count == 0) {
-    ret[0] = '\0';
+    ret[0] = 0x00;
     return 0;
   }
 
@@ -2705,176 +2724,6 @@ hsk_dns_label_get(const char *name, int index, char *ret) {
   assert(hsk_dns_label_split(name, labels, count) == count);
 
   return hsk_dns_label_get2(name, labels, count, index, ret);
-}
-
-bool
-hsk_dns_label_decode_srv(const char *name, char *protocol, char *service) {
-  int count = hsk_dns_label_count(name);
-
-  if (count < 3)
-    return false;
-
-  uint8_t labels[count];
-
-  assert(hsk_dns_label_split(name, labels, count) == count);
-
-  char label[HSK_DNS_MAX_LABEL + 1];
-  int len;
-
-  len = hsk_dns_label_get2(name, labels, count, 1, label);
-
-  if (len < 2)
-    return false;
-
-  if (label[0] != '_')
-    return false;
-
-  if (protocol) {
-    strcpy(protocol, &label[1]);
-    hsk_to_lower(protocol);
-  }
-
-  len = hsk_dns_label_get2(name, labels, count, 0, label);
-
-  if (len < 2)
-    return false;
-
-  if (label[0] != '_')
-    return false;
-
-  if (service) {
-    strcpy(service, &label[1]);
-    hsk_to_lower(service);
-  }
-
-  return true;
-}
-
-bool
-hsk_dns_label_is_srv(const char *name) {
-  return hsk_dns_label_decode_srv(name, NULL, NULL);
-}
-
-bool
-hsk_dns_label_decode_tlsa(const char *name, char *protocol, uint16_t *port) {
-  int count = hsk_dns_label_count(name);
-
-  if (count < 3)
-    return false;
-
-  uint8_t labels[count];
-
-  assert(hsk_dns_label_split(name, labels, count) == count);
-
-  char label[HSK_DNS_MAX_LABEL + 1];
-  int len;
-
-  len = hsk_dns_label_get2(name, labels, count, 1, label);
-
-  if (len < 2)
-    return false;
-
-  if (label[0] != '_')
-    return false;
-
-  if (protocol) {
-    strcpy(protocol, &label[1]);
-    hsk_to_lower(protocol);
-  }
-
-  len = hsk_dns_label_get2(name, labels, count, 0, label);
-
-  if (len < 2 || len > 6)
-    return false;
-
-  if (label[0] != '_')
-    return false;
-
-  uint32_t word = 0;
-  char *s = &label[1];
-
-  while (*s) {
-    int ch = ((int)*s) - 0x30;
-
-    if (ch < 0 || ch > 9)
-      return false;
-
-    word *= 10;
-    word += ch;
-
-    if (word > 0xffff)
-      return false;
-
-    s += 1;
-  }
-
-  if (port)
-    *port = (uint16_t)word;
-
-  return true;
-}
-
-bool
-hsk_dns_label_is_tlsa(const char *name) {
-  return hsk_dns_label_decode_tlsa(name, NULL, NULL);
-}
-
-static bool
-hsk_dns_label_decode_dane(const char *tag, const char *name, uint8_t *hash) {
-  int count = hsk_dns_label_count(name);
-
-  if (count < 3)
-    return false;
-
-  uint8_t labels[count];
-
-  assert(hsk_dns_label_split(name, labels, count) == count);
-
-  char label[HSK_DNS_MAX_LABEL + 1];
-  int len;
-
-  len = hsk_dns_label_get2(name, labels, count, 1, label);
-
-  if (len < 2)
-    return false;
-
-  if (strcasecmp(label, tag) != 0)
-    return false;
-
-  len = hsk_dns_label_get2(name, labels, count, 0, label);
-
-  if (len != 56)
-    return false;
-
-  if (!hsk_hex_decode(&label[0], hash))
-    return false;
-
-  return true;
-}
-
-static bool
-hsk_dns_label_is_dane(const char *tag, const char *name) {
-  return hsk_dns_label_decode_dane(tag, name, NULL);
-}
-
-bool
-hsk_dns_label_decode_smimea(const char *name, uint8_t *hash) {
-  return hsk_dns_label_decode_dane("_smimecert", name, hash);
-}
-
-bool
-hsk_dns_label_is_smimea(const char *name) {
-  return hsk_dns_label_is_dane("_smimecert", name);
-}
-
-bool
-hsk_dns_label_decode_openpgpkey(const char *name, uint8_t *hash) {
-  return hsk_dns_label_decode_dane("_openpgpkey", name, hash);
-}
-
-bool
-hsk_dns_label_is_openpgpkey(const char *name) {
-  return hsk_dns_label_is_dane("_openpgpkey", name);
 }
 
 /*
@@ -2911,8 +2760,8 @@ hsk_dns_dnskey_keytag(const hsk_dns_dnskey_rd_t *rd) {
 
 bool
 hsk_dns_rrsig_tbs(hsk_dns_rrsig_rd_t *rrsig, uint8_t **data, size_t *data_len) {
-  char signer_name[HSK_DNS_MAX_NAME + 1];
-  strcpy(signer_name, rrsig->signer_name);
+  uint8_t signer_name[HSK_DNS_MAX_NAME];
+  memcpy(signer_name, rrsig->signer_name, sizeof(rrsig->signer_name));
 
   uint8_t *signature = rrsig->signature;
   size_t signature_len = rrsig->signature_len;
@@ -2923,7 +2772,7 @@ hsk_dns_rrsig_tbs(hsk_dns_rrsig_rd_t *rrsig, uint8_t **data, size_t *data_len) {
 
   bool ret = hsk_dns_rd_encode(rrsig, HSK_DNS_RRSIG, data, data_len);
 
-  strcpy(rrsig->signer_name, signer_name);
+  memcpy(rrsig->signer_name, signer_name, HSK_DNS_MAX_NAME);
   rrsig->signature = signature;
   rrsig->signature_len = signature_len;
 
@@ -2931,7 +2780,7 @@ hsk_dns_rrsig_tbs(hsk_dns_rrsig_rd_t *rrsig, uint8_t **data, size_t *data_len) {
 }
 
 hsk_dns_rr_t *
-hsk_dns_dnskey_create(const char *zone, const uint8_t *priv, bool ksk) {
+hsk_dns_dnskey_create(const uint8_t *name, const uint8_t *priv, bool ksk) {
   hsk_dns_rr_t *key = hsk_dns_rr_create(HSK_DNS_DNSKEY);
 
   if (!key)
@@ -2952,7 +2801,7 @@ hsk_dns_dnskey_create(const char *zone, const uint8_t *priv, bool ksk) {
     return NULL;
   }
 
-  strcpy(key->name, zone);
+  memcpy(key->name, name, HSK_DNS_MAX_NAME);
   hsk_to_lower(key->name);
   key->type = HSK_DNS_DNSKEY;
   key->class = HSK_DNS_IN;
@@ -2995,7 +2844,7 @@ hsk_dns_ds_create(const hsk_dns_rr_t *key) {
     return NULL;
   }
 
-  strcpy(ds->name, key->name);
+  memcpy(ds->name, key->name, HSK_DNS_MAX_NAME);
   hsk_to_lower(ds->name);
   ds->type = HSK_DNS_DS;
   ds->class = key->class;
@@ -3015,7 +2864,7 @@ hsk_dns_ds_create(const hsk_dns_rr_t *key) {
     return NULL;
   }
 
-  uint8_t owner[HSK_DNS_MAX_NAME + 1];
+  uint8_t owner[HSK_DNS_MAX_NAME];
   size_t owner_len = hsk_dns_name_pack(ds->name, owner);
 
   hsk_sha256_ctx ctx;
@@ -3094,14 +2943,14 @@ hsk_dns_sign_rrset(
     return NULL;
   }
 
-  strcpy(sig->name, rrset->items[0]->name);
+  memcpy(sig->name, rrset->items[0]->name, HSK_DNS_MAX_NAME);
   hsk_to_lower(sig->name);
   sig->type = HSK_DNS_RRSIG;
   sig->class = key->class;
   sig->ttl = key->ttl;
 
   rrsig->key_tag = key_tag;
-  strcpy(rrsig->signer_name, key->name);
+  memcpy(rrsig->signer_name, key->name, HSK_DNS_MAX_NAME);
   hsk_to_lower(rrsig->signer_name);
   rrsig->algorithm = dnskey->algorithm;
   rrsig->inception = hsk_now() - (14 * 24 * 60 * 60);
@@ -3351,20 +3200,20 @@ hsk_dns_rrs_clean(hsk_dns_rrs_t *rrs, uint16_t type) {
  */
 
 bool
-hsk_dns_is_subdomain(const char *parent, const char *child) {
+hsk_dns_is_subdomain(const uint8_t *parent, const uint8_t *child) {
   int parent_count = hsk_dns_label_count(parent);
   int child_count = hsk_dns_label_count(child);
 
-  if (parent_count >= child_count)
+  if (parent_count > child_count)
     return false;
 
   uint8_t child_labels[child_count];
   hsk_dns_label_split(child, child_labels, child_count);
 
-  char sub[HSK_DNS_MAX_LABEL + 1];
+  uint8_t sub[HSK_DNS_MAX_NAME] = {0};
   hsk_dns_label_from2(child, child_labels, child_count, parent_count * -1, sub);
 
-  return strcmp(sub, parent) == 0;
+  return hsk_dns_name_cmp(sub, parent) == 0;
 }
 
 static int

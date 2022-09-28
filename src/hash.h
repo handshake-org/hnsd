@@ -39,7 +39,7 @@ hsk_hash_sha3_key(
 );
 
 void
-hsk_hash_name(const char *name, uint8_t *hash);
+hsk_hash_tld(const uint8_t *tld, uint8_t *hash);
 
 void
 hsk_hash_sha256(const uint8_t *data, size_t data_len, uint8_t *hash);

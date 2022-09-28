@@ -444,7 +444,7 @@ hsk_rs_worker_free(hsk_rs_worker_t *worker) {
 }
 
 int
-hsk_rs_worker_resolve(hsk_rs_worker_t *worker, char *name, int rrtype,
+hsk_rs_worker_resolve(hsk_rs_worker_t *worker, uint8_t *name, int rrtype,
                       int rrclass, void *data, ub_callback_type callback) {
   if (!callback)
     return HSK_EBADARGS;
@@ -468,7 +468,14 @@ hsk_rs_worker_resolve(hsk_rs_worker_t *worker, char *name, int rrtype,
   // avoid racing with the callback.
   hsk_rs_pending_enqueue(worker->rs_pending, rsp);
 
-  int rc = ub_resolve_async(worker->ub, name, rrtype, rrclass, (void *)rsp,
+  // Unbound's name resolution API expects a single null-terminated string.
+  // Since 0x00 is a valid byte mid-label in wire format we need to
+  // convert `req->name` to presentation format (i.e. "\000" for 0x00)
+  char namestr[HSK_DNS_MAX_NAME_STRING];
+  if (!hsk_dns_name_to_string(name, namestr))
+    return HSK_EFAILURE;
+
+  int rc = ub_resolve_async(worker->ub, namestr, rrtype, rrclass, (void *)rsp,
                             after_resolve_onthread, &rsp->async_id);
   if (rc) {
     // Remove the response since it couldn't be sent.
@@ -476,7 +483,7 @@ hsk_rs_worker_resolve(hsk_rs_worker_t *worker, char *name, int rrtype,
     hsk_rs_worker_log(worker, "unbound error: %s\n", ub_strerror(rc));
     return HSK_EFAILURE;
   }
-  hsk_rs_worker_log(worker, "request %d: %s\n", rsp->async_id, name);
+  hsk_rs_worker_log(worker, "request %d: %s\n", rsp->async_id, namestr);
 
   return HSK_SUCCESS;
 }

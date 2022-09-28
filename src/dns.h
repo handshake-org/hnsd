@@ -6,202 +6,11 @@
 #include <stdlib.h>
 #include "map.h"
 
-typedef struct hsk_dns_rr_s {
-  char name[256];
-  uint16_t type;
-  uint16_t class;
-  uint32_t ttl;
-  void *rd;
-} hsk_dns_rr_t;
-
-typedef hsk_dns_rr_t hsk_dns_qs_t;
-
-typedef struct hsk_dns_rrs_s {
-  size_t size;
-  hsk_dns_rr_t *items[255];
-} hsk_dns_rrs_t;
-
-typedef struct hsk_dns_msg_s {
-  uint16_t id;
-  uint8_t opcode;
-  uint16_t code;
-  uint16_t flags;
-  hsk_dns_rrs_t qd;
-  hsk_dns_rrs_t an;
-  hsk_dns_rrs_t ns;
-  hsk_dns_rrs_t ar;
-  struct {
-    bool enabled;
-    uint8_t version;
-    uint16_t flags;
-    uint16_t size;
-    uint8_t code;
-    size_t rd_len;
-    uint8_t *rd;
-  } edns;
-} hsk_dns_msg_t;
-
-typedef struct hsk_dns_txt_s {
-  uint8_t data_len;
-  uint8_t data[255];
-} hsk_dns_txt_t;
-
-typedef struct hsk_dns_txts_s {
-  size_t size;
-  hsk_dns_txt_t *items[255];
-} hsk_dns_txts_t;
-
-typedef struct {
-  size_t rd_len;
-  uint8_t *rd;
-} hsk_dns_unknown_rd_t;
-
-typedef struct {
-  char ns[256];
-  char mbox[256];
-  uint32_t serial;
-  uint32_t refresh;
-  uint32_t retry;
-  uint32_t expire;
-  uint32_t minttl;
-} hsk_dns_soa_rd_t;
-
-typedef struct {
-  uint8_t addr[4];
-} hsk_dns_a_rd_t;
-
-typedef struct {
-  uint8_t addr[16];
-} hsk_dns_aaaa_rd_t;
-
-typedef struct {
-  uint8_t version;
-  uint8_t size;
-  uint8_t horiz_pre;
-  uint8_t vert_pre;
-  uint32_t latitude;
-  uint32_t longitude;
-  uint32_t altitude;
-} hsk_dns_loc_rd_t;
-
-typedef struct {
-  char target[256];
-} hsk_dns_cname_rd_t;
-
-typedef struct {
-  char target[256];
-} hsk_dns_dname_rd_t;
-
-typedef struct {
-  char ns[256];
-} hsk_dns_ns_rd_t;
-
-typedef struct {
-  uint16_t preference;
-  char mx[256];
-} hsk_dns_mx_rd_t;
-
-typedef struct {
-  char ptr[256];
-} hsk_dns_ptr_rd_t;
-
-typedef struct {
-  uint16_t priority;
-  uint16_t weight;
-  uint16_t port;
-  char target[256];
-} hsk_dns_srv_rd_t;
-
-typedef struct {
-  hsk_dns_txts_t txts;
-} hsk_dns_txt_rd_t;
-
-typedef struct {
-  uint16_t key_tag;
-  uint8_t algorithm;
-  uint8_t digest_type;
-  size_t digest_len;
-  uint8_t *digest;
-} hsk_dns_ds_rd_t;
-
-typedef struct {
-  uint8_t usage;
-  uint8_t selector;
-  uint8_t matching_type;
-  size_t certificate_len;
-  uint8_t *certificate;
-} hsk_dns_tlsa_rd_t;
-
-#define hsk_dns_smimea_rd_t hsk_dns_tlsa_rd_t
-
-typedef struct {
-  uint8_t algorithm;
-  uint8_t digest_type;
-  size_t fingerprint_len;
-  uint8_t *fingerprint;
-} hsk_dns_sshfp_rd_t;
-
-typedef struct {
-  size_t pubkey_len;
-  uint8_t *pubkey;
-} hsk_dns_openpgpkey_rd_t;
-
-typedef struct {
-  size_t rd_len;
-  uint8_t *rd;
-} hsk_dns_opt_rd_t;
-
-typedef struct {
-  uint16_t flags;
-  uint8_t protocol;
-  uint8_t algorithm;
-  size_t pubkey_len;
-  uint8_t *pubkey;
-} hsk_dns_dnskey_rd_t;
-
-typedef struct {
-  uint16_t type_covered;
-  uint8_t algorithm;
-  uint8_t labels;
-  uint32_t orig_ttl;
-  uint32_t expiration;
-  uint32_t inception;
-  uint16_t key_tag;
-  char signer_name[256];
-  size_t signature_len;
-  uint8_t *signature;
-} hsk_dns_rrsig_rd_t;
-
-typedef struct {
-  uint16_t priority;
-  uint16_t weight;
-  uint8_t data_len;
-  uint8_t data[255];
-} hsk_dns_uri_rd_t;
-
-typedef struct {
-  char mbox[256];
-  char txt[256];
-} hsk_dns_rp_rd_t;
-
-typedef struct {
-  char next_domain[256];
-  size_t type_map_len;
-  uint8_t *type_map;
-} hsk_dns_nsec_rd_t;
-
-typedef struct {
-  hsk_map_t map;
-  uint8_t *msg;
-} hsk_dns_cmp_t;
-
-typedef struct {
-  uint8_t *msg;
-  size_t msg_len;
-} hsk_dns_dmp_t;
-
 // Constants
+// HSK_DNS_MAX_NAME includes all length bytes and final 0x00
 #define HSK_DNS_MAX_NAME 255
+// Byte arrays that include a length byte and final 0x00 (".")
+// will need to be size HSK_DNS_MAX_LABEL + 2
 #define HSK_DNS_MAX_LABEL 63
 #define HSK_DNS_MAX_SANITIZED 1009
 #define HSK_DNS_MAX_LABELS 128
@@ -209,6 +18,25 @@ typedef struct {
 #define HSK_DNS_STD_EDNS 1280
 #define HSK_DNS_MAX_EDNS 4096
 #define HSK_DNS_MAX_TCP 65535
+/*
+ * Bytes:     (3 x (0x3f + max label))
+ *          + (1 x (0x3d + remainder label))
+ *          + (0x00)
+ *
+ * String:    (3 x (max label + '.'))
+ *          + (1 x (remainder label + '.'))
+ *          + '\0'
+ *
+ * Each byte takes either 1 or 4 characters (\\DDD if unprintable)
+ *
+ *          = (3 * (63 * 4 + 1)) + ((61 * 4 + 1)) + 1
+ */
+#define HSK_DNS_MAX_NAME_STRING 1005
+#define HSK_DNS_POINTER 0xc0
+#define HSK_DNS_POINTER_BASE 0xc000
+// Pointers are flagged by setting two top bits (0xc000)
+// therefore this is the maximum pointer position value 
+#define HSK_DNS_POINTER_MAX 0x3fff
 
 // Opcodes
 #define HSK_DNS_QUERY 0
@@ -371,6 +199,200 @@ typedef struct {
 #define HSK_DNS_OPT_LOCALSTART 65001 // Beginning of local/experimental use
 #define HSK_DNS_OPT_LOCALEND 65534 // End of local/experimental use
 
+typedef struct hsk_dns_rr_s {
+  uint8_t name[HSK_DNS_MAX_NAME];
+  uint16_t type;
+  uint16_t class;
+  uint32_t ttl;
+  void *rd;
+} hsk_dns_rr_t;
+
+typedef hsk_dns_rr_t hsk_dns_qs_t;
+
+typedef struct hsk_dns_rrs_s {
+  size_t size;
+  hsk_dns_rr_t *items[255];
+} hsk_dns_rrs_t;
+
+typedef struct hsk_dns_msg_s {
+  uint16_t id;
+  uint8_t opcode;
+  uint16_t code;
+  uint16_t flags;
+  hsk_dns_rrs_t qd;
+  hsk_dns_rrs_t an;
+  hsk_dns_rrs_t ns;
+  hsk_dns_rrs_t ar;
+  struct {
+    bool enabled;
+    uint8_t version;
+    uint16_t flags;
+    uint16_t size;
+    uint8_t code;
+    size_t rd_len;
+    uint8_t *rd;
+  } edns;
+} hsk_dns_msg_t;
+
+typedef struct hsk_dns_txt_s {
+  uint8_t data_len;
+  uint8_t data[255];
+} hsk_dns_txt_t;
+
+typedef struct hsk_dns_txts_s {
+  size_t size;
+  hsk_dns_txt_t *items[255];
+} hsk_dns_txts_t;
+
+typedef struct {
+  size_t rd_len;
+  uint8_t *rd;
+} hsk_dns_unknown_rd_t;
+
+typedef struct {
+  uint8_t ns[HSK_DNS_MAX_NAME];
+  uint8_t mbox[HSK_DNS_MAX_NAME];
+  uint32_t serial;
+  uint32_t refresh;
+  uint32_t retry;
+  uint32_t expire;
+  uint32_t minttl;
+} hsk_dns_soa_rd_t;
+
+typedef struct {
+  uint8_t addr[4];
+} hsk_dns_a_rd_t;
+
+typedef struct {
+  uint8_t addr[16];
+} hsk_dns_aaaa_rd_t;
+
+typedef struct {
+  uint8_t version;
+  uint8_t size;
+  uint8_t horiz_pre;
+  uint8_t vert_pre;
+  uint32_t latitude;
+  uint32_t longitude;
+  uint32_t altitude;
+} hsk_dns_loc_rd_t;
+
+typedef struct {
+  uint8_t target[HSK_DNS_MAX_NAME];
+} hsk_dns_cname_rd_t;
+
+typedef struct {
+  uint8_t target[HSK_DNS_MAX_NAME];
+} hsk_dns_dname_rd_t;
+
+typedef struct {
+  uint8_t ns[HSK_DNS_MAX_NAME];
+} hsk_dns_ns_rd_t;
+
+typedef struct {
+  uint16_t preference;
+  uint8_t mx[HSK_DNS_MAX_NAME];
+} hsk_dns_mx_rd_t;
+
+typedef struct {
+  uint8_t ptr[HSK_DNS_MAX_NAME];
+} hsk_dns_ptr_rd_t;
+
+typedef struct {
+  uint16_t priority;
+  uint16_t weight;
+  uint16_t port;
+  uint8_t target[HSK_DNS_MAX_NAME];
+} hsk_dns_srv_rd_t;
+
+typedef struct {
+  hsk_dns_txts_t txts;
+} hsk_dns_txt_rd_t;
+
+typedef struct {
+  uint16_t key_tag;
+  uint8_t algorithm;
+  uint8_t digest_type;
+  size_t digest_len;
+  uint8_t *digest;
+} hsk_dns_ds_rd_t;
+
+typedef struct {
+  uint8_t usage;
+  uint8_t selector;
+  uint8_t matching_type;
+  size_t certificate_len;
+  uint8_t *certificate;
+} hsk_dns_tlsa_rd_t;
+
+#define hsk_dns_smimea_rd_t hsk_dns_tlsa_rd_t
+
+typedef struct {
+  uint8_t algorithm;
+  uint8_t digest_type;
+  size_t fingerprint_len;
+  uint8_t *fingerprint;
+} hsk_dns_sshfp_rd_t;
+
+typedef struct {
+  size_t pubkey_len;
+  uint8_t *pubkey;
+} hsk_dns_openpgpkey_rd_t;
+
+typedef struct {
+  size_t rd_len;
+  uint8_t *rd;
+} hsk_dns_opt_rd_t;
+
+typedef struct {
+  uint16_t flags;
+  uint8_t protocol;
+  uint8_t algorithm;
+  size_t pubkey_len;
+  uint8_t *pubkey;
+} hsk_dns_dnskey_rd_t;
+
+typedef struct {
+  uint16_t type_covered;
+  uint8_t algorithm;
+  uint8_t labels;
+  uint32_t orig_ttl;
+  uint32_t expiration;
+  uint32_t inception;
+  uint16_t key_tag;
+  uint8_t signer_name[HSK_DNS_MAX_NAME];
+  size_t signature_len;
+  uint8_t *signature;
+} hsk_dns_rrsig_rd_t;
+
+typedef struct {
+  uint16_t priority;
+  uint16_t weight;
+  uint8_t data_len;
+  uint8_t data[255];
+} hsk_dns_uri_rd_t;
+
+typedef struct {
+  uint8_t mbox[HSK_DNS_MAX_NAME];
+  uint8_t txt[HSK_DNS_MAX_NAME];
+} hsk_dns_rp_rd_t;
+
+typedef struct {
+  uint8_t next_domain[HSK_DNS_MAX_NAME];
+  size_t type_map_len;
+  uint8_t *type_map;
+} hsk_dns_nsec_rd_t;
+
+typedef struct {
+  hsk_map_t map;
+  uint8_t *msg;
+} hsk_dns_cmp_t;
+
+typedef struct {
+  uint8_t *msg;
+  size_t msg_len;
+} hsk_dns_dmp_t;
+
 void
 hsk_dns_msg_init(hsk_dns_msg_t *msg);
 
@@ -444,7 +466,7 @@ void
 hsk_dns_qs_free(hsk_dns_qs_t *qs);
 
 void
-hsk_dns_qs_set(hsk_dns_qs_t *qs, const char *name, uint16_t type);
+hsk_dns_qs_set(hsk_dns_qs_t *qs, const uint8_t *name, uint16_t type);
 
 int
 hsk_dns_qs_write(const hsk_dns_qs_t *qs, uint8_t **data, hsk_dns_cmp_t *cmp);
@@ -472,8 +494,8 @@ hsk_dns_rr_create(uint16_t type);
 void
 hsk_dns_rr_free(hsk_dns_rr_t *rr);
 
-bool
-hsk_dns_rr_set_name(hsk_dns_rr_t *rr, const char *name);
+void
+hsk_dns_rr_set_name(hsk_dns_rr_t *rr, const uint8_t *name);
 
 int
 hsk_dns_rr_write(const hsk_dns_rr_t *rr, uint8_t **data, hsk_dns_cmp_t *cmp);
@@ -588,26 +610,57 @@ hsk_dns_txt_alloc(void);
 void
 hsk_dns_txt_free(hsk_dns_txt_t *txt);
 
+/**
+ * Returns: length of uncompressed name
+ * In:      data_:      pointer to the beginning of a compressed wire-formatted
+ *                      name in a DNS message
+ *          data_len_:  pointer to remaining length of data in the `data_`
+ *                      byte array
+ *          dmp:        complete copy of the DNS message for pointer reference
+ * Out:     name:       (optional) the uncompressed name read from `data_`
+ *                      as a byte array, serialized in DNS wire format
+ */
 int
 hsk_dns_name_parse(
   uint8_t **data_,
   size_t *data_len_,
   const hsk_dns_dmp_t *dmp,
-  char *name
+  uint8_t *name
 );
 
-int
-hsk_dns_name_pack(const char *name, uint8_t *data);
+/**
+ * Returns: boolean (success)
+ * In:      name:  pointer to uncompressed wire-formatted name in a byte array.
+ *                 This function does NO CHECKS. Input must be valid length,
+ *                 all lower-case, etc.
+ * Out:  namestr:  pointer to destination string for domain name in presentation
+ *                 format (printable characters with dots and ending in \0).
+ */
+bool
+hsk_dns_name_to_string(const uint8_t *name, char *namestr);
+
+/**
+ * Returns: boolean (success)
+ * In:   namestr:  pointer to source string for domain name in presentation
+ *                 format (printable characters with dots and ending in \0).
+ * Out:     name:  pointer to destination byte array for domain name in
+ *                 uncompressed wire format.
+ */
+bool
+hsk_dns_name_from_string(const char *namestr, uint8_t *name);
 
 int
-hsk_dns_name_write(const char *name, uint8_t **data, hsk_dns_cmp_t *cmp);
+hsk_dns_name_pack(const uint8_t *name, uint8_t *data);
+
+int
+hsk_dns_name_write(const uint8_t *name, uint8_t **data, hsk_dns_cmp_t *cmp);
 
 bool
 hsk_dns_name_read(
   uint8_t **data,
   size_t *data_len,
   const hsk_dns_dmp_t *dmp,
-  char *name
+  uint8_t *name
 );
 
 int
@@ -617,125 +670,94 @@ hsk_dns_name_read_size(
   const hsk_dns_dmp_t *dmp
 );
 
+/**
+ * Verify a single label (TLD) follows Handshake protocol rules
+ */
 bool
-hsk_dns_name_alloc(
-  uint8_t **data,
-  size_t *data_len,
-  const hsk_dns_dmp_t *dmp,
-  char **name
-);
-
-bool
-hsk_dns_name_dirty(const char *name);
-
-void
-hsk_dns_name_sanitize(const char *name, char *out);
-
-bool
-hsk_dns_name_verify(const char *name);
-
-bool
-hsk_dns_name_is_fqdn(const char *name);
+hsk_dns_name_verify(const uint8_t *name);
 
 int
-hsk_dns_name_cmp(const char *a, const char *b);
+hsk_dns_name_cmp(const uint8_t *a, const uint8_t *b);
+
+bool
+hsk_dns_name_equal(const void *a, const void *b);
 
 /**
  * Returns: number of labels found in the name
- * In:      name:   pointer to string containing full domain name
-            size:   max number of labels expected in the name
+ * In:      name:   pointer to byte array containing full domain name
+ *          size:   max number of labels expected in the name
  * Out:     labels: if present, array is filled with offset (in bytes)
  *                  of starting point of each label in name
  */
 int
-hsk_dns_label_split(const char *name, uint8_t *labels, size_t size);
+hsk_dns_label_split(const uint8_t *name, uint8_t *labels, size_t size);
 
 /**
  * Returns: number of labels in the name
- * In:      name:   pointer to string containing full domain name
+ * In:      name:   pointer to byte array containing full domain name
  */
 int
-hsk_dns_label_count(const char *name);
+hsk_dns_label_count(const uint8_t *name);
 
 /**
- * Returns: length of string from requested label through end of name
- * In:      name:   pointer to string containing full domain name
+ * Returns: length of byte array from requested label through end of name
+ *          this includes all length bytes and terminal 0x00 byte.
+ * In:      name:   pointer to byte array containing full domain name
  *          labels: pointer to array of offsets of each label in name
  *          count:  number of labels in the name
  *          index:  index of starting label in name to return
  *                  (-1 = last label, TLD)
- * Out:     ret:    pointer to string to be filled with name from
- *                  specified label through end of name
+ * Out:     ret:    pointer to byte array to be filled with name from
+ *                  specified label through end of name including final 0x00
  */
 int
 hsk_dns_label_from2(
-  const char *name,
+  const uint8_t *name,
   uint8_t *labels,
   int count,
   int index,
-  char *ret
+  uint8_t *ret
 );
 
 /**
- * Returns: length of string from requested label through end of name
- * In:      name:   pointer to string containing full domain name
+ * Returns: length of byte array from requested label through end of name
+ *          this includes all length bytes and terminal 0x00 byte.
+ * In:      name:   pointer to byte array containing full domain name
  *          index:  index of starting label in name to return
  *                  (-1 = last label, TLD)
- * Out:     ret:    pointer to string to be filled with name from
- *                  specified label through end of name
+ * Out:     ret:    pointer to byte array to be filled with name from
+ *                  specified label through end of name including final 0x00
  */
 int
-hsk_dns_label_from(const char *name, int index, char *ret);
+hsk_dns_label_from(const uint8_t *name, int index, uint8_t *ret);
 
 /**
- * Returns: length of requested label
- * In:      name:   pointer to string containing full domain name
+ * Returns: length of requested label (without length byte)
+ * In:      name:   pointer to byte array containing full domain name
  *          labels: pointer to array of offsets of each label in name
  *          count:  number of labels in the name
  *          index:  index of label in name to return (-1 = last label, TLD)
- * Out:     ret:    pointer to string to be filled with requested label
+ * Out:     ret:    pointer to byte array to be filled with requested label
+ *                  with length byte and trailing 0x00 (".")
  */
 int
 hsk_dns_label_get2(
-  const char *name,
+  const uint8_t *name,
   uint8_t *labels,
   int count,
   int index,
-  char *ret
+  uint8_t *ret
 );
 
 /**
- * Returns: length of requested label
- * In:      name:   pointer to string containing full domain name
+ * Returns: length of requested label (without length byte)
+ * In:      name:   pointer to byte array containing full domain name
  *          index:  index of label in name to return (-1 = last label, TLD)
- * Out:     ret:    pointer to string to be filled with requested label
+ * Out:     ret:    pointer to byte array to be filled with requested label
+ *                  with length byte and trailing 0x00 (".")
  */
 int
-hsk_dns_label_get(const char *name, int index, char *ret);
-
-bool
-hsk_dns_label_decode_srv(const char *name, char *protocol, char *service);
-
-bool
-hsk_dns_label_is_srv(const char *name);
-
-bool
-hsk_dns_label_decode_tlsa(const char *name, char *protocol, uint16_t *port);
-
-bool
-hsk_dns_label_is_tlsa(const char *name);
-
-bool
-hsk_dns_label_decode_smimea(const char *name, uint8_t *hash);
-
-bool
-hsk_dns_label_is_smimea(const char *name);
-
-bool
-hsk_dns_label_decode_openpgpkey(const char *name, uint8_t *hash);
-
-bool
-hsk_dns_label_is_openpgpkey(const char *name);
+hsk_dns_label_get(const uint8_t *name, int index, uint8_t *ret);
 
 /*
  * DNSSEC
@@ -748,7 +770,7 @@ bool
 hsk_dns_rrsig_tbs(hsk_dns_rrsig_rd_t *rrsig, uint8_t **data, size_t *data_len);
 
 hsk_dns_rr_t *
-hsk_dns_dnskey_create(const char *zone, const uint8_t *priv, bool ksk);
+hsk_dns_dnskey_create(const uint8_t *name, const uint8_t *priv, bool ksk);
 
 hsk_dns_rr_t *
 hsk_dns_ds_create(const hsk_dns_rr_t *key);
@@ -789,6 +811,6 @@ hsk_dns_rrs_clean(hsk_dns_rrs_t *rrs, uint16_t type);
  */
 
 bool
-hsk_dns_is_subdomain(const char *parent, const char *child);
+hsk_dns_is_subdomain(const uint8_t *parent, const uint8_t *child);
 
 #endif

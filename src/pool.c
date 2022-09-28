@@ -195,7 +195,7 @@ hsk_pool_uninit(hsk_pool_t *pool) {
     hsk_peer_destroy(peer);
   }
 
-  hsk_name_req_t *req, *n;
+  hsk_tld_req_t *req, *n;
   for (req = pool->pending; req; req = n) {
     n = req->next;
     free(req);
@@ -502,11 +502,13 @@ hsk_pool_pick_prover(hsk_pool_t *pool, const uint8_t *name_hash) {
 int
 hsk_pool_resolve(
   hsk_pool_t *pool,
-  const char *name,
+  const uint8_t *tld,
   hsk_resolve_cb callback,
   const void *arg
 ) {
-  hsk_pool_log(pool, "sending proof request for: %s.\n", name);
+  char namestr[HSK_DNS_MAX_NAME_STRING] = {0};
+  assert(hsk_dns_name_to_string(tld, namestr));
+  hsk_pool_log(pool, "sending proof request for: %s\n", namestr);
 
   if (!hsk_chain_synced(&pool->chain)) {
     hsk_pool_log(pool, "cannot send proof request: chain not synced.\n");
@@ -514,14 +516,15 @@ hsk_pool_resolve(
   }
 
   const uint8_t *root = hsk_chain_safe_root(&pool->chain);
-  hsk_name_req_t *req = malloc(sizeof(hsk_name_req_t));
+  hsk_tld_req_t *req = malloc(sizeof(hsk_tld_req_t));
 
   if (!req)
     return HSK_ENOMEM;
 
-  strcpy(req->name, name);
+  // Copy length byte, label bytes, and terminal 0x00 (".")
+  memcpy(req->tld, tld, tld[0] + 2);
 
-  hsk_hash_name(name, req->hash);
+  hsk_hash_tld(tld, req->hash);
 
   memcpy(req->root, root, 32);
 
@@ -541,7 +544,7 @@ hsk_pool_resolve(
     return HSK_SUCCESS;
   }
 
-  hsk_name_req_t *head = hsk_map_get(&peer->names, req->hash);
+  hsk_tld_req_t *head = hsk_map_get(&peer->names, req->hash);
 
   if (!hsk_map_set(&peer->names, req->hash, (void *)req)) {
     free(req);
@@ -549,13 +552,13 @@ hsk_pool_resolve(
   }
 
   if (head) {
-    hsk_peer_log(peer, "already requesting proof for: %s.\n", name);
+    hsk_peer_log(peer, "already requesting proof for: %s\n", namestr);
     req->next = head;
     req->time = head->time;
     return HSK_SUCCESS;
   }
 
-  hsk_peer_log(peer, "sending proof request for: %s.\n", name);
+  hsk_peer_log(peer, "sending proof request for: %s\n", namestr);
 
   return hsk_peer_send_getproof(peer, req->hash, root);
 }
@@ -566,7 +569,7 @@ hsk_pool_resend(hsk_pool_t *pool) {
     return;
 
   uint8_t *root = pool->chain.tip->name_root;
-  hsk_name_req_t *req = pool->pending;
+  hsk_tld_req_t *req = pool->pending;
 
   if (!req)
     return;
@@ -576,7 +579,7 @@ hsk_pool_resend(hsk_pool_t *pool) {
   if (!peer)
     return;
 
-  hsk_name_req_t *next;
+  hsk_tld_req_t *next;
 
   pool->pending = NULL;
   pool->pending_count = 0;
@@ -592,7 +595,7 @@ hsk_pool_resend(hsk_pool_t *pool) {
     req->next = NULL;
     req->time = now;
 
-    hsk_name_req_t *head = hsk_map_get(&peer->names, req->hash);
+    hsk_tld_req_t *head = hsk_map_get(&peer->names, req->hash);
 
     if (!hsk_map_set(&peer->names, req->hash, (void *)req)) {
       free(req);
@@ -630,10 +633,10 @@ hsk_pool_merge_reqs(hsk_pool_t *pool, hsk_map_t *map) {
     if (!hsk_map_exists(map, i))
       continue;
 
-    hsk_name_req_t *req = (hsk_name_req_t *)hsk_map_value(map, i);
+    hsk_tld_req_t *req = (hsk_tld_req_t *)hsk_map_value(map, i);
     assert(req);
 
-    hsk_name_req_t *tail;
+    hsk_tld_req_t *tail;
     int count = 0;
 
     for (tail = req; tail; tail = tail->next) {
@@ -652,13 +655,13 @@ hsk_pool_merge_reqs(hsk_pool_t *pool, hsk_map_t *map) {
   hsk_map_reset(map);
 
   if (pool->pending_count > 100) {
-    hsk_name_req_t *req, *next;
+    hsk_tld_req_t *req, *next;
 
     for (req = pool->pending; req; req = next) {
       next = req->next;
 
       req->callback(
-        req->name,
+        req->tld,
         HSK_ETIMEOUT,
         false,
         NULL,
@@ -682,8 +685,8 @@ hsk_peer_timeout_reqs(hsk_peer_t *peer) {
     if (!hsk_map_exists(map, i))
       continue;
 
-    hsk_name_req_t *req = (hsk_name_req_t *)hsk_map_value(map, i);
-    hsk_name_req_t *next;
+    hsk_tld_req_t *req = (hsk_tld_req_t *)hsk_map_value(map, i);
+    hsk_tld_req_t *next;
 
     assert(req);
 
@@ -693,7 +696,7 @@ hsk_peer_timeout_reqs(hsk_peer_t *peer) {
       next = req->next;
 
       req->callback(
-        req->name,
+        req->tld,
         HSK_ETIMEOUT,
         false,
         NULL,
@@ -719,7 +722,7 @@ hsk_peer_is_overdue(hsk_peer_t *peer) {
     if (!hsk_map_exists(map, i))
       continue;
 
-    hsk_name_req_t *req = (hsk_name_req_t *)hsk_map_value(map, i);
+    hsk_tld_req_t *req = (hsk_tld_req_t *)hsk_map_value(map, i);
     assert(req);
 
     if (now > req->time + 5)
@@ -1521,7 +1524,7 @@ static int
 hsk_peer_handle_proof(hsk_peer_t *peer, const hsk_proof_msg_t *msg) {
   hsk_peer_log(peer, "received proof: %s\n", hsk_hex_encode32(msg->key));
 
-  hsk_name_req_t *reqs = hsk_map_get(&peer->names, msg->key);
+  hsk_tld_req_t *reqs = hsk_map_get(&peer->names, msg->key);
 
   if (!reqs) {
     hsk_peer_log(peer,
@@ -1530,7 +1533,9 @@ hsk_peer_handle_proof(hsk_peer_t *peer, const hsk_proof_msg_t *msg) {
     return HSK_EBADARGS;
   }
 
-  hsk_peer_log(peer, "received proof for: %s\n", reqs->name);
+  char namestr[HSK_DNS_MAX_NAME_STRING] = {0};
+  assert(hsk_dns_name_to_string(reqs->tld, namestr));
+  hsk_peer_log(peer, "received proof for: %s\n", namestr);
 
   if (memcmp(msg->root, reqs->root, 32) != 0) {
     hsk_peer_log(peer, "proof hash mismatch (why?)\n");
@@ -1557,13 +1562,13 @@ hsk_peer_handle_proof(hsk_peer_t *peer, const hsk_proof_msg_t *msg) {
 
   hsk_map_del(&peer->names, msg->key);
 
-  hsk_name_req_t *req, *next;
+  hsk_tld_req_t *req, *next;
 
   for (req = reqs; req; req = next) {
     next = req->next;
 
     req->callback(
-      req->name,
+      req->tld,
       HSK_SUCCESS,
       exists,
       data,
