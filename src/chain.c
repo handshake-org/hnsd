@@ -268,11 +268,6 @@ hsk_chain_maybe_sync(hsk_chain_t *chain) {
     return;
   }
 
-  if (HSK_USE_CHECKPOINTS) {
-    if (chain->height < HSK_LAST_CHECKPOINT)
-      return;
-  }
-
   if (((int64_t)chain->tip->time) < now - HSK_MAX_TIP_AGE)
     return;
 
