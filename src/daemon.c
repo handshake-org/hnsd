@@ -537,6 +537,23 @@ int
 hsk_daemon_open(hsk_daemon_t *daemon, hsk_options_t *opt) {
   int rc = HSK_SUCCESS;
 
+  if (opt->checkpoint && HSK_CHECKPOINT) {
+    hsk_checkpoint_t checkpoint;
+    uint8_t *data = (uint8_t *)HSK_CHECKPOINT;
+    size_t data_len = HSK_STORE_CHECKPOINT_SIZE;
+
+    // Read the hard-coded checkpoint
+    hsk_store_checkpoint_read(
+      &data,
+      &data_len,
+      &checkpoint
+    );
+
+    rc = hsk_chain_init_checkpoint(&daemon->pool->chain, &checkpoint);
+    if (rc != HSK_SUCCESS)
+      return rc;
+  }
+
   rc = hsk_pool_open(daemon->pool);
 
   if (rc != HSK_SUCCESS) {
