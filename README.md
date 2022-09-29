@@ -336,6 +336,12 @@ $ hnsd [options]
 -l, --log-file <filename>
   Redirect output to a log file.
 
+-a, --user-agent <string>
+  Add supplemental user agent string in p2p version message.
+
+-t, --checkpoint
+  Start chain sync from checkpoint.
+
 -d, --daemon
   Fork and background the process.
 
