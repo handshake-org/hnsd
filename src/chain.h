@@ -44,7 +44,6 @@ hsk_chain_alloc(const hsk_timedata_t *td);
 
 void
 hsk_chain_free(hsk_chain_t *chain);
-
 bool
 hsk_chain_has(const hsk_chain_t *chain, const uint8_t *hash);
 

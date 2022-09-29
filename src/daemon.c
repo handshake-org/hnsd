@@ -38,6 +38,7 @@ typedef struct hsk_options_s {
   char *seeds;
   int pool_size;
   char *user_agent;
+  bool checkpoint;
 } hsk_options_t;
 
 static void
@@ -55,6 +56,7 @@ hsk_options_init(hsk_options_t *opt) {
   opt->seeds = NULL;
   opt->pool_size = HSK_POOL_SIZE;
   opt->user_agent = NULL;
+  opt->checkpoint = false;
 }
 
 static void
@@ -150,6 +152,9 @@ help(int r) {
     "  -v, --version\n"
     "    Print version and network build information and exit.\n"
     "\n"
+    "  -t, --checkpoint\n"
+    "    Start chain sync from checkpoint.\n"
+    "\n"
 #ifndef _WIN32
     "  -d, --daemon\n"
     "    Fork and background the process.\n"
@@ -165,7 +170,8 @@ help(int r) {
 
 static void
 parse_arg(int argc, char **argv, hsk_options_t *opt) {
-  const static char *optstring = "hvc:n:r:i:u:p:k:s:l:a:"
+  const static char *optstring = "hvtc:n:r:i:u:p:k:s:l:h:a:"
+
 #ifndef _WIN32
     "d"
 #endif
@@ -183,6 +189,7 @@ parse_arg(int argc, char **argv, hsk_options_t *opt) {
     { "seeds", required_argument, NULL, 's' },
     { "log-file", required_argument, NULL, 'l' },
     { "user-agent", required_argument, NULL, 'a' },
+    { "checkpoint", no_argument, NULL, 't' },
 #ifndef _WIN32
     { "daemon", no_argument, NULL, 'd' },
 #endif
@@ -331,6 +338,13 @@ parse_arg(int argc, char **argv, hsk_options_t *opt) {
           free(opt->user_agent);
 
         opt->user_agent = strdup(optarg);
+
+        break;
+      }
+
+      case 't': {
+
+        opt->checkpoint = true;
 
         break;
       }
@@ -560,6 +574,7 @@ hsk_daemon_open(hsk_daemon_t *daemon, hsk_options_t *opt) {
     );
 
     rc = hsk_chain_init_checkpoint(&daemon->pool->chain, &checkpoint);
+
     if (rc != HSK_SUCCESS)
       return rc;
   }
