@@ -2,6 +2,7 @@
 #define _HSK_CONSTANTS_H
 
 #include "genesis.h"
+#include "checkpoints.h"
 
 #define HSK_MAIN 0
 #define HSK_TESTNET 1
@@ -18,6 +19,7 @@
 #define HSK_SERVICES 0
 #define HSK_MAX_DATA_SIZE 668
 #define HSK_MAX_VALUE_SIZE 512
+#define HSK_HEADER_SIZE 236
 
 static const uint8_t HSK_ZERO_HASH[32] = {
   0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -78,6 +80,10 @@ static const uint8_t HSK_CHAINWORK[32] = {
 #define HSK_NO_RETARGETTING false
 #define HSK_GENESIS HSK_GENESIS_MAIN
 
+#define HSK_CHECKPOINT_HEIGHT HSK_CHECKPOINT_HEIGHT_MAIN
+#define HSK_CHECKPOINT_CHAINWORK HSK_CHECKPOINT_CHAINWORK_MAIN
+#define HSK_CHECKPOINT_HEADERS HSK_CHECKPOINT_HEADERS_MAIN
+
 #define HSK_MAX_TIP_AGE (24 * 60 * 60)
 #define HSK_LAUNCH_DATE 0xffffffff        // Used for maybe_sync, not useful
 
@@ -131,6 +137,11 @@ static const uint8_t HSK_CHAINWORK[32] = {
 #define HSK_NO_RETARGETTING false
 #define HSK_GENESIS HSK_GENESIS_TESTNET
 
+// Effectively, no checkpoint
+#define HSK_CHECKPOINT_HEIGHT 0
+#define HSK_CHECKPOINT_CHAINWORK NULL
+#define HSK_CHECKPOINT_HEADERS NULL
+
 #define HSK_MAX_TIP_AGE (2 * 7 * 24 * 60 * 60)
 #define HSK_LAUNCH_DATE 0xffffffff
 
@@ -173,6 +184,11 @@ static const uint8_t HSK_CHAINWORK[32] = {
 #define HSK_NO_RETARGETTING true
 #define HSK_GENESIS HSK_GENESIS_REGTEST
 
+// Effectively, no checkpoint
+#define HSK_CHECKPOINT_HEIGHT 0
+#define HSK_CHECKPOINT_CHAINWORK NULL
+#define HSK_CHECKPOINT_HEADERS NULL
+
 #define HSK_MAX_TIP_AGE (2 * 7 * 24 * 60 * 60)
 #define HSK_LAUNCH_DATE 0xffffffff
 
@@ -214,6 +230,11 @@ static const uint8_t HSK_CHAINWORK[32] = {
 #define HSK_TARGET_RESET false
 #define HSK_NO_RETARGETTING false
 #define HSK_GENESIS HSK_GENESIS_SIMNET
+
+// Effectively, no checkpoint
+#define HSK_CHECKPOINT_HEIGHT 0
+#define HSK_CHECKPOINT_CHAINWORK NULL
+#define HSK_CHECKPOINT_HEADERS NULL
 
 #define HSK_MAX_TIP_AGE (2 * 7 * 24 * 60 * 60)
 #define HSK_LAUNCH_DATE 0xffffffff
