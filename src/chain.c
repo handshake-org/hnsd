@@ -27,9 +27,6 @@ static int
 hsk_chain_init_genesis(hsk_chain_t *chain);
 
 static int
-hsk_chain_init_checkpoint(hsk_chain_t *chain);
-
-static int
 hsk_chain_insert(
   hsk_chain_t *chain,
   hsk_header_t *hdr,
@@ -88,11 +85,7 @@ hsk_chain_init(hsk_chain_t *chain, const hsk_timedata_t *td) {
   hsk_map_init_hash_map(&chain->orphans, free);
   hsk_map_init_hash_map(&chain->prevs, NULL);
 
-  int check = hsk_chain_init_genesis(chain);
-  if (check != HSK_SUCCESS)
-    return check;
-
-  return hsk_chain_init_checkpoint(chain);
+  return hsk_chain_init_genesis(chain);
 }
 
 static int
