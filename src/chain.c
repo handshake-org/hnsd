@@ -57,6 +57,17 @@ qsort_cmp(const void *a, const void *b) {
  * Chain
  */
 
+
+static void
+hsk_chain_log(const hsk_chain_t *chain, const char *fmt, ...) {
+  printf("chain (%u): ", (uint32_t)chain->height);
+
+  va_list args;
+  va_start(args, fmt);
+  vprintf(fmt, args);
+  va_end(args);
+}
+
 int
 hsk_chain_init(hsk_chain_t *chain, const hsk_timedata_t *td) {
   if (!chain || !td)
@@ -148,16 +159,6 @@ hsk_chain_free(hsk_chain_t *chain) {
 
   hsk_chain_uninit(chain);
   free(chain);
-}
-
-static void
-hsk_chain_log(const hsk_chain_t *chain, const char *fmt, ...) {
-  printf("chain (%u): ", (uint32_t)chain->height);
-
-  va_list args;
-  va_start(args, fmt);
-  vprintf(fmt, args);
-  va_end(args);
 }
 
 bool
