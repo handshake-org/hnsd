@@ -7,6 +7,7 @@
 #include <strings.h>
 #include <stdint.h>
 #include <stdbool.h>
+#include <ctype.h>
 
 #include "bio.h"
 #include "dns.h"
@@ -2102,46 +2103,72 @@ hsk_dns_name_parse(
 ) {
   uint8_t *data = *data_;
   size_t data_len = *data_len_;
+  // Offset of "data" being parsed (bytes)
   int off = 0;
+  // Offset of "name" output string (characters, potentially \\DDD-encoded)
   int noff = 0;
   int res = 0;
-  int max = HSK_DNS_MAX_NAME;
   int ptr = 0;
+  // Start total by accounting for the final terminator \0
+  uint16_t total = 1;
 
   for (;;) {
     if (off >= data_len)
       return -1;
 
+    // First byte (size of label)
     uint8_t c = data[off];
     off += 1;
 
+    // Only occurs at end of name (zero label)
     if (c == 0x00)
       break;
 
     switch (c & 0xc0) {
+      // Uncompressed label
       case 0x00: {
+        // Label size can not exceed maximum
         if (c > HSK_DNS_MAX_LABEL)
           return -1;
 
+        // Label size can not exceed length of data we are parsing
         if (off + c > data_len)
-          return -1; // EOF
+          return -1;
 
-        if (noff + c + 1 > max)
+        // Label can not extend full name past maximum including length byte
+        // and resolved compression pointers. 
+        total += c + 1;
+        if (total > HSK_DNS_MAX_NAME)
           return -1;
 
         int j;
         for (j = off; j < off + c; j++) {
           uint8_t b = data[j];
 
-          // Hack because we're
-          // using c-strings.
-          if (b == 0x00)
-            b = 0xff;
+          switch (b) {
+            // Escape special characters
+            case 0x2e /*.*/:
+            case 0x28 /*(*/:
+            case 0x29 /*)*/:
+            case 0x3b /*;*/:
+            case 0x20 /* */:
+            case 0x40 /*@*/:
+            case 0x22 /*"*/:
+            case 0x5c /*\\*/:
+              if (name)
+                sprintf(&name[noff], "\\%c", (char)b);
 
-          // This allows for double-dots
-          // too easily in our design.
-          if (b == 0x2e)
-            b = 0xfe;
+              noff += 2;
+              continue;
+            default:
+              if (b < 0x20 || b > 0x7e) {
+                if (name)
+                  sprintf(&name[noff], "\\%03d", b);
+
+                noff += 4;
+              continue;
+            }
+          }
 
           if (name)
             name[noff] = b;
@@ -2158,6 +2185,7 @@ hsk_dns_name_parse(
         break;
       }
 
+      // Compression pointer
       case 0xc0: {
         if (!dmp)
           return -1;
@@ -2169,6 +2197,9 @@ hsk_dns_name_parse(
 
         off += 1;
 
+        // If this is the first pointer, save the "resume"
+        // address so after the pointer is resolved the
+        // rest of the packet read continues from here.
         if (ptr == 0)
           res = off;
 
@@ -2191,6 +2222,7 @@ hsk_dns_name_parse(
     }
   }
 
+  // No pointers were used, resume from current offset.
   if (ptr == 0)
     res = off;
 
@@ -2224,17 +2256,69 @@ hsk_dns_name_serialize(
   int size;
   int i;
   char *s;
+  int size_adjust = 0;
+  bool escaped = false;
+  size_t max = strlen(name) - 1;
+  // Start total by accounting for the final terminator \0
+  uint16_t total = 1;
 
   for (s = (char *)name, i = 0; *s; s++, i++) {
+    // Check for escaped byte codes and adjust length measurement.
+    if (name[i] == '\\') {
+      // Check the next three bytes (if within string length)
+      // for three-digit code which must encode a one-byte value.
+      if (i + 3 <= max &&
+          isdigit(name[i + 1]) &&
+          isdigit(name[i + 2]) &&
+          isdigit(name[i + 3])) {
+        uint16_t value = (name[i + 1] - 0x30) * 100;
+        value += (name[i + 2] - 0x30) * 10;
+        value += (name[i + 3] - 0x30);
+
+        // Bad escape, byte code out of range.
+        if (value > 0xff) {
+          *len = off;
+          return false;
+        }
+
+        // The next three characters don't count towards final size.
+        size_adjust += 2;
+        s += 2;
+        i += 2;
+
+        // Escaped dot by byte code
+        if (value == 0x2e)
+          escaped = true;
+      }
+
+      // Literal escaped dot
+      if (i + 1 <= max && name[i + 1] == 0x2e)
+        escaped = true;
+
+      // Remove single slash and skip next character.
+      size_adjust += 1;
+      s += 1;
+      i += 1;
+
+      continue;
+    }
+
     if (name[i] == '.') {
-      if (i > 0 && name[i - 1] == '.') {
+      if (i > 0 && name[i - 1] == '.' && !escaped) {
+        // Multiple dots (escaped dot is ok)
         *len = off;
         return false;
       }
 
-      size = i - begin;
+      size = i - begin - size_adjust;
 
       if (size > HSK_DNS_MAX_LABEL) {
+        *len = off;
+        return false;
+      }
+
+      total += size + 1;
+      if (total > HSK_DNS_MAX_NAME) {
         *len = off;
         return false;
       }
@@ -2247,18 +2331,33 @@ hsk_dns_name_serialize(
         data[off] = size;
       }
 
+      // Label compression
       if (cmp) {
+        // Get remainder of name
         char *sub = (char *)&name[begin];
+        // Don't compress single dot
         if (strcmp(sub, ".") != 0) {
+          // Add remainder of name to map if it's not there already
           size_t p = (size_t)hsk_map_get(&cmp->map, sub);
           if (p == 0) {
             size_t o = (size_t)(&data[off] - cmp->msg);
             if (o < (2 << 13))
               hsk_map_set(&cmp->map, sub, (void *)o);
           } else {
+            // If the string was already in the map, point to it
+            // instead of repeating the string.
             if (ptr == -1) {
               ptr = p;
               pos = off;
+
+              // Ensure remainder of string won't exceed limit
+              total += strlen(s) - 1;
+              if (total > HSK_DNS_MAX_NAME) {
+                *len = off;
+                return false;
+              }
+
+              // Advance through end of duplicate string
               i += strlen(s);
               break;
             }
@@ -2272,14 +2371,35 @@ hsk_dns_name_serialize(
         int j;
         for (j = begin; j < i; j++) {
           char ch = name[j];
+          // Check for escaped byte codes and process into output result
+          if (ch == '\\') {
+            // Check the next three bytes (if within label length)
+            // for three-digit code which must encode a one-byte value.
+            if (j + 3 <= i &&
+                isdigit(name[j + 1]) &&
+                isdigit(name[j + 2]) &&
+                isdigit(name[j + 3])) {
+              // Compute byte from next three characters.
+              uint16_t value = (name[++j] - 0x30) * 100;
+              value += (name[++j] - 0x30) * 10;
+              value += (name[++j] - 0x30);
 
-          // 0xff -> NUL
-          if (ch == -1)
-            ch = '\0';
+              // Bad escape, byte code out of range.
+              if (value > 0xff) {
+                *len = off;
+                return false;
+              }
 
-          // 0xfe -> .
-          if (ch == -2)
-            ch = '.';
+              // Write
+              data[off++] = value;
+              continue;
+            } else {
+              // Remove single slash and write next character
+              // as long as there is a next character.
+              if (j + 1 < i)
+                ch = name[++j];
+            }
+          }
 
           data[off++] = ch;
         }
@@ -2288,10 +2408,13 @@ hsk_dns_name_serialize(
       }
 
       begin = i + 1;
+      size_adjust = 0;
     }
+
+    escaped = false;
   }
 
-  if (i > HSK_DNS_MAX_NAME) {
+  if (i > HSK_DNS_MAX_NAME_STRING) {
     *len = off;
     return false;
   }
@@ -2379,30 +2502,6 @@ hsk_dns_name_read_size(
 }
 
 bool
-hsk_dns_name_alloc(
-  uint8_t **data,
-  size_t *data_len,
-  const hsk_dns_dmp_t *dmp,
-  char **name
-) {
-  int size = hsk_dns_name_read_size(*data, *data_len, dmp);
-
-  if (size == -1)
-    return false;
-
-  char *n = malloc(size + 1);
-
-  if (!n)
-    return false;
-
-  assert(hsk_dns_name_read(data, data_len, dmp, n));
-
-  *name = n;
-
-  return true;
-}
-
-bool
 hsk_dns_name_dirty(const char *name) {
   char *s = (char *)name;
 
@@ -2427,53 +2526,6 @@ hsk_dns_name_dirty(const char *name) {
   }
 
   return false;
-}
-
-void
-hsk_dns_name_sanitize(const char *name, char *out) {
-  char *s = (char *)name;
-  int off = 0;
-
-  while (*s && off < HSK_DNS_MAX_SANITIZED) {
-    uint8_t c = (uint8_t)*s;
-
-    switch (c) {
-      case 0xfe: {
-        c = 0x2e;
-        ; // fall through
-      }
-      case 0x28 /*(*/:
-      case 0x29 /*)*/:
-      case 0x3b /*;*/:
-      case 0x20 /* */:
-      case 0x40 /*@*/:
-      case 0x22 /*"*/:
-      case 0x5c /*\\*/: {
-        out[off++] = '\\';
-        out[off++] = c;
-        break;
-      }
-      case 0xff: {
-        c = 0x00;
-        ; // fall through
-      }
-      default: {
-        if (c < 0x20 || c > 0x7e) {
-          out[off++] = '\\';
-          out[off++] = (c / 100) + 0x30;
-          out[off++] = (c / 10) + 0x30;
-          out[off++] = (c % 10) + 0x30;
-        } else {
-          out[off++] = c;
-        }
-        break;
-      }
-    }
-
-    s += 1;
-  }
-
-  out[off] = '\0';
 }
 
 bool
