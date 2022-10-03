@@ -36,6 +36,9 @@ hsk_chain_insert(
 static void
 hsk_chain_maybe_sync(hsk_chain_t *chain);
 
+static void
+hsk_chain_checkpoint_flush(hsk_chain_t *chain);
+
 /*
  * Helpers
  */
@@ -79,6 +82,7 @@ hsk_chain_init(hsk_chain_t *chain, const hsk_timedata_t *td) {
   chain->genesis = NULL;
   chain->synced = false;
   chain->td = (hsk_timedata_t *)td;
+  chain->prefix = NULL;
 
   hsk_map_init_hash_map(&chain->hashes, free);
   hsk_map_init_int_map(&chain->heights, NULL);
@@ -115,6 +119,7 @@ hsk_chain_init_genesis(hsk_chain_t *chain) {
   }
 
   chain->height = tip->height;
+  chain->init_height = tip->height;
   chain->tip = tip;
   chain->genesis = tip;
 
@@ -163,6 +168,7 @@ hsk_chain_init_checkpoint(hsk_chain_t *chain, hsk_checkpoint_t *checkpoint) {
     }
 
     chain->height = height;
+    chain->init_height = checkpoint->height;
     chain->tip = tip;
     chain->genesis = tip;
     prev_ptr = tip;
@@ -327,6 +333,36 @@ hsk_chain_maybe_sync(hsk_chain_t *chain) {
 
   hsk_chain_log(chain, "chain is fully synced\n");
   chain->synced = true;
+}
+
+static void
+hsk_chain_checkpoint_flush(hsk_chain_t *chain) {
+  // Skip first window after init to avoid re-writing the same checkpoint
+  if (chain->height - chain->init_height <= HSK_STORE_CHECKPOINT_WINDOW)
+    return;
+
+  hsk_checkpoint_t checkpoint;
+  checkpoint.height = chain->height - HSK_STORE_CHECKPOINT_WINDOW;
+  hsk_header_t *prev = hsk_chain_get_by_height(chain, checkpoint.height - 1);
+  memcpy(checkpoint.chainwork, prev->work, 32);
+
+  for (int i = 0; i < HSK_STORE_HEADERS_COUNT; i++) {
+    checkpoint.headers[i] = hsk_chain_get_by_height(
+      chain,
+      i + checkpoint.height);
+  }
+
+  if (hsk_store_write(&checkpoint, chain->prefix)) {
+    hsk_chain_log(
+      chain,
+      "saved checkpoint to disk from height %d\n",
+      checkpoint.height);
+  } else {
+    hsk_chain_log(
+      chain,
+      "failed to write checkpoint to disk from height %d\n",
+      checkpoint.height);
+  }
 }
 
 bool
@@ -768,6 +804,9 @@ hsk_chain_insert(
     hsk_chain_log(chain, "  new height: %u\n", (uint32_t)chain->height);
 
     hsk_chain_maybe_sync(chain);
+
+    if (chain->height % HSK_STORE_CHECKPOINT_WINDOW == 0)
+      hsk_chain_checkpoint_flush(chain);    
   }
 
   return HSK_SUCCESS;

@@ -38,6 +38,7 @@ typedef struct hsk_options_s {
   int pool_size;
   char *user_agent;
   bool checkpoint;
+  char *prefix;
 } hsk_options_t;
 
 static void
@@ -56,6 +57,7 @@ hsk_options_init(hsk_options_t *opt) {
   opt->pool_size = HSK_POOL_SIZE;
   opt->user_agent = NULL;
   opt->checkpoint = false;
+  opt->prefix = NULL;
 }
 
 static void
@@ -151,6 +153,9 @@ help(int r) {
     "  -t, --checkpoint\n"
     "    Start chain sync from checkpoint.\n"
     "\n"
+    "  -x, --prefix <directory name>\n"
+    "    Write/read state to/from disk in given directory.\n"
+    "\n"
 #ifndef _WIN32
     "  -d, --daemon\n"
     "    Fork and background the process.\n"
@@ -166,7 +171,7 @@ help(int r) {
 
 static void
 parse_arg(int argc, char **argv, hsk_options_t *opt) {
-  const static char *optstring = "tc:n:r:i:u:p:k:s:l:h:a:"
+  const static char *optstring = "tc:n:r:i:u:p:k:s:l:h:a:x:"
 #ifndef _WIN32
     "d"
 #endif
@@ -184,6 +189,7 @@ parse_arg(int argc, char **argv, hsk_options_t *opt) {
     { "log-file", required_argument, NULL, 'l' },
     { "user-agent", required_argument, NULL, 'a' },
     { "checkpoint", no_argument, NULL, 't' },
+    { "prefix", required_argument, NULL, 'x' },
 #ifndef _WIN32
     { "daemon", no_argument, NULL, 'd' },
 #endif
@@ -327,6 +333,18 @@ parse_arg(int argc, char **argv, hsk_options_t *opt) {
           free(opt->user_agent);
 
         opt->user_agent = strdup(optarg);
+
+        break;
+      }
+
+      case 'x': {
+        if (!optarg || strlen(optarg) == 0)
+          return help(1);
+
+        if (opt->prefix)
+          free(opt->prefix);
+
+        opt->prefix = strdup(optarg);
 
         break;
       }
@@ -566,6 +584,33 @@ hsk_daemon_open(hsk_daemon_t *daemon, hsk_options_t *opt) {
 
     if (rc != HSK_SUCCESS)
       return rc;
+  }
+
+  if (opt->prefix) {
+    if (!hsk_store_exists(opt->prefix)) {
+      fprintf(stderr, "prefix path does not exist\n");
+      return HSK_EBADARGS;
+    }
+
+    daemon->pool->chain.prefix = opt->prefix;
+
+    hsk_checkpoint_t checkpoint;
+
+    // Read/write our own local checkpoint
+    if (hsk_store_read(&checkpoint, opt->prefix)) {
+      rc = hsk_chain_init_checkpoint(&daemon->pool->chain, &checkpoint);
+
+      if (rc != HSK_SUCCESS) {
+        fprintf(stderr, "failed checkpoint init: %s\n", hsk_strerror(rc));
+        return rc;
+      }
+    } else {
+      fprintf(
+        stderr,
+        "could not open checkpoint file from prefix: %s\n",
+        opt->prefix
+      );
+    }
   }
 
   rc = hsk_pool_open(daemon->pool);
