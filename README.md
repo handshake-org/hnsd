@@ -304,6 +304,16 @@ and some of them are reqired to be installed manually.
 $ hnsd [options]
 ```
 
+**Reccomended usage:**
+
+```sh
+mkdir ~/.hnsd
+hnsd -t -x ~/.hnsd
+```
+
+This will start hnsd sync from the hard-coded checkpoint and continue to save
+its own checkpoints to disk to ensure rapid chain sync on future boots.
+
 ### Options
 
 ```
@@ -342,6 +352,9 @@ $ hnsd [options]
 -t, --checkpoint
   Start chain sync from checkpoint.
 
+-x, --prefix <directory name>
+  Write/read state to/from disk in given directory.
+  
 -d, --daemon
   Fork and background the process.
 
