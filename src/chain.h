@@ -16,6 +16,7 @@
 
 typedef struct hsk_chain_s {
   int64_t height;
+  uint32_t init_height;
   hsk_header_t *tip;
   hsk_header_t *genesis;
   bool synced;
@@ -24,6 +25,7 @@ typedef struct hsk_chain_s {
   hsk_map_t heights;
   hsk_map_t orphans;
   hsk_map_t prevs;
+  char *prefix;
 } hsk_chain_t;
 
 /*
