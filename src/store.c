@@ -28,15 +28,16 @@ hsk_store_exists(char *path) {
 }
 
 static int
-hsk_store_filename(char *prefix, char *path) {
+hsk_store_filename(char *prefix, char *path, bool tmp) {
   sprintf(
     path,
-    "%s%c%s_%s%s",
+    "%s%c%s_%s%s%c",
     prefix,
     HSK_PATH_SEP,
     HSK_STORE_FILENAME,
     HSK_NETWORK_NAME,
-    HSK_STORE_EXTENSION
+    HSK_STORE_EXTENSION,
+    tmp ? '~' : '\0'
   );
 
   return HSK_SUCCESS;
@@ -90,14 +91,20 @@ hsk_store_write(hsk_checkpoint_t *checkpoint, char *prefix) {
   }
 
   // Write
+  char tmp[HSK_STORE_PATH_MAX];
   char path[HSK_STORE_PATH_MAX];
-  hsk_store_filename(prefix, path);
-  FILE *file = fopen(path, "w");
+  hsk_store_filename(prefix, tmp, true);
+  hsk_store_filename(prefix, path, false);
+  FILE *file = fopen(tmp, "w");
   if (!file)
     return false;
   size_t written = fwrite(&buf, 1, HSK_STORE_CHECKPOINT_SIZE, file);
   fclose(file);
-  return written == HSK_STORE_CHECKPOINT_SIZE;
+
+  if (written != HSK_STORE_CHECKPOINT_SIZE)
+    return false;
+
+  return rename(tmp, path) == 0;
 }
 
 bool
@@ -107,7 +114,7 @@ hsk_store_read(hsk_checkpoint_t *checkpoint, char *prefix) {
   size_t data_len = HSK_STORE_CHECKPOINT_SIZE;
 
   char path[HSK_STORE_PATH_MAX];
-  hsk_store_filename(prefix, path);
+  hsk_store_filename(prefix, path, false);
   FILE *file = fopen(path, "r");
   if (!file)
     return false;
