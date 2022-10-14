@@ -77,7 +77,9 @@ hnsd_CPPFLAGS = $(AM_CPPFLAGS)
 
 noinst_PROGRAMS = test_hnsd
 
-test_hnsd_SOURCES = test/hnsd-test.c
+test_hnsd_SOURCES = test/hnsd-test.c     \
+                    test/base32-test.c   \
+                    test/resource-test.c
 
 test_hnsd_LDFLAGS = -static
 test_hnsd_CPPFLAGS = $(AM_CPPFLAGS)
