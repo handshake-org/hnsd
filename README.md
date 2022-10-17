@@ -345,9 +345,23 @@ $ hnsd [options]
 
 ## Testing
 
+### Unit tests
+
 The `make` command will output two binaries into the root directory: `hnsd`
 and `test_hnsd`, which is compiled from unit tests in the `test/` directory.
 Run the tests with `./test_hnsd`.
+
+### Integration tests
+
+The `integration/` directory contains a nodejs package that installs hsd and
+runs a bmocha test suite. `hnsd` is run using `child_process.spawn()` and tested
+by making DNS queries to its open ports.
+
+```
+cd integration
+npm install
+npm run test
+```
 
 ## License
 

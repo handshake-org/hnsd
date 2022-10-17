@@ -25,9 +25,18 @@ jobs:
         run: sudo apt-get install -y libunbound-dev
 
       - name: Build
-        run: ./autogen.sh && ./configure && make
+        run: ./autogen.sh && ./configure --with-network=regtest && make
 
       - name: Unit Tests
         run: ./test_hnsd
 
-      # TODO: Install nodejs, intall hsd and test end-to-end integration.
+      - name: Setup Integration
+        uses: actions/setup-node@v3.5.1
+        with:
+          node-version: 16
+
+      - name: Integration Tests
+        working-directory: ./integration
+        run: |
+          npm install
+          npm run test

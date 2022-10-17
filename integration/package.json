@@ -1,0 +1,12 @@
+{
+  "name": "hnsd_integration_test",
+  "scripts": {
+    "test": "bmocha --reporter spec test/*.js",
+    "test-file": "bmocha --reporter spec"
+  },
+  "dependencies": {
+    "bmocha": "^2.1.5",
+    "bsert": "0.0.10",
+    "hsd": "^4.0.1"
+  }
+}
