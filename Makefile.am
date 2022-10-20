@@ -40,6 +40,7 @@ libhsk_la_SOURCES = src/addr.c                   \
                     src/error.c                  \
                     src/hash.c                   \
                     src/header.c                 \
+                    src/hesiod.c                 \
                     src/map.c                    \
                     src/msg.c                    \
                     src/poly1305/poly1305.c      \
