@@ -24,6 +24,7 @@
 #include "utils.h"
 #include "uv.h"
 #include "dnssec.h"
+#include "hesiod.h"
 
 // A RRSIG NSEC
 static const uint8_t hsk_type_map_a[] = {
@@ -326,13 +327,42 @@ hsk_ns_onrecv(
     goto done;
   }
 
+  bool should_cache = true;
+  // Hesiod class is used for local text queries of internal metadata
+  if (req->class == HSK_DNS_HS
+    && req->type == HSK_DNS_TXT
+    && req->labels >= 2) {
+    should_cache = false;
+
+    hsk_addr_t address;
+    hsk_addr_from_sa(&address, req->addr);
+    if (!hsk_addr_is_local(&address)) {
+      hsk_ns_log(ns, "ignoring non-local HS class request\n");
+      goto done;
+    }
+
+    msg = hsk_hesiod_resolve(req, ns);
+    if (!msg) {
+      hsk_ns_log(ns, "unknown HS class request\n");
+      goto fail;
+    }
+
+    if (!hsk_dns_msg_finalize(&msg, req, ns->ec, ns->key, &wire, &wire_len)) {
+      hsk_ns_log(ns, "could not reply to HS class request\n");
+      goto fail;
+    }
+
+    hsk_ns_send(ns, wire, wire_len, addr, true);
+
+    goto done;
+  }
+
   // Handle reverse pointers.
   // See https://github.com/handshake-org/hsd/issues/125
   // Resolving a name with a synth record will return an NS record
   // with a name that encodes an IP address: _[base32]._synth.
   // The synth name then resolves to an A/AAAA record that is derived
   // by decoding the name itself (it does not have to be looked up).
-  bool should_cache = true;
   if (strcmp(req->tld, "_synth") == 0 && req->labels <= 2) {
     msg = hsk_dns_msg_alloc();
     should_cache = false;
@@ -480,8 +510,6 @@ hsk_ns_onrecv(
     hsk_ns_log(ns, "could not reply\n");
     goto fail;
   }
-
-  hsk_ns_log(ns, "sending root soa (%u): %u\n", req->id, wire_len);
 
   hsk_ns_send(ns, wire, wire_len, addr, true);
 
