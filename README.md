@@ -357,10 +357,13 @@ The `integration/` directory contains a nodejs package that installs hsd and
 runs a bmocha test suite. `hnsd` is run using `child_process.spawn()` and tested
 by making DNS queries to its open ports.
 
+`hnsd` MUST be built in regtest mode: `./configure --with-network=regtest`
+
+Build and run the integration tests (requires nodejs >= v16):
+
 ```
-cd integration
-npm install
-npm run test
+npm install ./integration
+npm --prefix ./integration run test
 ```
 
 ## License
