@@ -362,7 +362,7 @@ by making DNS queries to its open ports.
 Build and run the integration tests (requires nodejs >= v16):
 
 ```
-npm install ./integration
+npm --prefix ./integration install
 npm --prefix ./integration run test
 ```
 

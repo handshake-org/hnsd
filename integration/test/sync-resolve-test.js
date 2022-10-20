@@ -90,7 +90,7 @@ describe('Basic sync & resolve', function() {
   });
 
   it('should resolve DS', async () => {
-    const res = await util.resolver.resolveRaw('test-ds', 'DS');
+    const res = await util.resolver.lookup('test-ds', 'DS');
 
     assert.strictEqual(res.code, wire.codes.NOERROR);
 
@@ -105,7 +105,7 @@ describe('Basic sync & resolve', function() {
   });
 
   it('should resolve NS', async () => {
-    const res = await util.resolver.resolveRaw('test-ns', 'NS');
+    const res = await util.resolver.lookup('test-ns', 'NS');
 
     assert.strictEqual(res.code, wire.codes.NOERROR);
 
@@ -119,7 +119,7 @@ describe('Basic sync & resolve', function() {
   });
 
   it('should resolve TXT', async () => {
-    const res = await util.resolver.resolveRaw('test-txt', 'TXT');
+    const res = await util.resolver.lookup('test-txt', 'TXT');
 
     assert.strictEqual(res.code, wire.codes.NOERROR);
 
@@ -133,7 +133,7 @@ describe('Basic sync & resolve', function() {
   });
 
   it('should resolve GLUE4 without glue', async () => {
-    const res = await util.resolver.resolveRaw('test-glue4', 'NS');
+    const res = await util.resolver.lookup('test-glue4', 'NS');
 
     assert.strictEqual(res.code, wire.codes.NOERROR);
 
@@ -148,7 +148,7 @@ describe('Basic sync & resolve', function() {
   });
 
   it('should resolve GLUE4 with glue', async () => {
-    const res = await util.resolver.resolveRaw('test-glue4-glue', 'NS');
+    const res = await util.resolver.lookup('test-glue4-glue', 'NS');
 
     assert.strictEqual(res.code, wire.codes.NOERROR);
 
@@ -169,7 +169,7 @@ describe('Basic sync & resolve', function() {
   });
 
   it('should resolve GLUE6 without glue', async () => {
-    const res = await util.resolver.resolveRaw('test-glue6', 'NS');
+    const res = await util.resolver.lookup('test-glue6', 'NS');
 
     assert.strictEqual(res.code, wire.codes.NOERROR);
 
@@ -184,7 +184,7 @@ describe('Basic sync & resolve', function() {
   });
 
   it('should resolve GLUE6 with glue', async () => {
-    const res = await util.resolver.resolveRaw('test-glue6-glue', 'NS');
+    const res = await util.resolver.lookup('test-glue6-glue', 'NS');
 
     assert.strictEqual(res.code, wire.codes.NOERROR);
 
@@ -205,7 +205,7 @@ describe('Basic sync & resolve', function() {
   });
 
   it('should resolve SYNTH4 with glue', async () => {
-    const res = await util.resolver.resolveRaw('test-synth4', 'NS');
+    const res = await util.resolver.lookup('test-synth4', 'NS');
 
     assert.strictEqual(res.code, wire.codes.NOERROR);
 
@@ -226,7 +226,7 @@ describe('Basic sync & resolve', function() {
   });
 
   it('should resolve SYNTH6 with glue', async () => {
-    const res = await util.resolver.resolveRaw('test-synth6', 'NS');
+    const res = await util.resolver.lookup('test-synth6', 'NS');
 
     assert.strictEqual(res.code, wire.codes.NOERROR);
 

@@ -4,7 +4,7 @@
 const {spawn} = require('child_process');
 const path = require('path');
 const {FullNode} = require('hsd');
-const dns = require('bns/lib/dns');
+const StubResolver = require('bns/lib/resolver/stub');
 
 class TestUtil {
   constructor() {
@@ -19,11 +19,7 @@ class TestUtil {
 
     this.wallet = null;
 
-    this.resolver = new dns.Resolver({
-      host: '127.0.0.1',
-      port: 25349,
-      dnssec: true
-    });
+    this.resolver = new StubResolver();
     this.resolver.setServers(['127.0.0.1:25349']);
 
     this.hnsd = null;
