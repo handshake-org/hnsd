@@ -34,10 +34,10 @@ hsk_hesiod_txt_push(char *name, char *text, hsk_dns_rrs_t *an) {
 }
 
 static bool
-hsk_hesiod_txt_push_int(char *name, uint64_t n, hsk_dns_rrs_t *an) {
-  char height[16];
-  sprintf(height, "%lld", n);
-  return hsk_hesiod_txt_push(name, height,an);
+hsk_hesiod_txt_push_u64(char *name, uint64_t n, hsk_dns_rrs_t *an) {
+  char number[65];
+  sprintf(number, "%llu", n);
+  return hsk_hesiod_txt_push(name, number, an);
 }
 
 static bool
@@ -48,58 +48,27 @@ hsk_hesiod_txt_push_hash(char *name, uint8_t *data, hsk_dns_rrs_t *an) {
   return hsk_hesiod_txt_push(name, hash, an);
 }
 
-static bool
-hsk_hesiod_resolve_chain(
-  char *name,
-  hsk_chain_t *chain,
-  hsk_dns_rrs_t *an
-) {
-  if (!hsk_hesiod_txt_push_int("height.tip.chain.hnsd.", chain->height, an))
-    return false;
-
-  if (!hsk_hesiod_txt_push_hash("hash.tip.chain.hnsd.", chain->tip->hash, an))
-    return false;
-
-  return true;
-}
-
-static bool
-hsk_hesiod_resolve_pool(
-  char *name,
-  hsk_pool_t *pool,
-  hsk_dns_rrs_t *an
-) {
-  return false;
-}
-
 hsk_dns_msg_t *
 hsk_hesiod_resolve(hsk_dns_req_t *req, hsk_ns_t *ns) {
-  if (strcmp(req->tld, "hnsd") != 0) {
-    return NULL;
-  }
-
   hsk_dns_msg_t *msg = hsk_dns_msg_alloc();
 
   if (!msg)
     return NULL;
 
   msg->flags |= HSK_DNS_AA;
-
-  char module[HSK_DNS_MAX_LABEL + 1];
-  hsk_dns_label_get(req->name, -2, module);
-
   hsk_dns_rrs_t *an = &msg->an;
-  if (strcmp(module, "chain") == 0) {
-    if (!hsk_hesiod_resolve_chain(req->name, &ns->pool->chain, an))
+
+  if (hsk_dns_is_subdomain(req->name, "hash.tip.chain.hnsd."))
+    if (!hsk_hesiod_txt_push_hash("hash.tip.chain.hnsd.", ns->pool->chain.tip->hash, an))
       goto fail;
 
-  } else if (strcmp(module, "pool") == 0) {
-    if (!hsk_hesiod_resolve_pool(req->name, ns->pool, an))
+  if (hsk_dns_is_subdomain(req->name, "height.tip.chain.hnsd."))
+    if (!hsk_hesiod_txt_push_u64("height.tip.chain.hnsd.", ns->pool->chain.tip->height, an))
       goto fail;
 
-  } else {
-    goto fail;
-  }
+  if (hsk_dns_is_subdomain(req->name, "time.tip.chain.hnsd."))
+    if (!hsk_hesiod_txt_push_u64("time.tip.chain.hnsd.", ns->pool->chain.tip->time, an))
+      goto fail;
 
   return msg;
 
