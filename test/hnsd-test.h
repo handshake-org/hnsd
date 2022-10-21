@@ -5,6 +5,9 @@ void
 test_base32();
 
 void
+test_dns();
+
+void
 test_resource();
 
 #endif

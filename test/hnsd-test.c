@@ -18,6 +18,9 @@ main() {
   printf("test_base32\n");
   test_base32();
 
+  printf("test_dns\n");
+  test_dns();
+
   printf("test_resource\n");
   test_resource();
 
