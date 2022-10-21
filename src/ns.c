@@ -331,7 +331,7 @@ hsk_ns_onrecv(
   // Hesiod class is used for local text queries of internal metadata
   if (req->class == HSK_DNS_HS
     && req->type == HSK_DNS_TXT
-    && req->labels >= 2) {
+  ) {
     should_cache = false;
 
     hsk_addr_t address;
