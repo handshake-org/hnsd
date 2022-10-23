@@ -81,7 +81,6 @@ static const uint8_t HSK_CHAINWORK[32] = {
 #define HSK_USE_CHECKPOINTS true
 #define HSK_LAST_CHECKPOINT 1008          // Used for maybe_sync, no block hash
 #define HSK_MAX_TIP_AGE (24 * 60 * 60)
-#define HSK_LAUNCH_DATE 0xffffffff        // Used for maybe_sync, not useful
 
 #elif HSK_NETWORK == HSK_TESTNET
 
@@ -136,7 +135,6 @@ static const uint8_t HSK_CHAINWORK[32] = {
 #define HSK_USE_CHECKPOINTS false
 #define HSK_LAST_CHECKPOINT 0
 #define HSK_MAX_TIP_AGE (2 * 7 * 24 * 60 * 60)
-#define HSK_LAUNCH_DATE 0xffffffff
 
 #elif HSK_NETWORK == HSK_REGTEST
 
@@ -180,7 +178,6 @@ static const uint8_t HSK_CHAINWORK[32] = {
 #define HSK_USE_CHECKPOINTS false
 #define HSK_LAST_CHECKPOINT 0
 #define HSK_MAX_TIP_AGE (2 * 7 * 24 * 60 * 60)
-#define HSK_LAUNCH_DATE 0xffffffff
 
 #elif HSK_NETWORK == HSK_SIMNET
 
@@ -224,7 +221,6 @@ static const uint8_t HSK_CHAINWORK[32] = {
 #define HSK_USE_CHECKPOINTS false
 #define HSK_LAST_CHECKPOINT 0
 #define HSK_MAX_TIP_AGE (2 * 7 * 24 * 60 * 60)
-#define HSK_LAUNCH_DATE 0xffffffff
 
 #else
 
