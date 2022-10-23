@@ -89,3 +89,8 @@ test_hnsd_LDADD = $(LIB_UNBOUND)             \
 
 # pkgconfigdir = $(libdir)/pkgconfig
 # pkgconfig_DATA = @PACKAGE_NAME@.pc
+
+.PHONY: e2e
+e2e:
+	npm --prefix ./integration/ install
+	npm --prefix ./integration/ run test
