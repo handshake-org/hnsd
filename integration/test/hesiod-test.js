@@ -12,7 +12,7 @@ const TestUtil = require('../test-util');
 const util = new TestUtil();
 
 describe('Hesiod', function() {
-  this.timeout(20000);
+  this.timeout(30000);
 
   before(async () => {
     await util.open();
@@ -23,7 +23,7 @@ describe('Hesiod', function() {
   });
 
   it('should sync', async () => {
-    await util.generate(123);
+    await util.generate(3000); // ensures at least 2x 2000-headers packets
     await util.waitForSync();
   });
 
@@ -52,7 +52,7 @@ describe('Hesiod', function() {
     assert.strictEqual(answer.length, 1);
 
     const height = answer[0].data.txt[0];
-    assert.strictEqual(height, '123');
+    assert.strictEqual(height, '3000');
     assert.strictEqual(height, String(util.node.chain.tip.height));
   });
 
@@ -70,6 +70,11 @@ describe('Hesiod', function() {
     assert.strictEqual(time, String(util.node.chain.tip.time));
   });
 
+  it('generate more blocks', async () => {
+    await util.generate(3000); // ensures at least 2x 2000-headers packets
+    await util.waitForSync();
+  });
+
   it('should get all chain info', async () => {
     const qs = wire.Question.fromJSON({
       name: 'chain.hnsd.',
@@ -79,5 +84,17 @@ describe('Hesiod', function() {
 
     const {answer} = await util.resolver.resolve(qs);
     assert.strictEqual(answer.length, 3);
+
+    const [hashTxt, heightTxt, timeTxt] = answer;
+
+    assert.strictEqual(hashTxt.name, 'hash.tip.chain.hnsd.');
+    assert.strictEqual(hashTxt.data.txt[0], util.node.chain.tip.hash.toString('hex'));
+
+    assert.strictEqual(heightTxt.name, 'height.tip.chain.hnsd.');
+    assert.strictEqual(heightTxt.data.txt[0], String(util.node.chain.tip.height));
+    assert.strictEqual(heightTxt.data.txt[0], '6000');
+
+    assert.strictEqual(timeTxt.name, 'time.tip.chain.hnsd.');
+    assert.strictEqual(timeTxt.data.txt[0], String(util.node.chain.tip.time));
   });
 });
