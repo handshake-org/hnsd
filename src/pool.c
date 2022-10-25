@@ -1489,7 +1489,7 @@ hsk_peer_handle_headers(hsk_peer_t *peer, const hsk_headers_msg_t *msg) {
     if (rc != HSK_SUCCESS) {
       hsk_peer_log(peer, "failed adding block: %s\n", hsk_strerror(rc));
       if (rc == HSK_EDUPLICATE)
-        return HSK_SUCCESS;
+        continue;
       else
         return rc;
     }
