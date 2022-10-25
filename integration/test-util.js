@@ -4,7 +4,7 @@
 const {spawn, execSync} = require('child_process');
 const assert = require('bsert');
 const path = require('path');
-const {FullNode} = require('hsd');
+const {FullNode, packets} = require('hsd');
 const wire = require('bns/lib/wire');
 const StubResolver = require('bns/lib/resolver/stub');
 const {EOL} = require('os');
@@ -13,7 +13,7 @@ const network = 'regtest';
 const hnsdPath = path.join(__dirname, '..', 'hnsd');
 
 class TestUtil {
-  constructor() {
+  constructor(options) {
     this.host = '127.0.0.1';
     this.port = 10000;
 
@@ -28,6 +28,15 @@ class TestUtil {
       plugins: [require('hsd/lib/wallet/plugin')]
     });
 
+    this.packets = {};
+    this.node.pool.on('packet', (packet) => {
+      const type = packets.typesByVal[packet.type];
+      if (!this.packets[type])
+        this.packets[type] = [packet];
+      else
+        this.packets[type].push(packet);
+    });
+
     this.wallet = null;
 
     this.resolver = new StubResolver();
@@ -35,6 +44,13 @@ class TestUtil {
 
     this.hnsd = null;
     this.hnsdHeight = 0;
+    this.hnsdArgsBase = ['-s', '127.0.0.1:10000'];
+    this.hnsdArgs = this.hnsdArgsBase;
+  }
+
+  extraArgs(args) {
+    assert(Array.isArray(args));
+    this.hnsdArgs = this.hnsdArgs.concat(args);
   }
 
   async open() {
@@ -54,11 +70,16 @@ class TestUtil {
     return this.openHNSD();
   }
 
+  async close() {
+    this.closeHNSD();
+    await this.node.close();
+  }
+
   async openHNSD() {
     return new Promise((resolve, reject) => {
       this.hnsd = spawn(
         path.join(__dirname, '..', 'hnsd'),
-        ['-s', `${this.host}:${this.port}`],
+        this.hnsdArgs,
         {stdio: 'ignore'}
       );
 
@@ -67,9 +88,23 @@ class TestUtil {
     });
   }
 
-  async close() {
+  closeHNSD() {
+    if (!this.hnsd)
+      return;
+
     this.hnsd.kill('SIGKILL');
-    await this.node.close();
+    this.hnsd = null;
+  }
+
+  async restartHNSD(args) {
+    this.closeHNSD();
+
+    if (args) {
+      assert(Array.isArray(args));
+      this.hnsdArgs = this.hnsdArgsBase.concat(args);
+    }
+
+    return this.openHNSD();
   }
 
   async getWalletAddress() {
