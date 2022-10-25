@@ -349,6 +349,10 @@ hsk_chain_synced(const hsk_chain_t *chain) {
 
 static void
 hsk_chain_checkpoint_flush(hsk_chain_t *chain) {
+  // Setting is off
+  if (!chain->prefix)
+    return;
+
   // Skip first window after init to avoid re-writing the same checkpoint
   if (chain->height - chain->init_height <= HSK_STORE_CHECKPOINT_WINDOW)
     return;
