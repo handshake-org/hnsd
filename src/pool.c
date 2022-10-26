@@ -843,6 +843,7 @@ hsk_peer_init(hsk_peer_t *peer, hsk_pool_t *pool, bool encrypted) {
 
   peer->id = pool->peer_id++;
   memset(peer->host, 0, sizeof(peer->host));
+  memset(peer->agent, 0, sizeof(peer->agent));
   hsk_addr_init(&peer->addr);
   peer->state = HSK_STATE_DISCONNECTED;
   memset(peer->read_buffer, 0, HSK_BUFFER_SIZE);
@@ -1316,6 +1317,7 @@ hsk_peer_handle_version(hsk_peer_t *peer, const hsk_version_msg_t *msg) {
 
   hsk_peer_log(peer, "received version: %s (%u)\n", msg->agent, msg->height);
   peer->height = (int64_t)msg->height;
+  strcpy(peer->agent, msg->agent);
 
   hsk_timedata_add(&pool->td, &peer->addr, msg->time);
   hsk_addrman_mark_ack(&pool->am, &peer->addr, msg->services);
