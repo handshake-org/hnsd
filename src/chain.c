@@ -277,6 +277,19 @@ hsk_chain_maybe_sync(hsk_chain_t *chain) {
   chain->synced = true;
 }
 
+float
+hsk_chain_progress(const hsk_chain_t *chain) {
+  uint64_t start = chain->genesis->time;
+  uint64_t current = chain->tip->time - start;
+  uint64_t end = hsk_timedata_now(chain->td) - start - (40 * 60);
+  float progress = (float)current / end;
+
+  if (progress > 1)
+    return 1;
+
+  return progress;
+}
+
 bool
 hsk_chain_synced(const hsk_chain_t *chain) {
   return chain->synced;
