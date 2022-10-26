@@ -1,3 +1,5 @@
+#include "config.h"
+
 #include <assert.h>
 #include <stdint.h>
 #include <stdbool.h>
@@ -103,6 +105,11 @@ hsk_store_write(hsk_checkpoint_t *checkpoint, char *prefix) {
 
   if (written != HSK_STORE_CHECKPOINT_SIZE)
     return false;
+
+#if defined(_WIN32)
+  // Can not do the rename-file trick to guarantee atomicity on windows
+  remove(path);
+#endif
 
   return rename(tmp, path) == 0;
 }
