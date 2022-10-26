@@ -48,6 +48,30 @@ hsk_hesiod_txt_push_hash(char *name, uint8_t *data, hsk_dns_rrs_t *an) {
   return hsk_hesiod_txt_push(name, hash, an);
 }
 
+static bool
+hsk_hesiod_txt_push_float(char *name, float f, hsk_dns_rrs_t *an) {
+  char value[65];
+  sprintf(value, "%f", f);
+  return hsk_hesiod_txt_push(name, value, an);
+}
+
+static bool
+hsk_hesiod_txt_push_peer(hsk_peer_t *peer, hsk_dns_rrs_t *an) {
+  char label[65];
+  char sublabel[40];
+  sprintf(sublabel, "%llu.peers.pool.hnsd.", peer->id);
+
+  sprintf(label, "host.%s", sublabel);
+  if (!hsk_hesiod_txt_push(label, peer->host, an))
+    return false;
+
+  sprintf(label, "agent.%s", sublabel);
+  if (!hsk_hesiod_txt_push(label, peer->agent, an))
+    return false;
+
+  return true;
+}
+
 hsk_dns_msg_t *
 hsk_hesiod_resolve(hsk_dns_req_t *req, hsk_ns_t *ns) {
   hsk_dns_msg_t *msg = hsk_dns_msg_alloc();
@@ -58,6 +82,8 @@ hsk_hesiod_resolve(hsk_dns_req_t *req, hsk_ns_t *ns) {
   msg->flags |= HSK_DNS_AA;
   hsk_dns_rrs_t *an = &msg->an;
 
+  // CHAIN
+  //   TIP
   if (hsk_dns_is_subdomain(req->name, "hash.tip.chain.hnsd.")) {
     if (!hsk_hesiod_txt_push_hash("hash.tip.chain.hnsd.",
                                   ns->pool->chain.tip->hash,
@@ -85,6 +111,37 @@ hsk_hesiod_resolve(hsk_dns_req_t *req, hsk_ns_t *ns) {
                              an))
       goto fail;
   }
+
+  //   PROGRESS
+  if (hsk_dns_is_subdomain(req->name, "progress.chain.hnsd.")) {
+    if (!hsk_hesiod_txt_push_float("progress.chain.hnsd.",
+                             hsk_chain_progress(&ns->pool->chain),
+                             an))
+      goto fail;
+  }
+
+  // POOL
+  //  SIZE
+  if (hsk_dns_is_subdomain(req->name, "size.pool.hnsd.")) {
+    char size[65];
+    sprintf(size, "%d", ns->pool->size);
+    if (!hsk_hesiod_txt_push("size.pool.hnsd.",
+                             size,
+                             an))
+      goto fail;
+  }
+
+  //  PEERS
+  if (hsk_dns_is_subdomain(req->name, "peers.pool.hnsd.")) {
+    hsk_peer_t *peerIter, *next;
+    for (peerIter = ns->pool->head; peerIter; peerIter = next) {
+      if (!hsk_hesiod_txt_push_peer(peerIter, an))
+        goto fail;
+
+      next = peerIter->next;
+    }
+  }
+
 
   return msg;
 
