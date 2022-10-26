@@ -22,9 +22,35 @@ describe('Hesiod', function() {
     await util.close();
   });
 
+  it('should not be synced', async () => {
+    const qs = wire.Question.fromJSON({
+      name: 'synced.tip.chain.hnsd.',
+      class: 'HS',
+      type: 'TXT'
+    });
+
+    const {answer} = await util.resolver.resolve(qs);
+    assert.strictEqual(answer.length, 1);
+
+    assert.strictEqual(answer[0].data.txt[0], 'false');
+  });
+
   it('should sync', async () => {
     await util.generate(3000); // ensures at least 2x 2000-headers packets
     await util.waitForSync();
+  });
+
+  it('should be synced', async () => {
+    const qs = wire.Question.fromJSON({
+      name: 'synced.tip.chain.hnsd.',
+      class: 'HS',
+      type: 'TXT'
+    });
+
+    const {answer} = await util.resolver.resolve(qs);
+    assert.strictEqual(answer.length, 1);
+
+    assert.strictEqual(answer[0].data.txt[0], 'true');
   });
 
   it('should get chain tip hash', async () => {
@@ -83,9 +109,9 @@ describe('Hesiod', function() {
     });
 
     const {answer} = await util.resolver.resolve(qs);
-    assert.strictEqual(answer.length, 3);
+    assert.strictEqual(answer.length, 4);
 
-    const [hashTxt, heightTxt, timeTxt] = answer;
+    const [hashTxt, heightTxt, timeTxt, syncedTxt] = answer;
 
     assert.strictEqual(hashTxt.name, 'hash.tip.chain.hnsd.');
     assert.strictEqual(hashTxt.data.txt[0], util.node.chain.tip.hash.toString('hex'));
@@ -96,5 +122,8 @@ describe('Hesiod', function() {
 
     assert.strictEqual(timeTxt.name, 'time.tip.chain.hnsd.');
     assert.strictEqual(timeTxt.data.txt[0], String(util.node.chain.tip.time));
+
+    assert.strictEqual(syncedTxt.name, 'synced.tip.chain.hnsd.');
+    assert.strictEqual(syncedTxt.data.txt[0], 'true');
   });
 });
