@@ -45,7 +45,7 @@ describe('Checkpoints', function() {
     await util.waitForSync();
 
     assert(util.packets.GETHEADERS.length);
-    const {locator} = util.packets.GETHEADERS.pop();
+    const {locator} = util.packets.GETHEADERS.shift();
 
     // Just the genesis block
     assert.strictEqual(locator.length, 1);
@@ -87,7 +87,7 @@ describe('Checkpoints', function() {
     await util.waitForSync();
 
     assert(util.packets.GETHEADERS.length);
-    const {locator} = util.packets.GETHEADERS.pop();
+    const {locator} = util.packets.GETHEADERS.shift();
     const heights = await hashesToHeights(locator);
 
     assert.deepStrictEqual(
