@@ -64,11 +64,11 @@ class TestUtil {
       this.hnsd = spawn(
         path.join(__dirname, '..', 'hnsd'),
         this.hnsdArgs,
-        {stdio: 'ignore'}
+        {stdio: 'ignore'} // pro tip: switch to 'inherit' to see hnsd output
       );
 
-      this.hnsd.on('spawn', () => resolve());
-      this.hnsd.on('error', () => reject());
+      this.hnsd.on('spawn', () => resolve(this.hnsd));
+      this.hnsd.on('error', e => reject(e));
     });
   }
 

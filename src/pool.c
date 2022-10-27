@@ -302,14 +302,19 @@ hsk_pool_set_agent(hsk_pool_t *pool, const char *user_agent) {
   if (!user_agent)
     return true;
 
+  if (strchr(user_agent, '/'))
+    return false;
+
   size_t len = strlen(pool->user_agent);
   len += strlen(user_agent);
+  len += 1; // terminal "/"
 
   // Agent size in p2p version message is 1 byte
-  if (len > 0xff)
+  if (len > HSK_MAX_AGENT)
     return false;
 
   pool->user_agent = strcat(pool->user_agent, user_agent);
+  pool->user_agent = strcat(pool->user_agent, "/");
 
   return true;
 }
