@@ -14,11 +14,16 @@ const hnsdPath = path.join(__dirname, '..', 'hnsd');
 
 class TestUtil {
   constructor() {
+    this.host = '127.0.0.1';
+    this.port = 10000;
+
     this.node = new FullNode({
       memory: true,
       network,
       listen: true,
-      port: 10000,
+      host: this.host,
+      port: this.port,
+      brontidePort: 46888, // avoid hnsd connecting via brontide
       noDns: true,
       plugins: [require('hsd/lib/wallet/plugin')]
     });
@@ -53,7 +58,7 @@ class TestUtil {
     return new Promise((resolve, reject) => {
       this.hnsd = spawn(
         path.join(__dirname, '..', 'hnsd'),
-        ['-s', '127.0.0.1:10000'],
+        ['-s', `${this.host}:${this.port}`],
         {stdio: 'ignore'}
       );
 
