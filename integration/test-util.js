@@ -1,16 +1,21 @@
 
 'use strict';
 
-const {spawn} = require('child_process');
+const {spawn, execSync} = require('child_process');
+const assert = require('bsert');
 const path = require('path');
 const {FullNode} = require('hsd');
 const StubResolver = require('bns/lib/resolver/stub');
+const {EOL} = require('os');
+const {version} = require('./package.json');
+const network = 'regtest';
+const hnsdPath = path.join(__dirname, '..', 'hnsd');
 
 class TestUtil {
   constructor() {
     this.node = new FullNode({
       memory: true,
-      network: 'regtest',
+      network,
       listen: true,
       port: 10000,
       noDns: true,
@@ -27,13 +32,20 @@ class TestUtil {
   }
 
   async open() {
+    const hnsdVersion = (await execSync(hnsdPath + ' -v')).toString('ascii');
+    assert.strictEqual(
+      hnsdVersion,
+      `${version} (${network})` + EOL,
+      'Network or version mismatch'
+    );
+
     await this.node.open();
     await this.node.connect();
 
     this.wallet = this.node.plugins.walletdb;
 
     this.hnsd = spawn(
-      path.join(__dirname, '..', 'hnsd'),
+      hnsdPath,
       ['-s', '127.0.0.1:10000']
     );
 

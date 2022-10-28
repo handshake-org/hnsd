@@ -12,6 +12,7 @@
 #include <sys/types.h>
 #include <unistd.h>
 
+#include "constants.h"
 #include "hsk.h"
 #include "pool.h"
 #include "ns.h"
@@ -109,7 +110,7 @@ static void
 help(int r) {
   fprintf(stderr,
     "\n"
-    "hnsd 1.0.0\n"
+    PACKAGE_NAME" "PACKAGE_VERSION" ("HSK_NETWORK_NAME")\n"
     "  Copyright (c) 2018, Christopher Jeffrey <chjj@handshake.org>\n"
     "\n"
     "Usage: hnsd [options]\n"
@@ -146,6 +147,9 @@ help(int r) {
     "  -a, --user-agent <string>\n"
     "    Add supplemental user agent string in p2p version message.\n"
     "\n"
+    "  -v, --version\n"
+    "    Print version and network build information and exit.\n"
+    "\n"
 #ifndef _WIN32
     "  -d, --daemon\n"
     "    Fork and background the process.\n"
@@ -161,13 +165,14 @@ help(int r) {
 
 static void
 parse_arg(int argc, char **argv, hsk_options_t *opt) {
-  const static char *optstring = "c:n:r:i:u:p:k:s:l:h:a"
+  const static char *optstring = "hvc:n:r:i:u:p:k:s:l:a:"
 #ifndef _WIN32
-    ":d"
+    "d"
 #endif
     ;
 
   const static struct option longopts[] = {
+    { "version", no_argument, NULL, 'v' },
     { "config", required_argument, NULL, 'c' },
     { "ns-host", required_argument, NULL, 'n' },
     { "rs-host", required_argument, NULL, 'r' },
@@ -200,6 +205,11 @@ parse_arg(int argc, char **argv, hsk_options_t *opt) {
       break;
 
     switch (o) {
+      case 'v': {
+        printf("%s (%s)\n", PACKAGE_VERSION, HSK_NETWORK_NAME);
+        exit(0);
+      }
+
       case 'h': {
         return help(0);
       }
