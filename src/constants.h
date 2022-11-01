@@ -1,6 +1,7 @@
 #ifndef _HSK_CONSTANTS_H
 #define _HSK_CONSTANTS_H
 
+#include "config.h"
 #include "genesis.h"
 
 #define HSK_MAIN 0
@@ -13,7 +14,7 @@
 #endif
 
 #define HSK_MAX_MESSAGE (8 * 1000 * 1000)
-#define HSK_USER_AGENT "/hnsd:1.0.0/"
+#define HSK_USER_AGENT "/"PACKAGE_NAME":"PACKAGE_VERSION"/"
 #define HSK_PROTO_VERSION 1
 #define HSK_SERVICES 0
 #define HSK_MAX_DATA_SIZE 668
