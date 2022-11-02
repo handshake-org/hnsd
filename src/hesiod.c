@@ -105,8 +105,8 @@ hsk_hesiod_resolve(hsk_dns_req_t *req, hsk_ns_t *ns) {
       goto fail;
   }
 
-  if (hsk_dns_is_subdomain(req->name, "synced.tip.chain.hnsd.")) {
-    if (!hsk_hesiod_txt_push("synced.tip.chain.hnsd.",
+  if (hsk_dns_is_subdomain(req->name, "synced.chain.hnsd.")) {
+    if (!hsk_hesiod_txt_push("synced.chain.hnsd.",
                              ns->pool->chain.synced ? "true" : "false",
                              an))
       goto fail;

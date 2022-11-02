@@ -26,7 +26,7 @@ describe('Hesiod', function() {
   describe('Chain', function () {
     it('should not be synced', async () => {
       const qs = wire.Question.fromJSON({
-        name: 'synced.tip.chain.hnsd.',
+        name: 'synced.chain.hnsd.',
         class: 'HS',
         type: 'TXT'
       });
@@ -44,7 +44,7 @@ describe('Hesiod', function() {
 
     it('should be synced', async () => {
       const qs = wire.Question.fromJSON({
-        name: 'synced.tip.chain.hnsd.',
+        name: 'synced.chain.hnsd.',
         class: 'HS',
         type: 'TXT'
       });
@@ -123,7 +123,7 @@ describe('Hesiod', function() {
       assert.strictEqual(answer[2].name, 'time.tip.chain.hnsd.');
       assert.strictEqual(answer[2].data.txt[0], String(util.node.chain.tip.time));
 
-      assert.strictEqual(answer[3].name, 'synced.tip.chain.hnsd.');
+      assert.strictEqual(answer[3].name, 'synced.chain.hnsd.');
       assert.strictEqual(answer[3].data.txt[0], 'true');
 
       assert.strictEqual(answer[4].name, 'progress.chain.hnsd.');
