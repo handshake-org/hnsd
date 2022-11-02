@@ -135,6 +135,7 @@ describe('Hesiod', function() {
     it('should have no peers', async () => {
       // Disconnect
       await util.node.pool.close();
+      await util.waitForHS('size.pool.hnsd.', 0);
 
       const qs = wire.Question.fromJSON({
         name: 'pool.hnsd.',

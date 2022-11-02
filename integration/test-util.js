@@ -114,6 +114,18 @@ class TestUtil {
     return answer[0].data.txt[0];
   }
 
+  async waitForHS(name, value) {
+    const answer = await this.resolveHS(name);
+    if (answer === String(value))
+      return value;
+
+    return new Promise(async (resolve) => {
+      setTimeout(async () => {
+        resolve(this.waitForHS(name));
+      }, 100);
+    });
+  }
+
   async getHeights() {
     const hnsd = this.hnsd
                  ? await this.resolveHS('height.tip.chain.hnsd.')
