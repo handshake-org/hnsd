@@ -11,6 +11,7 @@
 static bool
 hsk_hesiod_txt_push(char *name, char *text, hsk_dns_rrs_t *an) {
   hsk_dns_rr_t *rr = hsk_dns_rr_create(HSK_DNS_TXT);
+  rr->class = HSK_DNS_HS;
 
   if (!rr)
     return false;
