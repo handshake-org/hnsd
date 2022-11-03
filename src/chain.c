@@ -73,10 +73,15 @@ hsk_chain_log(const hsk_chain_t *chain, const char *fmt, ...) {
 }
 
 int
-hsk_chain_init(hsk_chain_t *chain, const hsk_timedata_t *td) {
-  if (!chain || !td)
+hsk_chain_init(
+  hsk_chain_t *chain,
+  const hsk_timedata_t *td,
+  const uv_loop_t *loop
+) {
+  if (!chain || !td || !loop)
     return HSK_EBADARGS;
 
+  chain->loop = (uv_loop_t *)loop;
   chain->height = 0;
   chain->tip = NULL;
   chain->genesis = NULL;
@@ -191,21 +196,6 @@ hsk_chain_uninit(hsk_chain_t *chain) {
 
   chain->tip = NULL;
   chain->genesis = NULL;
-}
-
-hsk_chain_t *
-hsk_chain_alloc(const hsk_timedata_t *td) {
-  hsk_chain_t *chain = malloc(sizeof(hsk_chain_t));
-
-  if (!chain)
-    return NULL;
-
-  if (hsk_chain_init(chain, td) != HSK_SUCCESS) {
-    free(chain);
-    return NULL;
-  }
-
-  return chain;
 }
 
 void

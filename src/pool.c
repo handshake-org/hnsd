@@ -160,7 +160,7 @@ hsk_pool_init(hsk_pool_t *pool, const uv_loop_t *loop) {
   pool->ec = ec;
   pool->key = &pool->key_[0];
   hsk_timedata_init(&pool->td);
-  hsk_chain_init(&pool->chain, &pool->td);
+  hsk_chain_init(&pool->chain, &pool->td, loop);
   hsk_addrman_init(&pool->am, &pool->td);
   pool->timer = NULL;
   pool->peer_id = 0;
