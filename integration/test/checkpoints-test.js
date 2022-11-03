@@ -28,6 +28,10 @@ describe('Checkpoints', function() {
     await util.close();
   });
 
+  beforeEach(() => {
+    util.resetPackets();
+  });
+
   async function hashesToHeights(hashes) {
     assert(Array.isArray(hashes));
 
@@ -39,13 +43,11 @@ describe('Checkpoints', function() {
   }
 
   it('should initial sync', async() => {
-    util.packets.GETHEADERS = [];
-
     await util.generate(1000);
     await util.waitForSync();
 
-    assert(util.packets.GETHEADERS.length);
-    const {locator} = util.packets.GETHEADERS.shift();
+    assert(util.packetsFrom.GETHEADERS.length);
+    const {locator} = util.packetsFrom.GETHEADERS.shift();
 
     // Just the genesis block
     assert.strictEqual(locator.length, 1);
@@ -56,7 +58,6 @@ describe('Checkpoints', function() {
     // Disconnect full node
     await util.node.pool.close();
 
-    util.packets.GETHEADERS = [];
     await util.restartHNSD(['-x', tmpdir]);
 
     // Sanity check: these blocks should not be received by hnsd
@@ -79,19 +80,26 @@ describe('Checkpoints', function() {
     const {hnsd, hsd} = await util.getHeights();
     assert.strictEqual(hsd, hnsd);
     assert.strictEqual(hnsd, 1100);
+
+    // Full node sent 151 headers, starting at height 950
+    assert(util.packetsTo.HEADERS.length);
+    const {items} = util.packetsTo.HEADERS.shift();
+    assert.strictEqual(items.length, 151);
+    const hashes = items.map(h => h.hash());
+    const heights = await hashesToHeights(hashes);
+    assert.strictEqual(heights[0], 950);
   });
 
   it('should restart from checkpoint and resync', async () => {
-    util.packets.GETHEADERS = [];
     await util.restartHNSD(['-x', tmpdir]);
     await util.waitForSync();
 
-    assert(util.packets.GETHEADERS.length);
-    const {locator} = util.packets.GETHEADERS.shift();
-    const heights = await hashesToHeights(locator);
+    assert(util.packetsFrom.GETHEADERS.length);
+    const {locator} = util.packetsFrom.GETHEADERS.shift();
+    const locatorHeights = await hashesToHeights(locator);
 
     assert.deepStrictEqual(
-      heights,
+      locatorHeights,
       [
         949, // tip
              // 10 prev blocks
@@ -110,6 +118,14 @@ describe('Checkpoints', function() {
     const {hnsd, hsd} = await util.getHeights();
     assert.strictEqual(hsd, hnsd);
     assert.strictEqual(hnsd, 1100);
+
+    // Full node sent 151 headers, starting at height 950
+    assert(util.packetsTo.HEADERS.length);
+    const {items} = util.packetsTo.HEADERS.shift();
+    assert.strictEqual(items.length, 151);
+    const hashes = items.map(h => h.hash());
+    const headersHeights = await hashesToHeights(hashes);
+    assert.strictEqual(headersHeights[0], 950);
   });
 
   it('should resync from checkpoint after a reorg (after)', async () => {
@@ -128,6 +144,7 @@ describe('Checkpoints', function() {
     await util.generate(110);
 
     // Reconnect full node
+    util.resetPackets();
     await util.restartHNSD(['-x', tmpdir]);
     await util.node.pool.open();
     await util.node.pool.connect();
@@ -136,6 +153,15 @@ describe('Checkpoints', function() {
     const {hnsd, hsd} = await util.getHeights();
     assert.strictEqual(hsd, hnsd);
     assert.strictEqual(hnsd, 1110);
+
+    // Full node sent 161 headers, starting at height 950
+    // (reorg fork was at height 930, last locator hash was at 949)
+    assert(util.packetsTo.HEADERS.length);
+    const {items} = util.packetsTo.HEADERS.shift();
+    assert.strictEqual(items.length, 161);
+    const hashes = items.map(h => h.hash());
+    const headersHeights = await hashesToHeights(hashes);
+    assert.strictEqual(headersHeights[0], 950);
   });
 
   it('should resync from checkpoint after a reorg (inside)', async () => {
@@ -154,6 +180,7 @@ describe('Checkpoints', function() {
     await util.generate(190);
 
     // Reconnect full node
+    util.resetPackets();
     await util.restartHNSD(['-x', tmpdir]);
     await util.node.pool.open();
     await util.node.pool.connect();
@@ -162,6 +189,15 @@ describe('Checkpoints', function() {
     const {hnsd, hsd} = await util.getHeights();
     assert.strictEqual(hsd, hnsd);
     assert.strictEqual(hnsd, 1120);
+
+    // Full node sent 196 headers, starting at height 925
+    // (reorg fork was at height 930, previous locator hash was at 924)
+    assert(util.packetsTo.HEADERS.length);
+    const {items} = util.packetsTo.HEADERS.shift();
+    assert.strictEqual(items.length, 196);
+    const hashes = items.map(h => h.hash());
+    const headersHeights = await hashesToHeights(hashes);
+    assert.strictEqual(headersHeights[0], 925);
   });
 
   it('should resync from checkpoint after a reorg (before)', async () => {
@@ -188,6 +224,15 @@ describe('Checkpoints', function() {
     const {hnsd, hsd} = await util.getHeights();
     assert.strictEqual(hsd, hnsd);
     assert.strictEqual(hnsd, 1130);
+
+    // Full node sent 1130 headers, starting at height 1
+    // (reorg fork was at height 800, previous locator hash was at 0)
+    assert(util.packetsTo.HEADERS.length);
+    const {items} = util.packetsTo.HEADERS.shift();
+    assert.strictEqual(items.length, 1130);
+    const hashes = items.map(h => h.hash());
+    const headersHeights = await hashesToHeights(hashes);
+    assert.strictEqual(headersHeights[0], 1);
   });
 
   it('should survive all that', async () => {

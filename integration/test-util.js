@@ -28,13 +28,30 @@ class TestUtil {
       plugins: [require('hsd/lib/wallet/plugin')]
     });
 
-    this.packets = {};
+    // Packets received by full node from hnsd
+    this.packetsFrom = {};
     this.node.pool.on('packet', (packet) => {
       const type = packets.typesByVal[packet.type];
-      if (!this.packets[type])
-        this.packets[type] = [packet];
+      if (!this.packetsFrom[type])
+        this.packetsFrom[type] = [packet];
       else
-        this.packets[type].push(packet);
+        this.packetsFrom[type].push(packet);
+    });
+
+    // Packets sent to hnsd by the full node
+    this.packetsTo = {};
+    this.node.pool.on('peer open', (peer) => {
+      peer.SEND = peer.send;
+
+      peer.send = (packet) => {
+        const type = packets.typesByVal[packet.type];
+        if (!this.packetsTo[type])
+          this.packetsTo[type] = [packet];
+        else
+          this.packetsTo[type].push(packet);
+
+        peer.SEND(packet);
+      };
     });
 
     this.wallet = null;
@@ -51,6 +68,11 @@ class TestUtil {
   extraArgs(args) {
     assert(Array.isArray(args));
     this.hnsdArgs = this.hnsdArgs.concat(args);
+  }
+
+  resetPackets() {
+    this.packetsTo = {};
+    this.packetsFrom = {};
   }
 
   async open() {
