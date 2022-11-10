@@ -43,17 +43,20 @@ hsk_store_exists(char *path) {
 }
 
 static void
-hsk_store_filename(char *prefix, char *path, bool tmp) {
+hsk_store_filename(char *prefix, char *path, uint32_t height) {
   sprintf(
     path,
-    "%s%c%s_%s%s%c",
+    "%s%c%s_%s%s",
     prefix,
     HSK_PATH_SEP,
     HSK_STORE_FILENAME,
     HSK_NETWORK_NAME,
-    HSK_STORE_EXTENSION,
-    tmp ? '~' : '\0'
+    HSK_STORE_EXTENSION
   );
+
+  if (height > 0) {
+    sprintf(path, "%s~%u", path, height);
+  }
 }
 
 static void
@@ -126,8 +129,8 @@ hsk_store_write(const hsk_chain_t *chain) {
   hsk_store_ctx_t *ctx = malloc(sizeof(hsk_store_ctx_t));
   if (!ctx)
     goto fail;
-  hsk_store_filename(chain->prefix, ctx->tmp, true);
-  hsk_store_filename(chain->prefix, ctx->path, false);
+  hsk_store_filename(chain->prefix, ctx->tmp, chain->height);
+  hsk_store_filename(chain->prefix, ctx->path, 0);
 
   // Serialize
   char buf[HSK_STORE_CHECKPOINT_SIZE];
@@ -248,7 +251,6 @@ hsk_store_inject_checkpoint(
     // Compute and set total chain work
     assert(hsk_header_calc_work(hdr, prev_ptr));
 
-
     if (hsk_chain_save(chain, hdr) != 0)
       return false;
 
@@ -265,7 +267,7 @@ hsk_store_read(
   hsk_chain_t *chain
 ) {
   char path[HSK_STORE_PATH_MAX];
-  hsk_store_filename(chain->prefix, path, false);
+  hsk_store_filename(chain->prefix, path, 0);
 
   hsk_store_log("loading checkpoint from file: %s\n", path);
 
