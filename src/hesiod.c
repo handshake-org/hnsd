@@ -57,10 +57,10 @@ hsk_hesiod_txt_push_float(char *name, float f, hsk_dns_rrs_t *an) {
 }
 
 static bool
-hsk_hesiod_txt_push_peer(hsk_peer_t *peer, hsk_dns_rrs_t *an) {
+hsk_hesiod_txt_push_peer(hsk_peer_t *peer, hsk_dns_rrs_t *an, uint16_t count) {
   char label[65];
   char sublabel[40];
-  sprintf(sublabel, "%llu.peers.pool.hnsd.", peer->id);
+  sprintf(sublabel, "%d.peers.pool.hnsd.", count);
 
   sprintf(label, "host.%s", sublabel);
   if (!hsk_hesiod_txt_push(label, peer->host, an))
@@ -68,6 +68,42 @@ hsk_hesiod_txt_push_peer(hsk_peer_t *peer, hsk_dns_rrs_t *an) {
 
   sprintf(label, "agent.%s", sublabel);
   if (!hsk_hesiod_txt_push(label, peer->agent, an))
+    return false;
+
+  sprintf(label, "headers.%s", sublabel);
+  if (!hsk_hesiod_txt_push_u64(label, peer->headers, an))
+    return false;
+
+  sprintf(label, "proofs.%s", sublabel);
+  if (!hsk_hesiod_txt_push_u64(label, peer->proofs, an))
+    return false;
+
+  char state[32];
+  switch (peer->state) {
+    case HSK_STATE_DISCONNECTED:
+      strcpy(state, "HSK_STATE_DISCONNECTED");
+      break;
+    case HSK_STATE_CONNECTING:
+      strcpy(state, "HSK_STATE_CONNECTING");
+      break;
+    case HSK_STATE_CONNECTED:
+      strcpy(state, "HSK_STATE_CONNECTED");
+      break;
+    case HSK_STATE_READING:
+      strcpy(state, "HSK_STATE_READING");
+      break;
+    case HSK_STATE_HANDSHAKE:
+      strcpy(state, "HSK_STATE_HANDSHAKE");
+      break;
+    case HSK_STATE_DISCONNECTING:
+      strcpy(state, "HSK_STATE_DISCONNECTING");
+      break;
+    default:
+      return true;
+  }
+
+  sprintf(label, "state.%s", sublabel);
+  if (!hsk_hesiod_txt_push(label, state, an))
     return false;
 
   return true;
@@ -135,8 +171,9 @@ hsk_hesiod_resolve(hsk_dns_req_t *req, hsk_ns_t *ns) {
   //  PEERS
   if (hsk_dns_is_subdomain(req->name, "peers.pool.hnsd.")) {
     hsk_peer_t *peerIter, *next;
+    uint16_t count = 0;
     for (peerIter = ns->pool->head; peerIter; peerIter = next) {
-      if (!hsk_hesiod_txt_push_peer(peerIter, an))
+      if (!hsk_hesiod_txt_push_peer(peerIter, an, count++))
         goto fail;
 
       next = peerIter->next;

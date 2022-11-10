@@ -164,17 +164,60 @@ describe('Hesiod', function() {
       });
 
       const {answer} = await util.resolver.resolve(qs);
-      assert.strictEqual(answer.length, 3);
+      assert.strictEqual(answer.length, 6);
 
       assert.strictEqual(answer[0].name, 'size.pool.hnsd.');
       assert.strictEqual(answer[0].data.txt[0], '1');
 
-      // Peer id isn't deterministic
-      assert(answer[1].name.match(/host\.[0-65535]\.peers\.pool\.hnsd\./));
+      assert.strictEqual(answer[1].name, 'host.0.peers.pool.hnsd.');
       assert.strictEqual(answer[1].data.txt[0], `${util.host}:${util.port}`);
 
-      assert(answer[2].name.match(/agent\.[0-65535]\.peers\.pool\.hnsd\./));
+      assert.strictEqual(answer[2].name, 'agent.0.peers.pool.hnsd.');
       assert.strictEqual(answer[2].data.txt[0], `/${pkg.name}:${pkg.version}/`);
+
+      assert.strictEqual(answer[3].name, 'headers.0.peers.pool.hnsd.');
+      assert.strictEqual(answer[3].data.txt[0], '1');
+
+      assert.strictEqual(answer[4].name, 'proofs.0.peers.pool.hnsd.');
+      assert.strictEqual(answer[4].data.txt[0], '0');
+
+      assert.strictEqual(answer[5].name, 'state.0.peers.pool.hnsd.');
+      assert.strictEqual(answer[5].data.txt[0], 'HSK_STATE_HANDSHAKE');
+    });
+
+    it('should count more headers', async () => {
+      await util.generate(10);
+      await util.waitForSync();
+
+      const qs = wire.Question.fromJSON({
+        name: 'peers.pool.hnsd.',
+        class: 'HS',
+        type: 'TXT'
+      });
+
+      const {answer} = await util.resolver.resolve(qs);
+      assert.strictEqual(answer[2].name, 'headers.0.peers.pool.hnsd.');
+      assert.strictEqual(answer[2].data.txt[0], '11');
+    });
+
+    it('should count proof requests', async () => {
+      const qs = wire.Question.fromJSON({
+        name: 'peers.pool.hnsd.',
+        class: 'HS',
+        type: 'TXT'
+      });
+
+      await util.resolver.lookup('fake', 'NS');
+
+      const res1 = await util.resolver.resolve(qs);
+      assert.strictEqual(res1.answer[3].name, 'proofs.0.peers.pool.hnsd.');
+      assert.strictEqual(res1.answer[3].data.txt[0], '1');
+
+      await util.resolver.lookup('phony', 'NS');
+
+      const res2 = await util.resolver.resolve(qs);
+      assert.strictEqual(res2.answer[3].name, 'proofs.0.peers.pool.hnsd.');
+      assert.strictEqual(res2.answer[3].data.txt[0], '2');
     });
   });
 });
