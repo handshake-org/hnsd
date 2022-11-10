@@ -107,12 +107,19 @@ class TestUtil {
 
       this.hnsd.on('spawn', () => resolve());
       this.hnsd.on('error', () => reject());
+      this.hnsd.on('close', this.crash);
     });
+  }
+
+  crash(code, signal) {
+    throw new Error(`hnsd crashed with code: ${code} and signal: ${signal}`);
   }
 
   closeHNSD() {
     if (!this.hnsd)
       return;
+
+    this.hnsd.removeListener('close', this.crash);
 
     this.hnsd.kill('SIGKILL');
     this.hnsd = null;
