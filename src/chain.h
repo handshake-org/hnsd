@@ -82,4 +82,18 @@ hsk_chain_synced(const hsk_chain_t *chain);
 
 int
 hsk_chain_add(hsk_chain_t *chain, const hsk_header_t *h);
+
+int
+hsk_chain_insert(
+  hsk_chain_t *chain,
+  hsk_header_t *hdr,
+  const hsk_header_t *prev
+);
+
+int
+hsk_chain_save(
+  hsk_chain_t *chain,
+  hsk_header_t *hdr
+);
+
 #endif
