@@ -126,57 +126,6 @@ hsk_chain_init_genesis(hsk_chain_t *chain) {
   return HSK_SUCCESS;
 }
 
-int
-hsk_chain_init_checkpoint(hsk_chain_t *chain, hsk_checkpoint_t *checkpoint) {
-  if (!chain || !checkpoint)
-    return HSK_EBADARGS;
-
-  if (!checkpoint) {
-    hsk_chain_log(chain, "no checkpoint, sync will start from genesis\n");    
-    return HSK_SUCCESS;
-  }
-
-  hsk_chain_log(
-    chain,
-    "jumping to checkpoint at height %d to begin chain sync\n",
-    checkpoint->height
-  );
-
-  // Insert the total chainwork up to this point
-  hsk_header_t prev;
-  hsk_header_t *prev_ptr = &prev;
-  memcpy(prev.work, checkpoint->chainwork, 32);
-
-  for (int i = 0; i < HSK_STORE_HEADERS_COUNT; i++) {
-    hsk_header_t *tip = checkpoint->headers[i];
-    uint32_t height = i + checkpoint->height;
-    tip->height = height;
-
-    assert(hsk_header_calc_work(tip, prev_ptr));
-
-    if (!hsk_map_set(&chain->hashes, hsk_header_cache(tip), tip)) {
-      free(tip);
-      return HSK_ENOMEM;
-    }
-
-    if (!hsk_map_set(&chain->heights, &tip->height, tip)) {
-      hsk_map_del(&chain->hashes, hsk_header_cache(tip));
-      free(tip);
-      return HSK_ENOMEM;
-    }
-
-    chain->height = height;
-    chain->init_height = checkpoint->height;
-    chain->tip = tip;
-    chain->genesis = tip;
-    prev_ptr = tip;
-  }
-
-  hsk_chain_maybe_sync(chain);
-
-  return HSK_SUCCESS;
-}
-
 void
 hsk_chain_uninit(hsk_chain_t *chain) {
   if (!chain)
@@ -340,28 +289,7 @@ hsk_chain_checkpoint_flush(hsk_chain_t *chain) {
   if (chain->height - chain->init_height <= HSK_STORE_CHECKPOINT_WINDOW)
     return;
 
-  hsk_checkpoint_t checkpoint;
-  checkpoint.height = chain->height - HSK_STORE_CHECKPOINT_WINDOW;
-  hsk_header_t *prev = hsk_chain_get_by_height(chain, checkpoint.height - 1);
-  memcpy(checkpoint.chainwork, prev->work, 32);
-
-  for (int i = 0; i < HSK_STORE_HEADERS_COUNT; i++) {
-    checkpoint.headers[i] = hsk_chain_get_by_height(
-      chain,
-      i + checkpoint.height);
-  }
-
-  if (hsk_store_write(&checkpoint, chain->prefix)) {
-    hsk_chain_log(
-      chain,
-      "saved checkpoint to disk from height %d\n",
-      checkpoint.height);
-  } else {
-    hsk_chain_log(
-      chain,
-      "failed to write checkpoint to disk from height %d\n",
-      checkpoint.height);
-  }
+  hsk_store_write(chain);
 }
 
 void

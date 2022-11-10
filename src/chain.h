@@ -9,7 +9,6 @@
 #include "map.h"
 #include "header.h"
 #include "timedata.h"
-#include "store.h"
 
 /*
  * Types
@@ -44,11 +43,9 @@ hsk_chain_init(
 void
 hsk_chain_uninit(hsk_chain_t *chain);
 
-int
-hsk_chain_init_checkpoint(hsk_chain_t *chain, hsk_checkpoint_t *checkpoint);
-
 void
 hsk_chain_free(hsk_chain_t *chain);
+
 bool
 hsk_chain_has(const hsk_chain_t *chain, const uint8_t *hash);
 

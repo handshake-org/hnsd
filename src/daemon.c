@@ -613,21 +613,13 @@ hsk_daemon_open(hsk_daemon_t *daemon, hsk_options_t *opt) {
   int rc = HSK_SUCCESS;
 
   if (opt->checkpoint && HSK_CHECKPOINT != NULL) {
-    hsk_checkpoint_t checkpoint;
+    // Read the hard-coded checkpoint
     uint8_t *data = (uint8_t *)HSK_CHECKPOINT;
     size_t data_len = HSK_STORE_CHECKPOINT_SIZE;
-
-    // Read the hard-coded checkpoint
-    hsk_store_checkpoint_read(
-      &data,
-      &data_len,
-      &checkpoint
-    );
-
-    rc = hsk_chain_init_checkpoint(&daemon->pool->chain, &checkpoint);
-
-    if (rc != HSK_SUCCESS)
-      return rc;
+    if (!hsk_store_inject_checkpoint(&data, &data_len, &daemon->pool->chain)) {
+      fprintf(stderr, "unable to inject hard-coded checkpoint\n");
+      return HSK_EBADARGS;
+    }
   }
 
   if (opt->prefix) {
@@ -638,22 +630,21 @@ hsk_daemon_open(hsk_daemon_t *daemon, hsk_options_t *opt) {
 
     daemon->pool->chain.prefix = opt->prefix;
 
-    hsk_checkpoint_t checkpoint;
-
-    // Read/write our own local checkpoint
-    if (hsk_store_read(&checkpoint, opt->prefix)) {
-      rc = hsk_chain_init_checkpoint(&daemon->pool->chain, &checkpoint);
-
-      if (rc != HSK_SUCCESS) {
-        fprintf(stderr, "failed checkpoint init: %s\n", hsk_strerror(rc));
-        return rc;
-      }
+    // Read the checkpoint from file
+    uint8_t data[HSK_STORE_CHECKPOINT_SIZE];
+    uint8_t *data_ptr = (uint8_t *)&data;
+    size_t data_len = HSK_STORE_CHECKPOINT_SIZE;
+    if (!hsk_store_read(&data_ptr, &data_len, &daemon->pool->chain)) {
+      fprintf(stderr, "unable to read checkpoint from file\n");
     } else {
-      fprintf(
-        stderr,
-        "could not open checkpoint file from prefix: %s\n",
-        opt->prefix
-      );
+      if (!hsk_store_inject_checkpoint(
+        &data_ptr,
+        &data_len,
+        &daemon->pool->chain
+      )) {
+        fprintf(stderr, "unable to inject checkpoint from file\n");
+        return HSK_EBADARGS;
+      }
     }
   }
 
