@@ -1,6 +1,9 @@
 #ifndef _HSK_STORE
 #define _HSK_STORE
 
+#include "uv.h"
+
+#include "chain.h"
 #include "header.h"
 
 /*
@@ -26,11 +29,13 @@
  * Types
  */
 
-typedef struct {
+typedef struct hsk_store_ctx_s {
+  char path[HSK_STORE_PATH_MAX];
+  char tmp[HSK_STORE_PATH_MAX];
+  uv_file file;
   uint32_t height;
-  uint8_t chainwork[32];
-  hsk_header_t *headers[HSK_STORE_HEADERS_COUNT];
-} hsk_checkpoint_t;
+} hsk_store_ctx_t;
+
 
 /*
  * Store
@@ -39,17 +44,21 @@ typedef struct {
 bool
 hsk_store_exists(char *path);
 
+void
+hsk_store_write(const hsk_chain_t *chain);
+
 bool
-hsk_store_checkpoint_read(
+hsk_store_inject_checkpoint(
   uint8_t **data,
   size_t *data_len,
-  hsk_checkpoint_t *checkpoint
+  hsk_chain_t *chain
 );
 
 bool
-hsk_store_write(hsk_checkpoint_t *checkpoint, char *prefix);
-
-bool
-hsk_store_read(hsk_checkpoint_t *checkpoint, char *prefix);
+hsk_store_read(
+  uint8_t **data,
+  size_t *data_len,
+  hsk_chain_t *chain
+);
 
 #endif
