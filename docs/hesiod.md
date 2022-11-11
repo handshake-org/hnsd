@@ -98,11 +98,11 @@ state.0.peers.pool.hnsd. 0      HS      TXT     "HSK_STATE_HANDSHAKE"
       size:     `unsigned int`,
       [index].peers: [
         {
-          host:  `string`,
-          agent: `string`,
-          headers `unsigned int`,
-          proofs: `unsigned int`,
-          state: `string`
+          host:    `string`,
+          agent:   `string`,
+          headers: `unsigned int`, // number of headers received from peer
+          proofs:  `unsigned int`, // number of urkel proofs received from peer
+          state:   `string`        // connection status, see pool.h
         }
       ]
     }
