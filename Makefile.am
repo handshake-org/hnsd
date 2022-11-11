@@ -40,6 +40,7 @@ libhsk_la_SOURCES = src/addr.c                   \
                     src/error.c                  \
                     src/hash.c                   \
                     src/header.c                 \
+                    src/hesiod.c                 \
                     src/map.c                    \
                     src/msg.c                    \
                     src/poly1305/poly1305.c      \
@@ -79,6 +80,7 @@ noinst_PROGRAMS = test_hnsd
 
 test_hnsd_SOURCES = test/hnsd-test.c     \
                     test/base32-test.c   \
+                    test/dns-test.c      \
                     test/resource-test.c
 
 test_hnsd_LDFLAGS = -static

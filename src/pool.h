@@ -59,6 +59,7 @@ typedef struct hsk_peer_s {
   hsk_brontide_t *brontide;
   uint64_t id;
   char host[HSK_MAX_HOST];
+  char agent[255];
   hsk_addr_t addr;
   int state;
   uint8_t read_buffer[HSK_BUFFER_SIZE];

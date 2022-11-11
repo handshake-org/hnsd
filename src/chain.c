@@ -262,12 +262,6 @@ hsk_chain_maybe_sync(hsk_chain_t *chain) {
 
   int64_t now = hsk_timedata_now(chain->td);
 
-  if (now < HSK_LAUNCH_DATE) {
-    hsk_chain_log(chain, "chain is fully synced\n");
-    chain->synced = true;
-    return;
-  }
-
   if (HSK_USE_CHECKPOINTS) {
     if (chain->height < HSK_LAST_CHECKPOINT)
       return;
@@ -281,6 +275,19 @@ hsk_chain_maybe_sync(hsk_chain_t *chain) {
 
   hsk_chain_log(chain, "chain is fully synced\n");
   chain->synced = true;
+}
+
+float
+hsk_chain_progress(const hsk_chain_t *chain) {
+  uint64_t start = chain->genesis->time;
+  uint64_t current = chain->tip->time - start;
+  uint64_t end = hsk_timedata_now(chain->td) - start - (40 * 60);
+  float progress = (float)current / end;
+
+  if (progress > 1)
+    return 1;
+
+  return progress;
 }
 
 bool

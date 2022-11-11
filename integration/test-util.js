@@ -5,6 +5,7 @@ const {spawn, execSync} = require('child_process');
 const assert = require('bsert');
 const path = require('path');
 const {FullNode} = require('hsd');
+const wire = require('bns/lib/wire');
 const StubResolver = require('bns/lib/resolver/stub');
 const {EOL} = require('os');
 const {version} = require('./package.json');
@@ -13,11 +14,16 @@ const hnsdPath = path.join(__dirname, '..', 'hnsd');
 
 class TestUtil {
   constructor() {
+    this.host = '127.0.0.1';
+    this.port = 10000;
+
     this.node = new FullNode({
       memory: true,
       network,
       listen: true,
-      port: 10000,
+      host: this.host,
+      port: this.port,
+      brontidePort: 46888, // avoid hnsd connecting via brontide
       noDns: true,
       plugins: [require('hsd/lib/wallet/plugin')]
     });
@@ -39,29 +45,25 @@ class TestUtil {
       'Network or version mismatch'
     );
 
+    await this.resolver.open();
     await this.node.open();
     await this.node.connect();
 
     this.wallet = this.node.plugins.walletdb;
 
-    this.hnsd = spawn(
-      hnsdPath,
-      ['-s', '127.0.0.1:10000']
-    );
+    return this.openHNSD();
+  }
 
-    this.hnsd.stdout.on('data', (data) => {
-      // TODO: `data` is always 8192 bytes and output gets cut off, why?
-      const chunk = data.toString('ascii');
-      const lines = chunk.split(/\n/);
+  async openHNSD() {
+    return new Promise((resolve, reject) => {
+      this.hnsd = spawn(
+        path.join(__dirname, '..', 'hnsd'),
+        ['-s', `${this.host}:${this.port}`],
+        {stdio: 'ignore'}
+      );
 
-      for (const line of lines) {
-        const words = line.split(/\s+/);
-
-        if (words[0] !== 'chain' || words.length < 2)
-          continue;
-
-        this.hnsdHeight = parseInt(words[1].slice(1, -2));
-      }
+      this.hnsd.on('spawn', () => resolve());
+      this.hnsd.on('error', () => reject());
     });
   }
 
@@ -100,21 +102,50 @@ class TestUtil {
     await this.generate(12); // safe root
   }
 
-  waitForSync() {
-    return new Promise((resolve, reject) => {
-      // Hack
-      setTimeout(() => {
-        resolve();
-      }, 5000);
+  async resolveHS(name) {
+    const qs = wire.Question.fromJSON({
+      name,
+      class: 'HS',
+      type: 'TXT'
+    });
 
-    // // TODO: Fix hnsd stdout parsing for chain height
-    //   setTimeout(() => {
-    //     reject(new Error('Timeout waiting for sync'));
-    //   }, 5000);
-    //   setInterval(() => {
-    //     if (this.hnsdHeight === this.node.chain.height)
-    //       resolve();
-    //   }, 100);
+    const {answer} = await this.resolver.resolve(qs);
+    assert(answer && answer.length);
+    return answer[0].data.txt[0];
+  }
+
+  async waitForHS(name, value) {
+    const answer = await this.resolveHS(name);
+    if (answer === String(value))
+      return value;
+
+    return new Promise(async (resolve) => {
+      setTimeout(async () => {
+        resolve(this.waitForHS(name));
+      }, 100);
+    });
+  }
+
+  async getHeights() {
+    const hnsd = this.hnsd
+                 ? await this.resolveHS('height.tip.chain.hnsd.')
+                 : 0;
+
+    return {
+      hnsd: parseInt(hnsd),
+      hsd: this.node.chain.height
+    };
+  }
+
+  async waitForSync() {
+    const {hsd, hnsd} = await this.getHeights();
+    if (hsd === hnsd)
+      return hnsd;
+
+    return new Promise(async (resolve) => {
+      setTimeout(async () => {
+        resolve(this.waitForSync());
+      }, 100);
     });
   }
 }

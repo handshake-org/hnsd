@@ -66,6 +66,9 @@ hsk_chain_get_ancestor(
   uint32_t height
 );
 
+float
+hsk_chain_progress(const hsk_chain_t *chain);
+
 bool
 hsk_chain_synced(const hsk_chain_t *chain);
 

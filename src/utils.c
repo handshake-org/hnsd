@@ -88,7 +88,11 @@ hsk_ymd(uint32_t *year, uint32_t *month, uint32_t *day) {
 
 uint32_t
 hsk_random(void) {
-  return _HSK_RANDOM();
+  // RAND_MAX may be only 0x7fff on Windows.
+  // Double up to guarantee 32 bits of randomness.
+  // https://learn.microsoft.com/en-us/cpp/c-runtime-library/rand-max
+  uint32_t n = _HSK_RANDOM();
+  return (n << 16) ^ _HSK_RANDOM();
 }
 
 uint64_t
