@@ -71,11 +71,34 @@ hsk_store_after_close(uv_fs_t *req_close) {
 #if defined(_WIN32)
   // Can not do the rename-file trick to guarantee atomicity on windows
   // so delete existing file if present
-  remove(ctx->path); // TODO replace with uv_fs_unlink
+  uv_fs_t req_unlink;
+  uv_fs_unlink(
+    req_close->loop,
+    &req_unlink,
+    ctx->path,
+    NULL // sync
+  );
+
+  if (req_unlink.result != 0) {
+    hsk_store_log("(%u) could not delete old checkpoint file\n", ctx->height);
+    goto done;
+  }
 #endif
 
   // Replace actual file with temp for atomicity
-  rename(ctx->tmp, ctx->path); // TODO replace with uv_fs_rename
+  uv_fs_t req_rename;
+  uv_fs_rename(
+    req_close->loop,
+    &req_rename,
+    ctx->tmp,
+    ctx->path,
+    NULL // sync
+  );
+
+  if (req_rename.result != 0) {
+    hsk_store_log("(%u) could not rename temp checkpoint file\n", ctx->height);
+    goto done;
+  }
 
   hsk_store_log(
     "(%u) checkpoint file written to path: %s\n",
@@ -215,9 +238,22 @@ hsk_store_inject_checkpoint(
   hsk_chain_t *chain
 ) {
   // Checkpoint start height
-  if (!read_u32be(data, data_len, &chain->init_height))
+  uint32_t height;
+  if (!read_u32be(data, data_len, &height))
     return false;
 
+  // Could be conflict between checkpoint file on disk
+  // and hard-coded checkpoint. Go with highest.
+  if (chain->init_height >= height) {
+    hsk_store_log(
+      "ignoring checkpoint at height %d, chain already initialized at %d\n",
+      height,
+      chain->init_height
+    );
+    return true;
+  }
+
+  chain->init_height = height;
   hsk_store_log(
     "injecting checkpoint into chain from height %d\n", 
     chain->init_height
@@ -273,29 +309,83 @@ hsk_store_read(
 
   hsk_store_log("loading checkpoint from file: %s\n", path);
 
-  FILE *file = fopen(path, "r");
-  if (!file)
-    return false;
+  bool ok = true;
+  uv_fs_t req_open;
+  uv_fs_t req_read;
+  uv_fs_t req_close;
 
-  // Synchronous, only run once on startup to initialize chain
-  size_t read = fread(*data, 1, HSK_STORE_CHECKPOINT_SIZE, file);
-  if (read != HSK_STORE_CHECKPOINT_SIZE)
-    return false;
-  fclose(file);
+  // Open
+  uv_fs_open(
+    chain->loop,
+    &req_open,
+    path,
+    UV_FS_O_RDONLY,
+    0,   // no mode flags needed for read-only
+    NULL // sync
+  );
+
+  if (req_open.result < 0) {
+    hsk_store_log("could not open checkpoint file: %s\n", path);
+    goto fail;
+  }
+
+  // Read
+  uv_buf_t uvbuf;
+  uvbuf.base = (char *)*data;
+  uvbuf.len = *data_len;
+  uv_fs_read(
+    chain->loop,
+    &req_read,
+    req_open.result, // file handle
+    &uvbuf,
+    1,   // number of buffers
+    0,   // start position
+    NULL // sync
+  );
+
+  if (req_read.result != HSK_STORE_CHECKPOINT_SIZE) {
+    hsk_store_log("could not read checkpoint file: %s\n", path);
+    goto fail;
+  }
 
   uint32_t magic;
-  if (!read_u32be(data, data_len, &magic))
-    return false;
+  if (!read_u32be(data, data_len, &magic)) {
+    hsk_store_log("could not read checkpoint file: %s\n", path);
+    goto fail;
+  }
 
-  if (magic != HSK_MAGIC)
-    return false;
+  if (magic != HSK_MAGIC) {
+    hsk_store_log("invalid magic bytes in checkpoint file: %s\n", path);
+    goto fail;
+  }
 
   uint8_t version;
-  if (!read_u8(data, data_len, &version))
-    return false;
+  if (!read_u8(data, data_len, &version)) {
+    hsk_store_log("could not read checkpoint file: %s\n", path);
+    goto fail;
+  }
 
-  if (version != HSK_STORE_VERSION)
-    return false;
+  if (version != HSK_STORE_VERSION){
+    hsk_store_log("invalid version in checkpoint file: %s\n", path);
+    goto fail;
+  }
 
-  return true;
+  goto done;
+
+fail:
+  ok = false;
+
+done:
+  // Close file
+  uv_fs_close(
+    chain->loop,
+    &req_close,
+    req_open.result, // file handle
+    NULL // sync
+  );
+
+  uv_fs_req_cleanup(&req_open);
+  uv_fs_req_cleanup(&req_read);
+  uv_fs_req_cleanup(&req_close);
+  return ok;
 }

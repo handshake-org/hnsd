@@ -634,9 +634,7 @@ hsk_daemon_open(hsk_daemon_t *daemon, hsk_options_t *opt) {
     uint8_t data[HSK_STORE_CHECKPOINT_SIZE];
     uint8_t *data_ptr = (uint8_t *)&data;
     size_t data_len = HSK_STORE_CHECKPOINT_SIZE;
-    if (!hsk_store_read(&data_ptr, &data_len, &daemon->pool->chain)) {
-      fprintf(stderr, "unable to read checkpoint from file\n");
-    } else {
+    if (hsk_store_read(&data_ptr, &data_len, &daemon->pool->chain)) {
       if (!hsk_store_inject_checkpoint(
         &data_ptr,
         &data_len,
