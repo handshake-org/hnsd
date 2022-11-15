@@ -102,7 +102,7 @@ hsk_store_after_write(uv_fs_t *req_write) {
     req_write->loop,
     &req_close,
     ctx->file, // file handle
-    NULL // sync
+    NULL       // sync
   );
 
   hsk_store_after_close(&req_close);
@@ -180,7 +180,7 @@ hsk_store_write(const hsk_chain_t *chain) {
 
   hsk_store_log("(%u) writing checkpoint file: %s\n", ctx->height, ctx->tmp);
 
-  // Write async
+  // Write
   uv_fs_t *req_write = malloc(sizeof(uv_fs_t));
   req_write->data = ctx;
 
@@ -189,10 +189,12 @@ hsk_store_write(const hsk_chain_t *chain) {
     req_write,
     req_open.result, // file handle
     &uvbuf,
-    1,  // number of buffers
-    0,  // start position
-    hsk_store_after_write
+    1,   // number of buffers
+    0,   // start position
+    NULL // sync
   );
+
+  hsk_store_after_write(req_write);
 
   goto done;
 
