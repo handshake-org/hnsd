@@ -115,14 +115,15 @@ class TestUtil {
   }
 
   async waitForHS(name, value) {
-    const answer = await this.resolveHS(name);
-    if (answer === String(value))
-      return value;
-
+    let interval;
     return new Promise(async (resolve) => {
-      setTimeout(async () => {
-        resolve(this.waitForHS(name));
-      }, 100);
+      interval = setInterval(async () => {
+        const answer = await this.resolveHS(name);
+        if (answer === String(value)) {
+          clearInterval(interval);
+          resolve(value);
+        }
+      }, 500);
     });
   }
 
@@ -138,14 +139,15 @@ class TestUtil {
   }
 
   async waitForSync() {
-    const {hsd, hnsd} = await this.getHeights();
-    if (hsd === hnsd)
-      return hnsd;
-
+    let interval;
     return new Promise(async (resolve) => {
-      setTimeout(async () => {
-        resolve(this.waitForSync());
-      }, 100);
+      interval = setInterval(async () => {
+        const {hsd, hnsd} = await this.getHeights();
+        if (hsd === hnsd) {
+          clearInterval(interval);
+          resolve(hnsd);
+        }
+      }, 500);
     });
   }
 }
