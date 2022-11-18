@@ -679,25 +679,40 @@ hsk_chain_insert(
 
   assert(hsk_header_calc_work(hdr, prev));
 
+  // Less work than chain tip, this header is on a fork
   if (memcmp(hdr->work, chain->tip->work, 32) <= 0) {
     if (!hsk_map_set(&chain->hashes, hash, (void *)hdr))
       return HSK_ENOMEM;
 
     hsk_chain_log(chain, "  stored on alternate chain\n");
   } else {
+    // More work than tip, but does not connect to tip: we have a reorg
     if (memcmp(hdr->prev_block, hsk_header_cache(chain->tip), 32) != 0) {
       hsk_chain_log(chain, "  reorganizing...\n");
       hsk_chain_reorganize(chain, hdr);
     }
 
-    if (!hsk_map_set(&chain->hashes, hash, (void *)hdr))
+    return hsk_chain_save(chain, hdr);
+  }
+
+  return HSK_SUCCESS;
+}
+
+int
+hsk_chain_save(
+  hsk_chain_t *chain,
+  hsk_header_t *hdr
+) {
+    // Save the header
+    if (!hsk_map_set(&chain->hashes, &hdr->hash, (void *)hdr))
       return HSK_ENOMEM;
 
     if (!hsk_map_set(&chain->heights, &hdr->height, (void *)hdr)) {
-      hsk_map_del(&chain->hashes, hash);
+      hsk_map_del(&chain->hashes, &hdr->hash);
       return HSK_ENOMEM;
     }
 
+    // Set the chain tip
     chain->height = hdr->height;
     chain->tip = hdr;
 
@@ -705,7 +720,6 @@ hsk_chain_insert(
     hsk_chain_log(chain, "  new height: %u\n", (uint32_t)chain->height);
 
     hsk_chain_maybe_sync(chain);
-  }
 
-  return HSK_SUCCESS;
+    return HSK_SUCCESS;
 }
