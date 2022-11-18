@@ -35,9 +35,6 @@ hsk_chain_init(hsk_chain_t *chain, const hsk_timedata_t *td);
 void
 hsk_chain_uninit(hsk_chain_t *chain);
 
-hsk_chain_t *
-hsk_chain_alloc(const hsk_timedata_t *td);
-
 void
 hsk_chain_free(hsk_chain_t *chain);
 

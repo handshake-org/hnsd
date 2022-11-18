@@ -137,21 +137,6 @@ hsk_chain_uninit(hsk_chain_t *chain) {
   chain->genesis = NULL;
 }
 
-hsk_chain_t *
-hsk_chain_alloc(const hsk_timedata_t *td) {
-  hsk_chain_t *chain = malloc(sizeof(hsk_chain_t));
-
-  if (!chain)
-    return NULL;
-
-  if (hsk_chain_init(chain, td) != HSK_SUCCESS) {
-    free(chain);
-    return NULL;
-  }
-
-  return chain;
-}
-
 void
 hsk_chain_free(hsk_chain_t *chain) {
   if (!chain)
