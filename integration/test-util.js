@@ -4,7 +4,7 @@
 const {spawn, execSync} = require('child_process');
 const assert = require('bsert');
 const path = require('path');
-const {FullNode} = require('hsd');
+const {FullNode, packets} = require('hsd');
 const wire = require('bns/lib/wire');
 const StubResolver = require('bns/lib/resolver/stub');
 const {EOL} = require('os');
@@ -28,6 +28,32 @@ class TestUtil {
       plugins: [require('hsd/lib/wallet/plugin')]
     });
 
+    // Packets received by full node from hnsd
+    this.packetsFrom = {};
+    this.node.pool.on('packet', (packet) => {
+      const type = packets.typesByVal[packet.type];
+      if (!this.packetsFrom[type])
+        this.packetsFrom[type] = [packet];
+      else
+        this.packetsFrom[type].push(packet);
+    });
+
+    // Packets sent to hnsd by the full node
+    this.packetsTo = {};
+    this.node.pool.on('peer open', (peer) => {
+      peer.SEND = peer.send;
+
+      peer.send = (packet) => {
+        const type = packets.typesByVal[packet.type];
+        if (!this.packetsTo[type])
+          this.packetsTo[type] = [packet];
+        else
+          this.packetsTo[type].push(packet);
+
+        peer.SEND(packet);
+      };
+    });
+
     this.wallet = null;
 
     this.resolver = new StubResolver();
@@ -35,6 +61,18 @@ class TestUtil {
 
     this.hnsd = null;
     this.hnsdHeight = 0;
+    this.hnsdArgsBase = ['-s', '127.0.0.1:10000'];
+    this.hnsdArgs = this.hnsdArgsBase;
+  }
+
+  extraArgs(args) {
+    assert(Array.isArray(args));
+    this.hnsdArgs = this.hnsdArgs.concat(args);
+  }
+
+  resetPackets() {
+    this.packetsTo = {};
+    this.packetsFrom = {};
   }
 
   async open() {
@@ -54,22 +92,48 @@ class TestUtil {
     return this.openHNSD();
   }
 
+  async close() {
+    this.closeHNSD();
+    await this.node.close();
+  }
+
   async openHNSD() {
     return new Promise((resolve, reject) => {
       this.hnsd = spawn(
         path.join(__dirname, '..', 'hnsd'),
-        ['-s', `${this.host}:${this.port}`],
+        this.hnsdArgs,
         {stdio: 'ignore'}
       );
 
       this.hnsd.on('spawn', () => resolve());
       this.hnsd.on('error', () => reject());
+      this.hnsd.on('close', this.crash);
     });
   }
 
-  async close() {
+  crash(code, signal) {
+    throw new Error(`hnsd crashed with code: ${code} and signal: ${signal}`);
+  }
+
+  closeHNSD() {
+    if (!this.hnsd)
+      return;
+
+    this.hnsd.removeListener('close', this.crash);
+
     this.hnsd.kill('SIGKILL');
-    await this.node.close();
+    this.hnsd = null;
+  }
+
+  async restartHNSD(args) {
+    this.closeHNSD();
+
+    if (args) {
+      assert(Array.isArray(args));
+      this.hnsdArgs = this.hnsdArgsBase.concat(args);
+    }
+
+    return this.openHNSD();
   }
 
   async getWalletAddress() {
