@@ -1,6 +1,8 @@
 #ifndef _HSK_STORE
 #define _HSK_STORE
 
+#include "chain.h"
+
 /*
  * Defs
  */
@@ -16,5 +18,16 @@
 #define HSK_STORE_VERSION 0
 #define HSK_STORE_HEADERS_COUNT 150
 #define HSK_STORE_CHECKPOINT_SIZE 35441
+
+/*
+ * Store
+ */
+
+bool
+hsk_store_inject_checkpoint(
+  uint8_t **data,
+  size_t *data_len,
+  hsk_chain_t *chain
+);
 
 #endif

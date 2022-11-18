@@ -115,6 +115,7 @@ hsk_chain_init_genesis(hsk_chain_t *chain) {
   }
 
   chain->height = tip->height;
+  chain->init_height = tip->height;
   chain->tip = tip;
   chain->genesis = tip;
 
@@ -300,7 +301,12 @@ hsk_chain_get_locator(const hsk_chain_t *chain, hsk_getheaders_msg_t *msg) {
       height = 0;
 
     hsk_header_t *hdr = hsk_chain_get_by_height(chain, (uint32_t)height);
-    assert(hdr);
+
+    // Due to checkpoint initialization
+    // we may not have any headers from here
+    // down to genesis
+    if (!hdr)
+      continue;
 
     hsk_header_hash(hdr, msg->hashes[i++]);
   }
