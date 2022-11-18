@@ -58,6 +58,34 @@ hsk_options_init(hsk_options_t *opt) {
 }
 
 static void
+hsk_options_uninit(hsk_options_t *opt) {
+  if (opt->config) {
+    free(opt->config);
+    opt->config = NULL;
+  }
+
+  if (opt->rs_config) {
+    free(opt->rs_config);
+    opt->rs_config = NULL;
+  }
+
+  if (opt->identity_key) {
+    free(opt->identity_key);
+    opt->identity_key = NULL;
+  }
+
+  if (opt->seeds) {
+    free(opt->seeds);
+    opt->seeds = NULL;
+  }
+
+  if (opt->user_agent) {
+    free(opt->user_agent);
+    opt->user_agent = NULL;
+  }
+}
+
+static void
 set_logfile(const char *logfile) {
   assert(logfile);
   freopen(logfile, "a", stdout);
@@ -694,6 +722,8 @@ done:
 
     uv_loop_close(loop);
   }
+
+  hsk_options_uninit(&opt);
 
   return rc;
 }
