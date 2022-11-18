@@ -39,4 +39,11 @@ hsk_store_inject_checkpoint(
   hsk_chain_t *chain
 );
 
+bool
+hsk_store_read(
+  uint8_t **data,
+  size_t *data_len,
+  hsk_chain_t *chain
+);
+
 #endif

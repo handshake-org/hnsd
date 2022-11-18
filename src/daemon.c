@@ -635,6 +635,21 @@ hsk_daemon_open(hsk_daemon_t *daemon, hsk_options_t *opt) {
     }
 
     daemon->pool->chain.prefix = opt->prefix;
+
+    // Read the checkpoint from file
+    uint8_t data[HSK_STORE_CHECKPOINT_SIZE];
+    uint8_t *data_ptr = (uint8_t *)&data;
+    size_t data_len = HSK_STORE_CHECKPOINT_SIZE;
+    if (hsk_store_read(&data_ptr, &data_len, &daemon->pool->chain)) {
+      if (!hsk_store_inject_checkpoint(
+        &data_ptr,
+        &data_len,
+        &daemon->pool->chain
+      )) {
+        fprintf(stderr, "unable to inject checkpoint from file\n");
+        return HSK_EBADARGS;
+      }
+    }
   }
 
   rc = hsk_pool_open(daemon->pool);

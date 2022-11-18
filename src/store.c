@@ -194,3 +194,55 @@ hsk_store_inject_checkpoint(
 
   return true;
 }
+
+bool
+hsk_store_read(
+  uint8_t **data,
+  size_t *data_len,
+  hsk_chain_t *chain
+) {
+  char path[HSK_STORE_PATH_MAX];
+  hsk_store_filename(chain->prefix, path, 0);
+
+  hsk_store_log("loading checkpoint from file: %s\n", path);
+
+  // Open
+  FILE *file = fopen(path, "r");
+  if (!file) {
+    hsk_store_log("could not open checkpoint file: %s\n", path);
+    return false;
+  }
+
+  // Read
+  size_t read = fread(*data, 1, *data_len, file);
+  fclose(file);
+
+  if (read != *data_len) {
+    hsk_store_log("could not read checkpoint file: %s\n", path);
+    return false;
+  }
+
+  uint32_t magic;
+  if (!read_u32be(data, data_len, &magic)) {
+    hsk_store_log("could not read magic from checkpoint file: %s\n", path);
+    return false;
+  }
+
+  if (magic != HSK_MAGIC) {
+    hsk_store_log("invalid magic bytes in checkpoint file: %s\n", path);
+    return false;
+  }
+
+  uint8_t version;
+  if (!read_u8(data, data_len, &version)) {
+    hsk_store_log("could not read version from checkpoint file: %s\n", path);
+    return false;
+  }
+
+  if (version != HSK_STORE_VERSION){
+    hsk_store_log("invalid version in checkpoint file: %s\n", path);
+    return false;
+  }
+
+  return true;
+}
