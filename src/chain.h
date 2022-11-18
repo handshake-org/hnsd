@@ -24,6 +24,7 @@ typedef struct hsk_chain_s {
   hsk_map_t heights;
   hsk_map_t orphans;
   hsk_map_t prevs;
+  char *prefix;
 } hsk_chain_t;
 
 /*
