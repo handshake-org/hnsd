@@ -15,6 +15,7 @@
 #include "header.h"
 #include "map.h"
 #include "msg.h"
+#include "store.h"
 #include "timedata.h"
 #include "utils.h"
 
@@ -34,6 +35,9 @@ hsk_chain_insert(
 
 static void
 hsk_chain_maybe_sync(hsk_chain_t *chain);
+
+static void
+hsk_chain_checkpoint_flush(hsk_chain_t *chain);
 
 /*
  * Helpers
@@ -78,6 +82,7 @@ hsk_chain_init(hsk_chain_t *chain, const hsk_timedata_t *td) {
   chain->genesis = NULL;
   chain->synced = false;
   chain->td = (hsk_timedata_t *)td;
+  chain->prefix = NULL;
 
   hsk_map_init_hash_map(&chain->hashes, free);
   hsk_map_init_int_map(&chain->heights, NULL);
@@ -98,9 +103,8 @@ hsk_chain_init_genesis(hsk_chain_t *chain) {
     return HSK_ENOMEM;
 
   uint8_t *data = (uint8_t *)HSK_GENESIS;
-  size_t size = sizeof(HSK_GENESIS) - 1;
 
-  assert(hsk_header_decode(data, size, tip));
+  assert(hsk_header_decode(data, HSK_HEADER_SIZE, tip));
   assert(hsk_header_calc_work(tip, NULL));
 
   if (!hsk_map_set(&chain->hashes, hsk_header_cache(tip), tip)) {
@@ -275,6 +279,19 @@ hsk_chain_progress(const hsk_chain_t *chain) {
 bool
 hsk_chain_synced(const hsk_chain_t *chain) {
   return chain->synced;
+}
+
+static void
+hsk_chain_checkpoint_flush(hsk_chain_t *chain) {
+  // Setting is off
+  if (!chain->prefix)
+    return;
+
+  // Skip first window after init to avoid re-writing the same checkpoint
+  if (chain->height - chain->init_height <= HSK_STORE_CHECKPOINT_WINDOW)
+    return;
+
+  hsk_store_write(chain);
 }
 
 void
@@ -726,6 +743,10 @@ hsk_chain_save(
     hsk_chain_log(chain, "  new height: %u\n", (uint32_t)chain->height);
 
     hsk_chain_maybe_sync(chain);
+
+    // Save batch of headers to disk
+    if (chain->height % HSK_STORE_CHECKPOINT_WINDOW == 0)
+      hsk_chain_checkpoint_flush(chain);
 
     return HSK_SUCCESS;
 }

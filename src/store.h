@@ -18,10 +18,19 @@
 #define HSK_STORE_VERSION 0
 #define HSK_STORE_HEADERS_COUNT 150
 #define HSK_STORE_CHECKPOINT_SIZE 35441
+#define HSK_STORE_FILENAME "checkpoint"
+#define HSK_STORE_EXTENSION ".dat"
+#define HSK_STORE_PATH_MAX 1024
 
 /*
  * Store
  */
+
+bool
+hsk_store_exists(char *path);
+
+void
+hsk_store_write(const hsk_chain_t *chain);
 
 bool
 hsk_store_inject_checkpoint(
