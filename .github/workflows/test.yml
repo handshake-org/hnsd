@@ -22,7 +22,7 @@ jobs:
 
       - name: Ubuntu Install Deps
         if: matrix.os == 'ubuntu-latest'
-        run: sudo apt-get install -y libunbound-dev
+        run: sudo apt-get update && sudo apt-get install -y libunbound-dev
 
       - name: Build
         run: ./autogen.sh && ./configure --with-network=regtest && make
