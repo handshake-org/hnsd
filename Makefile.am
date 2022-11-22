@@ -1,6 +1,6 @@
 AUTOMAKE_OPTIONS = foreign
-CFLAGS = -Wall -Wno-unused-function -std=gnu11 -O2
-LDFLAGS =
+CFLAGS = -Wall -Wno-unused-function -std=gnu11 -O2 $(SANITIZER_FLAGS)
+LDFLAGS = $(SANITIZER_FLAGS)
 
 SUBDIRS = uv
 

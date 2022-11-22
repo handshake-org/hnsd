@@ -63,6 +63,7 @@ class TestUtil {
     this.hnsdHeight = 0;
     this.hnsdArgsBase = ['-s', '127.0.0.1:10000'];
     this.hnsdArgs = this.hnsdArgsBase;
+    this.message = '';
   }
 
   extraArgs(args) {
@@ -93,8 +94,8 @@ class TestUtil {
   }
 
   async close() {
-    this.closeHNSD();
     await this.node.close();
+    this.closeHNSD();
   }
 
   async openHNSD() {
@@ -102,12 +103,26 @@ class TestUtil {
       this.hnsd = spawn(
         path.join(__dirname, '..', 'hnsd'),
         this.hnsdArgs,
-        {stdio: 'ignore'}
+        {stdio: ['ignore', 'ignore', 'pipe']}
       );
 
       this.hnsd.on('spawn', () => resolve());
       this.hnsd.on('error', () => reject());
       this.hnsd.on('close', this.crash);
+
+      this.message = '';
+      this.hnsd.stderr.on('data', (data) => {
+        this.message += data.toString('ascii');
+      });
+      this.hnsd.stderr.on('end', (data) => {
+        if (!this.message.length)
+          return;
+
+        const msg = this.message;
+        this.message = '';
+        console.log(msg);
+        throw new Error(msg);
+      });
     });
   }
 
@@ -121,7 +136,7 @@ class TestUtil {
 
     this.hnsd.removeListener('close', this.crash);
 
-    this.hnsd.kill('SIGKILL');
+    this.hnsd.kill('SIGINT');
     this.hnsd = null;
   }
 

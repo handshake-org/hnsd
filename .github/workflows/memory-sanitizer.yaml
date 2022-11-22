@@ -1,0 +1,34 @@
+name: Memory Sanitizer
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Ubuntu Install Deps
+        run: sudo apt-get update && sudo apt-get install -y libunbound-dev
+
+      - name: Build
+        run: ./autogen.sh && ./configure --with-network=regtest --with-sanitizers=address && make
+
+      - name: Unit Tests
+        run: ./test_hnsd
+
+      - name: Setup Integration
+        uses: actions/setup-node@v3.5.1
+        with:
+          node-version: 18
+
+      - name: Integration Tests
+        working-directory: ./integration
+        run: |
+          npm install
+          npm run test
