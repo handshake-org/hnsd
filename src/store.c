@@ -71,6 +71,7 @@ hsk_store_write(const hsk_chain_t *chain) {
   if (!write_u8(&data, HSK_STORE_VERSION))
     goto fail;
 
+  assert(chain->height % HSK_STORE_CHECKPOINT_WINDOW == 0);
   uint32_t height = chain->height - HSK_STORE_CHECKPOINT_WINDOW;
   if (!write_u32be(&data, height))
     goto fail;

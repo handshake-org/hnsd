@@ -629,7 +629,7 @@ hsk_daemon_open(hsk_daemon_t *daemon, hsk_options_t *opt) {
     }
 
     // Prefix must have enough room for filename
-    if (strlen(opt->prefix) + 32 >= HSK_STORE_PATH_MAX) {
+    if (strlen(opt->prefix) + HSK_STORE_PATH_RESERVED >= HSK_STORE_PATH_MAX) {
       fprintf(stderr, "prefix path is too long\n");
       return HSK_EBADARGS;
     }
