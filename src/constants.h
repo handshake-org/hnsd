@@ -3,6 +3,7 @@
 
 #include "config.h"
 #include "genesis.h"
+#include "checkpoints.h"
 
 #define HSK_MAIN 0
 #define HSK_TESTNET 1
@@ -79,8 +80,9 @@ static const uint8_t HSK_CHAINWORK[32] = {
 #define HSK_NO_RETARGETTING false
 #define HSK_GENESIS HSK_GENESIS_MAIN
 
-#define HSK_USE_CHECKPOINTS true
-#define HSK_LAST_CHECKPOINT 1008          // Used for maybe_sync, no block hash
+#define HSK_CHECKPOINT HSK_CHECKPOINT_MAIN
+#define HSK_STORE_CHECKPOINT_WINDOW 2000
+
 #define HSK_MAX_TIP_AGE (24 * 60 * 60)
 
 #elif HSK_NETWORK == HSK_TESTNET
@@ -133,8 +135,9 @@ static const uint8_t HSK_CHAINWORK[32] = {
 #define HSK_NO_RETARGETTING false
 #define HSK_GENESIS HSK_GENESIS_TESTNET
 
-#define HSK_USE_CHECKPOINTS false
-#define HSK_LAST_CHECKPOINT 0
+#define HSK_CHECKPOINT NULL
+#define HSK_STORE_CHECKPOINT_WINDOW 2000
+
 #define HSK_MAX_TIP_AGE (2 * 7 * 24 * 60 * 60)
 
 #elif HSK_NETWORK == HSK_REGTEST
@@ -176,8 +179,9 @@ static const uint8_t HSK_CHAINWORK[32] = {
 #define HSK_NO_RETARGETTING true
 #define HSK_GENESIS HSK_GENESIS_REGTEST
 
-#define HSK_USE_CHECKPOINTS false
-#define HSK_LAST_CHECKPOINT 0
+#define HSK_CHECKPOINT NULL
+#define HSK_STORE_CHECKPOINT_WINDOW 200
+
 #define HSK_MAX_TIP_AGE (2 * 7 * 24 * 60 * 60)
 
 #elif HSK_NETWORK == HSK_SIMNET
@@ -219,8 +223,9 @@ static const uint8_t HSK_CHAINWORK[32] = {
 #define HSK_NO_RETARGETTING false
 #define HSK_GENESIS HSK_GENESIS_SIMNET
 
-#define HSK_USE_CHECKPOINTS false
-#define HSK_LAST_CHECKPOINT 0
+#define HSK_CHECKPOINT NULL
+#define HSK_STORE_CHECKPOINT_WINDOW 200
+
 #define HSK_MAX_TIP_AGE (2 * 7 * 24 * 60 * 60)
 
 #else

@@ -28,6 +28,7 @@
 #include "sha256.h"
 #include "sig0.h"
 #include "siphash.h"
+#include "store.h"
 #include "timedata.h"
 #include "utils.h"
 

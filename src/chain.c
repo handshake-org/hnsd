@@ -15,6 +15,7 @@
 #include "header.h"
 #include "map.h"
 #include "msg.h"
+#include "store.h"
 #include "timedata.h"
 #include "utils.h"
 
@@ -34,6 +35,9 @@ hsk_chain_insert(
 
 static void
 hsk_chain_maybe_sync(hsk_chain_t *chain);
+
+static void
+hsk_chain_checkpoint_flush(hsk_chain_t *chain);
 
 /*
  * Helpers
@@ -57,6 +61,17 @@ qsort_cmp(const void *a, const void *b) {
  * Chain
  */
 
+
+static void
+hsk_chain_log(const hsk_chain_t *chain, const char *fmt, ...) {
+  printf("chain (%u): ", (uint32_t)chain->height);
+
+  va_list args;
+  va_start(args, fmt);
+  vprintf(fmt, args);
+  va_end(args);
+}
+
 int
 hsk_chain_init(hsk_chain_t *chain, const hsk_timedata_t *td) {
   if (!chain || !td)
@@ -67,6 +82,7 @@ hsk_chain_init(hsk_chain_t *chain, const hsk_timedata_t *td) {
   chain->genesis = NULL;
   chain->synced = false;
   chain->td = (hsk_timedata_t *)td;
+  chain->prefix = NULL;
 
   hsk_map_init_hash_map(&chain->hashes, free);
   hsk_map_init_int_map(&chain->heights, NULL);
@@ -87,9 +103,8 @@ hsk_chain_init_genesis(hsk_chain_t *chain) {
     return HSK_ENOMEM;
 
   uint8_t *data = (uint8_t *)HSK_GENESIS;
-  size_t size = sizeof(HSK_GENESIS) - 1;
 
-  assert(hsk_header_decode(data, size, tip));
+  assert(hsk_header_decode(data, HSK_HEADER_SIZE, tip));
   assert(hsk_header_calc_work(tip, NULL));
 
   if (!hsk_map_set(&chain->hashes, hsk_header_cache(tip), tip)) {
@@ -104,6 +119,7 @@ hsk_chain_init_genesis(hsk_chain_t *chain) {
   }
 
   chain->height = tip->height;
+  chain->init_height = tip->height;
   chain->tip = tip;
   chain->genesis = tip;
 
@@ -126,21 +142,6 @@ hsk_chain_uninit(hsk_chain_t *chain) {
   chain->genesis = NULL;
 }
 
-hsk_chain_t *
-hsk_chain_alloc(const hsk_timedata_t *td) {
-  hsk_chain_t *chain = malloc(sizeof(hsk_chain_t));
-
-  if (!chain)
-    return NULL;
-
-  if (hsk_chain_init(chain, td) != HSK_SUCCESS) {
-    free(chain);
-    return NULL;
-  }
-
-  return chain;
-}
-
 void
 hsk_chain_free(hsk_chain_t *chain) {
   if (!chain)
@@ -148,16 +149,6 @@ hsk_chain_free(hsk_chain_t *chain) {
 
   hsk_chain_uninit(chain);
   free(chain);
-}
-
-static void
-hsk_chain_log(const hsk_chain_t *chain, const char *fmt, ...) {
-  printf("chain (%u): ", (uint32_t)chain->height);
-
-  va_list args;
-  va_start(args, fmt);
-  vprintf(fmt, args);
-  va_end(args);
 }
 
 bool
@@ -262,11 +253,6 @@ hsk_chain_maybe_sync(hsk_chain_t *chain) {
 
   int64_t now = hsk_timedata_now(chain->td);
 
-  if (HSK_USE_CHECKPOINTS) {
-    if (chain->height < HSK_LAST_CHECKPOINT)
-      return;
-  }
-
   if (((int64_t)chain->tip->time) < now - HSK_MAX_TIP_AGE)
     return;
 
@@ -295,6 +281,19 @@ hsk_chain_synced(const hsk_chain_t *chain) {
   return chain->synced;
 }
 
+static void
+hsk_chain_checkpoint_flush(hsk_chain_t *chain) {
+  // Setting is off
+  if (!chain->prefix)
+    return;
+
+  // Skip first window after init to avoid re-writing the same checkpoint
+  if (chain->height - chain->init_height <= HSK_STORE_CHECKPOINT_WINDOW)
+    return;
+
+  hsk_store_write(chain);
+}
+
 void
 hsk_chain_get_locator(const hsk_chain_t *chain, hsk_getheaders_msg_t *msg) {
   assert(chain && msg);
@@ -319,7 +318,12 @@ hsk_chain_get_locator(const hsk_chain_t *chain, hsk_getheaders_msg_t *msg) {
       height = 0;
 
     hsk_header_t *hdr = hsk_chain_get_by_height(chain, (uint32_t)height);
-    assert(hdr);
+
+    // Due to checkpoint initialization
+    // we may not have any headers from here
+    // down to genesis
+    if (!hdr)
+      continue;
 
     hsk_header_hash(hdr, msg->hashes[i++]);
   }
@@ -698,25 +702,40 @@ hsk_chain_insert(
 
   assert(hsk_header_calc_work(hdr, prev));
 
+  // Less work than chain tip, this header is on a fork
   if (memcmp(hdr->work, chain->tip->work, 32) <= 0) {
     if (!hsk_map_set(&chain->hashes, hash, (void *)hdr))
       return HSK_ENOMEM;
 
     hsk_chain_log(chain, "  stored on alternate chain\n");
   } else {
+    // More work than tip, but does not connect to tip: we have a reorg
     if (memcmp(hdr->prev_block, hsk_header_cache(chain->tip), 32) != 0) {
       hsk_chain_log(chain, "  reorganizing...\n");
       hsk_chain_reorganize(chain, hdr);
     }
 
-    if (!hsk_map_set(&chain->hashes, hash, (void *)hdr))
+    return hsk_chain_save(chain, hdr);
+  }
+
+  return HSK_SUCCESS;
+}
+
+int
+hsk_chain_save(
+  hsk_chain_t *chain,
+  hsk_header_t *hdr
+) {
+    // Save the header
+    if (!hsk_map_set(&chain->hashes, &hdr->hash, (void *)hdr))
       return HSK_ENOMEM;
 
     if (!hsk_map_set(&chain->heights, &hdr->height, (void *)hdr)) {
-      hsk_map_del(&chain->hashes, hash);
+      hsk_map_del(&chain->hashes, &hdr->hash);
       return HSK_ENOMEM;
     }
 
+    // Set the chain tip
     chain->height = hdr->height;
     chain->tip = hdr;
 
@@ -724,7 +743,10 @@ hsk_chain_insert(
     hsk_chain_log(chain, "  new height: %u\n", (uint32_t)chain->height);
 
     hsk_chain_maybe_sync(chain);
-  }
 
-  return HSK_SUCCESS;
+    // Save batch of headers to disk
+    if (chain->height % HSK_STORE_CHECKPOINT_WINDOW == 0)
+      hsk_chain_checkpoint_flush(chain);
+
+    return HSK_SUCCESS;
 }

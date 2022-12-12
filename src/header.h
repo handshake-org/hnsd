@@ -6,6 +6,8 @@
 #include <stdint.h>
 #include <stdlib.h>
 
+#define HSK_HEADER_SIZE 236
+
 typedef struct hsk_header_s {
   // Preheader.
   uint32_t nonce;

@@ -15,6 +15,7 @@
 
 typedef struct hsk_chain_s {
   int64_t height;
+  uint32_t init_height;
   hsk_header_t *tip;
   hsk_header_t *genesis;
   bool synced;
@@ -23,6 +24,7 @@ typedef struct hsk_chain_s {
   hsk_map_t heights;
   hsk_map_t orphans;
   hsk_map_t prevs;
+  char *prefix;
 } hsk_chain_t;
 
 /*
@@ -34,9 +36,6 @@ hsk_chain_init(hsk_chain_t *chain, const hsk_timedata_t *td);
 
 void
 hsk_chain_uninit(hsk_chain_t *chain);
-
-hsk_chain_t *
-hsk_chain_alloc(const hsk_timedata_t *td);
 
 void
 hsk_chain_free(hsk_chain_t *chain);
@@ -74,4 +73,11 @@ hsk_chain_synced(const hsk_chain_t *chain);
 
 int
 hsk_chain_add(hsk_chain_t *chain, const hsk_header_t *h);
+
+int
+hsk_chain_save(
+  hsk_chain_t *chain,
+  hsk_header_t *hdr
+);
+
 #endif
