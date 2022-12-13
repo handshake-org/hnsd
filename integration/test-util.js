@@ -2,6 +2,7 @@
 'use strict';
 
 const {spawn, execSync} = require('child_process');
+const {EventEmitter} = require('events');
 const assert = require('bsert');
 const path = require('path');
 const {FullNode, packets} = require('hsd');
@@ -12,8 +13,10 @@ const {version} = require('./package.json');
 const network = 'regtest';
 const hnsdPath = path.join(__dirname, '..', 'hnsd');
 
-class TestUtil {
+class TestUtil extends EventEmitter {
   constructor() {
+    super();
+
     this.host = '127.0.0.1';
     this.port = 10000;
 
@@ -25,7 +28,8 @@ class TestUtil {
       port: this.port,
       brontidePort: 46888, // avoid hnsd connecting via brontide
       noDns: true,
-      plugins: [require('hsd/lib/wallet/plugin')]
+      plugins: [require('hsd/lib/wallet/plugin')],
+      // consoleLog: true, logLevel: 'spam'
     });
 
     // Packets received by full node from hnsd
@@ -95,10 +99,13 @@ class TestUtil {
 
   async close() {
     await this.node.close();
-    this.closeHNSD();
+    await this.closeHNSD();
   }
 
   async openHNSD() {
+    if (this.hnsd)
+      throw new Error('hnsd already open');
+
     return new Promise((resolve, reject) => {
       this.hnsd = spawn(
         path.join(__dirname, '..', 'hnsd'),
@@ -108,7 +115,10 @@ class TestUtil {
 
       this.hnsd.on('spawn', () => resolve());
       this.hnsd.on('error', () => reject());
-      this.hnsd.on('close', this.crash);
+
+      this.hnsd.on('close', (code) => {
+        this.emit('close', code);
+      });
 
       this.message = '';
       this.hnsd.stderr.on('data', (data) => {
@@ -120,28 +130,41 @@ class TestUtil {
 
         const msg = this.message;
         this.message = '';
-        console.log(msg);
-        throw new Error(msg);
+        console.log(msg);         // print memory leak errors to console
+        this.emit('stderr', msg); // for expected error message tests
       });
     });
   }
 
-  crash(code, signal) {
-    throw new Error(`hnsd crashed with code: ${code} and signal: ${signal}`);
-  }
-
-  closeHNSD() {
+  async closeHNSD() {
     if (!this.hnsd)
       return;
 
-    this.hnsd.removeListener('close', this.crash);
+    if (this.hnsd.exitCode != null) {
+      this.hnsd = null;
+      return;
+    }
+
+    const waiter = new Promise((resolve, reject) => {
+      this.hnsd.once('close', (code, signal) => {
+        this.hnsd = null;
+
+        if (code) {
+          reject(new Error(
+            `hnsd closed with exit code: ${code}, signal: ${signal}`
+          ));
+        }
+
+        resolve();
+      });
+    });
 
     this.hnsd.kill('SIGINT');
-    this.hnsd = null;
+    await waiter;
   }
 
   async restartHNSD(args) {
-    this.closeHNSD();
+    await this.closeHNSD();
 
     if (args) {
       assert(Array.isArray(args));
@@ -182,6 +205,9 @@ class TestUtil {
   }
 
   async resolveHS(name) {
+    if (!this.hnsd || this.hnsd.exitCode != null)
+      throw new Error('hnsd is closed');
+
     const qs = wire.Question.fromJSON({
       name,
       class: 'HS',

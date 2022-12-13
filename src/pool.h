@@ -27,6 +27,7 @@
 #define HSK_STATE_READING 4
 #define HSK_STATE_HANDSHAKE 5
 #define HSK_STATE_DISCONNECTING 6
+#define HSK_MAX_AGENT 255
 
 /*
  * Types
@@ -59,7 +60,7 @@ typedef struct hsk_peer_s {
   hsk_brontide_t *brontide;
   uint64_t id;
   char host[HSK_MAX_HOST];
-  char agent[255];
+  char agent[HSK_MAX_AGENT];
   hsk_addr_t addr;
   int state;
   uint8_t read_buffer[HSK_BUFFER_SIZE];
