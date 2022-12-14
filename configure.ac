@@ -160,6 +160,15 @@ AC_ARG_WITH([unbound],
   [libunbound_path=$withval],
   [libunbound_path=yes])
 
+AC_ARG_WITH([sanitizers],
+  [AS_HELP_STRING(
+    [--with-sanitizers]
+    [comma separated list of extra sanitizers to build with (default is none)]
+  )],
+  [SANITIZER_FLAGS="-g -fsanitize=$withval"])
+
+AC_SUBST(SANITIZER_FLAGS, ${SANITIZER_FLAGS})
+
 AC_CHECK_TYPES([__int128])
 
 AC_MSG_CHECKING([for __builtin_expect])

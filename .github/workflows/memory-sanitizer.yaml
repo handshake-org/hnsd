@@ -1,4 +1,4 @@
-name: Test
+name: Memory Sanitizer
 
 on:
   push:
@@ -8,24 +8,16 @@ on:
 
 jobs:
   build:
-    runs-on: ${{matrix.os}}
-    strategy:
-      matrix:
-        os: [macos-latest, ubuntu-latest]
+    runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v2
 
-      - name: MacOS Install Deps
-        if: matrix.os == 'macos-latest'
-        run: brew install automake autoconf libtool unbound
-
       - name: Ubuntu Install Deps
-        if: matrix.os == 'ubuntu-latest'
         run: sudo apt-get update && sudo apt-get install -y libunbound-dev
 
       - name: Build
-        run: ./autogen.sh && ./configure --with-network=regtest && make
+        run: ./autogen.sh && ./configure --with-network=regtest --with-sanitizers=address && make
 
       - name: Unit Tests
         run: ./test_hnsd
