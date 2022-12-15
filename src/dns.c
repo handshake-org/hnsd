@@ -3365,7 +3365,7 @@ hsk_dns_is_subdomain(const char *parent, const char *child) {
   uint8_t child_labels[child_count];
   hsk_dns_label_split(child, child_labels, child_count);
 
-  char sub[HSK_DNS_MAX_LABEL + 1];
+  char sub[HSK_DNS_MAX_NAME];
   hsk_dns_label_from2(child, child_labels, child_count, parent_count * -1, sub);
 
   return strcmp(sub, parent) == 0;

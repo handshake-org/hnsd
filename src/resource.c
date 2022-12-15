@@ -947,8 +947,12 @@ hsk_resource_to_dns(const hsk_resource_t *rs, const char *name, uint16_t type) {
   if (labels == 0)
     return NULL;
 
-  char tld[HSK_DNS_MAX_LABEL + 1];
-  hsk_dns_label_from(name, -1, tld);
+  char tld[HSK_DNS_MAX_NAME];
+  int tld_len = hsk_dns_label_from(name, -1, tld);
+
+  // tld_len includes the final dot but not the \0
+  if (tld_len > HSK_DNS_MAX_LABEL + 1)
+    return NULL;
 
   hsk_dns_msg_t *msg = hsk_dns_msg_alloc();
 

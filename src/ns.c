@@ -385,7 +385,7 @@ hsk_ns_onrecv(
       hsk_resource_root_to_soa(rrns);
       hsk_dnssec_sign_zsk(rrns, HSK_DNS_SOA);
     }
-  
+
     if (pointer_to_ip(synth, ip, &family)) {
       bool match = false;
 
