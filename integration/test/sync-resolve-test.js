@@ -245,4 +245,30 @@ describe('Basic sync & resolve', function() {
       names['test-synth6'][0]['address']
     );
   });
+
+  describe('synth', function () {
+    it('should get SOA when querying _synth.', async () => {
+      const res = await util.resolver.lookup('_synth.', 'NS');
+
+      assert.strictEqual(res.code, wire.codes.NOERROR);
+
+      assert(res.authority.length);
+      const referal = res.authority[0];
+      assert.strictEqual(referal.type, wire.types.SOA);
+    });
+
+    it('should resolve valid synth address', async () => {
+      const res = await util.resolver.lookup('_5l6tm80._synth.', 'A');
+
+      assert.strictEqual(res.code, wire.codes.NOERROR);
+
+      assert(res.answer.length);
+      const answer = res.answer[0];
+      assert.strictEqual(answer.type, wire.types.A);
+      assert.deepStrictEqual(
+        answer.data.getJSON()['address'],
+        '45.77.219.32'
+      );
+    });
+  });
 });

@@ -18,6 +18,11 @@ test_hsk_dns_is_subdomain() {
   assert(hsk_dns_is_subdomain("com.", "images.mail.google.com."));
   assert(hsk_dns_is_subdomain("mail.google.com.", "images.mail.google.com."));
   assert(!hsk_dns_is_subdomain("images.mail.google.com.", "mail.google.com."));
+
+  // 63-char labels
+  assert(hsk_dns_is_subdomain(
+    "ddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd.",
+    "ddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd.ddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd."));
 }
 
 void

@@ -37,7 +37,54 @@ test_resource_pointer_to_ip() {
 }
 
 void
+test_resource_to_dns() {
+  printf("test_resource_to_dns\n");
+
+  hsk_record_t rec;
+  rec.type = HSK_NS;
+  char *target = "\x03""ns1""\x10""nameserver""\x03""com.";
+  strcpy(rec.name, target);
+
+  hsk_resource_t res;
+  res.version = 0;
+  res.ttl = 6300;
+  res.record_count = 1;
+  res.records[0] = &rec;
+
+  hsk_dns_msg_t *msg1;
+  printf(" 62 char TLD\n");
+  char *name1 = "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd.";
+  msg1 = hsk_resource_to_dns(&res, name1, HSK_DNS_NS);
+  hsk_dns_rrs_t ns1 = msg1->ns;
+  hsk_dns_rr_t *rr1 = ns1.items[0];
+  hsk_dns_ns_rd_t *rd1 = rr1->rd;
+  assert(strcmp(rr1->name, name1) == 0);
+  assert(strcmp(rd1->ns, target) == 0);
+  hsk_dns_msg_free(msg1);
+
+  hsk_dns_msg_t *msg2;
+  printf(" 63 char TLD\n");
+  char *name2 = "ddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd.";
+  msg2 = hsk_resource_to_dns(&res, name2, HSK_DNS_NS);
+  hsk_dns_rrs_t ns2 = msg2->ns;
+  hsk_dns_rr_t *rr2 = ns2.items[0];
+  hsk_dns_ns_rd_t *rd2 = rr2->rd;
+  assert(strcmp(rr2->name, name2) == 0);
+  assert(strcmp(rd2->ns, target) == 0);
+  hsk_dns_msg_free(msg2);
+
+  hsk_dns_msg_t *msg3;
+  printf(" 64 char TLD (invalid)\n");
+  char *name3 = "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd.";
+  msg3 = hsk_resource_to_dns(&res, name3, HSK_DNS_NS);
+  assert(msg3 == NULL);
+}
+
+void
 test_resource() {
   printf(" test_resource_pointer_to_ip\n");
   test_resource_pointer_to_ip();
+
+  printf(" test_resource_to_dns\n");
+  test_resource_to_dns();
 }

@@ -374,18 +374,24 @@ hsk_ns_onrecv(
     hsk_dns_rrs_t *rrns = &msg->ns;
     hsk_dns_rrs_t *ar = &msg->ar;
 
-    uint8_t ip[16];
-    uint16_t family;
-    char synth[HSK_DNS_MAX_LABEL + 1];
-    hsk_dns_label_from(req->name, -2, synth);
-
+    // TLD '._synth' is being queried on its own, send SOA
+    // so recursive asks again with complete synth record.
     if (req->labels == 1) {
       hsk_resource_to_empty(req->tld, NULL, 0, rrns);
       hsk_dnssec_sign_zsk(rrns, HSK_DNS_NSEC);
       hsk_resource_root_to_soa(rrns);
       hsk_dnssec_sign_zsk(rrns, HSK_DNS_SOA);
+
+      goto finalize;
     }
-  
+
+    uint8_t ip[16];
+    uint16_t family;
+    char synth[HSK_DNS_MAX_LABEL + 1];
+    // Will buffer overflow if req->name doesn't
+    // have at least 2 labels.
+    hsk_dns_label_from(req->name, -2, synth);
+
     if (pointer_to_ip(synth, ip, &family)) {
       bool match = false;
 
@@ -451,6 +457,8 @@ hsk_ns_onrecv(
         hsk_dnssec_sign_zsk(ar, rrtype);
       }
     }
+
+finalize:
 
     if (!hsk_dns_msg_finalize(&msg, req, ns->ec, ns->key, &wire, &wire_len)) {
       hsk_ns_log(ns, "could not reply\n");

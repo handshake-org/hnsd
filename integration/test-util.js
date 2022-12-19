@@ -28,8 +28,7 @@ class TestUtil extends EventEmitter {
       port: this.port,
       brontidePort: 46888, // avoid hnsd connecting via brontide
       noDns: true,
-      plugins: [require('hsd/lib/wallet/plugin')],
-      // consoleLog: true, logLevel: 'spam'
+      plugins: [require('hsd/lib/wallet/plugin')]
     });
 
     // Packets received by full node from hnsd
