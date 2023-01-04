@@ -1,7 +1,20 @@
+# Package version (semver)
+define(MAJOR, 2)
+define(MINOR, 99)
+define(PATCH, 0)
+
+# Shared library version
+# see: https://www.gnu.org/software/libtool/manual/html_node/Updating-version-info.html
+define(CURRENT, 2)
+define(REVISION, 0)
+define(AGE, 0)
+
 AC_PREREQ([2.57])
-AC_INIT([hnsd], [1.0.0], [chjj@handshake.org])
+AC_INIT([hnsd], m4_join([.], MAJOR, MINOR, PATCH), [chjj@handshake.org])
 AC_CONFIG_MACRO_DIR([m4])
 AM_INIT_AUTOMAKE([-Wall -Werror foreign subdir-objects])
+
+AC_SUBST(LINKER_VERSION, m4_join([:], CURRENT, REVISION, AGE))
 
 AC_CANONICAL_HOST
 AC_ENABLE_SHARED

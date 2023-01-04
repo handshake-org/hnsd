@@ -23,7 +23,7 @@ libhsk_la_LIBADD = $(top_builddir)/uv/libuv.la   \
                    $(LIB_WINBCRYPT)
 
 libhsk_la_CFLAGS = -DHSK_BUILD @CFLAGS@
-libhsk_la_LDFLAGS = -no-undefined -version-info 1:0:0
+libhsk_la_LDFLAGS = -no-undefined -version-info $(LINKER_VERSION)
 libhsk_la_SOURCES = src/addr.c                   \
                     src/addrmgr.c                \
                     src/aead.c                   \

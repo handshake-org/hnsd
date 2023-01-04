@@ -1,7 +1,7 @@
 {
   "name": "hnsd_integration_test",
-  "meta": "!! version must match hnsd version in Makefile.am !!",
-  "version": "1.0.0", 
+  "meta": "!! version must match hnsd version in configure.ac !!",
+  "version": "2.99.0",
   "scripts": {
     "test": "bmocha --reporter spec test/*.js",
     "test-file": "bmocha --reporter spec"
