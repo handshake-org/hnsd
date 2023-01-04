@@ -1,6 +1,6 @@
 # Package version (semver)
 define(MAJOR, 2)
-define(MINOR, 99)
+define(MINOR, 0)
 define(PATCH, 0)
 
 # Shared library version
