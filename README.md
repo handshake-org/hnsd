@@ -89,6 +89,8 @@ $ brew install git automake autoconf libtool unbound
 You're a Linux user so you probably already know what to do. Make sure you have
 git, autotools, libtool, and unbound installed via whatever package manager
 your OS uses.
+You can install these dependencies on any Ubuntu/Debian style linux using
+`sudo apt install -y autotools-dev libtool libunbound-dev`
 
 ### Windows
 
