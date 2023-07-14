@@ -112,7 +112,7 @@ DLLs to the hnsd directory, etc.
 ## Cloning
 
 ``` sh
-$ git clone git://github.com/handshake-org/hnsd.git
+$ git clone https://github.com/handshake-org/hnsd.git
 $ cd hnsd
 ```
 
