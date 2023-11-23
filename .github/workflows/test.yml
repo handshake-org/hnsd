@@ -31,9 +31,10 @@ jobs:
         run: ./test_hnsd
 
       - name: Setup Integration
-        uses: actions/setup-node@v3.5.1
+        uses: actions/setup-node@v4
         with:
-          node-version: 18
+          node-version: lts/*
+          check-latest: true
 
       - name: Integration Tests
         working-directory: ./integration
