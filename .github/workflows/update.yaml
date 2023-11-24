@@ -29,19 +29,10 @@ jobs:
       - name: Install dependencies (hsd)
         run: npm --prefix=hs-names install hsd@^5
 
-      - name: Download (tlds-alpha-by-domain.txt)
-        uses: wei/wget@v1
-        with:
-          args: -O hs-names/data/tlds-alpha-by-domain.txt https://data.iana.org/TLD/tlds-alpha-by-domain.txt
-
-      - name: Download (root.zone)
-        uses: wei/wget@v1
-        with:
-          args: -O hs-names/data/root.zone https://www.internic.net/domain/root.zone
-
       - name: Build
         run: |
           cd hs-names
+          ./download
           # Workaround for https://github.com/chjj/bns/issues/41
           sed -i '/ZONEMD/d' data/root.zone
           ./zone.js
