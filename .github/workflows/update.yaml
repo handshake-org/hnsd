@@ -1,9 +1,9 @@
-name: Update
+name: Regenerate tld.h
 
 on: workflow_dispatch
 
 jobs:
-  update:
+  generate:
     runs-on: ubuntu-latest
 
     steps:
