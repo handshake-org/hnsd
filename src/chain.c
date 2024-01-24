@@ -589,6 +589,8 @@ hsk_chain_add(hsk_chain_t *chain, const hsk_header_t *h) {
   const uint8_t *hash = hsk_header_cache(hdr);
 
   hsk_chain_log(chain, "adding block: %s\n", hsk_hex_encode32(hash));
+  hsk_chain_log(chain, "tree_root %s timestamp %d \n",
+      hsk_hex_encode32(hdr->name_root), hdr->time);
 
   int64_t now = hsk_timedata_now(chain->td);
 
