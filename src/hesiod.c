@@ -135,6 +135,11 @@ hsk_hesiod_resolve(hsk_dns_req_t *req, hsk_ns_t *ns) {
       goto fail;
   }
 
+  if (hsk_dns_is_subdomain(req->name, "name_root.tip.chain.hnsd.")) {
+    if (!hsk_hesiod_txt_push_hash("name_root.tip.chain.hnsd.", ns->pool->chain.tip->name_root, an))
+      goto fail;
+  }
+
   if (hsk_dns_is_subdomain(req->name, "time.tip.chain.hnsd.")) {
     if (!hsk_hesiod_txt_push_u64("time.tip.chain.hnsd.",
                                  ns->pool->chain.tip->time,

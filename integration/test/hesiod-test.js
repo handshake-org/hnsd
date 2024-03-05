@@ -111,7 +111,7 @@ describe('Hesiod', function() {
       });
 
       const {answer} = await util.resolver.resolve(qs);
-      assert.strictEqual(answer.length, 5);
+      assert.strictEqual(answer.length, 6);
 
       assert.strictEqual(answer[0].name, 'hash.tip.chain.hnsd.');
       assert.strictEqual(answer[0].data.txt[0], util.node.chain.tip.hash.toString('hex'));
@@ -120,14 +120,17 @@ describe('Hesiod', function() {
       assert.strictEqual(answer[1].data.txt[0], String(util.node.chain.tip.height));
       assert.strictEqual(answer[1].data.txt[0], '6000');
 
-      assert.strictEqual(answer[2].name, 'time.tip.chain.hnsd.');
-      assert.strictEqual(answer[2].data.txt[0], String(util.node.chain.tip.time));
+      assert.strictEqual(answer[2].name, 'name_root.tip.chain.hnsd.');
+      assert.strictEqual(answer[2].data.txt[0], util.node.chain.tip.treeRoot.toString('hex'));
 
-      assert.strictEqual(answer[3].name, 'synced.chain.hnsd.');
-      assert.strictEqual(answer[3].data.txt[0], 'true');
+      assert.strictEqual(answer[3].name, 'time.tip.chain.hnsd.');
+      assert.strictEqual(answer[3].data.txt[0], String(util.node.chain.tip.time));
 
-      assert.strictEqual(answer[4].name, 'progress.chain.hnsd.');
-      assert.strictEqual(answer[4].data.txt[0], '1.000000');
+      assert.strictEqual(answer[4].name, 'synced.chain.hnsd.');
+      assert.strictEqual(answer[4].data.txt[0], 'true');
+
+      assert.strictEqual(answer[5].name, 'progress.chain.hnsd.');
+      assert.strictEqual(answer[5].data.txt[0], '1.000000');
     });
   });
 
