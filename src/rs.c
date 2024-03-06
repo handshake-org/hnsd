@@ -458,13 +458,8 @@ hsk_rs_respond(
   if (result->secure && !result->bogus)
     msg->flags |= HSK_DNS_AD;
 
-  // Strip out non-answer sections.
+  // Strip out additional section
   if (msg->an.size > 0) {
-    while (msg->ns.size > 0) {
-      hsk_dns_rr_t *rr = hsk_dns_rrs_pop(&msg->ns);
-      hsk_dns_rr_free(rr);
-    }
-
     while (msg->ar.size > 0) {
       hsk_dns_rr_t *rr = hsk_dns_rrs_pop(&msg->ar);
       hsk_dns_rr_free(rr);
