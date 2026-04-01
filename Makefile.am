@@ -13,10 +13,19 @@ AM_CPPFLAGS = -I$(top_builddir)             \
               -I$(top_srcdir)/uv/include    \
               -I$(top_srcdir)/src/secp256k1
 
-include_HEADERS =
+EXTRA_DIST = README.md \
+             LICENSE
 
-CLEANFILES =
+bin_PROGRAMS =
 
+noinst_PROGRAMS = test_hnsd
+
+include_HEADERS = src/libhsk.h
+
+CLEANFILES = test_libhsk
+
+
+# Base library
 lib_LTLIBRARIES = libhsk.la
 
 libhsk_la_LIBADD = $(top_builddir)/uv/libuv.la   \
@@ -41,6 +50,7 @@ libhsk_la_SOURCES = src/addr.c                   \
                     src/hash.c                   \
                     src/header.c                 \
                     src/hesiod.c                 \
+                    src/libhsk.c                 \
                     src/map.c                    \
                     src/msg.c                    \
                     src/poly1305/poly1305.c      \
@@ -58,10 +68,11 @@ libhsk_la_SOURCES = src/addr.c                   \
                     src/utils.c                  \
                     src/secp256k1/secp256k1.c
 
-EXTRA_DIST = README.md \
-             LICENSE
 
-bin_PROGRAMS = hnsd
+# hnsd executable daemon
+if BUILD_HNSD
+
+bin_PROGRAMS += hnsd
 
 hnsd_SOURCES = src/cache.c  \
                src/daemon.c \
@@ -77,8 +88,10 @@ hnsd_LDFLAGS = -static
 hnsd_CFLAGS = -DHSK_BUILD $(INC_UNBOUND) $(AM_CFLAGS)
 hnsd_CPPFLAGS = $(AM_CPPFLAGS)
 
-noinst_PROGRAMS = test_hnsd
+endif
 
+
+# Unit tests (any network)
 test_hnsd_SOURCES = test/hnsd-test.c     \
                     test/base32-test.c   \
                     test/dns-test.c      \
@@ -87,13 +100,22 @@ test_hnsd_SOURCES = test/hnsd-test.c     \
 test_hnsd_LDFLAGS = -static
 test_hnsd_CPPFLAGS = $(AM_CPPFLAGS)
 
-test_hnsd_LDADD = $(LIB_UNBOUND)             \
-                  $(top_builddir)/libhsk.la
+test_hnsd_LDADD = $(top_builddir)/libhsk.la
 
-# pkgconfigdir = $(libdir)/pkgconfig
-# pkgconfig_DATA = @PACKAGE_NAME@.pc
+
 
 .PHONY: e2e
+
+
+# Integration tests (regtest, requires daemon)
 e2e:
 	npm --prefix ./integration/ install
 	npm --prefix ./integration/ run test
+
+
+# libhsk test (main)
+test_libhsk:
+	$(CC) ./test/libhsk-test.c \
+	-I$(includedir) -lhsk -lpthread \
+	-Wl,-rpath $(libdir) \
+	-o test_libhsk
