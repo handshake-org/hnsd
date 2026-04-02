@@ -29,6 +29,8 @@ static const char *hsk_seeds[] = {
   "am2lsmbzzxncaptqjo22jay3mztfwl33bxhkp7icfx7kmi5rvjaic@139.162.183.168",
   // chjj
   "ap5vuwabzwyz6akhesanada4skhetd2jsvpkwuqxzuaoovn5ez4xg@45.79.134.225",
+  // handshake-enthusiast
+  'aiwykdz37okry3pb2lzdsgbxeg72uky2zckxmiapzstpqqmb2hnge@35.154.209.88',
   // Other nodes discovered by seed.easyhandshake.com and htools-org/hnsnodes
   "104.254.246.153",
   "66.94.118.127",
